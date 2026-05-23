@@ -1,0 +1,6 @@
+{
+  "appId": "com.heartmonitor.app",
+  "appName": "Smart Heart Monitor",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
