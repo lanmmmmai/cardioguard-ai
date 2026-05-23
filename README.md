@@ -1,170 +1,142 @@
-# 🫀 Hệ Thống Giám Sát Nhịp Tim & Chỉ Số Sinh Tồn Thời Gian Thực (Smart Heart Patient Monitoring)
+# 🫀 Hệ Thống Giám Sát Nhịp Tim & Chỉ Số Sinh Tồn Đa Nền Tảng (Smart Heart Patient Monitoring)
 
-Hệ thống theo dõi sức khỏe và chỉ số sinh tồn của bệnh nhân (Nhịp tim, SpO2, Huyết áp, ECG) trong phòng hồi sức tích cực (ICU) thời gian thực. Ứng dụng được thiết kế tối ưu cho cả giao diện Web và App di động (hỗ trợ PWA & Capacitor), mang lại trải nghiệm mượt mà, cao cấp với cả hai chế độ giao diện Sáng (Light Mode) và Tối (Dark Mode).
-
----
-
-## 🚀 Tính Năng Nổi Bật
-
-### 1. Bật Tắt Giao Diện Sáng/Tối (Light/Dark Mode) 🌓
-* Nút chuyển đổi giao diện bằng icon **Mặt trời (Sun) / Mặt trăng (Moon)** ngay trên thanh điều hướng đầu trang.
-* Tự động lưu trạng thái theme đã chọn vào `localStorage` để duy trì giao diện ở các phiên truy cập sau.
-* Sử dụng hệ thống **CSS Custom Variables (Vanilla CSS)** giúp chuyển đổi giao diện mượt mà và tối ưu hiệu suất.
-* Biểu đồ ECG tự động chuyển sang chế độ **giấy kẻ ô ly y tế đỏ/trắng** cổ điển khi ở chế độ Light Mode, giúp y bác sĩ dễ dàng quan sát như trên giấy đo thực tế.
-
-### 2. Mô Phỏng Quả Tim 3D Beat-sync Co Bóp 3D 💓
-* Point-cloud (đám mây điểm) 3D mô phỏng hình dáng quả tim chuyển động quay tự do vẽ bằng HTML5 Canvas 60fps.
-* Nhịp co bóp (heartbeat contraction) của quả tim 3D tự động đồng bộ theo nhịp tim (BPM) thực tế của bệnh nhân đang được chọn.
-
-### 3. Biểu Đồ Điện Tâm Đồ Live ECG Waveform 📈
-* Vẽ đường sóng tim P-Q-R-S-T chuẩn y khoa thời gian thực trên Canvas với hiệu ứng phát sáng neon dạ quang mượt mà.
-* Tự động giả lập tín hiệu nhiễu nhẹ ở đường cơ sở để tăng tính chân thực khi không có tín hiệu truyền từ cảm biến.
-
-### 4. Camera Giả Lập Hồng Ngoại Phòng ICU 📹
-* Giao diện mô phỏng camera giám sát giường bệnh hồng ngoại / thân nhiệt (Night-Vision) tại giường ICU số 04.
-* Mô phỏng chuyển động thở sinh học (Chest rise expansion) phập phồng ở ngực bệnh nhân trên giường bệnh theo thời gian thực.
-* HUD camera hiển thị đầy đủ thông tin thời gian chạy, nhấp nháy icon ghi hình "REC" và vạch pin của máy quay.
-
-### 5. Thống Kê & Phân Tích Chỉ Số Custom SVG 📊
-* Biểu đồ **Donut SVG tự vẽ**: Phân tích tỷ lệ mức độ cảnh báo (Cao - Trung bình - Thấp) dựa trên lịch sử dữ liệu thu được.
-* Biểu đồ **Vùng phát sáng neon SVG (Area Chart)**: Theo dõi tần suất xuất hiện cảnh báo của hệ thống trong 7 ngày qua.
-
-### 6. Hồ Sơ Bệnh Nhân Chi Tiết & Biểu Đồ Tiến Độ (Dossier) 📁
-* Quản lý danh sách bệnh nhân kèm chỉ số phân loại trạng thái bằng màu sắc cảnh báo động.
-* Khi nhấn xem chi tiết bệnh nhân, hệ thống hiển thị hồ sơ bệnh án, lịch sử cảnh báo và **hai biểu đồ đường SVG vẽ trực tiếp** theo dõi xu hướng Nhịp tim (BPM) và nồng độ oxy trong máu SpO2 (%) trong thời gian thực.
+Hệ thống theo dõi sức khỏe và chỉ số sinh tồn của bệnh nhân (Nhịp tim, SpO2, Huyết áp, ECG) trong phòng hồi sức tích cực (ICU) thời gian thực. Dự án được chia tách thành cấu trúc phân rã kiến trúc (Multi-platform Clean Architecture) rõ ràng, hỗ trợ đầy đủ giao diện Web cao cấp và App di động chạy Native mượt mà.
 
 ---
 
-## 🛠️ Công Nghệ Sử Dụng
-
-### Backend
-* **FastAPI**: Framework Python hiệu năng cao để xây dựng RESTful APIs và WebSocket Server.
-* **SQLAlchemy / asyncpg**: Thư viện ORM hỗ trợ kết nối cơ sở dữ liệu phi đồng bộ (async/await).
-* **PostgreSQL (Supabase)**: Cơ sở dữ liệu lưu trữ hồ sơ bệnh nhân, tài khoản người dùng và nhật ký cảnh báo.
-* **WebSockets**: Truyền phát các gói dữ liệu sinh tồn từ các cảm biến giả lập tới clients theo thời gian thực mà không bị trễ.
-* **Auth**: Bảo mật tài khoản sử dụng JWT tokens, thư viện `passlib` và mã hóa mật khẩu `bcrypt`.
-
-### Frontend
-* **ReactJS (Vite)**: Thư viện xây dựng giao diện người dùng nhanh chóng, tối ưu hóa kích thước bundle.
-* **TypeScript**: Ràng buộc kiểu dữ liệu tĩnh nghiêm ngặt giúp giảm thiểu lỗi runtime.
-* **Vanilla CSS**: Hệ thống giao diện được code tay 100% bằng CSS thuần để có thể tùy biến sâu các hiệu ứng Glassmorphic và Neon.
-* **Lucide Icons**: Bộ icon vector sắc nét, nhẹ và hiện đại.
-
----
-
-## 📂 Cấu Trúc Thư Mục Dự Án
+## 📂 Giao Diện & Cấu Trúc Thư Mục Dự Án
 
 ```text
-heart-monitor/
-├── app/                  # FastAPI Backend source code
-│   ├── api/              # Các router endpoints (Auth, Patients, Sensors, Alerts, WebSockets)
-│   ├── core/             # Cấu hình hệ thống, biến môi trường và kết nối DB
-│   ├── models/           # Định nghĩa các bảng Database (User, Patient, Alert)
-│   ├── schemas/          # Pydantic schemas để validate đầu vào/ra API
-│   ├── services/         # Logic nghiệp vụ (Giả lập sinh dữ liệu telemetry cảm biến)
-│   ├── websocket/        # Quản lý danh sách connections của real-time WebSocket
-│   └── main.py           # Điểm khởi chạy ứng dụng FastAPI
-├── frontend/             # React Frontend source code
-│   ├── public/           # Các assets tĩnh, PWA manifest, service worker và launcher icon
-│   ├── src/
-│   │   ├── components/   # Các màn hình chức năng (Dashboard, ICUCamera, Patients, PatientDetail, Stats...)
-│   │   ├── hooks/        # Hook tự động kết nối và reconnect WebSocket
-│   │   ├── App.tsx       # Quản lý routing chính, Auth state và giao diện khung (gồm theme toggler)
-│   │   ├── index.css     # Định nghĩa biến CSS variables, Light Mode overrides và toàn bộ styles
-│   │   └── main.tsx      # Điểm render React root
-│   ├── tsconfig.json     # Cấu hình TypeScript
-│   └── vite.config.ts    # Cấu hình Vite bundler
-├── .env                  # Lưu trữ chuỗi kết nối Database URL (Supabase)
-└── requirements.txt      # Danh sách thư viện Python của Backend
+heart-monitor-workspace/
+├── backend/                   # 🚀 Backend dịch vụ (Deploy lên Render)
+│   ├── app/                   # FastAPI source code (WebSocket, Telemetry Simulator)
+│   ├── .env                   # Thông tin cấu hình cơ sở dữ liệu Supabase
+│   └── requirements.txt       # Danh sách thư viện Python
+├── web_frontend/              # 🌐 Web Client (Deploy lên Vercel)
+│   ├── src/                   # ReactJS + TypeScript + Vite (Font Futura)
+│   ├── package.json
+│   └── index.html
+├── mobile_app/                # 📱 Mobile App (Build ra Android APK / iOS)
+│   ├── lib/                   # Flutter App (Dart code - Font Futura)
+│   │   ├── screens/           # Giao diện chính (Dashboard, Camera, Patients, Stats, Auth...)
+│   │   ├── services/          # HTTP ApiService & WebSocket telemetry
+│   │   └── widgets/           # Vẽ ECG Live & Quả tim 3D co bóp
+│   ├── assets/fonts/          # Thư mục lưu trữ font Futura.ttf
+│   └── pubspec.yaml           # Đăng ký thư viện và tài nguyên app
+└── README.md                  # Hướng dẫn khởi chạy hệ thống
 ```
 
 ---
 
-## 🛠️ Hướng Dẫn Cài Đặt & Chạy Dự Án
+## 🚀 Các Tính Năng Nổi Bật Trên Cả Web & App
 
-### Prerequisites
-* Máy tính đã cài đặt **Python 3.10+** và **Node.js 18+**.
+1. **Bật Tắt Chế Độ Sáng/Tối (Light/Dark Mode) 🌓**:
+   * Chuyển đổi giao diện bằng icon Mặt trời/Mặt trăng ngay trên thanh menu đầu, tự động ghi nhớ trạng thái vào `localStorage` (Web) hoặc bộ nhớ máy (App).
+   * Khi chuyển sang Light Mode, biểu đồ ECG tự động chuyển thành **giấy kẻ ô ly đỏ/trắng** cổ điển của bệnh viện để bác sĩ dễ đọc chỉ số.
+
+2. **Quả Tim 3D Beat-sync Co Bóp 💓**:
+   * Điểm đám mây (Point-cloud) 3D tự động quay quanh trục, co bóp theo tần số nhịp tim thực tế (BPM) của bệnh nhân qua các phép toán hình học chiếu không gian vẽ trên Canvas/CustomPainter.
+
+3. **Điện Tâm Đồ Live ECG Waveform 📈**:
+   * Vẽ chu kỳ sóng P-Q-R-S-T dạ quang mượt mà (60fps) giúp theo dõi sát sao nhịp tim sinh học.
+
+4. **Camera Giả Lập ICU 📹**:
+   * Chế độ camera hồng ngoại ban đêm (Night-Vision), giả lập nhịp thở phập phồng của bệnh nhân trên giường bệnh theo chu kỳ sóng Sin.
+
+5. **Thống Kê Tự Vẽ Custom SVG & fl_chart 📊**:
+   * Phân tích trực quan tỷ lệ cảnh báo nguy hiểm, xu hướng alarm 7 ngày qua của hệ thống.
+
+6. **Dùng Chung Database Supabase**:
+   * Đồng bộ hóa dữ liệu bệnh nhân, hồ sơ bệnh lý, tài khoản đăng nhập giữa Web và App di động.
 
 ---
 
-### Bước 1: Thiết Lập & Chạy Backend FastAPI
+## 🛠️ Hướng Dẫn Khởi Chạy Từng Thành Phần
 
-1. **Di chuyển vào thư mục gốc của dự án**:
+### 🚀 1. Khởi Chạy Backend (FastAPI)
+
+1. Mở cửa sổ Terminal và di chuyển vào thư mục `backend`:
    ```bash
-   cd heart-monitor
+   cd backend
    ```
-
-2. **Tạo và kích hoạt môi trường ảo Python (Virtual Environment)**:
-   * Trên Windows (PowerShell):
+2. Kích hoạt môi trường ảo Python (thư mục `.venv` nằm ở thư mục gốc):
+   * **Windows (PowerShell)**:
      ```powershell
-     python -m venv .venv
-     .venv\Scripts\activate
+     ..\.venv\Scripts\activate
      ```
-   * Trên macOS/Linux:
+   * **macOS/Linux**:
      ```bash
-     python3 -m venv .venv
-     source .venv/bin/activate
+     source ../.venv/bin/activate
      ```
-
-3. **Cài đặt các thư viện dependencies**:
+3. Cài đặt các thư viện (chỉ thực hiện ở lần đầu tiên):
    ```bash
    pip install -r requirements.txt
    ```
-
-4. **Kiểm tra file `.env` ở thư mục gốc**:
-   Đảm bảo tệp chứa cấu hình đường dẫn kết nối PostgreSQL của Supabase:
-   ```env
-   DATABASE_URL=postgresql+asyncpg://...
-   ```
-
-5. **Khởi động server Backend**:
+4. Khởi chạy Server:
    ```bash
    python -m uvicorn app.main:app --reload
    ```
-   * *Backend API sẽ hoạt động tại: `http://localhost:8000`*
-   * *Trang tài liệu tương tác Swagger UI: `http://localhost:8000/docs`*
+   * *API hoạt động tại: `http://localhost:8000`*
+   * *Swagger tài liệu API: `http://localhost:8000/docs`*
 
 ---
 
-### Bước 2: Thiết Lập & Chạy Frontend React (Vite)
+### 🌐 2. Khởi Chạy Web Frontend (React)
 
-1. **Mở một cửa sổ terminal mới và di chuyển vào thư mục `frontend`**:
+1. Mở cửa sổ Terminal thứ hai và di chuyển vào thư mục `web_frontend`:
    ```bash
-   cd heart-monitor/frontend
+   cd web_frontend
    ```
-
-2. **Cài đặt các thư viện Node modules**:
+2. Cài đặt các thư viện Node modules:
    ```bash
    npm install
    ```
-
-3. **Khởi chạy ứng dụng ở chế độ Development**:
+3. Khởi chạy Web Server:
    ```bash
    npm run dev
    ```
-
-4. **Truy cập ứng dụng**:
-   Mở trình duyệt web và truy cập: **[http://localhost:5173](http://localhost:5173)**
+4. Mở trình duyệt web truy cập: **[http://localhost:5173](http://localhost:5173)**
 
 ---
 
-## 🧪 Quy Trình Thử Nghiệm Giao Diện & Giả Lập Hệ Thống
+### 📱 3. Khởi Chạy & Biên Dịch Mobile App (Flutter)
 
-1. **Đăng Ký / Đăng Nhập**:
-   * Truy cập giao diện, chọn nút **Đăng ký ngay** để tạo tài khoản bác sĩ/y tá mới.
-   * Tiến hành đăng nhập bằng tài khoản vừa tạo để truy cập vào hệ thống giám sát.
+* **Yêu cầu**: Máy tính đã cài đặt [Flutter SDK](https://docs.flutter.dev/get-started/install) và cấu hình biến môi trường thành công.
+* **Cài Font**: Tải tệp tin `Futura.ttf` và lưu vào thư mục `mobile_app/assets/fonts/Futura.ttf` trước khi chạy.
 
-2. **Quản Lý Bệnh Bệnh**:
-   * Vào mục **Hồ Sơ Bệnh Nhân**, nhấn **Thêm Bệnh Nhân Mới**.
-   * Nhập thông tin (Tên tuổi, tiền sử bệnh lý) để lưu hồ sơ vào cơ sở dữ liệu đám mây Supabase.
+1. Mở cửa sổ Terminal thứ ba và di chuyển vào thư mục `mobile_app`:
+   ```bash
+   cd mobile_app
+   ```
+2. Tải các gói thư viện Flutter:
+   ```bash
+   flutter pub get
+   ```
+3. Khởi chạy trên thiết bị ảo hoặc cắm cáp thiết bị thật:
+   ```bash
+   flutter run
+   ```
+4. Build xuất file APK cài đặt lên điện thoại Android:
+   ```bash
+   flutter build apk --release
+   ```
+   * *Tệp tin APK xuất ra tại: `build/app/outputs/flutter-apk/app-release.apk`*
 
-3. **Bật Tắt Theme**:
-   * Nhấn vào nút hình Mặt trời/Mặt trăng trên thanh công cụ đầu trang để thấy toàn bộ giao diện chuyển đổi giữa chế độ Light và Dark Mode mượt mà.
+---
 
-4. **Kiểm Tra Cảnh Báo Telemetry Real-time**:
-   * Vào trang **Hệ Thống Giám Sát**.
-   * Nhấn nút **Giả lập Bình thường**: Hệ thống sẽ bắn tín hiệu nhịp tim ổn định (khoảng 70-80 BPM, SpO2 ~ 98%). Quả tim 3D co bóp nhịp nhàng, đường ECG đi đều đặn.
-   * Nhấn nút **Giả lập Bất thường**: Cảm biến giả lập phát tín hiệu rối loạn (nhịp tim vọt lên >140 BPM, SpO2 sụt giảm nghiêm trọng <90%). Hệ thống sẽ ngay lập tức:
-     * Viền thẻ nhịp tim/SpO2 chớp nhấp nháy đỏ dạ quang cảnh báo.
-     * Hiện thanh banner màu đỏ tươi nổi bật báo hiệu nguy kịch kèm còi báo động ảo trên đầu trang.
-     * Tự động thêm bản ghi cảnh báo mới vào mục **Cảnh Báo Hệ Thống** theo thời gian thực.
+## ⚠️ Lưu Ý Cấu Hình Địa Chỉ IP Khi Kiểm Thử App
+
+* **Khi chạy trên Thiết bị giả lập (Android Emulator)**:
+  Ứng dụng đã được cấu hình mặc định trỏ về máy chủ phát triển qua địa chỉ IP `10.0.2.2:8000` (Localhost chuyển tiếp của Emulator). Bạn không cần thay đổi gì.
+
+* **Khi cắm cáp chạy trên Điện thoại thật**:
+  Điện thoại và máy tính chạy server của bạn **bắt buộc phải kết nối chung một mạng Wi-Fi**. Bạn cần:
+  1. Tìm địa chỉ IP mạng nội bộ của máy tính bạn (Ví dụ: `192.168.1.15`).
+  2. Mở file [api_service.dart](file:///D:/STCN/heart-monitor/mobile_app/lib/services/api_service.dart#L6) và sửa dòng cấu hình `baseUrl`:
+     ```dart
+     static String baseUrl = 'http://192.168.1.15:8000'; // Thay thế IP máy tính của bạn
+     ```
+  3. Mở file [websocket_service.dart](file:///D:/STCN/heart-monitor/mobile_app/lib/services/websocket_service.dart#L5) và sửa dòng cấu hình `wsUrl`:
+     ```dart
+     static String wsUrl = 'ws://192.168.1.15:8000/ws/realtime'; // Thay thế IP máy tính của bạn
+     ```
