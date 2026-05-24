@@ -1,0 +1,34 @@
+# Dependency directories
+node_modules/
+web_frontend/node_modules/
+
+# Build outputs
+dist/
+build/
+web_frontend/dist/
+
+# Environments
+.env
+.env.local
+.env.*.local
+backend/.env
+
+# Python virtual environment
+.venv/
+venv/
+backend/.venv/
+
+# Python cache
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE and OS files
+.DS_Store
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
