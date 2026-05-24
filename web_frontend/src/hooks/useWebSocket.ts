@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { WS_URL } from '../config';
 
 interface WebSocketMessage {
   patient_id: string;
@@ -16,7 +17,7 @@ interface WebSocketMessage {
 }
 
 export const useWebSocket = (
-  url: string = 'ws://localhost:8000/ws/realtime',
+  url: string = `${WS_URL}/ws/realtime`,
   onMessageReceived?: (data: WebSocketMessage) => void
 ) => {
   const [isConnected, setIsConnected] = useState<boolean>(false);

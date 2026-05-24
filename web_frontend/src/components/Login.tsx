@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Activity, Mail, Lock, Loader2 } from 'lucide-react';
+import { API_URL } from '../config';
 
 interface LoginProps {
   onLoginSuccess: (token: string, user: { id: string; full_name: string; email: string; role: string }) => void;
@@ -23,7 +24,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/auth/login', {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

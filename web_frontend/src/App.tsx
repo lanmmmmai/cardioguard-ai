@@ -9,6 +9,7 @@ import { ICUCamera } from './components/ICUCamera';
 import { StatsDashboard } from './components/StatsDashboard';
 import { PatientDetail } from './components/PatientDetail';
 import { useWebSocket } from './hooks/useWebSocket';
+import { API_URL, WS_URL } from './config';
 
 interface Patient {
   id: string;
@@ -79,7 +80,7 @@ export const App: React.FC = () => {
   // Fetch initial patient records
   const fetchPatients = async () => {
     try {
-      const response = await fetch('http://localhost:8000/patients');
+      const response = await fetch(`${API_URL}/patients`);
       if (response.ok) {
         const data = await response.json();
         setPatients(data);
@@ -92,7 +93,7 @@ export const App: React.FC = () => {
   // Fetch initial alert log logs
   const fetchAlerts = async () => {
     try {
-      const response = await fetch('http://localhost:8000/alerts');
+      const response = await fetch(`${API_URL}/alerts`);
       if (response.ok) {
         const data = await response.json();
         setAlerts(data);
@@ -147,7 +148,7 @@ export const App: React.FC = () => {
   };
 
   // Connect to backend websocket
-  useWebSocket('ws://localhost:8000/ws/realtime', token ? handleWebSocketMessage : undefined);
+  useWebSocket(`${WS_URL}/ws/realtime`, token ? handleWebSocketMessage : undefined);
 
   // Authentication callbacks
   const handleLoginSuccess = (userToken: string, userData: any) => {

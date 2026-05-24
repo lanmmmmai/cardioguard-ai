@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Heart, Activity, AlertTriangle, User, Play, Radio, Plus } from 'lucide-react';
 import { ECGChart } from './ECGChart';
 import { BeatingHeart3D } from './BeatingHeart3D';
+import { API_URL } from '../config';
 
 interface Patient {
   id: string;
@@ -120,7 +121,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
 
     try {
-      const response = await fetch('http://localhost:8000/sensor-data', {
+      const response = await fetch(`${API_URL}/sensor-data`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

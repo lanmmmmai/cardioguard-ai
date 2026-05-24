@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Plus, X, Loader2 } from 'lucide-react';
+import { API_URL } from '../config';
 
 interface Patient {
   id: string;
@@ -56,7 +57,7 @@ export const Patients: React.FC<PatientsProps> = ({
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:8000/patients', {
+      const response = await fetch(`${API_URL}/patients`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

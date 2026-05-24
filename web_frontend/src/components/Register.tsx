@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Activity, Mail, Lock, User, Loader2 } from 'lucide-react';
+import { API_URL } from '../config';
 
 interface RegisterProps {
   onRegisterSuccess: () => void;
@@ -32,7 +33,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/auth/register', {
+      const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
