@@ -154,10 +154,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
         <h2 className="page-title" style={{ marginBottom: '1rem' }}>Chưa Có Bệnh Nhân Nào</h2>
         <p className="page-subtitle" style={{ marginBottom: '2rem' }}>
-          Đăng ký hồ sơ bệnh án bệnh nhân trước để bắt đầu theo dõi dữ liệu điện tâm đồ.
+          Hệ thống chỉ hiển thị tài khoản Patient đã đăng ký và xác thực OTP qua email.
         </p>
         <button className="btn btn-primary" onClick={onAddPatientClick}>
-          <Plus size={18} /> Đăng ký bệnh nhân mới
+          <Plus size={18} /> Mở danh sách bệnh nhân
         </button>
       </div>
     );
@@ -182,7 +182,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               style={{ width: '220px', height: '42px', padding: '6px 12px' }}
             >
               {patients.map(p => (
-                <option key={p.id} value={p.id}>{p.full_name} ({p.age}t)</option>
+                <option key={p.id} value={p.id}>{p.full_name}</option>
               ))}
             </select>
           </div>

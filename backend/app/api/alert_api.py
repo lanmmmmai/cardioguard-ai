@@ -10,14 +10,14 @@ async def get_alerts():
     SELECT 
         alerts.id,
         alerts.patient_id,
-        patients.full_name,
+        users.full_name,
         alerts.alert_type,
         alerts.message,
         alerts.severity,
         alerts.is_resolved,
         alerts.created_at
     FROM alerts
-    JOIN patients ON alerts.patient_id = patients.id
+    JOIN users ON alerts.patient_id::text = users.id::text AND lower(users.role) = 'patient'
     ORDER BY alerts.created_at DESC
     """
 

@@ -277,7 +277,9 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
               <Calendar size={16} style={{ color: 'var(--text-muted)' }} />
               <div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Tuổi & Giới tính</span>
-                <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{patient.age} tuổi • {patient.gender}</span>
+                <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+                  {patient.age > 0 ? `${patient.age} tuổi` : 'Chưa cập nhật tuổi'} • {patient.gender || 'Chưa cập nhật'}
+                </span>
               </div>
             </div>
 

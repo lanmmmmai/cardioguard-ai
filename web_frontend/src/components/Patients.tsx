@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, X, Loader2 } from 'lucide-react';
+import { Search, X, Loader2 } from 'lucide-react';
 import { API_URL } from '../config';
 
 interface Patient {
@@ -99,12 +99,14 @@ export const Patients: React.FC<PatientsProps> = ({
     <div>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Hồ Sơ Bệnh Nhân</h1>
-          <p className="page-subtitle">Quản lý danh sách và hồ sơ bệnh án của bệnh nhân ({patients.length})</p>
+          <h1 className="page-title">Bệnh Nhân Đã Xác Thực OTP</h1>
+          <p className="page-subtitle">
+            Danh sách này chỉ lấy từ tài khoản Patient đã đăng ký và xác thực OTP qua email ({patients.length}).
+          </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-          <Plus size={18} /> Đăng ký bệnh nhân
-        </button>
+        <span className="badge" style={{ background: 'var(--color-bp-glow)', color: 'var(--color-bp)' }}>
+          Verified accounts only
+        </span>
       </div>
 
       {/* Search Input bar */}
@@ -126,7 +128,7 @@ export const Patients: React.FC<PatientsProps> = ({
       <div className="patient-list">
         {filteredPatients.length === 0 ? (
           <div className="panel" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-            Không tìm thấy bệnh nhân nào khớp với từ khóa tìm kiếm.
+            Chưa có tài khoản bệnh nhân đã xác thực OTP hoặc không tìm thấy kết quả phù hợp.
           </div>
         ) : (
           filteredPatients.map(p => (
@@ -138,9 +140,9 @@ export const Patients: React.FC<PatientsProps> = ({
                 <div className="patient-name">{p.full_name}</div>
                 <div className="patient-meta">
                   <span>Mã BN: {p.id.slice(0, 8)}...</span> •{' '}
-                  <span>{p.gender}</span> •{' '}
-                  <span>{p.age} tuổi</span> •{' '}
-                  <span>SĐT: {p.phone}</span>
+                  <span>{p.gender || 'Chưa cập nhật'}</span> •{' '}
+                  <span>{p.age > 0 ? `${p.age} tuổi` : 'Chưa cập nhật tuổi'}</span> •{' '}
+                  <span>Email: {p.phone}</span>
                 </div>
               </div>
               

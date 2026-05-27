@@ -2,15 +2,61 @@ import random
 import smtplib
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
+from jose import JWTError, jwt
 from app.core.config import settings
 from app.core.database import database
-from app.core.security import hash_password, verify_password, create_access_token
+from app.core.security import ALGORITHM, SECRET_KEY, hash_password, verify_password, create_access_token
 from app.schemas.auth_schema import RegisterRequest, LoginRequest, RegisterOtpRequest
 
 router = APIRouter()
 
 otp_store: dict[str, dict[str, object]] = {}
+VALID_ROLES = {"admin", "doctor", "patient"}
+
+
+def normalize_role(role: str | None) -> str:
+    normalized = (role or "").strip().lower()
+    if normalized not in VALID_ROLES:
+        raise HTTPException(status_code=403, detail="Tài khoản chưa được phân quyền")
+    return normalized
+
+
+def extract_bearer_token(authorization: str | None) -> str:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    return authorization.split(" ", 1)[1].strip()
+
+
+async def get_user_from_token(authorization: str | None):
+    token = extract_bearer_token(authorization)
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+    except JWTError as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
+
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    user = await database.fetch_one(
+        """
+        SELECT id::text as id, full_name, email, role
+        FROM users
+        WHERE id::text = :user_id
+        """,
+        {"user_id": user_id}
+    )
+
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return {
+        "id": user["id"],
+        "full_name": user["full_name"],
+        "email": user["email"],
+        "role": normalize_role(user["role"])
+    }
 
 
 def send_register_otp_email(email: str, full_name: str, otp: str) -> bool:
@@ -84,7 +130,7 @@ async def register(data: RegisterRequest):
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
     if otp_record["expires_at"] < now:
-        otp_store.pop(data.email, None)
+        otp_store.pop(email, None)
         raise HTTPException(status_code=400, detail="OTP expired")
 
     check_query = "SELECT id FROM users WHERE email = :email"
@@ -126,7 +172,7 @@ async def login(data: LoginRequest):
 
     user = await database.fetch_one(
         query=query,
-        values={"email": data.email}
+        values={"email": data.email.lower()}
     )
 
     if not user:
@@ -138,7 +184,7 @@ async def login(data: LoginRequest):
     token = create_access_token({
         "sub": user["id"],
         "email": user["email"],
-        "role": user["role"]
+        "role": normalize_role(user["role"])
     })
 
     return {
@@ -148,6 +194,11 @@ async def login(data: LoginRequest):
             "id": user["id"],
             "full_name": user["full_name"],
             "email": user["email"],
-            "role": user["role"]
+            "role": normalize_role(user["role"])
         }
     }
+
+
+@router.get("/auth/me")
+async def me(authorization: str | None = Header(default=None)):
+    return {"user": await get_user_from_token(authorization)}

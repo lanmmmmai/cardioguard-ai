@@ -18,21 +18,21 @@ interface FeatureHubProps {
 
 const aiDisclaimer = 'Kết quả AI chỉ mang tính tham khảo, cần bác sĩ xác nhận trước khi sử dụng cho quyết định điều trị.';
 
-const mockData = {
+const moduleSections = {
   appointments: [
-    { title: 'Khám tim mạch định kỳ', status: 'Đã xác nhận', detail: '09:00 hôm nay - Phòng khám Tim mạch A' },
-    { title: 'Tư vấn trực tuyến', status: 'Chờ bác sĩ', detail: '15:30 hôm nay - Video call bảo mật' },
-    { title: 'Tái khám sau cảnh báo SpO2', status: 'Cần xử lý', detail: 'Ưu tiên bệnh nhân có cảnh báo mức cao' },
+    { title: 'Đặt lịch khám', status: 'Module', detail: 'Tạo lịch, chọn bác sĩ/phòng khám và gửi yêu cầu xác nhận.' },
+    { title: 'Xác nhận & dời lịch', status: 'Module', detail: 'Quản lý trạng thái lịch hẹn, hủy hoặc dời lịch theo quyền.' },
+    { title: 'Tư vấn trực tuyến', status: 'Module', detail: 'Không gian chuẩn bị cho video call và chat bảo mật.' },
   ],
   records: [
-    { title: 'Bệnh án điện tử', status: 'Đang đồng bộ', detail: 'Chẩn đoán, lịch sử khám, file PDF/X-ray/xét nghiệm' },
-    { title: 'Phân tích xu hướng sức khỏe', status: 'AI hỗ trợ', detail: 'Tổng hợp nhịp tim, SpO2, huyết áp theo thời gian' },
-    { title: 'Quản lý file y tế', status: 'Mock storage', detail: 'Sẵn sàng nối API upload khi backend có object storage' },
+    { title: 'Bệnh án điện tử', status: 'Module', detail: 'Chẩn đoán, lịch sử khám, file PDF/X-ray/xét nghiệm.' },
+    { title: 'Phân tích xu hướng sức khỏe', status: 'AI hỗ trợ', detail: 'Tổng hợp nhịp tim, SpO2, huyết áp theo thời gian khi có dữ liệu thật.' },
+    { title: 'Quản lý file y tế', status: 'Module', detail: 'Sẵn sàng nối API upload khi backend có object storage.' },
   ],
   devices: [
-    { title: 'Wearable CG-01', status: 'Online', detail: 'Pin 82%, truyền nhịp tim/SpO2 mỗi 5 giây' },
-    { title: 'ECG Gateway ICU', status: 'Cần kiểm tra', detail: 'Mất gói 3%, nên kiểm tra kết nối mạng phòng ICU' },
-    { title: 'Camera ICU-02', status: 'AI giám sát', detail: 'Theo dõi té ngã, sự kiện bất thường và lưu video cảnh báo' },
+    { title: 'Wearable devices', status: 'Module', detail: 'Khai báo smartwatch/vòng đeo và trạng thái pin/kết nối.' },
+    { title: 'ECG Gateway', status: 'Module', detail: 'Chuẩn bị vùng quản lý gateway ECG và stream realtime.' },
+    { title: 'Camera ICU', status: 'Module', detail: 'Theo dõi té ngã, sự kiện bất thường và lưu video cảnh báo.' },
   ],
 };
 
@@ -74,7 +74,7 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
       </div>
 
       <div className="grid-3" style={{ marginBottom: '1.5rem' }}>
-        {mockData[type].map((item) => (
+        {moduleSections[type].map((item) => (
           <div className="panel" key={item.title} style={{ minHeight: '150px' }}>
             <div className="metric-header">
               <span className="metric-title">{item.title}</span>
@@ -92,7 +92,7 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
           </h3>
           {visiblePatients.length === 0 ? (
             <div style={{ color: 'var(--text-muted)', padding: '1.5rem 0' }}>
-              Chưa có bệnh nhân để hiển thị. Dữ liệu mock vẫn giữ màn hình hoạt động ổn định.
+              Chưa có tài khoản Patient đã xác thực OTP để hiển thị trong module này.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

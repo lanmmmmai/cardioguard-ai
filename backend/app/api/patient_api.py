@@ -1,57 +1,53 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Header, HTTPException
 from app.schemas.patient_schema import PatientCreate
 from app.core.database import database
+from app.api.auth_api import get_user_from_token
 
 router = APIRouter()
 
 
 @router.post("/patients")
 async def create_patient(patient: PatientCreate):
-
-    query = """
-    INSERT INTO patients(
-        full_name,
-        age,
-        gender,
-        phone,
-        address,
-        medical_history
+    raise HTTPException(
+        status_code=403,
+        detail="Bệnh nhân chỉ được tạo bằng đăng ký tài khoản và xác thực OTP qua email"
     )
-    VALUES (
-        :full_name,
-        :age,
-        :gender,
-        :phone,
-        :address,
-        :medical_history
-    )
-    """
-
-    await database.execute(
-        query=query,
-        values={
-            "full_name": patient.full_name,
-            "age": patient.age,
-            "gender": patient.gender,
-            "phone": patient.phone,
-            "address": patient.address,
-            "medical_history": patient.medical_history
-        }
-    )
-
-    return {
-        "message": "Patient created successfully"
-    }
 
 
 @router.get("/patients")
-async def get_patients():
+async def get_patients(authorization: str | None = Header(default=None)):
+    current_user = await get_user_from_token(authorization)
+    role = current_user["role"]
 
-    query = """
-    SELECT * FROM patients
-    ORDER BY created_at DESC
-    """
+    if role == "patient":
+        query = """
+        SELECT id::text as id, full_name, email
+        FROM users
+        WHERE id::text = :user_id AND lower(role) = 'patient'
+        ORDER BY full_name ASC
+        """
+        rows = await database.fetch_all(query=query, values={"user_id": current_user["id"]})
+    else:
+        query = """
+        SELECT id::text as id, full_name, email
+        FROM users
+        WHERE lower(role) = 'patient'
+        ORDER BY full_name ASC
+        """
+        rows = await database.fetch_all(query=query)
 
-    patients = await database.fetch_all(query)
-
-    return patients
+    return [
+        {
+            "id": row["id"],
+            "full_name": row["full_name"],
+            "age": 0,
+            "gender": "Chưa cập nhật",
+            "phone": row["email"],
+            "address": "Chưa cập nhật",
+            "medical_history": "Hồ sơ được tạo từ tài khoản bệnh nhân đã xác thực OTP",
+            "email": row["email"],
+            "created_at": None,
+            "source": "verified_patient_account"
+        }
+        for row in rows
+    ]

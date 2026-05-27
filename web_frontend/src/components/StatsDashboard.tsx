@@ -35,21 +35,21 @@ export const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients, alerts
   const mediumAlertsCount = alerts.filter(a => a.severity.toLowerCase() === 'medium' || a.severity.toLowerCase() === 'warning').length;
   const lowAlertsCount = totalAlerts - highAlertsCount - mediumAlertsCount;
 
-  // 2. Mockup data blend for severity ratios if no alerts exist yet, to avoid blank pages
-  const displayHigh = totalAlerts > 0 ? highAlertsCount : 5;
-  const displayMedium = totalAlerts > 0 ? mediumAlertsCount : 12;
-  const displayLow = totalAlerts > 0 ? lowAlertsCount : 8;
+  // 2. Use only real alert data. Empty reports should display zero states, not fake values.
+  const displayHigh = highAlertsCount;
+  const displayMedium = mediumAlertsCount;
+  const displayLow = lowAlertsCount;
   const displayTotal = displayHigh + displayMedium + displayLow;
 
-  const pctHigh = Math.round((displayHigh / displayTotal) * 100);
-  const pctMedium = Math.round((displayMedium / displayTotal) * 100);
-  const pctLow = 100 - pctHigh - pctMedium;
+  const pctHigh = displayTotal > 0 ? Math.round((displayHigh / displayTotal) * 100) : 0;
+  const pctMedium = displayTotal > 0 ? Math.round((displayMedium / displayTotal) * 100) : 0;
+  const pctLow = displayTotal > 0 ? 100 - pctHigh - pctMedium : 0;
 
   // Circumference of SVG Circle with r=50 is 2 * PI * 50 = 314.16
   const circ = 314.16;
-  const strokeHigh = (displayHigh / displayTotal) * circ;
-  const strokeMedium = (displayMedium / displayTotal) * circ;
-  const strokeLow = (displayLow / displayTotal) * circ;
+  const strokeHigh = displayTotal > 0 ? (displayHigh / displayTotal) * circ : 0;
+  const strokeMedium = displayTotal > 0 ? (displayMedium / displayTotal) * circ : 0;
+  const strokeLow = displayTotal > 0 ? (displayLow / displayTotal) * circ : 0;
 
   const offsetHigh = 0;
   const offsetMedium = strokeHigh;
@@ -74,21 +74,13 @@ export const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients, alerts
   
   // Count alerts for each of these days
   const alertCountsByDay = last7Days.map(day => {
-    // If we have actual alerts, count them. Otherwise, default to some reasonable mock values
-    if (totalAlerts > 0) {
-      return alerts.filter(a => {
-        if (!a.created_at) return false;
-        return a.created_at.startsWith(day.dateStr);
-      }).length;
-    } else {
-      // Mock values for visualization: [3, 5, 2, 7, 4, 6, 3] style
-      const mockDaysValues: { [key: number]: number } = { 0: 2, 1: 4, 2: 1, 3: 5, 4: 3, 5: 6, 6: 2 };
-      const index = last7Days.findIndex(d => d.dateStr === day.dateStr);
-      return mockDaysValues[index] !== undefined ? mockDaysValues[index] : 2;
-    }
+    return alerts.filter(a => {
+      if (!a.created_at) return false;
+      return a.created_at.startsWith(day.dateStr);
+    }).length;
   });
 
-  const maxAlertsCount = Math.max(...alertCountsByDay, 5); // ensure max is at least 5 for chart height
+  const maxAlertsCount = Math.max(...alertCountsByDay, 1);
 
   // Map values to Y coordinates in SVG (height = 200, padding = 30)
   // SVGs coordinate starts from top, so we do: height - padding - (val/max) * (height - 2*padding)
@@ -329,7 +321,7 @@ export const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients, alerts
             </svg>
             <div style={{ position: 'absolute', textAlign: 'center' }}>
               <div style={{ fontSize: '1.75rem', fontWeight: 800, fontFamily: 'var(--font-display)', color: 'var(--text-primary)' }}>
-                {displayTotal}
+                {totalAlerts}
               </div>
               <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Tổng số ca

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, Bell, LogOut, Activity, AlertOctagon, Video, TrendingUp, Sun, Moon, CalendarDays, FileText, Cpu } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertOctagon, ArrowLeft } from 'lucide-react';
 import { Login } from './components/Login';
 import { Register } from './components/Register';
 import { Dashboard } from './components/Dashboard';
@@ -9,6 +9,11 @@ import { ICUCamera } from './components/ICUCamera';
 import { StatsDashboard } from './components/StatsDashboard';
 import { PatientDetail } from './components/PatientDetail';
 import { FeatureHub } from './components/FeatureHub';
+import { AuthProvider, useAuth } from './auth/AuthContext';
+import { ProtectedRoute } from './auth/ProtectedRoute';
+import { defaultRouteByRole, normalizeRole, type UserRole } from './auth/roles';
+import { AdminLayout, DoctorLayout, PatientLayout } from './layouts/RoleLayout';
+import { AdminDashboard, DoctorDashboard, PatientHome, PlaceholderPage } from './pages/RolePages';
 import { useWebSocket } from './hooks/useWebSocket';
 import { API_URL, WS_URL } from './config';
 
@@ -41,414 +46,287 @@ interface SensorData {
   diastolic_bp: number;
   ecg_value: number;
   is_abnormal: boolean;
-  alerts: Array<{
-    alert_type: string;
-    message: string;
-    severity: string;
-  }>;
+  alerts: Array<{ alert_type: string; message: string; severity: string }>;
 }
 
-export const App: React.FC = () => {
-  // Theme state
+const privateRouteRole = (path: string): UserRole | null => {
+  if (path.startsWith('/admin')) return 'admin';
+  if (path.startsWith('/doctor')) return 'doctor';
+  if (path.startsWith('/patient')) return 'patient';
+  return null;
+};
+
+const pageTitles: Record<string, { title: string; subtitle: string }> = {
+  '/admin/users': { title: 'Quản lý tài khoản', subtitle: 'Quản trị tài khoản, vai trò và phân quyền người dùng.' },
+  '/admin/doctors': { title: 'Quản lý bác sĩ', subtitle: 'Danh sách bác sĩ, phân công chuyên khoa và quyền truy cập.' },
+  '/admin/system-logs': { title: 'Nhật ký hệ thống', subtitle: 'Audit log, lịch sử đăng nhập và thao tác bảo mật.' },
+  '/admin/settings': { title: 'Cài đặt hệ thống', subtitle: 'Cấu hình nền tảng, API token và trạng thái kết nối.' },
+  '/admin/profile': { title: 'Hồ sơ cá nhân', subtitle: 'Thông tin tài khoản admin và đổi mật khẩu.' },
+  '/doctor/prescriptions': { title: 'Đơn thuốc', subtitle: 'Kê đơn, xem lịch sử đơn thuốc và AI hỗ trợ tham khảo.' },
+  '/doctor/chat': { title: 'Chat tư vấn', subtitle: 'Tư vấn trực tuyến bảo mật giữa bác sĩ và bệnh nhân.' },
+  '/doctor/ai-analysis': { title: 'AI phân tích sức khỏe', subtitle: 'Dự đoán nguy cơ tim mạch, phát hiện bất thường và gợi ý chẩn đoán tham khảo.' },
+  '/doctor/profile': { title: 'Hồ sơ cá nhân', subtitle: 'Thông tin bác sĩ, chuyên khoa và lịch làm việc.' },
+  '/patient/health': { title: 'Chỉ số sức khỏe', subtitle: 'Theo dõi nhịp tim, SpO2, huyết áp và ECG realtime.' },
+  '/patient/history': { title: 'Lịch sử sức khỏe', subtitle: 'Lưu trữ và phân tích chỉ số sức khỏe theo thời gian.' },
+  '/patient/prescriptions': { title: 'Đơn thuốc của tôi', subtitle: 'Danh sách đơn thuốc hiện tại và lịch sử kê đơn.' },
+  '/patient/sos': { title: 'SOS khẩn cấp', subtitle: 'Kích hoạt cảnh báo khẩn cấp gửi tới bác sĩ và hệ thống.' },
+  '/patient/chat': { title: 'Chat với bác sĩ', subtitle: 'Trao đổi nhanh với bác sĩ phụ trách.' },
+  '/patient/notifications': { title: 'Thông báo', subtitle: 'Lịch hẹn, cảnh báo sức khỏe và cập nhật hệ thống.' },
+  '/patient/profile': { title: 'Hồ sơ cá nhân', subtitle: 'Xem/cập nhật thông tin cá nhân và ảnh đại diện.' },
+  '/patient/settings': { title: 'Cài đặt', subtitle: 'Tùy chỉnh thông báo, bảo mật và giao diện.' },
+};
+
+const useBrowserPath = () => {
+  const [path, setPath] = useState(() => window.location.pathname || '/');
+
+  useEffect(() => {
+    const handlePopState = () => setPath(window.location.pathname || '/');
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigate = (to: string, replace = false) => {
+    if (window.location.pathname === to) {
+      setPath(to);
+      return;
+    }
+
+    if (replace) {
+      window.history.replaceState(null, '', to);
+    } else {
+      window.history.pushState(null, '', to);
+    }
+    setPath(to);
+  };
+
+  return { path, navigate };
+};
+
+const AppContent: React.FC = () => {
+  const { accessToken, isAuthenticated, loading, role, login } = useAuth();
+  const { path, navigate } = useBrowserPath();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = localStorage.getItem('theme');
-    return (savedTheme === 'light' || savedTheme === 'dark') ? savedTheme : 'dark';
+    return savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'dark';
   });
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [latestTelemetry, setLatestTelemetry] = useState<SensorData | null>(null);
+  const [activeBanner, setActiveBanner] = useState<{ message: string; patientName: string; severity: string } | null>(null);
+  const [showAddPatientModal, setShowAddPatientModal] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+
+  const normalizedPath = path === '/' ? (role ? defaultRouteByRole[role] : '/login') : path;
+  const routeRole = privateRouteRole(normalizedPath);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  // Auth state
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
-  const [user, setUser] = useState<any | null>(JSON.parse(localStorage.getItem('user') || 'null'));
-  const [authScreen, setAuthScreen] = useState<'login' | 'register'>('login');
+  useEffect(() => {
+    if (path === '/' && !loading) {
+      navigate(role ? defaultRouteByRole[role] : '/login', true);
+    }
+  }, [loading, path, role]);
 
-  // Navigation route state
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'patients' | 'alerts' | 'icu-camera' | 'stats' | 'patient-detail' | 'appointments' | 'records' | 'devices'>('dashboard');
-  const [selectedPatientIdForDetail, setSelectedPatientIdForDetail] = useState<string | null>(null);
-  const [showAddPatientModal, setShowAddPatientModal] = useState(false);
+  useEffect(() => {
+    if (!loading && isAuthenticated && role && ['/login', '/register', '/forgot-password'].includes(path)) {
+      navigate(defaultRouteByRole[role], true);
+    }
+  }, [isAuthenticated, loading, path, role]);
 
-  // App core database states
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [latestTelemetry, setLatestTelemetry] = useState<SensorData | null>(null);
-
-  // Real-time notification banners
-  const [activeBanner, setActiveBanner] = useState<{ message: string; patientName: string; severity: string } | null>(null);
-
-  // Fetch initial patient records
   const fetchPatients = async () => {
     try {
-      const response = await fetch(`${API_URL}/patients`);
-      if (response.ok) {
-        const data = await response.json();
-        setPatients(data);
-      }
+      const response = await fetch(`${API_URL}/patients`, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+      if (response.ok) setPatients(await response.json());
     } catch (err) {
       console.error('Failed to fetch patients:', err);
     }
   };
 
-  // Fetch initial alert log logs
   const fetchAlerts = async () => {
     try {
       const response = await fetch(`${API_URL}/alerts`);
-      if (response.ok) {
-        const data = await response.json();
-        setAlerts(data);
-      }
+      if (response.ok) setAlerts(await response.json());
     } catch (err) {
       console.error('Failed to fetch alerts:', err);
     }
   };
 
   useEffect(() => {
-    if (token) {
-      fetchPatients();
-      fetchAlerts();
-    }
-  }, [token]);
+    if (!accessToken) return;
+    fetchPatients();
+    fetchAlerts();
+  }, [accessToken]);
 
-  // Handle incoming web socket telemetry broadcasts
   const handleWebSocketMessage = (data: SensorData) => {
-    // Save telemetry to update dashboard canvas/metrics
     setLatestTelemetry(data);
+    if (!data.is_abnormal || data.alerts.length === 0) return;
 
-    // If an alert is broadcasted, handle instant notification and prepend alert
-    if (data.is_abnormal && data.alerts.length > 0) {
-      const firstAlert = data.alerts[0];
-      const matchingPatient = patients.find(p => p.id === data.patient_id);
-      const patientName = matchingPatient ? matchingPatient.full_name : 'Bệnh nhân';
+    const firstAlert = data.alerts[0];
+    const matchingPatient = patients.find((patient) => patient.id === data.patient_id);
+    const patientName = matchingPatient?.full_name || 'Bệnh nhân';
 
-      // Set global warning banner
-      setActiveBanner({
-        message: firstAlert.message,
-        patientName,
-        severity: firstAlert.severity
-      });
+    setActiveBanner({ message: firstAlert.message, patientName, severity: firstAlert.severity });
+    window.setTimeout(() => setActiveBanner(null), 7000);
 
-      // Automatically clear warning banner after 7 seconds
-      setTimeout(() => {
-        setActiveBanner(null);
-      }, 7000);
-
-      // Prepend to local alerts log list so the alerts page updates in real-time
-      const newAlerts: Alert[] = data.alerts.map(a => ({
+    setAlerts((prev) => [
+      ...data.alerts.map((alert) => ({
         patient_id: data.patient_id,
         full_name: patientName,
-        alert_type: a.alert_type,
-        message: a.message,
-        severity: a.severity,
-        created_at: new Date().toISOString()
-      }));
+        alert_type: alert.alert_type,
+        message: alert.message,
+        severity: alert.severity,
+        created_at: new Date().toISOString(),
+      })),
+      ...prev,
+    ]);
+  };
 
-      setAlerts(prev => [...newAlerts, ...prev]);
+  useWebSocket(WS_URL, accessToken ? handleWebSocketMessage : undefined);
+
+  const handleLoginSuccess = (token: string, userData: { id: string; full_name: string; email: string; role: string }) => {
+    const userRole = normalizeRole(userData.role);
+    if (!userRole) {
+      throw new Error('Tài khoản chưa được phân quyền');
     }
+
+    const normalizedUser = login(token, { ...userData, role: userRole });
+    navigate(defaultRouteByRole[normalizedUser.role], true);
   };
 
-  // Connect to backend websocket
-  useWebSocket(WS_URL, token ? handleWebSocketMessage : undefined);
+  const renderPatientList = () => {
+    if (selectedPatientId) {
+      const patient = patients.find((item) => item.id === selectedPatientId);
+      return patient ? (
+        <PatientDetail
+          patient={patient}
+          latestTelemetry={latestTelemetry}
+          alerts={alerts}
+          onBackClick={() => setSelectedPatientId(null)}
+        />
+      ) : (
+        <PlaceholderPage title="Không tìm thấy bệnh nhân" subtitle="Hồ sơ này không tồn tại hoặc đã bị xóa." />
+      );
+    }
 
-  // Authentication callbacks
-  const handleLoginSuccess = (userToken: string, userData: any) => {
-    localStorage.setItem('token', userToken);
-    localStorage.setItem('user', JSON.stringify(userData));
-    setToken(userToken);
-    setUser(userData);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setToken(null);
-    setUser(null);
-    setCurrentScreen('dashboard');
-  };
-
-  if (!token) {
-    return authScreen === 'login' ? (
-      <Login 
-        onLoginSuccess={handleLoginSuccess} 
-        onNavigateToRegister={() => setAuthScreen('register')} 
+    return (
+      <Patients
+        patients={patients}
+        onPatientAdded={fetchPatients}
+        showAddModal={showAddPatientModal}
+        setShowAddModal={setShowAddPatientModal}
+        onViewPatientDetail={setSelectedPatientId}
       />
-    ) : (
-      <Register 
-        onRegisterSuccess={() => setAuthScreen('login')} 
-        onNavigateToLogin={() => setAuthScreen('login')} 
-      />
+    );
+  };
+
+  const routeContent = useMemo(() => {
+    switch (normalizedPath) {
+      case '/admin/dashboard':
+        return <AdminDashboard patients={patients} alerts={alerts} />;
+      case '/admin/patients':
+      case '/doctor/patients':
+        return renderPatientList();
+      case '/admin/alerts':
+      case '/doctor/alerts':
+        return <Alerts alerts={alerts} />;
+      case '/admin/devices':
+        return <FeatureHub type="devices" role="admin" patients={patients} />;
+      case '/admin/cameras':
+        return <ICUCamera />;
+      case '/admin/reports':
+      case '/doctor/reports':
+        return <StatsDashboard patients={patients} alerts={alerts} />;
+      case '/doctor/dashboard':
+        return <DoctorDashboard patients={patients} alerts={alerts} />;
+      case '/doctor/appointments':
+      case '/patient/appointments':
+        return <FeatureHub type="appointments" role={routeRole || 'doctor'} patients={patients} />;
+      case '/doctor/medical-records':
+        return <FeatureHub type="records" role="doctor" patients={patients} />;
+      case '/doctor/realtime-monitoring':
+        return <Dashboard patients={patients} latestTelemetry={latestTelemetry} alerts={alerts} onAddPatientClick={() => navigate('/doctor/patients')} />;
+      case '/patient/home':
+        return <PatientHome latestTelemetry={latestTelemetry} alerts={alerts} />;
+      default: {
+        const meta = pageTitles[normalizedPath];
+        return meta ? <PlaceholderPage title={meta.title} subtitle={meta.subtitle} /> : null;
+      }
+    }
+  }, [alerts, latestTelemetry, normalizedPath, patients, routeRole, selectedPatientId, showAddPatientModal]);
+
+  if (loading) {
+    return <div className="route-loading">Đang khôi phục phiên đăng nhập...</div>;
+  }
+
+  if (path === '/register') {
+    return <Register onRegisterSuccess={() => navigate('/login', true)} onNavigateToLogin={() => navigate('/login')} />;
+  }
+
+  if (path === '/forgot-password') {
+    return (
+      <div className="auth-container">
+        <div className="panel auth-panel">
+          <button type="button" className="auth-back-btn" onClick={() => navigate('/login')}>
+            <ArrowLeft size={16} /> Quay lại đăng nhập
+          </button>
+          <h2 className="auth-title">Quên mật khẩu</h2>
+          <p className="auth-subtitle">Module khôi phục mật khẩu/OTP đã có route riêng và có thể nối API email khi backend sẵn sàng.</p>
+        </div>
+      </div>
     );
   }
 
+  if (path === '/login' || !routeRole) {
+    if (!isAuthenticated) {
+      return <Login onLoginSuccess={handleLoginSuccess} onNavigateToRegister={() => navigate('/register')} />;
+    }
+    navigate(role ? defaultRouteByRole[role] : '/login', true);
+    return null;
+  }
+
+  if (!routeContent) {
+    navigate(role ? defaultRouteByRole[role] : '/login', true);
+    return null;
+  }
+
+  const layoutProps = {
+    currentPath: normalizedPath,
+    navigate,
+    theme,
+    onToggleTheme: () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark')),
+  };
+
+  const layout = routeRole === 'admin'
+    ? <AdminLayout {...layoutProps}>{routeContent}</AdminLayout>
+    : routeRole === 'doctor'
+      ? <DoctorLayout {...layoutProps}>{routeContent}</DoctorLayout>
+      : <PatientLayout {...layoutProps}>{routeContent}</PatientLayout>;
+
   return (
-    <div className="app-vertical-layout">
-      {/* Real-time Global Alert notification banner */}
+    <ProtectedRoute allowedRoles={[routeRole]} currentPath={normalizedPath} navigate={navigate}>
       {activeBanner && (
         <div className="global-notification-bar">
           <AlertOctagon className="beat-animated" size={18} />
           <span>
-            <strong>CẢNH BÁO NGUY KỊCH ({activeBanner.severity.toUpperCase()}):</strong> Bệnh nhân{' '}
-            {activeBanner.patientName} - {activeBanner.message}!
+            <strong>CẢNH BÁO ({activeBanner.severity.toUpperCase()}):</strong> {activeBanner.patientName} - {activeBanner.message}
           </span>
-          <button 
-            onClick={() => setActiveBanner(null)}
-            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '4px', color: 'white', padding: '2px 8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold' }}
-          >
-            Đóng
-          </button>
+          <button type="button" onClick={() => setActiveBanner(null)}>Đóng</button>
         </div>
       )}
-
-      {/* Top Header menu navigation bar */}
-      <header className="top-header">
-        <div className="brand" style={{ margin: 0 }}>
-          <div className="brand-icon">
-            <Activity className="beat-animated" size={24} />
-          </div>
-          <span className="brand-name">HEART MONITOR</span>
-        </div>
-
-        <nav className="top-header-menu">
-          <div 
-            className={`nav-item ${currentScreen === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setCurrentScreen('dashboard')}
-          >
-            <LayoutDashboard size={16} />
-            <span>Hệ Thống Giám Sát</span>
-          </div>
-
-          <div 
-            className={`nav-item ${currentScreen === 'patients' || currentScreen === 'patient-detail' ? 'active' : ''}`}
-            onClick={() => setCurrentScreen('patients')}
-          >
-            <Users size={16} />
-            <span>Hồ Sơ Bệnh Nhân</span>
-          </div>
-
-          <div 
-            className={`nav-item ${currentScreen === 'alerts' ? 'active' : ''}`}
-            onClick={() => {
-              setCurrentScreen('alerts');
-              fetchAlerts(); // Refresh alerts
-            }}
-          >
-            <Bell size={16} />
-            <span>Cảnh Báo Hệ Thống</span>
-            {alerts.filter(a => a.severity === 'high').length > 0 && (
-              <span className="badge high" style={{ marginLeft: '8px', padding: '2px 6px', fontSize: '0.65rem' }}>
-                {alerts.filter(a => a.severity === 'high').length}
-              </span>
-            )}
-          </div>
-
-          <div
-            className={`nav-item ${currentScreen === 'appointments' ? 'active' : ''}`}
-            onClick={() => setCurrentScreen('appointments')}
-          >
-            <CalendarDays size={16} />
-            <span>Lịch Hẹn</span>
-          </div>
-
-          <div
-            className={`nav-item ${currentScreen === 'records' ? 'active' : ''}`}
-            onClick={() => setCurrentScreen('records')}
-          >
-            <FileText size={16} />
-            <span>Bệnh Án</span>
-          </div>
-
-          <div 
-            className={`nav-item ${currentScreen === 'icu-camera' ? 'active' : ''}`}
-            onClick={() => setCurrentScreen('icu-camera')}
-          >
-            <Video size={16} />
-            <span>Phòng ICU</span>
-          </div>
-
-          <div 
-            className={`nav-item ${currentScreen === 'stats' ? 'active' : ''}`}
-            onClick={() => setCurrentScreen('stats')}
-          >
-            <TrendingUp size={16} />
-            <span>Thống Kê</span>
-          </div>
-
-          <div
-            className={`nav-item ${currentScreen === 'devices' ? 'active' : ''}`}
-            onClick={() => setCurrentScreen('devices')}
-          >
-            <Cpu size={16} />
-            <span>Thiết Bị</span>
-          </div>
-        </nav>
-
-        <div className="top-header-right">
-          {/* Theme Toggle Button */}
-          <button 
-            onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
-            className="theme-toggle-btn"
-            title={theme === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
-            style={{
-              background: 'var(--input-bg)',
-              border: '1px solid var(--glass-border)',
-              borderRadius: '50%',
-              width: '36px',
-              height: '36px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: theme === 'dark' ? '#ffb606' : '#475467',
-              transition: 'var(--transition-smooth)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = 'var(--glass-border-hover)';
-              e.currentTarget.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--glass-border)';
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-          >
-            {theme === 'dark' ? (
-              <Sun size={18} fill="#ffb606" color="#ffb606" />
-            ) : (
-              <Moon size={18} fill="#475467" color="#475467" />
-            )}
-          </button>
-
-          {user && (
-            <div className="user-profile" style={{ margin: 0, padding: '6px 12px' }}>
-              <div className="avatar" style={{ width: '28px', height: '28px', fontSize: '0.8rem' }}>
-                {user.full_name.charAt(0).toUpperCase()}
-              </div>
-              <div className="user-info">
-                <div className="user-name" style={{ fontSize: '0.8rem' }}>{user.full_name}</div>
-                <div className="user-role" style={{ fontSize: '0.65rem' }}>{user.role || 'Nhân viên y tế'}</div>
-              </div>
-              <button className="logout-btn" onClick={handleLogout} title="Đăng xuất" style={{ marginLeft: '8px' }}>
-                <LogOut size={14} />
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* Mobile Bottom Tab navigation bar */}
-      <nav className="mobile-nav-bar">
-        <div 
-          className={`mobile-nav-item ${currentScreen === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setCurrentScreen('dashboard')}
-        >
-          <LayoutDashboard />
-          <span>Giám sát</span>
-        </div>
-
-        <div 
-          className={`mobile-nav-item ${currentScreen === 'patients' || currentScreen === 'patient-detail' ? 'active' : ''}`}
-          onClick={() => setCurrentScreen('patients')}
-        >
-          <Users />
-          <span>Bệnh nhân</span>
-        </div>
-
-        <div 
-          className={`mobile-nav-item ${currentScreen === 'alerts' ? 'active' : ''}`}
-          onClick={() => {
-            setCurrentScreen('alerts');
-            fetchAlerts();
-          }}
-        >
-          <Bell />
-          <span>Cảnh báo</span>
-        </div>
-
-        <div 
-          className={`mobile-nav-item ${currentScreen === 'appointments' || currentScreen === 'records' ? 'active' : ''}`}
-          onClick={() => setCurrentScreen('appointments')}
-        >
-          <CalendarDays />
-          <span>Lịch</span>
-        </div>
-
-        <div 
-          className={`mobile-nav-item ${currentScreen === 'stats' || currentScreen === 'devices' || currentScreen === 'icu-camera' ? 'active' : ''}`}
-          onClick={() => setCurrentScreen('stats')}
-        >
-          <TrendingUp />
-          <span>Khác</span>
-        </div>
-      </nav>
-
-      {/* Main Render Page Content */}
-      <main className="main-content" style={{ marginTop: activeBanner ? '40px' : '0px' }}>
-        {currentScreen === 'dashboard' && (
-          <Dashboard 
-            patients={patients} 
-            latestTelemetry={latestTelemetry} 
-            alerts={alerts}
-            onAddPatientClick={() => {
-              setCurrentScreen('patients');
-              setShowAddPatientModal(true);
-            }}
-          />
-        )}
-        
-        {currentScreen === 'patients' && (
-          <Patients 
-            patients={patients} 
-            onPatientAdded={fetchPatients}
-            showAddModal={showAddPatientModal}
-            setShowAddModal={setShowAddPatientModal}
-            onViewPatientDetail={(patientId) => {
-              setSelectedPatientIdForDetail(patientId);
-              setCurrentScreen('patient-detail');
-            }}
-          />
-        )}
-        
-        {currentScreen === 'alerts' && (
-          <Alerts alerts={alerts} />
-        )}
-
-        {currentScreen === 'appointments' && (
-          <FeatureHub type="appointments" role={user?.role || 'doctor'} patients={patients} />
-        )}
-
-        {currentScreen === 'records' && (
-          <FeatureHub type="records" role={user?.role || 'doctor'} patients={patients} />
-        )}
-
-        {currentScreen === 'devices' && (
-          <FeatureHub type="devices" role={user?.role || 'admin'} patients={patients} />
-        )}
-
-        {currentScreen === 'icu-camera' && (
-          <ICUCamera />
-        )}
-
-        {currentScreen === 'stats' && (
-          <StatsDashboard patients={patients} alerts={alerts} />
-        )}
-
-        {currentScreen === 'patient-detail' && (() => {
-          const p = patients.find(p => p.id === selectedPatientIdForDetail);
-          return p ? (
-            <PatientDetail
-              patient={p}
-              latestTelemetry={latestTelemetry}
-              alerts={alerts}
-              onBackClick={() => setCurrentScreen('patients')}
-            />
-          ) : (
-            <div className="panel" style={{ textAlign: 'center', padding: '2rem' }}>
-              Không tìm thấy thông tin bệnh nhân.
-            </div>
-          );
-        })()}
-      </main>
-    </div>
+      {layout}
+    </ProtectedRoute>
   );
 };
+
+export const App: React.FC = () => (
+  <AuthProvider>
+    <AppContent />
+  </AuthProvider>
+);
+
 export default App;

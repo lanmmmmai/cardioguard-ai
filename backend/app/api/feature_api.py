@@ -43,7 +43,7 @@ async def iot_devices():
 @router.get("/reports/summary")
 async def reports_summary():
     return {
-        "uptime": "mocked",
+        "uptime": "pending_monitoring_integration",
         "server": {"cpu": "N/A", "ram": "N/A", "database": "configured"},
         "export_pdf": "pending_real_implementation",
     }
