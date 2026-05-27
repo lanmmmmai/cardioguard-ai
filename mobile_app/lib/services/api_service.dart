@@ -22,20 +22,21 @@ class ApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/login'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: {
-          'username': email, // OAuth2 Password flow uses 'username'
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'email': email,
           'password': password,
-        },
+        }),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         token = data['access_token'];
+        final user = data['user'] ?? {};
         currentUser = {
-          'email': email,
-          'full_name': data['full_name'] ?? email.split('@')[0],
-          'role': data['role'] ?? 'Nhân viên y tế',
+          'email': user['email'] ?? email,
+          'full_name': user['full_name'] ?? email.split('@')[0],
+          'role': user['role'] ?? 'patient',
         };
         return true;
       }
