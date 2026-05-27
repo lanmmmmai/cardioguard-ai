@@ -10,6 +10,7 @@ import { FeatureHub } from './components/FeatureHub';
 import { ApiDataPage } from './components/ApiDataPage';
 import { ProfilePage } from './components/ProfilePage';
 import { CmsPage } from './components/cms/CmsPage';
+import { DoctorsManager } from './components/DoctorsManager';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { defaultRouteByRole, normalizeRole, type UserRole } from './auth/roles';
@@ -112,6 +113,7 @@ const AppContent: React.FC = () => {
   });
   const [patients, setPatients] = useState<Patient[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [doctors, setDoctors] = useState<any[]>([]);
   const [latestTelemetry, setLatestTelemetry] = useState<SensorData | null>(null);
   const [activeBanner, setActiveBanner] = useState<{ message: string; patientName: string; severity: string } | null>(null);
   const [showAddPatientModal, setShowAddPatientModal] = useState(false);
@@ -159,11 +161,25 @@ const AppContent: React.FC = () => {
     }
   };
 
+  const fetchDoctors = async () => {
+    try {
+      const response = await fetch(`${API_URL}/admin/doctors`, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+      if (response.ok) setDoctors(await response.json());
+    } catch (err) {
+      console.error('Failed to fetch doctors:', err);
+    }
+  };
+
   useEffect(() => {
     if (!accessToken) return;
     fetchPatients();
     fetchAlerts();
-  }, [accessToken]);
+    if (role === 'admin') {
+      fetchDoctors();
+    }
+  }, [accessToken, role]);
 
   const handleWebSocketMessage = (data: SensorData) => {
     setLatestTelemetry(data);
@@ -230,9 +246,11 @@ const AppContent: React.FC = () => {
   const routeContent = useMemo(() => {
     switch (normalizedPath) {
       case '/admin/dashboard':
-        return <AdminDashboard patients={patients} alerts={alerts} />;
+        return <AdminDashboard patients={patients} alerts={alerts} doctors={doctors} />;
       case '/admin/cms':
         return <CmsPage />;
+      case '/admin/doctors':
+        return <DoctorsManager />;
       case '/admin/patients':
       case '/doctor/patients':
         return renderPatientList();

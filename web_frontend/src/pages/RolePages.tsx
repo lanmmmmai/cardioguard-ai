@@ -44,9 +44,9 @@ const Card: React.FC<{ icon: React.ReactNode; label: string; value: string | num
   </div>
 );
 
-export const AdminDashboard: React.FC<{ patients: Patient[]; alerts: Alert[] }> = ({ patients, alerts }) => {
+export const AdminDashboard: React.FC<{ patients: Patient[]; alerts: Alert[]; doctors?: any[] }> = ({ patients, alerts, doctors = [] }) => {
   const highAlerts = alerts.filter((alert) => alert.severity === 'high').length;
-  const chartValues = [patients.length, alerts.length, highAlerts, 0, 0, 0, 0];
+  const chartValues = [patients.length, alerts.length, highAlerts, doctors.length, 0, 0, 0];
   const maxChartValue = Math.max(...chartValues, 1);
 
   return (
@@ -60,7 +60,7 @@ export const AdminDashboard: React.FC<{ patients: Patient[]; alerts: Alert[] }> 
 
       <div className="role-stat-grid">
         <Card icon={<Users size={22} />} label="Tổng số bệnh nhân" value={patients.length} hint="Đang được quản lý" />
-        <Card icon={<Stethoscope size={22} />} label="Tổng số bác sĩ" value="0" hint="Chưa có API quản lý bác sĩ" />
+        <Card icon={<Stethoscope size={22} />} label="Tổng số bác sĩ" value={doctors.length} hint="Đang hoạt động" />
         <Card icon={<Cpu size={22} />} label="Thiết bị IoT" value="0" hint="Chưa có thiết bị thật được liên kết" />
         <Card icon={<ShieldAlert size={22} />} label="Cảnh báo" value={alerts.length} hint={`${highAlerts} cảnh báo mức cao`} tone="danger" />
       </div>
