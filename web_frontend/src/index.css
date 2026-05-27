@@ -1,9 +1,4 @@
-@font-face {
-  font-family: 'Futura';
-  src: local('Futura'), local('Futura Bold'), local('Futura-Bold'), url('./assets/fonts/Futura.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
 
 /* Custom Premium Dark Mode Design System for Smart Heart Patient Monitoring */
 :root {
@@ -36,8 +31,8 @@
   --color-critical: #ff0055; /* Critical Red */
   
   /* Fonts */
-  --font-display: 'Futura', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-sans: 'Futura', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
   
   /* UI Constants */
   --sidebar-width: 260px;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Users, Bell, LogOut, Activity, AlertOctagon, Video, TrendingUp, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Users, Bell, LogOut, Activity, AlertOctagon, Video, TrendingUp, Sun, Moon, CalendarDays, FileText, Cpu } from 'lucide-react';
 import { Login } from './components/Login';
 import { Register } from './components/Register';
 import { Dashboard } from './components/Dashboard';
@@ -8,6 +8,7 @@ import { Alerts } from './components/Alerts';
 import { ICUCamera } from './components/ICUCamera';
 import { StatsDashboard } from './components/StatsDashboard';
 import { PatientDetail } from './components/PatientDetail';
+import { FeatureHub } from './components/FeatureHub';
 import { useWebSocket } from './hooks/useWebSocket';
 import { API_URL, WS_URL } from './config';
 
@@ -65,7 +66,7 @@ export const App: React.FC = () => {
   const [authScreen, setAuthScreen] = useState<'login' | 'register'>('login');
 
   // Navigation route state
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'patients' | 'alerts' | 'icu-camera' | 'stats' | 'patient-detail'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'patients' | 'alerts' | 'icu-camera' | 'stats' | 'patient-detail' | 'appointments' | 'records' | 'devices'>('dashboard');
   const [selectedPatientIdForDetail, setSelectedPatientIdForDetail] = useState<string | null>(null);
   const [showAddPatientModal, setShowAddPatientModal] = useState(false);
 
@@ -148,7 +149,7 @@ export const App: React.FC = () => {
   };
 
   // Connect to backend websocket
-  useWebSocket(`${WS_URL}/ws/realtime`, token ? handleWebSocketMessage : undefined);
+  useWebSocket(WS_URL, token ? handleWebSocketMessage : undefined);
 
   // Authentication callbacks
   const handleLoginSuccess = (userToken: string, userData: any) => {
@@ -241,6 +242,22 @@ export const App: React.FC = () => {
             )}
           </div>
 
+          <div
+            className={`nav-item ${currentScreen === 'appointments' ? 'active' : ''}`}
+            onClick={() => setCurrentScreen('appointments')}
+          >
+            <CalendarDays size={16} />
+            <span>Lịch Hẹn</span>
+          </div>
+
+          <div
+            className={`nav-item ${currentScreen === 'records' ? 'active' : ''}`}
+            onClick={() => setCurrentScreen('records')}
+          >
+            <FileText size={16} />
+            <span>Bệnh Án</span>
+          </div>
+
           <div 
             className={`nav-item ${currentScreen === 'icu-camera' ? 'active' : ''}`}
             onClick={() => setCurrentScreen('icu-camera')}
@@ -255,6 +272,14 @@ export const App: React.FC = () => {
           >
             <TrendingUp size={16} />
             <span>Thống Kê</span>
+          </div>
+
+          <div
+            className={`nav-item ${currentScreen === 'devices' ? 'active' : ''}`}
+            onClick={() => setCurrentScreen('devices')}
+          >
+            <Cpu size={16} />
+            <span>Thiết Bị</span>
           </div>
         </nav>
 
@@ -340,19 +365,19 @@ export const App: React.FC = () => {
         </div>
 
         <div 
-          className={`mobile-nav-item ${currentScreen === 'icu-camera' ? 'active' : ''}`}
-          onClick={() => setCurrentScreen('icu-camera')}
+          className={`mobile-nav-item ${currentScreen === 'appointments' || currentScreen === 'records' ? 'active' : ''}`}
+          onClick={() => setCurrentScreen('appointments')}
         >
-          <Video />
-          <span>ICU</span>
+          <CalendarDays />
+          <span>Lịch</span>
         </div>
 
         <div 
-          className={`mobile-nav-item ${currentScreen === 'stats' ? 'active' : ''}`}
+          className={`mobile-nav-item ${currentScreen === 'stats' || currentScreen === 'devices' || currentScreen === 'icu-camera' ? 'active' : ''}`}
           onClick={() => setCurrentScreen('stats')}
         >
           <TrendingUp />
-          <span>Thống kê</span>
+          <span>Khác</span>
         </div>
       </nav>
 
@@ -385,6 +410,18 @@ export const App: React.FC = () => {
         
         {currentScreen === 'alerts' && (
           <Alerts alerts={alerts} />
+        )}
+
+        {currentScreen === 'appointments' && (
+          <FeatureHub type="appointments" role={user?.role || 'doctor'} patients={patients} />
+        )}
+
+        {currentScreen === 'records' && (
+          <FeatureHub type="records" role={user?.role || 'doctor'} patients={patients} />
+        )}
+
+        {currentScreen === 'devices' && (
+          <FeatureHub type="devices" role={user?.role || 'admin'} patients={patients} />
         )}
 
         {currentScreen === 'icu-camera' && (

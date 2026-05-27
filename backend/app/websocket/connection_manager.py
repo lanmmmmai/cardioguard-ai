@@ -1,4 +1,5 @@
 from fastapi import WebSocket
+from starlette.websockets import WebSocketDisconnect
 
 
 class ConnectionManager:
@@ -10,11 +11,22 @@ class ConnectionManager:
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
 
     async def broadcast(self, data: dict):
+        disconnected: list[WebSocket] = []
+
         for connection in self.active_connections:
-            await connection.send_json(data)
+            try:
+                await connection.send_json(data)
+            except WebSocketDisconnect:
+                disconnected.append(connection)
+            except RuntimeError:
+                disconnected.append(connection)
+
+        for connection in disconnected:
+            self.disconnect(connection)
 
 
 manager = ConnectionManager()

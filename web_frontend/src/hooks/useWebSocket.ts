@@ -17,7 +17,7 @@ interface WebSocketMessage {
 }
 
 export const useWebSocket = (
-  url: string = `${WS_URL}/ws/realtime`,
+  url: string = WS_URL,
   onMessageReceived?: (data: WebSocketMessage) => void
 ) => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -56,6 +56,7 @@ export const useWebSocket = (
 
       socket.onclose = () => {
         setIsConnected(false);
+        if (!onMessageReceived) return;
         console.log('Realtime WebSocket disconnected, retrying connection in 3 seconds...');
         // Attempt to reconnect after 3 seconds
         reconnectTimeoutRef.current = window.setTimeout(() => {
@@ -73,6 +74,8 @@ export const useWebSocket = (
   }, [url, onMessageReceived]);
 
   useEffect(() => {
+    if (!onMessageReceived) return;
+
     connect();
 
     return () => {

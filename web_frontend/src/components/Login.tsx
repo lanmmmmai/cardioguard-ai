@@ -57,7 +57,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
         </div>
 
         <h2 className="auth-title">Đăng Nhập Hệ Thống</h2>
-        <p className="auth-subtitle">Theo dõi nhịp tim bệnh nhân thời gian thực</p>
+        <p className="auth-subtitle">Dành cho Admin, Doctor và Patient trong hệ thống CardioGuard AI</p>
 
         {error && (
           <div className="alert-strip high" style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
@@ -86,7 +86,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
                 id="email"
                 type="email"
                 className="form-control"
-                placeholder="bacsi@benhvien.com"
+                placeholder="admin/doctor/patient@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={{ paddingLeft: '45px' }}
@@ -139,7 +139,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
         </form>
 
         <div className="auth-footer">
-          Chưa có tài khoản?{' '}
+          Bệnh nhân chưa có tài khoản?{' '}
           <span className="auth-link" onClick={onNavigateToRegister}>
             Đăng ký ngay
           </span>
