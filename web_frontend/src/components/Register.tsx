@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Activity, Mail, Lock, User, Loader2, ShieldCheck } from 'lucide-react';
+import { Activity, ArrowLeft, CheckCircle2, Lock, Mail, ShieldCheck, User, Loader2 } from 'lucide-react';
 import { API_URL } from '../config';
 
 interface RegisterProps {
@@ -23,6 +23,13 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+
+  const passwordRules = [
+    { label: 'Tối thiểu 8 ký tự', valid: password.length >= 8 },
+    { label: 'Có ít nhất 1 chữ hoa', valid: /[A-Z]/.test(password) },
+    { label: 'Có chữ và số', valid: /[A-Za-z]/.test(password) && /\d/.test(password) },
+    { label: 'Có ký tự đặc biệt', valid: /[^A-Za-z\d]/.test(password) },
+  ];
 
   const validateForm = () => {
     const normalizedName = normalizeName(fullName);
@@ -82,7 +89,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
       setSuccess(
         data.dev_otp
           ? `Môi trường dev chưa cấu hình SMTP. Mã OTP tạm: ${data.dev_otp}`
-          : 'Đã gửi OTP tới Gmail. Vui lòng kiểm tra hộp thư hoặc spam.'
+          : `Đã gửi OTP tới ${data.email || email.toLowerCase()}. Vui lòng kiểm tra hộp thư hoặc spam.`
       );
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
@@ -165,19 +172,31 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
   };
 
   return (
-    <div className="auth-container">
-      <div className="panel auth-panel">
-        <div className="brand" style={{ justifyContent: 'center', marginBottom: '1.5rem' }}>
-          <div className="brand-icon">
+    <div className="auth-container register-auth-shell">
+      <div className="panel auth-panel register-panel">
+        <div className="register-card-topline" />
+
+        <div className="brand register-brand">
+          <div className="brand-icon register-brand-icon">
             <Activity className="beat-animated" size={24} />
           </div>
           <span className="brand-name">CARDIOGUARD AI</span>
         </div>
 
         <h2 className="auth-title">Đăng Ký Bệnh Nhân</h2>
-        <p className="auth-subtitle">
-          Bước 1: nhập thông tin và bấm Đăng ký để nhận OTP. Bước 2: nhập OTP rồi xác nhận.
-        </p>
+        <p className="auth-subtitle register-subtitle">Tạo tài khoản Patient bằng Gmail OTP. Admin và Doctor dùng tài khoản được cấp riêng.</p>
+
+        <div className="auth-stepper">
+          <div className={`auth-step ${step === 'form' ? 'active' : 'done'}`}>
+            <span>1</span>
+            <p>Thông tin</p>
+          </div>
+          <div className="auth-step-line" />
+          <div className={`auth-step ${step === 'otp' ? 'active' : ''}`}>
+            <span>2</span>
+            <p>Xác minh OTP</p>
+          </div>
+        </div>
 
         {error && (
           <div className="alert-strip high" style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
@@ -197,7 +216,12 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ textAlign: 'left' }}>
+        <div className="auth-helper-card">
+          <ShieldCheck size={18} />
+          <span>Bấm Đăng Ký để nhận OTP, sau đó nhập mã trong form xác minh hiện lên.</span>
+        </div>
+
+        <form onSubmit={handleSubmit} className="register-form">
           <div className="form-group">
             <label htmlFor="fullName">Họ và tên bệnh nhân</label>
             <div style={{ position: 'relative' }}>
@@ -250,8 +274,13 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
                 required
               />
             </div>
-            <div style={{ marginTop: '6px', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              Tối thiểu 8 ký tự, có chữ hoa, chữ, số và ký tự đặc biệt.
+            <div className="password-rule-list">
+              {passwordRules.map((rule) => (
+                <div key={rule.label} className={`password-rule ${rule.valid ? 'valid' : ''}`}>
+                  <CheckCircle2 size={13} />
+                  <span>{rule.label}</span>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -286,7 +315,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
               </>
             ) : (
               <>
-                <ShieldCheck size={18} /> Đăng Ký
+                <ShieldCheck size={18} /> Đăng Ký & Gửi OTP
               </>
             )}
           </button>
@@ -303,15 +332,29 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
       {step === 'otp' && (
         <div className="modal-overlay">
           <div className="modal-content otp-modal-card">
-            <div className="brand" style={{ justifyContent: 'center', marginBottom: '1rem' }}>
-              <div className="brand-icon">
+            <button
+              type="button"
+              className="otp-back-btn"
+              onClick={() => {
+                setStep('form');
+                setOtp('');
+                setSuccess(null);
+              }}
+              disabled={isLoading}
+            >
+              <ArrowLeft size={16} /> Sửa thông tin
+            </button>
+
+            <div className="brand otp-modal-brand">
+              <div className="brand-icon otp-shield-icon">
                 <ShieldCheck size={22} />
               </div>
             </div>
 
             <h2 className="auth-title">Nhập Mã OTP</h2>
-            <p className="auth-subtitle" style={{ marginBottom: '1.25rem' }}>
-              Mã xác minh đã được gửi tới <strong>{email.toLowerCase()}</strong>. Nhập đủ 6 số để xác nhận đăng ký.
+            <p className="auth-subtitle otp-modal-subtitle">
+              Mã xác minh đã được gửi tới
+              <span className="otp-email-chip">{email.toLowerCase()}</span>
             </p>
 
             <div className="otp-digit-grid" aria-label="Nhập mã OTP 6 số">
@@ -337,24 +380,11 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
               ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+            <div className="otp-actions-row">
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ flex: 1, justifyContent: 'center' }}
-                onClick={() => {
-                  setStep('form');
-                  setOtp('');
-                  setSuccess(null);
-                }}
-                disabled={isLoading}
-              >
-                Sửa thông tin
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ flex: 1, justifyContent: 'center' }}
+                style={{ width: '100%', justifyContent: 'center' }}
                 onClick={requestOtp}
                 disabled={isLoading}
               >

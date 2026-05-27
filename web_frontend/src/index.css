@@ -701,6 +701,72 @@ body {
 .otp-modal-card {
   max-width: 460px;
   text-align: center;
+  overflow: hidden;
+}
+
+.otp-modal-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(0, 242, 254, 0.14), transparent 34%),
+    radial-gradient(circle at 80% 10%, rgba(255, 51, 102, 0.16), transparent 32%);
+}
+
+.otp-modal-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.otp-back-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.otp-back-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--glass-border-hover);
+}
+
+.otp-modal-brand {
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.otp-shield-icon {
+  background: linear-gradient(135deg, var(--color-spo2), var(--color-primary));
+}
+
+.otp-modal-subtitle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1.25rem;
+}
+
+.otp-email-chip {
+  display: inline-flex;
+  border: 1px solid rgba(0, 242, 254, 0.24);
+  background: rgba(0, 242, 254, 0.08);
+  color: var(--color-spo2);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-weight: 700;
 }
 
 .otp-digit-grid {
@@ -735,6 +801,153 @@ body {
   opacity: 0.65;
 }
 
+.otp-actions-row {
+  margin-top: 1.5rem;
+}
+
+.register-auth-shell {
+  align-items: flex-start;
+  padding-top: 42px;
+  padding-bottom: 42px;
+  background:
+    radial-gradient(circle at 15% 15%, rgba(0, 242, 254, 0.08) 0%, transparent 32%),
+    radial-gradient(circle at 85% 0%, rgba(255, 51, 102, 0.12) 0%, transparent 30%),
+    linear-gradient(135deg, #06080d 0%, #0d111a 52%, #08090d 100%);
+}
+
+.register-panel {
+  max-width: 520px;
+  position: relative;
+  overflow: hidden;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.register-card-topline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-spo2), var(--color-primary), var(--color-warning));
+}
+
+.register-brand {
+  justify-content: center;
+  margin-bottom: 1.2rem;
+}
+
+.register-brand-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+}
+
+.register-subtitle {
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.auth-stepper {
+  display: grid;
+  grid-template-columns: 1fr 42px 1fr;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 1.35rem;
+}
+
+.auth-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.auth-step span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: var(--input-bg);
+}
+
+.auth-step.active,
+.auth-step.done {
+  color: var(--text-primary);
+}
+
+.auth-step.active span,
+.auth-step.done span {
+  border-color: rgba(255, 51, 102, 0.45);
+  background: var(--color-primary-glow);
+  color: var(--color-primary);
+}
+
+.auth-step-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-border-hover), transparent);
+}
+
+.auth-helper-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 1.35rem;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(0, 242, 254, 0.06);
+  border: 1px solid rgba(0, 242, 254, 0.13);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.auth-helper-card svg {
+  color: var(--color-spo2);
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.register-form {
+  text-align: left;
+}
+
+.password-rule-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+  margin-top: 10px;
+}
+
+.password-rule {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.password-rule svg {
+  color: var(--text-muted);
+}
+
+.password-rule.valid {
+  color: var(--color-bp);
+}
+
+.password-rule.valid svg {
+  color: var(--color-bp);
+}
+
 @media (max-width: 520px) {
   .otp-digit-grid {
     gap: 7px;
@@ -744,6 +957,18 @@ body {
     height: 50px;
     border-radius: 12px;
     font-size: 1.25rem;
+  }
+
+  .register-panel {
+    padding: 1.5rem;
+  }
+
+  .password-rule-list {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-stepper {
+    grid-template-columns: 1fr 26px 1fr;
   }
 }
 

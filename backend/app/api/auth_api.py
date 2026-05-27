@@ -68,7 +68,7 @@ async def request_register_otp(data: RegisterOtpRequest):
         print(f"[SMTP ERROR] Unable to send OTP to {email}: {exc}")
         raise HTTPException(status_code=502, detail=str(exc) or "Unable to send OTP email") from exc
 
-    response = {"message": "OTP sent to email", "email_sent": email_sent}
+    response = {"message": "OTP sent to email", "email": email, "email_sent": email_sent}
     if not email_sent:
         response["dev_otp"] = otp
     return response
