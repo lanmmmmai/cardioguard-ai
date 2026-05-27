@@ -13,10 +13,10 @@ router = APIRouter()
 otp_store: dict[str, dict[str, object]] = {}
 
 
-def send_register_otp_email(email: str, full_name: str, otp: str) -> None:
+def send_register_otp_email(email: str, full_name: str, otp: str) -> bool:
     if not settings.SMTP_USERNAME or not settings.SMTP_PASSWORD:
         print(f"[DEV OTP] Register OTP for {email}: {otp}")
-        return
+        return False
 
     message = EmailMessage()
     message["Subject"] = "CardioGuard AI - Mã OTP đăng ký"
@@ -29,42 +29,55 @@ def send_register_otp_email(email: str, full_name: str, otp: str) -> None:
         "CardioGuard AI"
     )
 
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as smtp:
-        smtp.starttls()
-        smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-        smtp.send_message(message)
+    try:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as smtp:
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+            smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+            smtp.send_message(message)
+    except smtplib.SMTPAuthenticationError as exc:
+        raise RuntimeError("Gmail rejected SMTP login. Use a Gmail App Password, not the normal Gmail password.") from exc
+
+    return True
 
 
 @router.post("/auth/register/request-otp")
 async def request_register_otp(data: RegisterOtpRequest):
+    email = data.email.lower()
     check_query = "SELECT id FROM users WHERE email = :email"
     existing_user = await database.fetch_one(
         query=check_query,
-        values={"email": data.email}
+        values={"email": email}
     )
 
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already exists")
 
     otp = f"{random.randint(0, 999999):06d}"
-    otp_store[data.email] = {
+    otp_store[email] = {
         "otp": otp,
         "full_name": data.full_name,
         "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10)
     }
 
     try:
-        send_register_otp_email(data.email, data.full_name, otp)
+        email_sent = send_register_otp_email(email, data.full_name, otp)
     except Exception as exc:
-        otp_store.pop(data.email, None)
-        raise HTTPException(status_code=502, detail="Unable to send OTP email") from exc
+        otp_store.pop(email, None)
+        print(f"[SMTP ERROR] Unable to send OTP to {email}: {exc}")
+        raise HTTPException(status_code=502, detail=str(exc) or "Unable to send OTP email") from exc
 
-    return {"message": "OTP sent to email"}
+    response = {"message": "OTP sent to email", "email_sent": email_sent}
+    if not email_sent:
+        response["dev_otp"] = otp
+    return response
 
 
 @router.post("/auth/register")
 async def register(data: RegisterRequest):
-    otp_record = otp_store.get(data.email)
+    email = data.email.lower()
+    otp_record = otp_store.get(email)
     now = datetime.now(timezone.utc)
 
     if not otp_record or otp_record["otp"] != data.otp:
@@ -77,7 +90,7 @@ async def register(data: RegisterRequest):
     check_query = "SELECT id FROM users WHERE email = :email"
     existing_user = await database.fetch_one(
         query=check_query,
-        values={"email": data.email}
+        values={"email": email}
     )
 
     if existing_user:
@@ -92,13 +105,13 @@ async def register(data: RegisterRequest):
         query=insert_query,
         values={
             "full_name": data.full_name,
-            "email": data.email,
+            "email": email,
             "password_hash": hash_password(data.password),
             "role": "patient"
         }
     )
 
-    otp_store.pop(data.email, None)
+    otp_store.pop(email, None)
 
     return {"message": "Register successfully"}
 

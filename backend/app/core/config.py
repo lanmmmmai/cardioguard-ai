@@ -1,4 +1,8 @@
-from pydantic_settings import BaseSettings
+from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BASE_DIR = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -11,9 +15,10 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = ""
 
-    class Config:
-        env_file = ".env"
-        extra = "allow"
+    model_config = SettingsConfigDict(
+        env_file=(BASE_DIR / ".env", BASE_DIR / "backend" / ".env"),
+        extra="allow"
+    )
 
 
 settings = Settings()

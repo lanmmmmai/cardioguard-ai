@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Activity, Mail, Lock, User, Loader2, ShieldCheck } from 'lucide-react';
 import { API_URL } from '../config';
 
@@ -18,16 +18,17 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
+  const [step, setStep] = useState<'form' | 'otp'>('form');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
-  const validateIdentity = () => {
+  const validateForm = () => {
     const normalizedName = normalizeName(fullName);
 
-    if (!normalizedName || !email) {
-      return 'Vui lòng nhập họ tên và Gmail để nhận OTP';
+    if (!normalizedName || !email || !password || !confirmPassword) {
+      return 'Vui lòng nhập đầy đủ họ tên, Gmail và mật khẩu';
     }
 
     if (!fullNamePattern.test(normalizedName)) {
@@ -38,14 +39,6 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
       return 'Vui lòng dùng địa chỉ Gmail để xác minh OTP';
     }
 
-    return null;
-  };
-
-  const validatePassword = () => {
-    if (!password || !confirmPassword) {
-      return 'Vui lòng nhập mật khẩu và xác nhận mật khẩu';
-    }
-
     if (!passwordPattern.test(password)) {
       return 'Mật khẩu tối thiểu 8 ký tự, có ít nhất 1 chữ hoa, có chữ, số và ký tự đặc biệt';
     }
@@ -54,15 +47,11 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
       return 'Mật khẩu nhập lại không khớp';
     }
 
-    if (!/^\d{6}$/.test(otp.trim())) {
-      return 'OTP phải gồm đúng 6 chữ số';
-    }
-
     return null;
   };
 
   const requestOtp = async () => {
-    const validationError = validateIdentity();
+    const validationError = validateForm();
     if (validationError) {
       setError(validationError);
       return;
@@ -78,7 +67,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: normalizeName(fullName),
-          email,
+          email: email.toLowerCase(),
         }),
       });
 
@@ -88,8 +77,13 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
         throw new Error(data.detail || 'Không gửi được OTP. Vui lòng thử lại');
       }
 
-      setOtpSent(true);
-      setSuccess('Đã gửi OTP tới Gmail. Vui lòng kiểm tra hộp thư hoặc spam.');
+      setStep('otp');
+      setOtp('');
+      setSuccess(
+        data.dev_otp
+          ? `Môi trường dev chưa cấu hình SMTP. Mã OTP tạm: ${data.dev_otp}`
+          : 'Đã gửi OTP tới Gmail. Vui lòng kiểm tra hộp thư hoặc spam.'
+      );
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
     } finally {
@@ -97,13 +91,40 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleOtpDigitChange = (index: number, value: string) => {
+    const digit = value.replace(/\D/g, '').slice(-1);
+    const nextOtp = otp.padEnd(6, ' ').split('');
+    nextOtp[index] = digit || ' ';
+    setOtp(nextOtp.join('').replace(/\s/g, ''));
 
-    const identityError = validateIdentity();
-    const passwordError = validatePassword();
-    if (identityError || passwordError) {
-      setError(identityError || passwordError);
+    if (digit && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedOtp = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    setOtp(pastedOtp);
+    const focusIndex = Math.min(pastedOtp.length, 5);
+    window.setTimeout(() => otpInputRefs.current[focusIndex]?.focus(), 0);
+  };
+
+  const confirmOtpAndRegister = async () => {
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setError('OTP phải gồm đúng 6 chữ số');
       return;
     }
 
@@ -117,7 +138,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: normalizeName(fullName),
-          email,
+          email: email.toLowerCase(),
           password,
           otp: otp.trim(),
         }),
@@ -138,6 +159,11 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await requestOtp();
+  };
+
   return (
     <div className="auth-container">
       <div className="panel auth-panel">
@@ -149,7 +175,9 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
         </div>
 
         <h2 className="auth-title">Đăng Ký Bệnh Nhân</h2>
-        <p className="auth-subtitle">Đăng ký chỉ dành cho Patient. Admin và Doctor đăng nhập bằng tài khoản được cấp.</p>
+        <p className="auth-subtitle">
+          Bước 1: nhập thông tin và bấm Đăng ký để nhận OTP. Bước 2: nhập OTP rồi xác nhận.
+        </p>
 
         {error && (
           <div className="alert-strip high" style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
@@ -163,7 +191,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
         {success && (
           <div className="alert-strip low" style={{ marginBottom: '1.5rem', textAlign: 'left', borderLeftColor: 'var(--color-bp)' }}>
             <div className="alert-strip-body">
-              <div className="alert-strip-title" style={{ color: 'var(--color-bp)' }}>Thành Công</div>
+              <div className="alert-strip-title" style={{ color: 'var(--color-bp)' }}>Thông Báo</div>
               <div className="alert-strip-desc">{success}</div>
             </div>
           </div>
@@ -182,6 +210,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 style={{ paddingLeft: '45px' }}
+                disabled={isLoading}
                 required
               />
             </div>
@@ -199,36 +228,10 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={{ paddingLeft: '45px' }}
+                disabled={isLoading}
                 required
               />
             </div>
-          </div>
-
-          <button
-            type="button"
-            className="btn btn-secondary"
-            style={{ width: '100%', justifyContent: 'center', height: '42px', marginBottom: '1rem' }}
-            onClick={requestOtp}
-            disabled={isLoading}
-          >
-            {isLoading && !otpSent ? <Loader2 className="beat-animated" size={16} /> : <ShieldCheck size={16} />}
-            {otpSent ? 'Gửi lại OTP' : 'Gửi OTP qua Gmail'}
-          </button>
-
-          <div className="form-group">
-            <label htmlFor="otp">Mã OTP</label>
-            <input
-              id="otp"
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              className="form-control"
-              placeholder="Nhập 6 chữ số"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-              disabled={!otpSent}
-              required
-            />
           </div>
 
           <div className="form-group">
@@ -243,11 +246,12 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 style={{ paddingLeft: '45px' }}
+                disabled={isLoading}
                 required
               />
             </div>
             <div style={{ marginTop: '6px', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              Tối thiểu 8 ký tự, có chữ hoa, chữ thường/chữ cái, số và ký tự đặc biệt.
+              Tối thiểu 8 ký tự, có chữ hoa, chữ, số và ký tự đặc biệt.
             </div>
           </div>
 
@@ -263,6 +267,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 style={{ paddingLeft: '45px' }}
+                disabled={isLoading}
                 required
               />
             </div>
@@ -272,15 +277,17 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
             type="submit"
             className="btn btn-primary"
             style={{ width: '100%', justifyContent: 'center', height: '46px' }}
-            disabled={isLoading || !otpSent}
+            disabled={isLoading}
           >
-            {isLoading && otpSent ? (
+            {isLoading ? (
               <>
                 <Loader2 className="beat-animated" size={18} style={{ marginRight: '6px' }} />
-                Đang xác minh...
+                Đang gửi OTP...
               </>
             ) : (
-              'Xác Minh OTP & Đăng Ký'
+              <>
+                <ShieldCheck size={18} /> Đăng Ký
+              </>
             )}
           </button>
         </form>
@@ -292,6 +299,88 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
           </span>
         </div>
       </div>
+
+      {step === 'otp' && (
+        <div className="modal-overlay">
+          <div className="modal-content otp-modal-card">
+            <div className="brand" style={{ justifyContent: 'center', marginBottom: '1rem' }}>
+              <div className="brand-icon">
+                <ShieldCheck size={22} />
+              </div>
+            </div>
+
+            <h2 className="auth-title">Nhập Mã OTP</h2>
+            <p className="auth-subtitle" style={{ marginBottom: '1.25rem' }}>
+              Mã xác minh đã được gửi tới <strong>{email.toLowerCase()}</strong>. Nhập đủ 6 số để xác nhận đăng ký.
+            </p>
+
+            <div className="otp-digit-grid" aria-label="Nhập mã OTP 6 số">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <input
+                  key={index}
+                  ref={(element) => {
+                    otpInputRefs.current[index] = element;
+                  }}
+                  className="otp-digit-input"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                  maxLength={1}
+                  value={otp[index] || ''}
+                  onChange={(e) => handleOtpDigitChange(index, e.target.value)}
+                  onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                  onPaste={handleOtpPaste}
+                  disabled={isLoading}
+                  autoFocus={index === 0}
+                  aria-label={`Số OTP thứ ${index + 1}`}
+                />
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={() => {
+                  setStep('form');
+                  setOtp('');
+                  setSuccess(null);
+                }}
+                disabled={isLoading}
+              >
+                Sửa thông tin
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ flex: 1, justifyContent: 'center' }}
+                onClick={requestOtp}
+                disabled={isLoading}
+              >
+                Gửi lại OTP
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ width: '100%', justifyContent: 'center', height: '46px', marginTop: '12px' }}
+              onClick={confirmOtpAndRegister}
+              disabled={isLoading || otp.length !== 6}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="beat-animated" size={18} style={{ marginRight: '6px' }} />
+                  Đang xác nhận...
+                </>
+              ) : (
+                'Xác Nhận OTP'
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
