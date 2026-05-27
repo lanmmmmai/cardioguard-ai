@@ -27,6 +27,15 @@ async def get_patients(authorization: str | None = Header(default=None)):
         ORDER BY full_name ASC
         """
         rows = await database.fetch_all(query=query, values={"user_id": current_user["id"]})
+    elif role == "doctor":
+        query = """
+        SELECT users.id::text as id, users.full_name, users.email
+        FROM users
+        JOIN doctor_patient dp ON dp.patient_id::text = users.id::text
+        WHERE dp.doctor_id::text = :doctor_id AND lower(users.role) = 'patient'
+        ORDER BY users.full_name ASC
+        """
+        rows = await database.fetch_all(query=query, values={"doctor_id": current_user["id"]})
     else:
         query = """
         SELECT id::text as id, full_name, email

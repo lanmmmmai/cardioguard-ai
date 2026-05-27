@@ -5,10 +5,11 @@ import { Register } from './components/Register';
 import { Dashboard } from './components/Dashboard';
 import { Patients } from './components/Patients';
 import { Alerts } from './components/Alerts';
-import { ICUCamera } from './components/ICUCamera';
-import { StatsDashboard } from './components/StatsDashboard';
 import { PatientDetail } from './components/PatientDetail';
 import { FeatureHub } from './components/FeatureHub';
+import { ApiDataPage } from './components/ApiDataPage';
+import { ProfilePage } from './components/ProfilePage';
+import { CmsPage } from './components/cms/CmsPage';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { defaultRouteByRole, normalizeRole, type UserRole } from './auth/roles';
@@ -149,7 +150,9 @@ const AppContent: React.FC = () => {
 
   const fetchAlerts = async () => {
     try {
-      const response = await fetch(`${API_URL}/alerts`);
+      const response = await fetch(`${API_URL}/alerts`, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
       if (response.ok) setAlerts(await response.json());
     } catch (err) {
       console.error('Failed to fetch alerts:', err);
@@ -228,6 +231,8 @@ const AppContent: React.FC = () => {
     switch (normalizedPath) {
       case '/admin/dashboard':
         return <AdminDashboard patients={patients} alerts={alerts} />;
+      case '/admin/cms':
+        return <CmsPage />;
       case '/admin/patients':
       case '/doctor/patients':
         return renderPatientList();
@@ -237,10 +242,10 @@ const AppContent: React.FC = () => {
       case '/admin/devices':
         return <FeatureHub type="devices" role="admin" patients={patients} />;
       case '/admin/cameras':
-        return <ICUCamera />;
+        return <ApiDataPage title="Quản lý camera" subtitle="Danh sách camera thật từ bảng cameras theo quyền hiện tại." endpoint="/cameras" />;
       case '/admin/reports':
       case '/doctor/reports':
-        return <StatsDashboard patients={patients} alerts={alerts} />;
+        return <ApiDataPage title="Báo cáo" subtitle="Danh sách báo cáo thật từ bảng reports theo quyền hiện tại." endpoint="/reports" />;
       case '/doctor/dashboard':
         return <DoctorDashboard patients={patients} alerts={alerts} />;
       case '/doctor/appointments':
@@ -248,6 +253,20 @@ const AppContent: React.FC = () => {
         return <FeatureHub type="appointments" role={routeRole || 'doctor'} patients={patients} />;
       case '/doctor/medical-records':
         return <FeatureHub type="records" role="doctor" patients={patients} />;
+      case '/doctor/prescriptions':
+      case '/patient/prescriptions':
+        return <ApiDataPage title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/prescriptions" />;
+      case '/doctor/chat':
+      case '/patient/chat':
+        return <ApiDataPage title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/chat-messages" />;
+      case '/patient/notifications':
+        return <ApiDataPage title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/notifications" />;
+      case '/admin/system-logs':
+        return <ApiDataPage title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/audit-logs" />;
+      case '/admin/profile':
+      case '/doctor/profile':
+      case '/patient/profile':
+        return <ProfilePage role={routeRole || 'patient'} />;
       case '/doctor/realtime-monitoring':
         return <Dashboard patients={patients} latestTelemetry={latestTelemetry} alerts={alerts} onAddPatientClick={() => navigate('/doctor/patients')} />;
       case '/patient/home':

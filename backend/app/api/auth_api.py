@@ -39,9 +39,27 @@ async def get_user_from_token(authorization: str | None):
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
-    user = await database.fetch_one(
+    columns = await database.fetch_all(
         """
-        SELECT id::text as id, full_name, email, role
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'users'
+        """
+    )
+    user_columns = {column["column_name"] for column in columns}
+    select_columns = [
+        "id::text as id",
+        "full_name",
+        "email",
+        "phone" if "phone" in user_columns else "NULL::text as phone",
+        "role",
+        "created_at" if "created_at" in user_columns else "NULL::timestamptz as created_at",
+        "status" if "status" in user_columns else "NULL::text as status",
+    ]
+
+    user = await database.fetch_one(
+        f"""
+        SELECT {", ".join(select_columns)}
         FROM users
         WHERE id::text = :user_id
         """,
@@ -55,7 +73,10 @@ async def get_user_from_token(authorization: str | None):
         "id": user["id"],
         "full_name": user["full_name"],
         "email": user["email"],
-        "role": normalize_role(user["role"])
+        "phone": user["phone"],
+        "role": normalize_role(user["role"]),
+        "created_at": user["created_at"],
+        "status": user["status"]
     }
 
 

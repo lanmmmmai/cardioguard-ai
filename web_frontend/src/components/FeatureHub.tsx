@@ -1,5 +1,7 @@
-import React from 'react';
-import { AlertTriangle, CalendarDays, Cpu, FileText, ShieldCheck, Sparkles } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, CalendarDays, Cpu, FileText, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
+import { API_URL } from '../config';
+import { useAuth } from '../auth/AuthContext';
 
 interface Patient {
   id: string;
@@ -41,23 +43,57 @@ const pageMeta = {
     icon: CalendarDays,
     title: 'Lịch Hẹn & Tư Vấn',
     subtitle: 'Đặt lịch, xác nhận, dời lịch, thống kê lịch khám và tư vấn trực tuyến.',
+    endpoint: '/appointments',
   },
   records: {
     icon: FileText,
     title: 'Bệnh Án & AI Hỗ Trợ',
     subtitle: 'Quản lý hồ sơ bệnh án, file y tế, kết quả khám và phân tích nguy cơ tim mạch.',
+    endpoint: '/medical-records',
   },
   devices: {
     icon: Cpu,
     title: 'IoT Devices & Camera',
     subtitle: 'Quản lý thiết bị wearable, gateway ECG, camera ICU và trạng thái kết nối realtime.',
+    endpoint: '/devices',
   },
 };
 
 export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) => {
+  const { accessToken } = useAuth();
   const meta = pageMeta[type];
   const Icon = meta.icon;
   const visiblePatients = role === 'patient' ? patients.slice(0, 1) : patients;
+  const [records, setRecords] = useState<Array<Record<string, any>>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchRecords = async () => {
+    if (!accessToken) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${API_URL}${meta.endpoint}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Không lấy được dữ liệu');
+      setRecords(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      setError(err.message || 'Lỗi kết nối máy chủ');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecords();
+  }, [accessToken, meta.endpoint]);
+
+  const primaryColumns = useMemo(() => {
+    const keys = Array.from(new Set(records.flatMap((record) => Object.keys(record))));
+    return keys.filter((key) => key !== 'updated_at').slice(0, 6);
+  }, [records]);
 
   return (
     <div>
@@ -71,6 +107,42 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
         <span className="badge" style={{ background: 'var(--color-spo2-glow)', color: 'var(--color-spo2)' }}>
           Role: {role || 'doctor'}
         </span>
+      </div>
+
+      <div className="panel" style={{ marginBottom: '1.5rem' }}>
+        <div className="metric-header" style={{ marginBottom: '1rem' }}>
+          <span className="metric-title">Dữ liệu thật từ Supabase</span>
+          <button type="button" className="btn btn-secondary" onClick={fetchRecords} disabled={loading}>
+            <RefreshCw size={14} /> Làm mới
+          </button>
+        </div>
+        {loading ? (
+          <div style={{ color: 'var(--text-muted)', padding: '1rem 0' }}>Đang tải dữ liệu...</div>
+        ) : error ? (
+          <div className="alert-strip high">
+            <AlertTriangle size={16} className="alert-strip-icon" />
+            <div className="alert-strip-body">
+              <div className="alert-strip-title">Không thể tải dữ liệu</div>
+              <div className="alert-strip-desc">{error}</div>
+            </div>
+          </div>
+        ) : records.length === 0 ? (
+          <div style={{ color: 'var(--text-muted)', padding: '1rem 0' }}>
+            Chưa có bản ghi thật trong bảng này theo quyền hiện tại.
+          </div>
+        ) : (
+          <div className="activity-list">
+            {records.slice(0, 12).map((record) => (
+              <div key={String(record.id)}>
+                {primaryColumns.map((column) => (
+                  <span key={column} style={{ marginRight: '12px' }}>
+                    <strong>{column}:</strong> {String(record[column] ?? '')}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid-3" style={{ marginBottom: '1.5rem' }}>

@@ -11,6 +11,7 @@ interface AuthContextValue {
   authError: string | null;
   login: (token: string, user: AuthUser) => AuthUser;
   logout: () => void;
+  refreshUser: () => Promise<AuthUser | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -23,7 +24,10 @@ const normalizeUser = (user: any): AuthUser | null => {
     id: String(user.id),
     full_name: user.full_name || user.email || 'Người dùng',
     email: user.email,
+    phone: user.phone || null,
     role,
+    created_at: user.created_at || null,
+    status: user.status || null,
   };
 };
 
@@ -56,6 +60,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return normalizedUser;
   };
 
+  const refreshUser = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+
+    const response = await fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      throw new Error(response.status === 401 ? 'Phiên đăng nhập đã hết hạn' : 'Không lấy được thông tin tài khoản');
+    }
+
+    const data = await response.json();
+    const normalizedUser = normalizeUser(data.user || data);
+    if (!normalizedUser) {
+      throw new Error('Tài khoản chưa được phân quyền');
+    }
+
+    localStorage.setItem('user', JSON.stringify(normalizedUser));
+    setAccessToken(token);
+    setUser(normalizedUser);
+    return normalizedUser;
+  };
+
   useEffect(() => {
     const restoreSession = async () => {
       const token = localStorage.getItem('token');
@@ -65,23 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       try {
-        const response = await fetch(`${API_URL}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!response.ok) {
-          throw new Error(response.status === 401 ? 'Phiên đăng nhập đã hết hạn' : 'Không lấy được thông tin tài khoản');
-        }
-
-        const data = await response.json();
-        const normalizedUser = normalizeUser(data.user || data);
-        if (!normalizedUser) {
-          throw new Error('Tài khoản chưa được phân quyền');
-        }
-
-        localStorage.setItem('user', JSON.stringify(normalizedUser));
-        setAccessToken(token);
-        setUser(normalizedUser);
+        await refreshUser();
       } catch (err: any) {
         logout();
         setAuthError(err.message || 'Không thể khôi phục phiên đăng nhập');
@@ -102,6 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     authError,
     login,
     logout,
+    refreshUser,
   }), [accessToken, user, loading, authError]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

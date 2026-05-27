@@ -4,7 +4,10 @@ export interface AuthUser {
   id: string;
   full_name: string;
   email: string;
+  phone?: string | null;
   role: UserRole;
+  created_at?: string | null;
+  status?: string | null;
 }
 
 export const VALID_ROLES: UserRole[] = ['admin', 'doctor', 'patient'];

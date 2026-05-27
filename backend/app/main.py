@@ -8,6 +8,9 @@ from app.api.alert_api import router as alert_router
 from app.api.realtime_api import router as realtime_router
 from app.api.auth_api import router as auth_router
 from app.api.feature_api import router as feature_router
+from app.api.crud_api import router as crud_router
+from app.api.user_api import router as user_router
+from app.api.cms_api import router as cms_router
 
 
 app = FastAPI(
@@ -41,9 +44,12 @@ async def shutdown():
 
 app.include_router(realtime_router)
 app.include_router(auth_router)
+app.include_router(user_router)
 app.include_router(patient_router)
 app.include_router(sensor_router)
 app.include_router(alert_router)
+app.include_router(crud_router)
+app.include_router(cms_router)
 app.include_router(feature_router)
 
 
