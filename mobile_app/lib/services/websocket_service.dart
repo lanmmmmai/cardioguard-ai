@@ -3,7 +3,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 
 class WebSocketService {
-  static String wsUrl = 'ws://10.0.2.2:8000/ws/realtime';
+  static String wsUrl = 'wss://cardioguard-ai-1-27vd.onrender.com/ws/realtime';
   static WebSocketChannel? _channel;
   static bool _isConnected = false;
   static final List<Function(Map<String, dynamic>)> _listeners = [];

@@ -1,9 +1,10 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // Use 10.0.2.2 for Android emulator to access localhost of host machine, or localhost for web/iOS
-  static String baseUrl = 'http://10.0.2.2:8000'; 
+  // Use production Render URL instead of local URL
+  static String baseUrl = 'https://cardioguard-ai-1-27vd.onrender.com'; 
   static String? token;
   static Map<String, dynamic>? currentUser;
 
@@ -131,12 +132,38 @@ class ApiService {
   // Trigger Telemetry Simulator (Normal / Abnormal)
   static Future<bool> triggerSimulation(String patientId, bool isAbnormal) async {
     try {
-      final endpoint = isAbnormal ? 'abnormal' : 'normal';
+      final rand = math.Random();
+      int hr = rand.nextInt(40) + 60; // 60 - 100 normal
+      int o2 = rand.nextInt(5) + 95;  // 95 - 100 normal
+      int sys = rand.nextInt(25) + 110; // 110 - 135 normal
+      int dia = rand.nextInt(15) + 70;  // 70 - 85 normal
+      double ecg = (rand.nextDouble() - 0.5) * 0.3;
+
+      if (isAbnormal) {
+        final randType = rand.nextDouble();
+        if (randType < 0.33) {
+          hr = rand.nextBool() ? 135 : 45; // high/low heart rate
+        } else if (randType < 0.66) {
+          o2 = rand.nextInt(6) + 85; // 85 - 91 low oxygen
+        } else {
+          sys = 155; // high blood pressure
+          dia = 95;
+        }
+      }
+
       final response = await http.post(
-        Uri.parse('$baseUrl/sensor/$patientId/$endpoint'),
+        Uri.parse('$baseUrl/sensor-data'),
         headers: _headers,
+        body: json.encode({
+          'patient_id': patientId,
+          'heart_rate': hr,
+          'spo2': o2,
+          'systolic_bp': sys,
+          'diastolic_bp': dia,
+          'ecg_value': ecg,
+        }),
       );
-      return response.statusCode == 200;
+      return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       print('Trigger simulation error: $e');
       return false;
