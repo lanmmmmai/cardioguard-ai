@@ -88,7 +88,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
       setOtp('');
       setSuccess(
         data.dev_otp
-          ? `Môi trường dev chưa cấu hình SMTP. Mã OTP tạm: ${data.dev_otp}`
+          ? `Môi trường dev chưa cấu hình Resend API. Mã OTP tạm: ${data.dev_otp}`
           : `Đã gửi OTP tới ${data.email || email.toLowerCase()}. Vui lòng kiểm tra hộp thư hoặc spam.`
       );
     } catch (err: any) {

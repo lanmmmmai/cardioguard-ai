@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     SMTP_USERNAME: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = ""
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = "CardioGuard <onboarding@resend.dev>"
 
     model_config = SettingsConfigDict(
         env_file=(BASE_DIR / ".env", BASE_DIR / "backend" / ".env"),
