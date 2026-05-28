@@ -91,9 +91,7 @@ class _StatsScreenState extends State<StatsScreen> {
                     children: [
                       Text(
                         'Thống Kê Hệ Thống',
-                        style: TextStyle(
-                          fontFamily: 'Futura',
-                          fontSize: 22,
+                        style: TextStyle(fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: textColor,
                         ),
@@ -101,7 +99,7 @@ class _StatsScreenState extends State<StatsScreen> {
                       const SizedBox(height: 4),
                       Text(
                         'Phân tích sự cố và hiệu suất telemetry',
-                        style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Futura'),
+                        style: TextStyle(color: textMuted, fontSize: 13,),
                       ),
                     ],
                   ),
@@ -156,9 +154,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF9EA5B4),
-                                    fontFamily: 'Futura',
-                                    letterSpacing: 0.5,
+                                    color: Color(0xFF9EA5B4),letterSpacing: 0.5,
                                   ),
                                 ),
                                 const SizedBox(height: 20),
@@ -174,21 +170,21 @@ class _StatsScreenState extends State<StatsScreen> {
                                           value: _highAlertsVal,
                                           title: 'Nguy kịch',
                                           radius: 30,
-                                          titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Futura'),
+                                          titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white,),
                                         ),
                                         PieChartSectionData(
                                           color: const Color(0xFFFFB606),
                                           value: _medAlertsVal,
                                           title: 'Cảnh báo',
                                           radius: 30,
-                                          titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Futura'),
+                                          titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white,),
                                         ),
                                         PieChartSectionData(
                                           color: const Color(0xFF39FF14),
                                           value: _lowAlertsVal,
                                           title: 'Ổn định',
                                           radius: 30,
-                                          titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white, fontFamily: 'Futura'),
+                                          titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white,),
                                         ),
                                       ],
                                     ),
@@ -225,9 +221,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF9EA5B4),
-                                    fontFamily: 'Futura',
-                                    letterSpacing: 0.5,
+                                    color: Color(0xFF9EA5B4),letterSpacing: 0.5,
                                   ),
                                 ),
                                 const SizedBox(height: 24),
@@ -256,7 +250,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                               if (idx >= 0 && idx < days.length) {
                                                 return Padding(
                                                   padding: const EdgeInsets.only(top: 6),
-                                                  child: Text(days[idx], style: TextStyle(color: textMuted, fontSize: 10, fontFamily: 'Futura')),
+                                                  child: Text(days[idx], style: TextStyle(color: textMuted, fontSize: 10,)),
                                                 );
                                               }
                                               return const Text('');
@@ -334,9 +328,7 @@ class _StatsScreenState extends State<StatsScreen> {
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: textColor,
-              fontFamily: 'Futura',
-            ),
+              color: textColor,),
           ),
           const SizedBox(height: 2),
           Text(
@@ -362,7 +354,7 @@ class _StatsScreenState extends State<StatsScreen> {
         const SizedBox(width: 6),
         Text(
           label,
-          style: TextStyle(color: textMuted, fontSize: 11, fontFamily: 'Futura'),
+          style: TextStyle(color: textMuted, fontSize: 11,),
         ),
       ],
     );

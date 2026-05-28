@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
+import '../core/secure_storage.dart';
+import '../config/app_config.dart';
 
 class WebSocketService {
-  static String wsUrl = 'ws://10.0.2.2:8000/ws/realtime';
+  static String wsUrl = AppConfig.wsUrl;
   static WebSocketChannel? _channel;
   static bool _isConnected = false;
   static final List<Function(Map<String, dynamic>)> _listeners = [];
@@ -13,26 +15,32 @@ class WebSocketService {
   }
 
   static void addListener(Function(Map<String, dynamic>) callback) {
-    _listeners.add(callback);
+    if (!_listeners.contains(callback)) {
+      _listeners.add(callback);
+    }
   }
 
   static void removeListener(Function(Map<String, dynamic>) callback) {
     _listeners.remove(callback);
   }
 
-  static void connect() {
+  static Future<void> connect() async {
     if (_isConnected) return;
 
     try {
-      _channel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
+      final token = await SecureStorage().getToken();
+      final uriStr = token != null ? '$wsUrl?token=$token' : wsUrl;
+      final uri = Uri.parse(uriStr);
+
+      _channel = IOWebSocketChannel.connect(uri);
       _isConnected = true;
-      print('WebSocket connected to $wsUrl');
+      print('WebSocket authenticated connection opened to $wsUrl');
 
       _channel!.stream.listen(
         (message) {
           try {
             final Map<String, dynamic> data = json.decode(message);
-            for (var listener in _listeners) {
+            for (var listener in List.from(_listeners)) {
               listener(data);
             }
           } catch (e) {
@@ -57,11 +65,12 @@ class WebSocketService {
   static void _handleDisconnect() {
     _isConnected = false;
     _channel = null;
+    
     // Auto-reconnect after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(seconds: 3), () async {
       if (!_isConnected) {
         print('Attempting to reconnect WebSocket...');
-        connect();
+        await connect();
       }
     });
   }

@@ -44,3 +44,121 @@ async def get_alerts(authorization: str | None = Header(default=None)):
     alerts = await database.fetch_all(query, values)
 
     return alerts
+
+
+from fastapi import HTTPException
+
+@router.patch("/alerts/{alert_id}/resolve")
+async def resolve_alert(alert_id: str, authorization: str | None = Header(default=None)):
+    current_user = await get_user_from_token(authorization)
+    role = current_user["role"]
+    
+    # Verify alert exists
+    alert = await database.fetch_one(
+        "SELECT patient_id::text FROM alerts WHERE id::text = :alert_id",
+        {"alert_id": alert_id}
+    )
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+        
+    patient_id = alert["patient_id"]
+    if role == "patient" and patient_id != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền xử lý cảnh báo của bệnh nhân khác")
+    elif role == "doctor":
+        assigned = await database.fetch_one(
+            "SELECT 1 FROM doctor_patient WHERE doctor_id::text = :doctor_id AND patient_id::text = :patient_id",
+            {"doctor_id": current_user["id"], "patient_id": patient_id}
+        )
+        if not assigned:
+            raise HTTPException(status_code=403, detail="Bác sĩ chưa được phân công quản lý bệnh nhân này")
+
+    # Update is_resolved
+    await database.execute(
+        "UPDATE alerts SET is_resolved = TRUE WHERE id::text = :alert_id",
+        {"alert_id": alert_id}
+    )
+    
+    # Fetch complete updated alert to broadcast
+    updated_alert = await database.fetch_one(
+        """
+        SELECT 
+            alerts.id,
+            alerts.patient_id::text as patient_id,
+            users.full_name,
+            alerts.alert_type,
+            alerts.message,
+            alerts.severity,
+            alerts.is_resolved,
+            alerts.created_at
+        FROM alerts
+        JOIN users ON alerts.patient_id::text = users.id::text AND lower(users.role) = 'patient'
+        WHERE alerts.id::text = :alert_id
+        """,
+        {"alert_id": alert_id}
+    )
+    
+    alert_dict = {key: updated_alert[key] for key in updated_alert.keys()}
+    from app.api.crud_api import to_jsonable
+    alert_dict = to_jsonable(alert_dict)
+    
+    from app.websocket.connection_manager import manager
+    await manager.broadcast_alert(patient_id, alert_dict)
+    
+    return {"message": "Cảnh báo đã được xác nhận xử lý thành công", "alert_id": alert_id}
+
+
+from pydantic import BaseModel
+
+class AlertCreate(BaseModel):
+    message: str = "Yêu cầu hỗ trợ khẩn cấp (SOS)"
+
+@router.post("/alerts")
+async def create_sos_alert(payload: AlertCreate, authorization: str | None = Header(default=None)):
+    current_user = await get_user_from_token(authorization)
+    if current_user["role"] != "patient":
+        raise HTTPException(status_code=403, detail="Chỉ bệnh nhân mới có thể gửi cảnh báo SOS")
+        
+    import uuid
+    alert_id = str(uuid.uuid4())
+    insert_query = """
+    INSERT INTO alerts (id, patient_id, alert_type, message, severity, is_resolved)
+    VALUES (:id, :patient_id, :alert_type, :message, :severity, FALSE)
+    """
+    
+    await database.execute(
+        insert_query,
+        {
+            "id": alert_id,
+            "patient_id": current_user["id"],
+            "alert_type": "SOS",
+            "message": payload.message,
+            "severity": "critical"
+        }
+    )
+    
+    updated_alert = await database.fetch_one(
+        """
+        SELECT 
+            alerts.id,
+            alerts.patient_id::text as patient_id,
+            users.full_name,
+            alerts.alert_type,
+            alerts.message,
+            alerts.severity,
+            alerts.is_resolved,
+            alerts.created_at
+        FROM alerts
+        JOIN users ON alerts.patient_id::text = users.id::text AND lower(users.role) = 'patient'
+        WHERE alerts.id::text = :alert_id
+        """,
+        {"alert_id": alert_id}
+    )
+    
+    alert_dict = {key: updated_alert[key] for key in updated_alert.keys()}
+    from app.api.crud_api import to_jsonable
+    alert_dict = to_jsonable(alert_dict)
+    
+    from app.websocket.connection_manager import manager
+    await manager.broadcast_alert(current_user["id"], alert_dict)
+    
+    return alert_dict

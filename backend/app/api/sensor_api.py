@@ -68,8 +68,8 @@ async def create_sensor_data(data: SensorDataCreate):
                 "severity": alert["severity"]
             }
         )
-    await manager.broadcast({
-        "patient_id": data.patient_id,
+    broadcast_data = {
+        "patient_id": str(data.patient_id),
         "heart_rate": data.heart_rate,
         "spo2": data.spo2,
         "systolic_bp": data.systolic_bp,
@@ -77,7 +77,19 @@ async def create_sensor_data(data: SensorDataCreate):
         "ecg_value": data.ecg_value,
         "is_abnormal": len(alerts) > 0,
         "alerts": alerts
-    })
+    }
+    await manager.broadcast_sensor_data(str(data.patient_id), broadcast_data)
+    
+    from datetime import datetime, timezone
+    for alert in alerts:
+        await manager.broadcast_alert(str(data.patient_id), {
+            "patient_id": str(data.patient_id),
+            "alert_type": alert["alert_type"],
+            "message": alert["message"],
+            "severity": alert["severity"],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+
     return {
         "message": "Sensor data saved successfully",
         "is_abnormal": len(alerts) > 0,
