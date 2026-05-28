@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertOctagon, ArrowLeft } from 'lucide-react';
+import { AlertOctagon } from 'lucide-react';
 import { Login } from './components/Login';
 import { Register } from './components/Register';
+import { ForgotPassword } from './components/ForgotPassword';
+import { ChangePassword } from './components/ChangePassword';
 import { Dashboard } from './components/Dashboard';
 import { Patients } from './components/Patients';
 import { Alerts } from './components/Alerts';
@@ -207,14 +209,18 @@ const AppContent: React.FC = () => {
 
   useWebSocket(WS_URL, accessToken ? handleWebSocketMessage : undefined);
 
-  const handleLoginSuccess = (token: string, userData: { id: string; full_name: string; email: string; role: string }) => {
+  const handleLoginSuccess = (token: string, userData: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean }) => {
     const userRole = normalizeRole(userData.role);
     if (!userRole) {
       throw new Error('Tài khoản chưa được phân quyền');
     }
 
     const normalizedUser = login(token, { ...userData, role: userRole });
-    navigate(defaultRouteByRole[normalizedUser.role], true);
+    if (userData.must_change_password) {
+      navigate('/change-password', true);
+    } else {
+      navigate(defaultRouteByRole[normalizedUser.role], true);
+    }
   };
 
   const renderPatientList = () => {
@@ -305,22 +311,31 @@ const AppContent: React.FC = () => {
   }
 
   if (path === '/forgot-password') {
-    return (
-      <div className="auth-container">
-        <div className="panel auth-panel">
-          <button type="button" className="auth-back-btn" onClick={() => navigate('/login')}>
-            <ArrowLeft size={16} /> Quay lại đăng nhập
-          </button>
-          <h2 className="auth-title">Quên mật khẩu</h2>
-          <p className="auth-subtitle">Module khôi phục mật khẩu/OTP đã có route riêng và có thể nối API email khi backend sẵn sàng.</p>
-        </div>
-      </div>
-    );
+    return <ForgotPassword onNavigateToLogin={() => navigate('/login')} />;
   }
 
-  if (path === '/login' || !routeRole) {
+  if (path === '/change-password') {
+    if (!isAuthenticated || !role) {
+      navigate('/login', true);
+      return null;
+    }
+    return <ChangePassword onNavigateNext={() => {
+      // Once successfully changed, refresh user info and navigate to default route
+      useAuth().refreshUser().then(() => {
+        navigate(defaultRouteByRole[role], true);
+      }).catch(() => {
+        navigate(defaultRouteByRole[role], true);
+      });
+    }} />;
+  }
+
+  if (path === '/login' || (!routeRole && path !== '/change-password')) {
     if (!isAuthenticated) {
-      return <Login onLoginSuccess={handleLoginSuccess} onNavigateToRegister={() => navigate('/register')} />;
+      return <Login 
+        onLoginSuccess={handleLoginSuccess} 
+        onNavigateToRegister={() => navigate('/register')} 
+        onNavigateToForgotPassword={() => navigate('/forgot-password')}
+      />;
     }
     navigate(role ? defaultRouteByRole[role] : '/login', true);
     return null;
@@ -345,7 +360,7 @@ const AppContent: React.FC = () => {
       : <PatientLayout {...layoutProps}>{routeContent}</PatientLayout>;
 
   return (
-    <ProtectedRoute allowedRoles={[routeRole]} currentPath={normalizedPath} navigate={navigate}>
+    <ProtectedRoute allowedRoles={routeRole ? [routeRole] : []} currentPath={normalizedPath} navigate={navigate}>
       {activeBanner && (
         <div className="global-notification-bar">
           <AlertOctagon className="beat-animated" size={18} />

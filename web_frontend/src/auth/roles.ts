@@ -8,6 +8,7 @@ export interface AuthUser {
   role: UserRole;
   created_at?: string | null;
   status?: string | null;
+  must_change_password?: boolean;
 }
 
 export const VALID_ROLES: UserRole[] = ['admin', 'doctor', 'patient'];
