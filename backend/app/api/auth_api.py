@@ -1,5 +1,5 @@
 import random
-import resend
+import requests
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Header, HTTPException
 from jose import JWTError, jwt
@@ -85,11 +85,9 @@ async def get_user_from_token(authorization: str | None):
 
 
 def send_forgot_password_otp_email(email: str, full_name: str, otp: str) -> bool:
-    if not settings.RESEND_API_KEY:
+    if not settings.BREVO_API_KEY:
         print(f"[DEV OTP] Forgot Password OTP for {email}: {otp}")
         return False
-
-    resend.api_key = settings.RESEND_API_KEY
 
     html_body = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
@@ -106,23 +104,31 @@ def send_forgot_password_otp_email(email: str, full_name: str, otp: str) -> bool
     """
 
     try:
-        resend.Emails.send({
-            "from": settings.EMAIL_FROM,
-            "to": [email],
-            "subject": "CardioGuard AI - Mã OTP đặt lại mật khẩu",
-            "html": html_body,
-        })
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "accept": "application/json",
+                "api-key": settings.BREVO_API_KEY,
+                "content-type": "application/json"
+            },
+            json={
+                "sender": {"name": settings.EMAIL_FROM_NAME, "email": settings.EMAIL_FROM_EMAIL},
+                "to": [{"email": email, "name": full_name}],
+                "subject": "CardioGuard AI - Mã OTP đặt lại mật khẩu",
+                "htmlContent": html_body
+            },
+            timeout=10
+        )
+        response.raise_for_status()
         return True
     except Exception as exc:
-        raise RuntimeError(f"Resend API error: {exc}") from exc
+        raise RuntimeError(f"Brevo API error: {exc}") from exc
 
 
 def send_random_password_email(email: str, full_name: str, new_password: str) -> bool:
-    if not settings.RESEND_API_KEY:
+    if not settings.BREVO_API_KEY:
         print(f"[DEV EMAIL] New Password for {email}: {new_password}")
         return False
-
-    resend.api_key = settings.RESEND_API_KEY
 
     html_body = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
@@ -139,23 +145,31 @@ def send_random_password_email(email: str, full_name: str, new_password: str) ->
     """
 
     try:
-        resend.Emails.send({
-            "from": settings.EMAIL_FROM,
-            "to": [email],
-            "subject": "CardioGuard AI - Mật khẩu mới của bạn",
-            "html": html_body,
-        })
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "accept": "application/json",
+                "api-key": settings.BREVO_API_KEY,
+                "content-type": "application/json"
+            },
+            json={
+                "sender": {"name": settings.EMAIL_FROM_NAME, "email": settings.EMAIL_FROM_EMAIL},
+                "to": [{"email": email, "name": full_name}],
+                "subject": "CardioGuard AI - Mật khẩu mới của bạn",
+                "htmlContent": html_body
+            },
+            timeout=10
+        )
+        response.raise_for_status()
         return True
     except Exception as exc:
-        raise RuntimeError(f"Resend API error: {exc}") from exc
+        raise RuntimeError(f"Brevo API error: {exc}") from exc
 
 
 def send_register_otp_email(email: str, full_name: str, otp: str) -> bool:
-    if not settings.RESEND_API_KEY:
+    if not settings.BREVO_API_KEY:
         print(f"[DEV OTP] Register OTP for {email}: {otp}")
         return False
-
-    resend.api_key = settings.RESEND_API_KEY
 
     html_body = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
@@ -172,15 +186,25 @@ def send_register_otp_email(email: str, full_name: str, otp: str) -> bool:
     """
 
     try:
-        resend.Emails.send({
-            "from": settings.EMAIL_FROM,
-            "to": [email],
-            "subject": "CardioGuard AI - Mã OTP đăng ký",
-            "html": html_body,
-        })
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "accept": "application/json",
+                "api-key": settings.BREVO_API_KEY,
+                "content-type": "application/json"
+            },
+            json={
+                "sender": {"name": settings.EMAIL_FROM_NAME, "email": settings.EMAIL_FROM_EMAIL},
+                "to": [{"email": email, "name": full_name}],
+                "subject": "CardioGuard AI - Mã OTP đăng ký",
+                "htmlContent": html_body
+            },
+            timeout=10
+        )
+        response.raise_for_status()
         return True
     except Exception as exc:
-        raise RuntimeError(f"Resend API error: {exc}") from exc
+        raise RuntimeError(f"Brevo API error: {exc}") from exc
 
 
 
