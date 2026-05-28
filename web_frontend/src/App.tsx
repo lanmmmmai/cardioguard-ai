@@ -12,6 +12,9 @@ import { FeatureHub } from './components/FeatureHub';
 import { ApiDataPage } from './components/ApiDataPage';
 import { ProfilePage } from './components/ProfilePage';
 import { CmsPage } from './components/cms/CmsPage';
+import { EmailCmsPage } from './components/cms/EmailCmsPage';
+import { PatientChatbot } from './pages/PatientChatbot';
+import { DoctorChatbot } from './pages/DoctorChatbot';
 import { DoctorsManager } from './components/DoctorsManager';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
@@ -61,7 +64,10 @@ const privateRouteRole = (path: string): UserRole | null => {
 };
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
-  '/admin/users': { title: 'Quản lý tài khoản', subtitle: 'Quản trị tài khoản, vai trò và phân quyền người dùng.' },
+  '/admin/email': { title: 'Email CMS', subtitle: 'Quản lý mẫu email, gửi thông báo và theo dõi lịch sử.' },
+  '/admin/patients': { title: 'Quản lý bệnh nhân', subtitle: 'Hồ sơ y tế, lịch sử khám và thông tin người bệnh.' },
+  '/patient/chatbot': { title: 'Trợ lý AI', subtitle: 'Giải đáp, phân tích và theo dõi sức khỏe tim mạch.' },
+  '/doctor/ai-assistant': { title: 'AI Command Center', subtitle: 'Trợ lý phân tích dữ liệu, tóm tắt bệnh án và phát hiện bất thường.' },
   '/admin/doctors': { title: 'Quản lý bác sĩ', subtitle: 'Danh sách bác sĩ, phân công chuyên khoa và quyền truy cập.' },
   '/admin/system-logs': { title: 'Nhật ký hệ thống', subtitle: 'Audit log, lịch sử đăng nhập và thao tác bảo mật.' },
   '/admin/settings': { title: 'Cài đặt hệ thống', subtitle: 'Cấu hình nền tảng, API token và trạng thái kết nối.' },
@@ -107,7 +113,7 @@ const useBrowserPath = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { accessToken, isAuthenticated, loading, role, login } = useAuth();
+  const { accessToken, isAuthenticated, loading, role, login, refreshUser } = useAuth();
   const { path, navigate } = useBrowserPath();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -251,12 +257,18 @@ const AppContent: React.FC = () => {
 
   const routeContent = useMemo(() => {
     switch (normalizedPath) {
+      case '/patient/chatbot':
+        return <PatientChatbot />;
       case '/admin/dashboard':
         return <AdminDashboard patients={patients} alerts={alerts} doctors={doctors} />;
       case '/admin/cms':
         return <CmsPage />;
+      case '/admin/email':
+        return <EmailCmsPage />;
       case '/admin/doctors':
         return <DoctorsManager />;
+      case '/doctor/ai-assistant':
+        return <DoctorChatbot />;
       case '/admin/patients':
       case '/doctor/patients':
         return renderPatientList();
@@ -320,8 +332,8 @@ const AppContent: React.FC = () => {
       return null;
     }
     return <ChangePassword onNavigateNext={() => {
-      // Once successfully changed, refresh user info and navigate to default route
-      useAuth().refreshUser().then(() => {
+      // Refresh user info (clears must_change_password) then navigate to default route
+      refreshUser().then(() => {
         navigate(defaultRouteByRole[role], true);
       }).catch(() => {
         navigate(defaultRouteByRole[role], true);

@@ -39,7 +39,7 @@ export const DoctorsManager: React.FC = () => {
   const [status, setStatus] = useState('active');
   const [formError, setFormError] = useState<string | null>(null);
 
-  const fetchDoctors = async () => {
+  const fetchDoctors = React.useCallback(async () => {
     if (!accessToken) return;
     setIsLoading(true);
     setError(null);
@@ -52,16 +52,16 @@ export const DoctorsManager: React.FC = () => {
         throw new Error(data.detail || 'Không lấy được danh sách bác sĩ');
       }
       setDoctors(data);
-    } catch (err: any) {
-      setError(err.message || 'Lỗi kết nối máy chủ');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     fetchDoctors();
-  }, [accessToken]);
+  }, [fetchDoctors]);
 
   const validateForm = (isEdit: boolean) => {
     if (!fullName.trim()) {
@@ -160,8 +160,8 @@ export const DoctorsManager: React.FC = () => {
 
       setShowAddModal(false);
       fetchDoctors();
-    } catch (err: any) {
-      setFormError(err.message || 'Lỗi kết nối máy chủ');
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
     } finally {
       setIsSubmitting(false);
     }
@@ -211,8 +211,8 @@ export const DoctorsManager: React.FC = () => {
 
       setShowEditModal(false);
       fetchDoctors();
-    } catch (err: any) {
-      setFormError(err.message || 'Lỗi kết nối máy chủ');
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
     } finally {
       setIsSubmitting(false);
     }
@@ -237,8 +237,8 @@ export const DoctorsManager: React.FC = () => {
 
       setShowDeleteConfirm(false);
       fetchDoctors();
-    } catch (err: any) {
-      alert(err.message || 'Lỗi kết nối máy chủ');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
     } finally {
       setIsSubmitting(false);
     }
