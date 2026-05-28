@@ -1,23 +1,23 @@
 import React, { useState } from 'react';
-import { Activity, Mail, Lock, Loader2 } from 'lucide-react';
+import { Activity, Lock, Loader2 } from 'lucide-react';
 import { API_URL } from '../config';
+import { useAuth } from '../auth/AuthContext';
 
-interface LoginProps {
-  onLoginSuccess: (token: string, user: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean }) => void;
-  onNavigateToRegister: () => void;
-  onNavigateToForgotPassword: () => void;
+interface ChangePasswordProps {
+  onNavigateNext: () => void;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegister, onNavigateToForgotPassword }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }) => {
+  const { accessToken } = useAuth();
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      setError('Vui lòng điền đầy đủ email và mật khẩu');
+    if (!oldPassword || !newPassword) {
+      setError('Vui lòng điền đầy đủ thông tin');
       return;
     }
 
@@ -25,21 +25,23 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(`${API_URL}/auth/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Email hoặc mật khẩu không chính xác');
+        throw new Error(data.detail || 'Thay đổi mật khẩu thất bại');
       }
 
-      onLoginSuccess(data.access_token, data.user);
+      // Success - navigate next
+      onNavigateNext();
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
     } finally {
@@ -57,13 +59,13 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
           <span className="brand-name">HEART MONITOR</span>
         </div>
 
-        <h2 className="auth-title">Đăng Nhập Hệ Thống</h2>
-        <p className="auth-subtitle">Dành cho Admin, Doctor và Patient trong hệ thống CardioGuard AI</p>
+        <h2 className="auth-title">Đổi Mật Khẩu</h2>
+        <p className="auth-subtitle">Bạn cần đổi mật khẩu để tiếp tục sử dụng hệ thống một cách an toàn.</p>
 
         {error && (
           <div className="alert-strip high" style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
             <div className="alert-strip-body">
-              <div className="alert-strip-title" style={{ color: 'var(--color-critical)' }}>Lỗi Đăng Nhập</div>
+              <div className="alert-strip-title" style={{ color: 'var(--color-critical)' }}>Lỗi</div>
               <div className="alert-strip-desc">{error}</div>
             </div>
           </div>
@@ -71,33 +73,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
 
         <form onSubmit={handleSubmit} style={{ textAlign: 'left' }}>
           <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <div style={{ position: 'relative' }}>
-              <Mail 
-                size={18} 
-                style={{ 
-                  position: 'absolute', 
-                  left: '14px', 
-                  top: '50%', 
-                  transform: 'translateY(-50%)',
-                  color: 'var(--text-muted)' 
-                }} 
-              />
-              <input
-                id="email"
-                type="email"
-                className="form-control"
-                placeholder="admin/doctor/patient@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                style={{ paddingLeft: '45px' }}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="form-group" style={{ marginBottom: '2rem' }}>
-            <label htmlFor="password">Mật khẩu</label>
+            <label htmlFor="oldPassword">Mật khẩu hiện tại (hoặc mật khẩu tạm thời)</label>
             <div style={{ position: 'relative' }}>
               <Lock 
                 size={18} 
@@ -110,12 +86,38 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
                 }} 
               />
               <input
-                id="password"
+                id="oldPassword"
                 type="password"
                 className="form-control"
                 placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                style={{ paddingLeft: '45px' }}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '2rem' }}>
+            <label htmlFor="newPassword">Mật khẩu mới</label>
+            <div style={{ position: 'relative' }}>
+              <Lock 
+                size={18} 
+                style={{ 
+                  position: 'absolute', 
+                  left: '14px', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-muted)' 
+                }} 
+              />
+              <input
+                id="newPassword"
+                type="password"
+                className="form-control"
+                placeholder="Mật khẩu mới (ít nhất 8 ký tự, chữ hoa, số, ký tự đặc biệt)"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
                 style={{ paddingLeft: '45px' }}
                 required
               />
@@ -134,24 +136,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
                 Đang xử lý...
               </>
             ) : (
-              'Đăng Nhập'
+              'Cập nhật mật khẩu'
             )}
           </button>
         </form>
-
-        <div className="auth-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div>
-            Bệnh nhân chưa có tài khoản?{' '}
-            <span className="auth-link" onClick={onNavigateToRegister}>
-              Đăng ký ngay
-            </span>
-          </div>
-          <div>
-            <span className="auth-link" onClick={onNavigateToForgotPassword}>
-              Quên mật khẩu?
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );

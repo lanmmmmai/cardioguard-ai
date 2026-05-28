@@ -28,6 +28,7 @@ const normalizeUser = (user: any): AuthUser | null => {
     role,
     created_at: user.created_at || null,
     status: user.status || null,
+    must_change_password: user.must_change_password || false,
   };
 };
 
