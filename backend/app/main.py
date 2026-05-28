@@ -12,6 +12,8 @@ from app.api.crud_api import router as crud_router
 from app.api.user_api import router as user_router
 from app.api.cms_api import router as cms_router
 from app.api.admin_doctor_api import router as admin_doctor_router
+from app.api.email_api import router as email_router
+from app.api.chat_api import router as chat_router
 
 
 app = FastAPI(
@@ -52,8 +54,9 @@ app.include_router(alert_router)
 app.include_router(crud_router)
 app.include_router(cms_router)
 app.include_router(admin_doctor_router)
+app.include_router(email_router, prefix="/email", tags=["Email CMS"])
 app.include_router(feature_router)
-
+app.include_router(chat_router, prefix="/api/chat", tags=["Chatbot"])
 
 
 @app.get("/")
