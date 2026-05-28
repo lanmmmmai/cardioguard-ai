@@ -107,7 +107,7 @@ const useBrowserPath = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { accessToken, isAuthenticated, loading, role, login } = useAuth();
+  const { accessToken, isAuthenticated, loading, role, login, refreshUser } = useAuth();
   const { path, navigate } = useBrowserPath();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -321,7 +321,7 @@ const AppContent: React.FC = () => {
     }
     return <ChangePassword onNavigateNext={() => {
       // Once successfully changed, refresh user info and navigate to default route
-      useAuth().refreshUser().then(() => {
+      refreshUser().then(() => {
         navigate(defaultRouteByRole[role], true);
       }).catch(() => {
         navigate(defaultRouteByRole[role], true);
