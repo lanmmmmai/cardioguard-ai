@@ -1,7 +1,6 @@
 import random
-import smtplib
+import resend
 from datetime import datetime, timedelta, timezone
-from email.message import EmailMessage
 from fastapi import APIRouter, Header, HTTPException
 from jose import JWTError, jwt
 from app.core.config import settings
@@ -81,32 +80,37 @@ async def get_user_from_token(authorization: str | None):
 
 
 def send_register_otp_email(email: str, full_name: str, otp: str) -> bool:
-    if not settings.SMTP_USERNAME or not settings.SMTP_PASSWORD:
+    if not settings.RESEND_API_KEY:
         print(f"[DEV OTP] Register OTP for {email}: {otp}")
         return False
 
-    message = EmailMessage()
-    message["Subject"] = "CardioGuard AI - Mã OTP đăng ký"
-    message["From"] = settings.SMTP_FROM_EMAIL or settings.SMTP_USERNAME
-    message["To"] = email
-    message.set_content(
-        f"Xin chào {full_name},\n\n"
-        f"Mã OTP đăng ký tài khoản bệnh nhân CardioGuard AI của bạn là: {otp}\n"
-        "Mã này có hiệu lực trong 10 phút. Không chia sẻ mã này cho người khác.\n\n"
-        "CardioGuard AI"
-    )
+    resend.api_key = settings.RESEND_API_KEY
+
+    html_body = f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+      <h2 style="color:#e11d48;margin-bottom:8px">CardioGuard AI</h2>
+      <p style="color:#374151">Xin chào <strong>{full_name}</strong>,</p>
+      <p style="color:#374151">Mã OTP đăng ký tài khoản của bạn là:</p>
+      <div style="font-size:36px;font-weight:700;letter-spacing:10px;text-align:center;padding:24px 0;color:#e11d48">
+        {otp}
+      </div>
+      <p style="color:#6b7280;font-size:13px">Mã có hiệu lực trong <strong>10 phút</strong>. Không chia sẻ mã này với bất kỳ ai.</p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
+      <p style="color:#9ca3af;font-size:12px">CardioGuard AI — Hệ thống giám sát tim mạch thông minh</p>
+    </div>
+    """
 
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as smtp:
-            smtp.ehlo()
-            smtp.starttls()
-            smtp.ehlo()
-            smtp.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-            smtp.send_message(message)
-    except smtplib.SMTPAuthenticationError as exc:
-        raise RuntimeError("Gmail rejected SMTP login. Use a Gmail App Password, not the normal Gmail password.") from exc
+        resend.Emails.send({
+            "from": settings.EMAIL_FROM,
+            "to": [email],
+            "subject": "CardioGuard AI - Mã OTP đăng ký",
+            "html": html_body,
+        })
+        return True
+    except Exception as exc:
+        raise RuntimeError(f"Resend API error: {exc}") from exc
 
-    return True
 
 
 @router.post("/auth/register/request-otp")
