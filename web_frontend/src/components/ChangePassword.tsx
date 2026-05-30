@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, Lock, Loader2 } from 'lucide-react';
+import { Activity, Lock, Loader2, CheckCircle2 } from 'lucide-react';
 import { API_URL } from '../config';
 import { useAuth } from '../auth/AuthContext';
 
@@ -11,13 +11,23 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }
   const { accessToken } = useAuth();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!oldPassword || !newPassword) {
+    if (!oldPassword || !newPassword || !confirmPassword) {
       setError('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Mật khẩu mới và xác nhận mật khẩu không khớp');
+      return;
+    }
+    if (newPassword === oldPassword) {
+      setError('Mật khẩu mới phải khác mật khẩu hiện tại');
       return;
     }
 
@@ -40,8 +50,10 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }
         throw new Error(data.detail || 'Thay đổi mật khẩu thất bại');
       }
 
-      // Success - navigate next
-      onNavigateNext();
+      setSuccess(true);
+      setTimeout(() => {
+        onNavigateNext();
+      }, 2000);
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
     } finally {
@@ -71,19 +83,31 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }
           </div>
         )}
 
+        {success && (
+          <div className="alert-strip low" style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+            <div className="alert-strip-body" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle2 size={18} style={{ color: 'var(--color-safe)', flexShrink: 0 }} />
+              <div>
+                <div className="alert-strip-title" style={{ color: 'var(--color-safe)' }}>Thành công!</div>
+                <div className="alert-strip-desc">Mật khẩu đã được cập nhật. Đang chuyển hướng...</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} style={{ textAlign: 'left' }}>
           <div className="form-group">
             <label htmlFor="oldPassword">Mật khẩu hiện tại (hoặc mật khẩu tạm thời)</label>
             <div style={{ position: 'relative' }}>
-              <Lock 
-                size={18} 
-                style={{ 
-                  position: 'absolute', 
-                  left: '14px', 
-                  top: '50%', 
+              <Lock
+                size={18}
+                style={{
+                  position: 'absolute',
+                  left: '14px',
+                  top: '50%',
                   transform: 'translateY(-50%)',
-                  color: 'var(--text-muted)' 
-                }} 
+                  color: 'var(--text-muted)'
+                }}
               />
               <input
                 id="oldPassword"
@@ -94,41 +118,81 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }
                 onChange={(e) => setOldPassword(e.target.value)}
                 style={{ paddingLeft: '45px' }}
                 required
+                disabled={success}
               />
             </div>
           </div>
 
-          <div className="form-group" style={{ marginBottom: '2rem' }}>
+          <div className="form-group">
             <label htmlFor="newPassword">Mật khẩu mới</label>
             <div style={{ position: 'relative' }}>
-              <Lock 
-                size={18} 
-                style={{ 
-                  position: 'absolute', 
-                  left: '14px', 
-                  top: '50%', 
+              <Lock
+                size={18}
+                style={{
+                  position: 'absolute',
+                  left: '14px',
+                  top: '50%',
                   transform: 'translateY(-50%)',
-                  color: 'var(--text-muted)' 
-                }} 
+                  color: 'var(--text-muted)'
+                }}
               />
               <input
                 id="newPassword"
                 type="password"
                 className="form-control"
-                placeholder="Mật khẩu mới (ít nhất 8 ký tự, chữ hoa, số, ký tự đặc biệt)"
+                placeholder="Tối thiểu 8 ký tự, chữ hoa, số, ký tự đặc biệt"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 style={{ paddingLeft: '45px' }}
                 required
+                disabled={success}
               />
             </div>
+            <small style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+              Phải có ít nhất 8 ký tự, 1 chữ hoa, 1 số và 1 ký tự đặc biệt.
+            </small>
           </div>
 
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
+          <div className="form-group" style={{ marginBottom: '2rem' }}>
+            <label htmlFor="confirmPassword">Xác nhận mật khẩu mới</label>
+            <div style={{ position: 'relative' }}>
+              <Lock
+                size={18}
+                style={{
+                  position: 'absolute',
+                  left: '14px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: confirmPassword && confirmPassword !== newPassword ? 'var(--color-critical)' : 'var(--text-muted)'
+                }}
+              />
+              <input
+                id="confirmPassword"
+                type="password"
+                className="form-control"
+                placeholder="Nhập lại mật khẩu mới"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                style={{
+                  paddingLeft: '45px',
+                  borderColor: confirmPassword && confirmPassword !== newPassword ? 'var(--color-critical)' : undefined
+                }}
+                required
+                disabled={success}
+              />
+            </div>
+            {confirmPassword && confirmPassword !== newPassword && (
+              <small style={{ color: 'var(--color-critical)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                Mật khẩu không khớp
+              </small>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            className="btn btn-primary"
             style={{ width: '100%', justifyContent: 'center', height: '46px' }}
-            disabled={isLoading}
+            disabled={isLoading || success || !!(confirmPassword && confirmPassword !== newPassword)}
           >
             {isLoading ? (
               <>

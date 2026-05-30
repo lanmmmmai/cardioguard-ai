@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     BREVO_API_KEY: str = ""
     EMAIL_FROM_EMAIL: str = "noreply@cardioguard.ai"
     EMAIL_FROM_NAME: str = "CardioGuard AI"
+    OPENAI_API_KEY: str = ""
+    SECRET_KEY: str = "heart_monitor_secret_key"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
     model_config = SettingsConfigDict(
         env_file=(BASE_DIR / ".env", BASE_DIR / "backend" / ".env"),

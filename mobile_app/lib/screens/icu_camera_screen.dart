@@ -82,9 +82,7 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
                     children: [
                       Text(
                         'Camera Giả Lập ICU',
-                        style: TextStyle(
-                          fontFamily: 'Futura',
-                          fontSize: 22,
+                        style: TextStyle(fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: textColor,
                         ),
@@ -92,7 +90,7 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
                       const SizedBox(height: 4),
                       Text(
                         'Theo dõi luồng video trực tiếp từ giường bệnh hồi sức',
-                        style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Futura'),
+                        style: TextStyle(color: textMuted, fontSize: 13,),
                       ),
                     ],
                   ),
@@ -112,9 +110,7 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
                           style: TextStyle(
                             fontSize: 10,
                             color: Color(0xFF39FF14),
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'Futura',
-                          ),
+                            fontWeight: FontWeight.bold,),
                         ),
                       ],
                     ),
@@ -189,9 +185,7 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
                         'Hệ thống đang hiển thị tín hiệu hồng ngoại từ Giường 04. Cảm biến lồng ngực thở (biên độ chest rise) đang hoạt động tự động.',
                         style: TextStyle(
                           color: textMuted,
-                          fontSize: 12,
-                          fontFamily: 'Futura',
-                        ),
+                          fontSize: 12,),
                       ),
                     ),
                   ],
@@ -325,7 +319,7 @@ class _IcuCameraPainter extends CustomPainter {
       
       textPainter.text = const TextSpan(
         text: 'REC',
-        style: TextStyle(color: Color(0xFFFF3366), fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'Futura'),
+        style: TextStyle(color: Color(0xFFFF3366), fontSize: 10, fontWeight: FontWeight.bold,),
       );
       textPainter.layout();
       textPainter.paint(canvas, const Offset(margin + 20, margin + 6));
@@ -334,7 +328,7 @@ class _IcuCameraPainter extends CustomPainter {
     // Camera name
     textPainter.text = const TextSpan(
       text: 'CAM 04 - ICU ROOM',
-      style: TextStyle(color: Color(0xFF39FF14), fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'Futura'),
+      style: TextStyle(color: Color(0xFF39FF14), fontSize: 10, fontWeight: FontWeight.bold,),
     );
     textPainter.layout();
     textPainter.paint(canvas, const Offset(margin + 10, margin + 26));
@@ -342,7 +336,7 @@ class _IcuCameraPainter extends CustomPainter {
     // Connection status
     textPainter.text = const TextSpan(
       text: 'CONN: ACTIVE',
-      style: TextStyle(color: Color(0xFF39FF14), fontSize: 9, fontWeight: FontWeight.bold, fontFamily: 'Futura'),
+      style: TextStyle(color: Color(0xFF39FF14), fontSize: 9, fontWeight: FontWeight.bold,),
     );
     textPainter.layout();
     textPainter.paint(canvas, Offset(width - margin - 80, margin + 10));
@@ -350,7 +344,7 @@ class _IcuCameraPainter extends CustomPainter {
     // Clock Timecode
     textPainter.text = TextSpan(
       text: timeString,
-      style: const TextStyle(color: Color(0xFF39FF14), fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'Futura'),
+      style: const TextStyle(color: Color(0xFF39FF14), fontSize: 10, fontWeight: FontWeight.bold,),
     );
     textPainter.layout();
     textPainter.paint(canvas, Offset(margin + 10, height - margin - 15));

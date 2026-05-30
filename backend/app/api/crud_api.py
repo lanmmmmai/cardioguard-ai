@@ -261,6 +261,27 @@ async def list_records(table: str, authorization: str | None, limit: int, offset
     return [row_to_dict(row) for row in rows]
 
 
+async def trigger_websocket_broadcast(table: str, record: dict[str, Any]):
+    from app.websocket.connection_manager import manager
+    try:
+        if table == "chat_messages":
+            sender_id = record.get("sender_id")
+            recipient_id = record.get("recipient_id")
+            if sender_id and recipient_id:
+                await manager.broadcast_chat_message(str(sender_id), str(recipient_id), record)
+        elif table == "appointments":
+            patient_id = record.get("patient_id")
+            doctor_id = record.get("doctor_id")
+            if patient_id and doctor_id:
+                await manager.broadcast_appointment(str(patient_id), str(doctor_id), record)
+        elif table == "notifications":
+            user_id = record.get("user_id")
+            if user_id:
+                await manager.broadcast_notification(str(user_id), record)
+    except Exception as e:
+        print(f"Error triggering WebSocket broadcast for table {table}: {e}")
+
+
 async def create_record(table: str, payload: dict[str, Any], authorization: str | None):
     user = await get_user_from_token(authorization)
     columns = await table_columns(table)
@@ -280,7 +301,9 @@ async def create_record(table: str, payload: dict[str, Any], authorization: str 
         f"INSERT INTO {quote_identifier(table)} ({insert_columns}) VALUES ({bind_columns})",
         values,
     )
-    return await fetch_authorized_row(table, str(record_id), columns, user)
+    inserted_row = await fetch_authorized_row(table, str(record_id), columns, user)
+    await trigger_websocket_broadcast(table, inserted_row)
+    return inserted_row
 
 
 async def update_record(table: str, record_id: str, payload: dict[str, Any], authorization: str | None):
@@ -302,7 +325,9 @@ async def update_record(table: str, record_id: str, payload: dict[str, Any], aut
         f"UPDATE {quote_identifier(table)} SET {set_sql} WHERE \"id\"::text = :record_id",
         {**values, "record_id": record_id},
     )
-    return await fetch_authorized_row(table, record_id, columns, user)
+    updated_row = await fetch_authorized_row(table, record_id, columns, user)
+    await trigger_websocket_broadcast(table, updated_row)
+    return updated_row
 
 
 async def delete_record(table: str, record_id: str, authorization: str | None):

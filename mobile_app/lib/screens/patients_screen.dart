@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../services/api_service.dart';
+import '../providers/patient_provider.dart';
+import '../providers/auth_provider.dart';
+import '../core/api_client.dart';
 import 'patient_detail_screen.dart';
 
 class PatientsScreen extends StatefulWidget {
@@ -12,59 +15,67 @@ class PatientsScreen extends StatefulWidget {
 }
 
 class _PatientsScreenState extends State<PatientsScreen> {
-  List<dynamic> _patients = [];
-  List<dynamic> _filteredPatients = [];
-  bool _isLoading = false;
   final _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _loadPatients();
-    _searchController.addListener(_onSearchChanged);
-  }
-
-  Future<void> _loadPatients() async {
-    setState(() {
-      _isLoading = true;
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.toLowerCase();
+      });
     });
-    final list = await ApiService.getPatients();
-    setState(() {
-      _patients = list;
-      _filteredPatients = list;
-      _isLoading = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<PatientProvider>(context, listen: false).fetchPatients();
     });
   }
 
-  void _onSearchChanged() {
-    final query = _searchController.text.toLowerCase();
-    setState(() {
-      _filteredPatients = _patients.where((p) {
-        final name = (p['full_name'] as String).toLowerCase();
-        final history = (p['medical_history'] as String? ?? '').toLowerCase();
-        return name.contains(query) || history.contains(query);
-      }).toList();
-    });
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
-  void _showAddPatientBottomSheet() {
-    final nameController = TextEditingController();
-    final ageController = TextEditingController();
-    final phoneController = TextEditingController();
-    final addressController = TextEditingController();
-    final historyController = TextEditingController();
-    String gender = 'Nam';
+  // Admin Modal: Manage Doctor-Patient Assignments
+  void _showAssignmentsModal() {
+    final client = ApiClient();
+    List<dynamic> assignments = [];
+    List<dynamic> doctors = [];
+    bool modalLoading = true;
+    String? selectedDoctorId;
+    String? selectedPatientId;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: widget.isDarkTheme ? const Color(0xFF131720) : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: widget.isDarkTheme ? const Color(0xFF11151D) : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            
+            // Initial loader
+            if (modalLoading) {
+              Future.wait([
+                client.get('/admin/assignments'),
+                client.get('/cms/users', queryParameters: {'filter': 'role:doctor', 'limit': 100})
+              ]).then((responses) {
+                setModalState(() {
+                  assignments = responses[0].data;
+                  doctors = responses[1].data['items'] ?? [];
+                  modalLoading = false;
+                });
+              }).catchError((e) {
+                print('Error fetching modal data: $e');
+                setModalState(() => modalLoading = false);
+              });
+            }
+
+            final patientProvider = Provider.of<PatientProvider>(context);
+            final primaryBg = widget.isDarkTheme ? const Color(0xFF07080A) : const Color(0xFFF5F6F8);
+            final itemBg = widget.isDarkTheme ? const Color(0xFF1C222D) : Colors.black.withOpacity(0.02);
+
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -72,115 +83,143 @@ class _PatientsScreenState extends State<PatientsScreen> {
                 right: 20,
                 top: 20,
               ),
-              child: SingleChildScrollView(
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.75,
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Thêm Bệnh Nhân Mới',
-                      style: TextStyle(
-                        fontFamily: 'Futura',
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: widget.isDarkTheme ? Colors.white : const Color(0xFF1D2939),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: nameController,
-                      style: TextStyle(color: widget.isDarkTheme ? Colors.white : Colors.black, fontFamily: 'Futura'),
-                      decoration: const InputDecoration(labelText: 'Họ và tên'),
-                    ),
-                    const SizedBox(height: 12),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: ageController,
-                            keyboardType: TextInputType.number,
-                            style: TextStyle(color: widget.isDarkTheme ? Colors.white : Colors.black, fontFamily: 'Futura'),
-                            decoration: const InputDecoration(labelText: 'Tuổi'),
-                          ),
+                        const Text(
+                          'Quản Lý Phân Công Bác Sĩ',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: gender,
-                            dropdownColor: widget.isDarkTheme ? const Color(0xFF131720) : Colors.white,
-                            style: TextStyle(color: widget.isDarkTheme ? Colors.white : Colors.black, fontFamily: 'Futura'),
-                            decoration: const InputDecoration(labelText: 'Giới tính'),
-                            items: const [
-                              DropdownMenuItem(value: 'Nam', child: Text('Nam')),
-                              DropdownMenuItem(value: 'Nữ', child: Text('Nữ')),
-                              DropdownMenuItem(value: 'Khác', child: Text('Khác')),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) {
-                                setModalState(() {
-                                  gender = val;
-                                });
-                              }
-                            },
-                          ),
+                        IconButton(
+                          icon: const Icon(LucideIcons.x),
+                          onPressed: () => Navigator.pop(context),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: phoneController,
-                      keyboardType: TextInputType.phone,
-                      style: TextStyle(color: widget.isDarkTheme ? Colors.white : Colors.black, fontFamily: 'Futura'),
-                      decoration: const InputDecoration(labelText: 'Số điện thoại'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: addressController,
-                      style: TextStyle(color: widget.isDarkTheme ? Colors.white : Colors.black, fontFamily: 'Futura'),
-                      decoration: const InputDecoration(labelText: 'Địa chỉ'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: historyController,
-                      maxLines: 2,
-                      style: TextStyle(color: widget.isDarkTheme ? Colors.white : Colors.black, fontFamily: 'Futura'),
-                      decoration: const InputDecoration(labelText: 'Tiền sử bệnh lý'),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF3366)),
-                        onPressed: () async {
-                          final name = nameController.text.trim();
-                          final age = int.tryParse(ageController.text.trim()) ?? 0;
-                          final phone = phoneController.text.trim();
-                          final address = addressController.text.trim();
-                          final history = historyController.text.trim();
-
-                          if (name.isEmpty || age == 0 || phone.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Vui lòng nhập đầy đủ các trường bắt buộc')),
-                            );
-                            return;
-                          }
-
-                          final success = await ApiService.addPatient(name, age, gender, phone, address, history);
-                          if (success) {
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                              _loadPatients();
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    
+                    // Add Assignment Form
+                    const Text('THÊM PHÂN CÔNG MỚI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF3366))),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        // Doctor Dropdown
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            hint: const Text('Bác sĩ', style: TextStyle(fontSize: 12)),
+                            value: selectedDoctorId,
+                            dropdownColor: widget.isDarkTheme ? const Color(0xFF11151D) : Colors.white,
+                            items: doctors.map((doc) {
+                              return DropdownMenuItem<String>(
+                                value: doc['id'] as String,
+                                child: Text(doc['full_name'] as String, style: const TextStyle(fontSize: 12)),
+                              );
+                            }).toList(),
+                            onChanged: (id) => setModalState(() => selectedDoctorId = id),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Patient Dropdown
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            hint: const Text('Bệnh nhân', style: TextStyle(fontSize: 12)),
+                            value: selectedPatientId,
+                            dropdownColor: widget.isDarkTheme ? const Color(0xFF11151D) : Colors.white,
+                            items: patientProvider.patients.map((p) {
+                              return DropdownMenuItem<String>(
+                                value: p.id,
+                                child: Text(p.fullName, style: const TextStyle(fontSize: 12)),
+                              );
+                            }).toList(),
+                            onChanged: (id) => setModalState(() => selectedPatientId = id),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Add Button
+                        IconButton(
+                          icon: const Icon(LucideIcons.plusCircle, color: Color(0xFFFF3366)),
+                          onPressed: (selectedDoctorId == null || selectedPatientId == null) ? null : () async {
+                            try {
+                              final res = await client.post('/admin/assignments', data: {
+                                'doctor_id': selectedDoctorId,
+                                'patient_id': selectedPatientId,
+                              });
+                              if (res.statusCode == 200 || res.statusCode == 201) {
+                                selectedDoctorId = null;
+                                selectedPatientId = null;
+                                modalLoading = true; // refresh
+                                setModalState(() {});
+                                patientProvider.fetchPatients(); // refresh main patients list
+                              }
+                            } catch (e) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Thêm bệnh nhân thành công!')),
+                                const SnackBar(content: Text('Lỗi phân công (Có thể đã phân công trước đó)')),
                               );
                             }
-                          }
-                        },
-                        child: const Text('Thêm Bệnh Nhân', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontFamily: 'Futura')),
-                      ),
+                          },
+                        )
+                      ],
                     ),
                     const SizedBox(height: 20),
+
+                    const Text('DANH SÁCH ĐÃ PHÂN CÔNG', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFFF3366))),
+                    const SizedBox(height: 10),
+
+                    // Assignments list
+                    Expanded(
+                      child: modalLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : assignments.isEmpty
+                              ? const Center(child: Text('Chưa có phân công nào.', style: TextStyle(fontSize: 12, color: Colors.grey)))
+                              : ListView.builder(
+                                  itemCount: assignments.length,
+                                  itemBuilder: (context, index) {
+                                    final item = assignments[index];
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: itemBg,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text('BS: ${item['doctor_name']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                const SizedBox(height: 2),
+                                                Text('BN: ${item['patient_name']}', style: TextStyle(color: widget.isDarkTheme ? Colors.white70 : Colors.black87, fontSize: 12)),
+                                              ],
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(LucideIcons.trash2, color: Colors.red, size: 18),
+                                            onPressed: () async {
+                                              try {
+                                                await client.delete('/admin/assignments/${item['doctor_id']}/${item['patient_id']}');
+                                                modalLoading = true; // refresh
+                                                setModalState(() {});
+                                                patientProvider.fetchPatients(); // refresh main patients list
+                                              } catch (e) {
+                                                print('Error deleting assignment: $e');
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                    ),
                   ],
                 ),
               ),
@@ -192,19 +231,25 @@ class _PatientsScreenState extends State<PatientsScreen> {
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final patientProvider = Provider.of<PatientProvider>(context);
+
     final isDark = widget.isDarkTheme;
     final primaryBg = isDark ? const Color(0xFF07080A) : const Color(0xFFF5F6F8);
-    final cardBg = isDark ? const Color(0xFF11151D).withOpacity(0.7) : Colors.white.withOpacity(0.9);
+    final cardBg = isDark ? const Color(0xFF11151D) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1D2939);
     final textMuted = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
     final borderColor = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08);
+
+    final role = authProvider.currentUser?.role ?? 'patient';
+
+    // Filter patients based on query
+    final filtered = patientProvider.patients.where((p) {
+      final name = p.fullName.toLowerCase();
+      final history = p.medicalHistory.toLowerCase();
+      return name.contains(_searchQuery) || history.contains(_searchQuery);
+    }).toList();
 
     return Scaffold(
       backgroundColor: primaryBg,
@@ -221,30 +266,26 @@ class _PatientsScreenState extends State<PatientsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Hồ Sơ Bệnh Nhân',
-                        style: TextStyle(
-                          fontFamily: 'Futura',
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: textColor,
-                        ),
+                        'Danh sách Bệnh nhân',
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Danh sách quản lý bệnh nhân nội trú',
-                        style: TextStyle(color: textMuted, fontSize: 13, fontFamily: 'Futura'),
+                        role == 'doctor' ? 'Bệnh nhân được phân công khám' : 'Danh sách bệnh nhân toàn viện',
+                        style: TextStyle(color: textMuted, fontSize: 13),
                       ),
                     ],
                   ),
-                  ElevatedButton.icon(
-                    onPressed: _showAddPatientBottomSheet,
-                    icon: const Icon(LucideIcons.userPlus, size: 16, color: Colors.white),
-                    label: const Text('Thêm mới', style: TextStyle(color: Colors.white, fontFamily: 'Futura')),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF3366),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  )
+                  if (role == 'admin')
+                    ElevatedButton.icon(
+                      onPressed: _showAssignmentsModal,
+                      icon: const Icon(LucideIcons.shieldAlert, size: 16, color: Colors.white),
+                      label: const Text('Phân công BS', style: TextStyle(color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF3366),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    )
                 ],
               ),
             ),
@@ -254,10 +295,10 @@ class _PatientsScreenState extends State<PatientsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: TextField(
                 controller: _searchController,
-                style: TextStyle(color: textColor, fontFamily: 'Futura'),
+                style: TextStyle(color: textColor),
                 decoration: InputDecoration(
-                  hintText: 'Tìm kiếm theo tên hoặc bệnh lý...',
-                  hintStyle: TextStyle(color: textMuted, fontFamily: 'Futura'),
+                  hintText: 'Tìm kiếm tên hoặc bệnh lý...',
+                  hintStyle: TextStyle(color: textMuted),
                   prefixIcon: Icon(LucideIcons.search, color: textMuted, size: 18),
                   filled: true,
                   fillColor: cardBg,
@@ -274,27 +315,22 @@ class _PatientsScreenState extends State<PatientsScreen> {
             ),
             const SizedBox(height: 12),
 
-            // List of Patients
+            // Patients List
             Expanded(
-              child: _isLoading
+              child: patientProvider.isLoading
                   ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF3366)))
-                  : _filteredPatients.isEmpty
-                      ? Center(
-                          child: Text(
-                            'Không tìm thấy bệnh nhân nào.',
-                            style: TextStyle(color: textMuted, fontFamily: 'Futura'),
-                          ),
-                        )
+                  : filtered.isEmpty
+                      ? Center(child: Text('Không có bệnh nhân nào.', style: TextStyle(color: textMuted)))
                       : RefreshIndicator(
-                          onRefresh: _loadPatients,
+                          onRefresh: patientProvider.fetchPatients,
                           color: const Color(0xFFFF3366),
                           child: ListView.builder(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            itemCount: _filteredPatients.length,
+                            itemCount: filtered.length,
                             itemBuilder: (context, index) {
-                              final p = _filteredPatients[index];
-                              final String initials = p['full_name'].isNotEmpty ? p['full_name'].substring(0, 1).toUpperCase() : '?';
-                              
+                              final p = filtered[index];
+                              final String initials = p.fullName.isNotEmpty ? p.fullName.substring(0, 1).toUpperCase() : '?';
+
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 12),
                                 decoration: BoxDecoration(
@@ -305,28 +341,17 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                 child: ListTile(
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                   leading: CircleAvatar(
-                                    backgroundColor: isDark ? const Color(0xFF131720) : const Color(0xFFEAECF0),
+                                    backgroundColor: isDark ? const Color(0xFF1A212D) : const Color(0xFFEAECF0),
                                     radius: 22,
                                     child: Text(
                                       initials,
-                                      style: TextStyle(
-                                        color: textColor,
-                                        fontWeight: FontWeight.bold,
-                                        fontFamily: 'Futura',
-                                      ),
+                                      style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
                                     ),
                                   ),
-                                  title: Text(
-                                    p['full_name'],
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: textColor,
-                                      fontFamily: 'Futura',
-                                    ),
-                                  ),
+                                  title: Text(p.fullName, style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
                                   subtitle: Text(
-                                    '${p['gender']} - ${p['age']} tuổi\nSĐT: ${p['phone']}',
-                                    style: TextStyle(color: textMuted, fontSize: 12, fontFamily: 'Futura'),
+                                    '${p.gender} - ${p.age} tuổi\nSĐT: ${p.phone}',
+                                    style: TextStyle(color: textMuted, fontSize: 12),
                                   ),
                                   trailing: const Icon(LucideIcons.chevronRight, color: Color(0xFFFF3366), size: 18),
                                   onTap: () {
@@ -334,7 +359,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) => PatientDetailScreen(
-                                          patient: p,
+                                          patient: p.toJson(),
                                           isDarkTheme: isDark,
                                         ),
                                       ),

@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+
+import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/patients_screen.dart';
+import 'screens/alerts_screen.dart';
 import 'screens/icu_camera_screen.dart';
-import 'screens/stats_screen.dart';
+import 'screens/settings_screen.dart';
+
+import 'providers/auth_provider.dart';
+import 'providers/patient_provider.dart';
+import 'providers/alert_provider.dart';
+import 'providers/chat_provider.dart';
+import 'providers/appointment_provider.dart';
 
 void main() {
   runApp(const HeartMonitorApp());
@@ -28,74 +39,83 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Smart Heart Patient Monitoring',
-      debugShowCheckedModeBanner: false,
-      themeMode: _isDarkTheme ? ThemeMode.dark : ThemeMode.light,
-      
-      // Light Theme Style
-      theme: ThemeData(
-        brightness: Brightness.light,
-        primaryColor: const Color(0xFFFF3366),
-        fontFamily: 'Futura',
-        scaffoldBackgroundColor: const Color(0xFFF5F6F8),
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFFFF3366),
-          secondary: Color(0xFF00F2FE),
-          background: Color(0xFFF5F6F8),
-          surface: Colors.white,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.black.withOpacity(0.03),
-          labelStyle: TextStyle(color: Colors.black.withOpacity(0.6)),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => PatientProvider()),
+        ChangeNotifierProvider(create: (_) => AlertProvider()),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(create: (_) => AppointmentProvider()),
+      ],
+      child: MaterialApp(
+        title: 'Smart Heart Patient Monitoring',
+        debugShowCheckedModeBanner: false,
+        themeMode: _isDarkTheme ? ThemeMode.dark : ThemeMode.light,
+        
+        // Light Theme Style
+        theme: ThemeData(
+          brightness: Brightness.light,
+          primaryColor: const Color(0xFFFF3366),
+          scaffoldBackgroundColor: const Color(0xFFF5F6F8),
+          colorScheme: const ColorScheme.light(
+            primary: Color(0xFFFF3366),
+            secondary: Color(0xFF00F2FE),
+            background: Color(0xFFF5F6F8),
+            surface: Colors.white,
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFFF3366)),
-          ),
-        ),
-      ),
-
-      // Dark Theme Style
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: const Color(0xFFFF3366),
-        fontFamily: 'Futura',
-        scaffoldBackgroundColor: const Color(0xFF07080A),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFFF3366),
-          secondary: Color(0xFF00F2FE),
-          background: Color(0xFF07080A),
-          surface: Color(0xFF11151D),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white.withOpacity(0.03),
-          labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.white.withOpacity(0.07)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFFF3366)),
-          ),
-        ),
-      ),
-
-      // Initial route
-      initialRoute: '/login',
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/dashboard': (context) => MainTabWrapper(
-              isDarkTheme: _isDarkTheme,
-              onToggleTheme: _toggleTheme,
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.black.withOpacity(0.03),
+            labelStyle: TextStyle(color: Colors.black.withOpacity(0.6)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
             ),
-      },
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFFF3366)),
+            ),
+          ),
+        ),
+
+        // Dark Theme Style
+        darkTheme: ThemeData(
+          brightness: Brightness.dark,
+          primaryColor: const Color(0xFFFF3366),
+          scaffoldBackgroundColor: const Color(0xFF07080A),
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFFFF3366),
+            secondary: Color(0xFF00F2FE),
+            background: Color(0xFF07080A),
+            surface: Color(0xFF11151D),
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.white.withOpacity(0.03),
+            labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.white.withOpacity(0.07)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFFFF3366)),
+            ),
+          ),
+        ),
+
+        // Initial route is splash for session verification
+        initialRoute: '/splash',
+        routes: {
+          '/splash': (context) => const SplashScreen(),
+          '/login': (context) => const LoginScreen(),
+          '/register': (context) => const RegisterScreen(),
+          '/dashboard': (context) => MainTabWrapper(
+                isDarkTheme: _isDarkTheme,
+                onToggleTheme: _toggleTheme,
+              ),
+        },
+      ),
     );
   }
 }
@@ -125,16 +145,58 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
     final inactiveColor = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
     final borderColor = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08);
 
-    // List of screens corresponding to bottom tabs
-    final List<Widget> screens = [
-      DashboardScreen(
-        isDarkTheme: widget.isDarkTheme,
-        onToggleTheme: widget.onToggleTheme,
-      ),
-      PatientsScreen(isDarkTheme: widget.isDarkTheme),
-      IcuCameraScreen(isDarkTheme: widget.isDarkTheme),
-      StatsScreen(isDarkTheme: widget.isDarkTheme),
-    ];
+    final authProvider = Provider.of<AuthProvider>(context);
+    final role = authProvider.currentUser?.role ?? 'patient';
+
+    // Configure items and screens dynamically based on the active role
+    final List<Widget> screens;
+    final List<Map<String, dynamic>> tabConfig;
+
+    if (role == 'admin' || role == 'doctor') {
+      screens = [
+        DashboardScreen(
+          isDarkTheme: widget.isDarkTheme,
+          onToggleTheme: widget.onToggleTheme,
+        ),
+        PatientsScreen(isDarkTheme: widget.isDarkTheme),
+        AlertsScreen(isDarkTheme: widget.isDarkTheme),
+        IcuCameraScreen(isDarkTheme: widget.isDarkTheme),
+        SettingsScreen(
+          isDarkTheme: widget.isDarkTheme,
+          onToggleTheme: widget.onToggleTheme,
+        ),
+      ];
+      tabConfig = [
+        {'icon': LucideIcons.layoutDashboard, 'label': 'Giám sát'},
+        {'icon': LucideIcons.users, 'label': 'Bệnh nhân'},
+        {'icon': LucideIcons.bell, 'label': 'Cảnh báo'},
+        {'icon': LucideIcons.video, 'label': 'Phòng ICU'},
+        {'icon': LucideIcons.user, 'label': 'Cá nhân'},
+      ];
+    } else {
+      // Patient Role Specific Tabbed Screen Views
+      screens = [
+        DashboardScreen(
+          isDarkTheme: widget.isDarkTheme,
+          onToggleTheme: widget.onToggleTheme,
+        ),
+        AlertsScreen(isDarkTheme: widget.isDarkTheme),
+        SettingsScreen(
+          isDarkTheme: widget.isDarkTheme,
+          onToggleTheme: widget.onToggleTheme,
+        ),
+      ];
+      tabConfig = [
+        {'icon': LucideIcons.heart, 'label': 'Chỉ số'},
+        {'icon': LucideIcons.bellRing, 'label': 'Cảnh báo'},
+        {'icon': LucideIcons.user, 'label': 'Cá nhân'},
+      ];
+    }
+
+    // Wrap in Safe Index Boundaries
+    if (_currentIndex >= screens.length) {
+      _currentIndex = 0;
+    }
 
     return Scaffold(
       body: IndexedStack(
@@ -151,12 +213,16 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(0, LucideIcons.layoutDashboard, 'Giám sát', activeColor, inactiveColor),
-                _buildNavItem(1, LucideIcons.users, 'Bệnh nhân', activeColor, inactiveColor),
-                _buildNavItem(2, LucideIcons.video, 'Phòng ICU', activeColor, inactiveColor),
-                _buildNavItem(3, LucideIcons.barChart2, 'Thống kê', activeColor, inactiveColor),
-              ],
+              children: List.generate(tabConfig.length, (index) {
+                final config = tabConfig[index];
+                return _buildNavItem(
+                  index, 
+                  config['icon'] as IconData, 
+                  config['label'] as String, 
+                  activeColor, 
+                  inactiveColor
+                );
+              }),
             ),
           ),
         ),
@@ -176,7 +242,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
       },
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 80,
+        width: 70,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -188,7 +254,6 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
                 color: color,
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                fontFamily: 'Futura',
               ),
             ),
           ],

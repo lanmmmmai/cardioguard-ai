@@ -1,4 +1,4 @@
-import random
+import secrets
 import requests
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Header, HTTPException
@@ -220,7 +220,7 @@ async def request_register_otp(data: RegisterOtpRequest):
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already exists")
 
-    otp = f"{random.randint(0, 999999):06d}"
+    otp = f"{secrets.randbelow(1_000_000):06d}"
     otp_store[email] = {
         "otp": otp,
         "full_name": data.full_name,
@@ -297,6 +297,10 @@ async def login(data: LoginRequest):
         select_cols += ", must_change_password"
     else:
         select_cols += ", FALSE as must_change_password"
+    if "status" in user_columns:
+        select_cols += ", status"
+    else:
+        select_cols += ", NULL::text as status"
 
     query = f"""
     SELECT {select_cols}
@@ -315,6 +319,9 @@ async def login(data: LoginRequest):
     if not verify_password(data.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    if (user["status"] or "").strip().lower() == "inactive":
+        raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
+
     token = create_access_token({
         "sub": user["id"],
         "email": user["email"],
@@ -329,6 +336,7 @@ async def login(data: LoginRequest):
             "full_name": user["full_name"],
             "email": user["email"],
             "role": normalize_role(user["role"]),
+            "status": user["status"],
             "must_change_password": user["must_change_password"]
         }
     }
@@ -343,7 +351,7 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest):
         # Avoid user enumeration, pretend it sent
         return {"message": "If the email exists, an OTP will be sent.", "email": email, "email_sent": True}
 
-    otp = f"{random.randint(0, 999999):06d}"
+    otp = f"{secrets.randbelow(1_000_000):06d}"
     forgot_password_otp_store[email] = {
         "otp": otp,
         "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10)
@@ -379,29 +387,38 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest):
     if not user:
         raise HTTPException(status_code=400, detail="User not found")
 
-    import string
-    chars = string.ascii_letters + string.digits + "@!#?$"
-    new_password = "".join(random.choice(chars) for _ in range(12))
-    # ensure strong requirements
-    new_password += "A1!a"
+    if data.new_password:
+        new_password = data.new_password
+        must_change_password = False
+    else:
+        import string
+        chars = string.ascii_letters + string.digits + "@!#?$"
+        new_password = "".join(secrets.choice(chars) for _ in range(12))
+        # ensure strong requirements
+        new_password += "A1!a"
+        must_change_password = True
     
     hashed_password = hash_password(new_password)
 
     await database.execute(
         """
         UPDATE users 
-        SET password_hash = :password_hash, must_change_password = TRUE
+        SET password_hash = :password_hash, must_change_password = :must_change_password
         WHERE id = :id
         """,
-        {"password_hash": hashed_password, "id": user["id"]}
+        {"password_hash": hashed_password, "must_change_password": must_change_password, "id": user["id"]}
     )
 
     forgot_password_otp_store.pop(email, None)
 
-    # Send email with new password
-    send_random_password_email(email, user["full_name"], new_password)
+    if data.new_password:
+        return {"message": "Password has been reset successfully."}
 
-    return {"message": "Password has been reset. Please check your email for the new password."}
+    email_sent = send_random_password_email(email, user["full_name"], new_password)
+    response = {"message": "Password has been reset. Please check your email for the new password.", "email_sent": email_sent}
+    if not email_sent:
+        response["dev_new_password"] = new_password
+    return response
 
 
 @router.post("/auth/change-password")
