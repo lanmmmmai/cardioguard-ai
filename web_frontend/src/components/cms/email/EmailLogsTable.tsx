@@ -102,8 +102,6 @@ export const EmailLogsTable: React.FC<EmailLogsTableProps> = ({ refreshSignal })
   const handleExport = () => {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
-    window.open(`${API_URL}/email/export-logs?${params}&Authorization=Bearer ${accessToken}`);
-    // Dùng fetch thay window.open để có auth header
     fetch(`${API_URL}/email/export-logs?${params}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })

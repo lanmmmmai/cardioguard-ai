@@ -12,7 +12,7 @@ export const DoctorChatbot: React.FC = () => {
   useEffect(() => {
     const fetchPatients = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/patients`, {
+        const res = await fetch(`${API_URL}/patients`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         const data = await res.json();

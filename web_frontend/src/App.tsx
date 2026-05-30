@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertOctagon } from 'lucide-react';
 import { Login } from './components/Login';
 import { Register } from './components/Register';
@@ -189,7 +189,7 @@ const AppContent: React.FC = () => {
     }
   }, [accessToken, role]);
 
-  const handleWebSocketMessage = (data: SensorData) => {
+  const handleSensorTelemetry = useCallback((data: SensorData) => {
     setLatestTelemetry(data);
     if (!data.is_abnormal || data.alerts.length === 0) return;
 
@@ -211,9 +211,36 @@ const AppContent: React.FC = () => {
       })),
       ...prev,
     ]);
-  };
+  }, [patients]);
 
-  useWebSocket(WS_URL, accessToken ? handleWebSocketMessage : undefined);
+  const handleRealtimeMessage = useCallback((message: any) => {
+    if (!message?.type) {
+      handleSensorTelemetry(message as SensorData);
+      return;
+    }
+
+    if (message.type === 'health_metrics' && message.data) {
+      handleSensorTelemetry({
+        ...message.data,
+        patient_id: message.patient_id || message.data.patient_id,
+      } as SensorData);
+      return;
+    }
+
+    if (message.type === 'emergency_alerts' && message.data) {
+      const alert = {
+        ...message.data,
+        patient_id: message.patient_id || message.data.patient_id,
+      } as Alert;
+      const matchingPatient = patients.find((patient) => patient.id === alert.patient_id);
+      const patientName = alert.full_name || matchingPatient?.full_name || 'Bệnh nhân';
+      setActiveBanner({ message: alert.message, patientName, severity: alert.severity });
+      window.setTimeout(() => setActiveBanner(null), 7000);
+      setAlerts((prev) => [{ ...alert, full_name: patientName }, ...prev]);
+    }
+  }, [handleSensorTelemetry, patients]);
+
+  useWebSocket(WS_URL, accessToken ? handleRealtimeMessage : undefined, accessToken);
 
   const handleLoginSuccess = (token: string, userData: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean }) => {
     const userRole = normalizeRole(userData.role);

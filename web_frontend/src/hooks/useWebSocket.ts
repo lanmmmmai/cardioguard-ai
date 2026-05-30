@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { WS_URL } from '../config';
 
-interface WebSocketMessage {
+export interface SensorTelemetryMessage {
   patient_id: string;
   heart_rate: number;
   spo2: number;
@@ -16,9 +16,18 @@ interface WebSocketMessage {
   }>;
 }
 
+export interface RealtimeEnvelope {
+  type: string;
+  patient_id?: string;
+  data?: any;
+  message?: string;
+  timestamp?: string;
+}
+
 export const useWebSocket = (
   url: string = WS_URL,
-  onMessageReceived?: (data: WebSocketMessage) => void
+  onMessageReceived?: (data: RealtimeEnvelope | SensorTelemetryMessage) => void,
+  token?: string | null
 ) => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const socketRef = useRef<WebSocket | null>(null);
@@ -33,6 +42,10 @@ export const useWebSocket = (
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       wsUrl = `${protocol}//${window.location.host}${url}`;
     }
+    if (token) {
+      const separator = wsUrl.includes('?') ? '&' : '?';
+      wsUrl = `${wsUrl}${separator}token=${encodeURIComponent(token)}`;
+    }
 
     try {
       const socket = new WebSocket(wsUrl);
@@ -45,7 +58,7 @@ export const useWebSocket = (
 
       socket.onmessage = (event) => {
         try {
-          const parsedData = JSON.parse(event.data) as WebSocketMessage;
+          const parsedData = JSON.parse(event.data) as RealtimeEnvelope | SensorTelemetryMessage;
           if (onMessageReceived) {
             onMessageReceived(parsedData);
           }
@@ -71,7 +84,7 @@ export const useWebSocket = (
     } catch (e) {
       console.error('Failed to initialize WebSocket connection:', e);
     }
-  }, [url, onMessageReceived]);
+  }, [url, onMessageReceived, token]);
 
   useEffect(() => {
     if (!onMessageReceived) return;

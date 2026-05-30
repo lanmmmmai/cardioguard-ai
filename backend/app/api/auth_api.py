@@ -1,4 +1,4 @@
-import random
+import secrets
 import requests
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Header, HTTPException
@@ -220,7 +220,7 @@ async def request_register_otp(data: RegisterOtpRequest):
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already exists")
 
-    otp = f"{random.randint(0, 999999):06d}"
+    otp = f"{secrets.randbelow(1_000_000):06d}"
     otp_store[email] = {
         "otp": otp,
         "full_name": data.full_name,
@@ -343,7 +343,7 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest):
         # Avoid user enumeration, pretend it sent
         return {"message": "If the email exists, an OTP will be sent.", "email": email, "email_sent": True}
 
-    otp = f"{random.randint(0, 999999):06d}"
+    otp = f"{secrets.randbelow(1_000_000):06d}"
     forgot_password_otp_store[email] = {
         "otp": otp,
         "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10)
@@ -381,7 +381,7 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest):
 
     import string
     chars = string.ascii_letters + string.digits + "@!#?$"
-    new_password = "".join(random.choice(chars) for _ in range(12))
+    new_password = "".join(secrets.choice(chars) for _ in range(12))
     # ensure strong requirements
     new_password += "A1!a"
     

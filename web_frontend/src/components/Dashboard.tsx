@@ -3,6 +3,7 @@ import { Heart, Activity, AlertTriangle, User, Play, Radio, Plus } from 'lucide-
 import { ECGChart } from './ECGChart';
 import { BeatingHeart3D } from './BeatingHeart3D';
 import { API_URL } from '../config';
+import { useAuth } from '../auth/AuthContext';
 
 interface Patient {
   id: string;
@@ -53,6 +54,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   alerts,
   onAddPatientClick
 }) => {
+  const { accessToken } = useAuth();
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [isSimulating, setIsSimulating] = useState(false);
   
@@ -125,6 +127,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify({
           patient_id: selectedPatientId,

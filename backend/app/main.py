@@ -54,7 +54,7 @@ app.include_router(alert_router)
 app.include_router(crud_router)
 app.include_router(cms_router)
 app.include_router(admin_doctor_router)
-app.include_router(email_router, prefix="/email", tags=["Email CMS"])
+app.include_router(email_router)
 app.include_router(feature_router)
 app.include_router(chat_router, prefix="/api/chat", tags=["Chatbot"])
 
