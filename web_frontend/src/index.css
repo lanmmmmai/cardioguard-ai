@@ -342,6 +342,21 @@ body {
   border-color: var(--glass-border-hover);
 }
 
+.btn:disabled,
+.btn:disabled:hover {
+  cursor: not-allowed;
+  opacity: 0.65;
+  transform: none;
+}
+
+.btn-primary:disabled,
+.btn-primary:disabled:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--glass-border);
+  box-shadow: none;
+  color: var(--text-muted);
+}
+
 /* Glassmorphic Panel/Card System */
 .panel {
   background: var(--glass-bg);

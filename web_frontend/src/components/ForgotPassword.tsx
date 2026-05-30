@@ -201,7 +201,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
                   id="otp"
                   type="text"
                   className="form-control"
-                  placeholder="123456"
+                  placeholder="Nhập mã OTP"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   style={{ paddingLeft: '45px', letterSpacing: '2px', fontFamily: 'monospace' }}
@@ -273,7 +273,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
               type="submit" 
               className="btn btn-primary" 
               style={{ width: '100%', justifyContent: 'center', height: '46px' }}
-              disabled={isLoading || otp.length !== 6 || !newPassword || newPassword !== confirmPassword}
+              disabled={isLoading || otp.length !== 6 || !passwordPattern.test(newPassword) || newPassword !== confirmPassword}
             >
               {isLoading ? (
                 <>
