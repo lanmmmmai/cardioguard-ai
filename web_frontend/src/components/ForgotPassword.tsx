@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Activity, Mail, Loader2, ArrowLeft, KeyRound, Lock } from 'lucide-react';
 import { API_URL } from '../config';
+import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
 
 interface ForgotPasswordProps {
   onNavigateToLogin: () => void;
@@ -15,7 +16,6 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const passwordPattern = /^(?=.*[A-Z])(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,8 +41,8 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
       }
 
       setSuccess(
-        data.dev_otp
-          ? `Môi trường dev chưa cấu hình SMTP. Mã OTP tạm: ${data.dev_otp}`
+        data.email_sent === false
+          ? 'Nếu email tồn tại, mã OTP đã được tạo. Môi trường dev chưa cấu hình gửi email, vui lòng xem log backend.'
           : 'Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.'
       );
       setStep(2);
@@ -59,8 +59,8 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
       setError('Vui lòng nhập mã OTP');
       return;
     }
-    if (!passwordPattern.test(newPassword)) {
-      setError('Mật khẩu mới cần ít nhất 8 ký tự, có chữ hoa, số và ký tự đặc biệt');
+    if (!isStrongPassword(newPassword)) {
+      setError(passwordPolicyMessage);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -273,7 +273,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
               type="submit" 
               className="btn btn-primary" 
               style={{ width: '100%', justifyContent: 'center', height: '46px' }}
-              disabled={isLoading || otp.length !== 6 || !passwordPattern.test(newPassword) || newPassword !== confirmPassword}
+              disabled={isLoading || otp.length !== 6 || !isStrongPassword(newPassword) || newPassword !== confirmPassword}
             >
               {isLoading ? (
                 <>

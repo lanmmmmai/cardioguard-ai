@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from app.api.auth_api import get_user_from_token
 from app.core.sqlalchemy_async import AsyncSessionLocal
+from app.core.password_policy import validate_password
 from app.core.security import hash_password
 
 router = APIRouter(prefix="/cms", tags=["cms"])
@@ -176,10 +177,10 @@ def validate_payload(payload: dict[str, Any], columns: list[dict[str, Any]], con
 
     for key, value in normalized.items():
         if key == "password" and "password_hash" in column_map:
-            if not value or len(str(value)) < 8:
-                errors.append("password must be at least 8 characters")
-            else:
-                values["password_hash"] = hash_password(str(value))
+            try:
+                values["password_hash"] = hash_password(validate_password(str(value or "")))
+            except ValueError as exc:
+                errors.append(str(exc))
             continue
         if key not in column_map:
             errors.append(f"Unknown column: {key}")

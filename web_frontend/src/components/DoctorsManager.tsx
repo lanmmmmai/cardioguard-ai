@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Search, X, Loader2, Plus, Edit2, Trash2, Stethoscope, Mail, Phone, Building } from 'lucide-react';
 import { API_URL } from '../config';
 import { useAuth } from '../auth/AuthContext';
+import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
 
 interface Doctor {
   id: string;
@@ -74,15 +75,15 @@ export const DoctorsManager: React.FC = () => {
       if (!password) {
         return 'Mật khẩu là bắt buộc';
       }
-      if (password.length < 6) {
-        return 'Mật khẩu phải tối thiểu 6 ký tự';
+      if (!isStrongPassword(password)) {
+        return passwordPolicyMessage;
       }
       if (password !== confirmPassword) {
         return 'Xác nhận mật khẩu không khớp';
       }
     } else {
-      if (password && password.length < 6) {
-        return 'Mật khẩu mới phải tối thiểu 6 ký tự';
+      if (password && !isStrongPassword(password)) {
+        return passwordPolicyMessage;
       }
       if (password && password !== confirmPassword) {
         return 'Xác nhận mật khẩu mới không khớp';

@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, KeyRound, Loader2, Save, ShieldCheck, User
 import { API_URL } from '../config';
 import { useAuth } from '../auth/AuthContext';
 import { roleLabel, type UserRole } from '../auth/roles';
+import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
 
 interface ProfilePageProps {
   role: UserRole;
@@ -36,7 +37,6 @@ const emptyPasswordForm = {
 };
 
 const phonePattern = /^[0-9+() .-]{7,20}$/;
-const passwordPattern = /^(?=.*[A-Z])(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 
 const formatDate = (value?: string | null) => {
   if (!value) return 'Chưa có dữ liệu';
@@ -149,7 +149,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
 
   const validatePassword = () => {
     if (!passwordForm.current_password) return 'Vui lòng nhập mật khẩu hiện tại.';
-    if (!passwordPattern.test(passwordForm.new_password)) return 'Mật khẩu mới cần ít nhất 8 ký tự, có chữ hoa, số và ký tự đặc biệt.';
+    if (!isStrongPassword(passwordForm.new_password)) return passwordPolicyMessage;
     if (passwordForm.new_password !== passwordForm.confirm_password) return 'Xác nhận mật khẩu không khớp.';
     return null;
   };

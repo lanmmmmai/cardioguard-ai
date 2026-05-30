@@ -1,11 +1,10 @@
 from pathlib import Path
-from pydantic import model_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 DEFAULT_SECRET_KEY = "heart_monitor_secret_key"
-PRODUCTION_ENVIRONMENTS = {"prod", "production"}
 
 
 class Settings(BaseSettings):
@@ -17,15 +16,16 @@ class Settings(BaseSettings):
     EMAIL_FROM_EMAIL: str = "noreply@cardioguard.ai"
     EMAIL_FROM_NAME: str = "CardioGuard AI"
     OPENAI_API_KEY: str = ""
-    SECRET_KEY: str = DEFAULT_SECRET_KEY
+    SECRET_KEY: str = Field(..., min_length=32)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    EXPOSE_DEV_OTP: bool = False
 
-    @model_validator(mode="after")
-    def validate_production_settings(self):
-        if self.ENVIRONMENT.lower() in PRODUCTION_ENVIRONMENTS:
-            if not self.SECRET_KEY or self.SECRET_KEY == DEFAULT_SECRET_KEY:
-                raise ValueError("SECRET_KEY must be set to a strong unique value in production")
-        return self
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def validate_secret_key(cls, value: str) -> str:
+        if value == DEFAULT_SECRET_KEY:
+            raise ValueError("SECRET_KEY must not use the default development value")
+        return value
 
     model_config = SettingsConfigDict(
         env_file=(BASE_DIR / ".env", BASE_DIR / "backend" / ".env"),

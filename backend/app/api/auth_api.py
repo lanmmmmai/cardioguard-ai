@@ -1,6 +1,5 @@
 import secrets
 import requests
-from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Header, HTTPException
 from jose import JWTError, jwt
 from app.core.config import settings
@@ -10,11 +9,17 @@ from app.schemas.auth_schema import (
     RegisterRequest, LoginRequest, RegisterOtpRequest,
     ForgotPasswordRequest, ForgotPasswordVerifyRequest, ChangePasswordRequest
 )
+from app.services.otp_service import (
+    OTP_PURPOSE_FORGOT_PASSWORD,
+    OTP_PURPOSE_REGISTER,
+    create_otp_token,
+    invalidate_otp_tokens,
+    verify_otp_token,
+)
 router = APIRouter()
 
-otp_store: dict[str, dict[str, object]] = {}
-forgot_password_otp_store: dict[str, dict[str, object]] = {}
 VALID_ROLES = {"admin", "doctor", "patient"}
+PRODUCTION_ENVIRONMENTS = {"prod", "production"}
 
 
 def normalize_role(role: str | None) -> str:
@@ -22,6 +27,18 @@ def normalize_role(role: str | None) -> str:
     if normalized not in VALID_ROLES:
         raise HTTPException(status_code=403, detail="Tài khoản chưa được phân quyền")
     return normalized
+
+
+def should_expose_dev_auth_values() -> bool:
+    return settings.EXPOSE_DEV_OTP and settings.ENVIRONMENT.lower() not in PRODUCTION_ENVIRONMENTS
+
+
+def generic_forgot_password_response(email: str) -> dict[str, object]:
+    return {
+        "message": "If the email exists, an OTP will be sent.",
+        "email": email,
+        "email_sent": bool(settings.BREVO_API_KEY),
+    }
 
 
 def extract_bearer_token(authorization: str | None) -> str:
@@ -220,22 +237,21 @@ async def request_register_otp(data: RegisterOtpRequest):
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already exists")
 
-    otp = f"{secrets.randbelow(1_000_000):06d}"
-    otp_store[email] = {
-        "otp": otp,
-        "full_name": data.full_name,
-        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10)
-    }
+    otp = await create_otp_token(
+        purpose=OTP_PURPOSE_REGISTER,
+        email=email,
+        metadata={"full_name": data.full_name},
+    )
 
     try:
         email_sent = send_register_otp_email(email, data.full_name, otp)
     except Exception as exc:
-        otp_store.pop(email, None)
+        await invalidate_otp_tokens(purpose=OTP_PURPOSE_REGISTER, email=email)
         print(f"[SMTP ERROR] Unable to send OTP to {email}: {exc}")
         raise HTTPException(status_code=502, detail=str(exc) or "Unable to send OTP email") from exc
 
     response = {"message": "OTP sent to email", "email": email, "email_sent": email_sent}
-    if not email_sent:
+    if not email_sent and should_expose_dev_auth_values():
         response["dev_otp"] = otp
     return response
 
@@ -243,15 +259,16 @@ async def request_register_otp(data: RegisterOtpRequest):
 @router.post("/auth/register")
 async def register(data: RegisterRequest):
     email = data.email.lower()
-    otp_record = otp_store.get(email)
-    now = datetime.now(timezone.utc)
+    otp_result = await verify_otp_token(
+        purpose=OTP_PURPOSE_REGISTER,
+        email=email,
+        otp=data.otp,
+    )
 
-    if not otp_record or otp_record["otp"] != data.otp:
+    if not otp_result.is_valid:
+        if otp_result.reason == "expired":
+            raise HTTPException(status_code=400, detail="OTP expired")
         raise HTTPException(status_code=400, detail="Invalid OTP")
-
-    if otp_record["expires_at"] < now:
-        otp_store.pop(email, None)
-        raise HTTPException(status_code=400, detail="OTP expired")
 
     check_query = "SELECT id FROM users WHERE email = :email"
     existing_user = await database.fetch_one(
@@ -270,14 +287,12 @@ async def register(data: RegisterRequest):
     await database.execute(
         query=insert_query,
         values={
-            "full_name": data.full_name,
+            "full_name": otp_result.metadata.get("full_name") or data.full_name,
             "email": email,
             "password_hash": hash_password(data.password),
             "role": "patient"
         }
     )
-
-    otp_store.pop(email, None)
 
     return {"message": "Register successfully"}
 
@@ -345,47 +360,58 @@ async def login(data: LoginRequest):
 @router.post("/auth/forgot-password/request-otp")
 async def request_forgot_password_otp(data: ForgotPasswordRequest):
     email = data.email.lower()
-    user = await database.fetch_one("SELECT full_name FROM users WHERE email = :email", {"email": email})
+    response = generic_forgot_password_response(email)
+    user = await database.fetch_one(
+        "SELECT id::text AS id, full_name FROM users WHERE email = :email",
+        {"email": email},
+    )
     
     if not user:
-        # Avoid user enumeration, pretend it sent
-        return {"message": "If the email exists, an OTP will be sent.", "email": email, "email_sent": True}
+        return response
 
-    otp = f"{secrets.randbelow(1_000_000):06d}"
-    forgot_password_otp_store[email] = {
-        "otp": otp,
-        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10)
-    }
+    otp = await create_otp_token(
+        purpose=OTP_PURPOSE_FORGOT_PASSWORD,
+        email=email,
+        metadata={"user_id": user["id"], "full_name": user["full_name"]},
+    )
 
     try:
-        email_sent = send_forgot_password_otp_email(email, user["full_name"], otp)
+        send_forgot_password_otp_email(email, user["full_name"], otp)
     except Exception as exc:
-        forgot_password_otp_store.pop(email, None)
         print(f"[SMTP ERROR] Unable to send OTP to {email}: {exc}")
-        raise HTTPException(status_code=502, detail="Unable to send OTP email") from exc
+        if settings.BREVO_API_KEY:
+            await invalidate_otp_tokens(purpose=OTP_PURPOSE_FORGOT_PASSWORD, email=email)
 
-    response = {"message": "If the email exists, an OTP will be sent.", "email": email, "email_sent": email_sent}
-    if not email_sent:
-        response["dev_otp"] = otp
     return response
 
 
 @router.post("/auth/forgot-password/verify-otp")
 async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest):
     email = data.email.lower()
-    otp_record = forgot_password_otp_store.get(email)
-    now = datetime.now(timezone.utc)
+    otp_result = await verify_otp_token(
+        purpose=OTP_PURPOSE_FORGOT_PASSWORD,
+        email=email,
+        otp=data.otp,
+    )
 
-    if not otp_record or otp_record["otp"] != data.otp:
+    if not otp_result.is_valid:
+        if otp_result.reason == "expired":
+            raise HTTPException(status_code=400, detail="OTP expired")
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
-    if otp_record["expires_at"] < now:
-        forgot_password_otp_store.pop(email, None)
-        raise HTTPException(status_code=400, detail="OTP expired")
-
-    user = await database.fetch_one("SELECT id, full_name FROM users WHERE email = :email", {"email": email})
+    user_id = otp_result.metadata.get("user_id")
+    if user_id:
+        user = await database.fetch_one(
+            "SELECT id, full_name FROM users WHERE id::text = :id",
+            {"id": user_id},
+        )
+    else:
+        user = await database.fetch_one(
+            "SELECT id, full_name FROM users WHERE email = :email",
+            {"email": email},
+        )
     if not user:
-        raise HTTPException(status_code=400, detail="User not found")
+        raise HTTPException(status_code=400, detail="Invalid OTP")
 
     if data.new_password:
         new_password = data.new_password
@@ -409,14 +435,12 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest):
         {"password_hash": hashed_password, "must_change_password": must_change_password, "id": user["id"]}
     )
 
-    forgot_password_otp_store.pop(email, None)
-
     if data.new_password:
         return {"message": "Password has been reset successfully."}
 
     email_sent = send_random_password_email(email, user["full_name"], new_password)
     response = {"message": "Password has been reset. Please check your email for the new password.", "email_sent": email_sent}
-    if not email_sent:
+    if not email_sent and should_expose_dev_auth_values():
         response["dev_new_password"] = new_password
     return response
 

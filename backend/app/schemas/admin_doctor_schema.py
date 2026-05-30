@@ -1,15 +1,21 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from datetime import datetime
+from app.core.password_policy import validate_password
 
 class DoctorCreate(BaseModel):
     full_name: str
     email: EmailStr
     phone: str | None = None
-    password: str = Field(..., min_length=6)
+    password: str
     confirm_password: str
     specialty: str | None = None
     department: str | None = None
     status: str = "active"
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        return validate_password(v)
 
     @field_validator("status")
     @classmethod
@@ -28,11 +34,18 @@ class DoctorUpdate(BaseModel):
     full_name: str | None = None
     email: EmailStr | None = None
     phone: str | None = None
-    password: str | None = Field(default=None, min_length=6)
+    password: str | None = None
     confirm_password: str | None = None
     specialty: str | None = None
     department: str | None = None
     status: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return validate_password(v)
 
     @field_validator("status")
     @classmethod

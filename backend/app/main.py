@@ -14,6 +14,7 @@ from app.api.cms_api import router as cms_router
 from app.api.admin_doctor_api import router as admin_doctor_router
 from app.api.email_api import router as email_router
 from app.api.chat_api import router as chat_router
+from app.services.otp_service import ensure_otp_table
 
 
 app = FastAPI(
@@ -39,6 +40,7 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     await connect_db()
+    await ensure_otp_table()
 
 
 @app.on_event("shutdown")
