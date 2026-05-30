@@ -126,12 +126,12 @@ export const BeatingHeart3D: React.FC<BeatingHeart3DProps> = ({ heartRate }) => 
       // Project 3D to 2D
       const projected = points.map(p => {
         // Y-axis rotation
-        let x1 = p.x * cosY - p.z * sinY;
-        let z1 = p.x * sinY + p.z * cosY;
+        const x1 = p.x * cosY - p.z * sinY;
+        const z1 = p.x * sinY + p.z * cosY;
 
         // X-axis rotation
-        let y2 = p.y * cosX - z1 * sinX;
-        let z2 = p.y * sinX + z1 * cosX;
+        const y2 = p.y * cosX - z1 * sinX;
+        const z2 = p.y * sinX + z1 * cosX;
 
         // Perspective projection
         const scale = cameraDistance / (cameraDistance + z2);

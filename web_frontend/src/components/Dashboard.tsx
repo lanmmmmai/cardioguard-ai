@@ -107,7 +107,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     let o2 = Math.floor(Math.random() * (100 - 95) + 95); // 95 - 100 normal
     let sys = Math.floor(Math.random() * (135 - 110) + 110); // 110 - 135 normal
     let dia = Math.floor(Math.random() * (85 - 70) + 70); // 70 - 85 normal
-    let ecg = (Math.random() - 0.5) * 0.3; // tiny baseline
+    const ecg = (Math.random() - 0.5) * 0.3; // tiny baseline
 
     if (abnormal) {
       // Trigger abnormal readings

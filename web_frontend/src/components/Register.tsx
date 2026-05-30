@@ -7,7 +7,7 @@ interface RegisterProps {
   onNavigateToLogin: () => void;
 }
 
-const fullNamePattern = /^[A-Za-zÀ-ỹ]+(?:[ '\-][A-Za-zÀ-ỹ]+)+$/;
+const fullNamePattern = /^[A-Za-zÀ-ỹ]+(?:[ '-][A-Za-zÀ-ỹ]+)+$/;
 const passwordPattern = /^(?=.*[A-Z])(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 
 const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ');
