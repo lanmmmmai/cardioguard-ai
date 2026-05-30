@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, Mail, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
+import { Activity, Mail, Loader2, ArrowLeft, KeyRound, Lock } from 'lucide-react';
 import { API_URL } from '../config';
 
 interface ForgotPasswordProps {
@@ -10,9 +10,12 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
   const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const passwordPattern = /^(?=.*[A-Z])(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +40,11 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
         throw new Error(data.detail || 'Không thể yêu cầu OTP');
       }
 
-      setSuccess('Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.');
+      setSuccess(
+        data.dev_otp
+          ? `Môi trường dev chưa cấu hình SMTP. Mã OTP tạm: ${data.dev_otp}`
+          : 'Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.'
+      );
       setStep(2);
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
@@ -52,6 +59,14 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
       setError('Vui lòng nhập mã OTP');
       return;
     }
+    if (!passwordPattern.test(newPassword)) {
+      setError('Mật khẩu mới cần ít nhất 8 ký tự, có chữ hoa, số và ký tự đặc biệt');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Mật khẩu mới và xác nhận mật khẩu không khớp');
+      return;
+    }
 
     setError(null);
     setSuccess(null);
@@ -61,7 +76,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
       const response = await fetch(`${API_URL}/auth/forgot-password/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp }),
+        body: JSON.stringify({ email, otp, new_password: newPassword }),
       });
 
       const data = await response.json();
@@ -69,8 +84,11 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
         throw new Error(data.detail || 'Xác minh OTP thất bại');
       }
 
-      setSuccess('Mật khẩu của bạn đã được đặt lại thành công! Một email chứa mật khẩu mới đã được gửi cho bạn.');
+      setSuccess('Mật khẩu của bạn đã được đặt lại thành công. Đang chuyển sang đăng nhập...');
       setStep(1); // Reset form logically
+      setOtp('');
+      setNewPassword('');
+      setConfirmPassword('');
       setTimeout(() => {
         onNavigateToLogin();
       }, 5000);
@@ -193,11 +211,69 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
               </div>
             </div>
 
+            <div className="form-group">
+              <label htmlFor="newPassword">Mật khẩu mới</label>
+              <div style={{ position: 'relative' }}>
+                <Lock
+                  size={18}
+                  style={{
+                    position: 'absolute',
+                    left: '14px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--text-muted)'
+                  }}
+                />
+                <input
+                  id="newPassword"
+                  type="password"
+                  className="form-control"
+                  placeholder="Tối thiểu 8 ký tự, chữ hoa, số, ký tự đặc biệt"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  style={{ paddingLeft: '45px' }}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '2rem' }}>
+              <label htmlFor="confirmPassword">Xác nhận mật khẩu mới</label>
+              <div style={{ position: 'relative' }}>
+                <Lock
+                  size={18}
+                  style={{
+                    position: 'absolute',
+                    left: '14px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: confirmPassword && confirmPassword !== newPassword ? 'var(--color-critical)' : 'var(--text-muted)'
+                  }}
+                />
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  className="form-control"
+                  placeholder="Nhập lại mật khẩu mới"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  style={{
+                    paddingLeft: '45px',
+                    borderColor: confirmPassword && confirmPassword !== newPassword ? 'var(--color-critical)' : undefined
+                  }}
+                  required
+                />
+              </div>
+              <small style={{ color: confirmPassword && confirmPassword !== newPassword ? 'var(--color-critical)' : 'var(--text-muted)', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                Mật khẩu phải có ít nhất 8 ký tự, 1 chữ hoa, 1 số và 1 ký tự đặc biệt.
+              </small>
+            </div>
+
             <button 
               type="submit" 
               className="btn btn-primary" 
               style={{ width: '100%', justifyContent: 'center', height: '46px' }}
-              disabled={isLoading || otp.length !== 6}
+              disabled={isLoading || otp.length !== 6 || !newPassword || newPassword !== confirmPassword}
             >
               {isLoading ? (
                 <>

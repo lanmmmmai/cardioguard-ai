@@ -65,6 +65,7 @@ class ForgotPasswordRequest(BaseModel):
 class ForgotPasswordVerifyRequest(BaseModel):
     email: EmailStr
     otp: str
+    new_password: str | None = None
 
     @field_validator("otp")
     @classmethod
@@ -72,6 +73,13 @@ class ForgotPasswordVerifyRequest(BaseModel):
         if not re.fullmatch(r"\d{6}", value.strip()):
             raise ValueError("OTP must be 6 digits")
         return value.strip()
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_strength(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return validate_password(value)
 
 
 class ChangePasswordRequest(BaseModel):
