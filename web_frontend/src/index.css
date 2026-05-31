@@ -4077,3 +4077,50 @@ body {
   box-shadow: 0 4px 15px rgba(239, 68, 68, 0.25);
 }
 
+/* =============================================================================
+   CardioGuard AI — Premium Theme Toggle Button Style (Glassmorphism & Micro-animations)
+   ============================================================================= */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary, #ffffff);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 0;
+}
+
+[data-theme="light"] .theme-toggle-btn {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #1f2937;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.theme-toggle-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #eab308; /* Icon Sun màu vàng ấm áp ở Dark Mode */
+  box-shadow: 0 6px 20px rgba(234, 179, 8, 0.25);
+}
+
+[data-theme="light"] .theme-toggle-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.15);
+  color: #3b82f6; /* Icon Moon màu xanh dương dịu mát ở Light Mode */
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.15);
+}
+
+.theme-toggle-btn:active {
+  transform: translateY(0) scale(0.95);
+}
+
+
