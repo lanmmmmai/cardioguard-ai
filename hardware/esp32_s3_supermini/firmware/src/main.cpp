@@ -3,55 +3,82 @@
 #include "config.h"
 #include "random_telemetry.h"
 #include "state_machine.h"
+#include "telemetry_format.h"
+#include "telemetry_sender.h"
 
 namespace {
 RuntimeState g_state = RuntimeState::boot;
 DemoMode g_mode = kDefaultMode;
 unsigned long g_last_tick_ms = 0UL;
 unsigned long g_sequence = 0UL;
+String g_serial_line;
 
 void PrintTelemetry(const TelemetryFrame &frame) {
-  Serial.print("{\"device_uid\":\"");
-  Serial.print(frame.device_uid);
-  Serial.print("\",\"sequence\":");
-  Serial.print(frame.sequence);
-  Serial.print(",\"mode\":\"");
-  Serial.print(frame.mode);
-  Serial.print("\",\"readings\":{\"heart_rate\":");
-  Serial.print(frame.readings.heart_rate);
-  Serial.print(",\"spo2\":");
-  Serial.print(frame.readings.spo2);
-  Serial.print(",\"systolic_bp\":");
-  if (frame.readings.has_bp) {
-    Serial.print(frame.readings.systolic_bp);
-  } else {
-    Serial.print("null");
+  const String json = BuildTelemetryJson(frame);
+  Serial.println(json);
+}
+
+void HandleSerialCommand(const String &command) {
+  if (command.startsWith("mode ")) {
+    const String value = command.substring(5);
+    const DemoMode previous_mode = g_mode;
+    g_mode = ParseModeFromText(value, g_mode);
+    if (g_mode != previous_mode) {
+      Serial.print("[CardioGuard] Mode -> ");
+      Serial.println(ModeToString(g_mode));
+    } else {
+      Serial.print("[CardioGuard] Mode unchanged: ");
+      Serial.println(ModeToString(g_mode));
+    }
+    return;
   }
-  Serial.print(",\"diastolic_bp\":");
-  if (frame.readings.has_bp) {
-    Serial.print(frame.readings.diastolic_bp);
-  } else {
-    Serial.print("null");
+
+  if (command == "status") {
+    Serial.print("[CardioGuard] State=");
+    Serial.print(StateToString(g_state));
+    Serial.print(", Mode=");
+    Serial.print(ModeToString(g_mode));
+    Serial.print(", Sequence=");
+    Serial.print(g_sequence);
+    Serial.print(", WiFi=");
+    Serial.print(IsWifiConnected() ? "connected" : "disconnected");
+    Serial.print(", Buffer=");
+    Serial.println(PendingBufferSize());
+    return;
   }
-  Serial.print(",\"ecg_value\":");
-  Serial.print(frame.readings.ecg_value, 3);
-  Serial.print("},\"signal\":{\"ppg_quality\":\"");
-  Serial.print(frame.signal.ppg_quality);
-  Serial.print("\",\"ecg_quality\":\"");
-  Serial.print(frame.signal.ecg_quality);
-  Serial.print("\",\"leads_off\":");
-  Serial.print(frame.signal.leads_off ? "true" : "false");
-  Serial.print(",\"motion_detected\":");
-  Serial.print(frame.signal.motion_detected ? "true" : "false");
-  Serial.print("},\"device\":{\"battery\":");
-  Serial.print(frame.device.battery);
-  Serial.print(",\"rssi\":");
-  Serial.print(frame.device.rssi);
-  Serial.print(",\"firmware_version\":\"");
-  Serial.print(frame.device.firmware_version);
-  Serial.print("\",\"uptime_ms\":");
-  Serial.print(frame.device.uptime_ms);
-  Serial.println("}}");
+
+  if (command == "help") {
+    Serial.println("[CardioGuard] Commands:");
+    Serial.println("  mode normal");
+    Serial.println("  mode occasional");
+    Serial.println("  mode critical");
+    Serial.println("  mode poor_signal");
+    Serial.println("  mode offline");
+    Serial.println("  status");
+    return;
+  }
+
+  if (command.length() > 0) {
+    Serial.print("[CardioGuard] Unknown command: ");
+    Serial.println(command);
+  }
+}
+
+void PollSerialCommands() {
+  while (Serial.available() > 0) {
+    const char ch = static_cast<char>(Serial.read());
+    if (ch == '\n' || ch == '\r') {
+      if (g_serial_line.length() > 0) {
+        HandleSerialCommand(g_serial_line);
+        g_serial_line = "";
+      }
+      continue;
+    }
+
+    if (g_serial_line.length() < 80) {
+      g_serial_line += ch;
+    }
+  }
 }
 }  // namespace
 
@@ -59,15 +86,20 @@ void setup() {
   Serial.begin(115200);
   delay(400);
   randomSeed(esp_random());
+  InitializeTelemetrySender();
 
   Serial.println("[CardioGuard] ESP32-S3 demo boot");
   Serial.print("[CardioGuard] Device UID: ");
   Serial.println(kDeviceUid);
   Serial.print("[CardioGuard] Initial state: ");
   Serial.println(StateToString(g_state));
+  Serial.println("[CardioGuard] Type 'help' for serial commands");
 }
 
 void loop() {
+  PollSerialCommands();
+  MaintainConnectivity();
+
   const unsigned long now_ms = millis();
   if (now_ms - g_last_tick_ms < kTelemetryIntervalMs) {
     return;
@@ -93,7 +125,33 @@ void loop() {
   const TelemetryFrame frame = GenerateRandomTelemetry(g_sequence, g_mode);
   g_state = RuntimeState::sending;
 
+  const String payload = BuildTelemetryJson(frame);
+  const SendResult send_result = SendTelemetryFrame(payload);
   PrintTelemetry(frame);
+  if (send_result.auth_failed) {
+    g_state = RuntimeState::auth_failed;
+    Serial.println("[CardioGuard] AUTH_FAILED: token rejected");
+    return;
+  }
 
-  g_state = RuntimeState::measuring;
+  if (!IsWifiConnected()) {
+    g_state = RuntimeState::wifi_disconnected;
+  } else if (send_result.should_backoff) {
+    g_state = RuntimeState::backend_unavailable;
+  } else if (send_result.buffered) {
+    g_state = RuntimeState::offline_buffering;
+  } else {
+    g_state = RuntimeState::measuring;
+  }
+
+  Serial.print("[CardioGuard] send status=");
+  Serial.print(send_result.status_code);
+  Serial.print(", buffered=");
+  Serial.print(send_result.buffered ? "true" : "false");
+  Serial.print(", pending=");
+  Serial.println(send_result.buffer_size);
+
+  if (g_state != RuntimeState::auth_failed) {
+    g_state = RuntimeState::measuring;
+  }
 }

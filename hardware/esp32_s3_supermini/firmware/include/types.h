@@ -37,6 +37,10 @@ struct TelemetryReadings {
   int systolic_bp;
   int diastolic_bp;
   float ecg_value;
+  bool has_body_temperature;
+  float body_temperature;
+  bool has_motion_value;
+  float motion_value;
 };
 
 struct TelemetryFrame {

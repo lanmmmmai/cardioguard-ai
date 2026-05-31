@@ -1,18 +1,21 @@
-# ESP32-S3 SuperMini Firmware (Phase 1)
+# ESP32-S3 SuperMini Firmware (Phase 1-3)
 
-Muc tieu phase nay:
+Muc tieu giai doan nay:
 
 - Khoi dong ESP32-S3 va in trang thai state machine.
-- Tao random telemetry moi 1 giay.
+- Tao random telemetry moi 1 giay voi cac mode test.
 - In frame dang JSON len Serial de test luong truoc khi noi backend.
+- Gui telemetry len backend qua HTTP voi buffer + retry/backoff.
 
 ## Cau truc
 
 - `platformio.ini`: cau hinh PlatformIO cho ESP32-S3.
 - `include/config.h`: device UID, interval, mode demo.
 - `include/types.h`: struct telemetry va runtime state.
-- `src/main.cpp`: loop chinh 1 giay, state machine, print telemetry.
-- `src/random_telemetry.*`: sinh du lieu random co kiem soat.
+- `src/main.cpp`: loop chinh 1 giay, state machine, serial command de doi mode.
+- `src/random_telemetry.*`: sinh du lieu random co kiem soat, co dao dong mem.
+- `src/telemetry_format.*`: tao JSON payload tu telemetry frame.
+- `src/telemetry_sender.*`: Wi-Fi connect, HTTP POST, FIFO buffer 300 frame, retry/backoff.
 - `src/state_machine.*`: state transition co ban.
 
 ## Chay nhanh
@@ -28,6 +31,18 @@ Muc tieu phase nay:
 
 ## Ghi chu
 
-- Day la demo phase 1, chua ket noi Wi-Fi/backend that.
+- Day la demo phase 1-3, da co khung ket noi Wi-Fi/backend.
 - `systolic_bp` va `diastolic_bp` dang de `null`.
-- De test abnormal nhanh, doi `kDefaultMode` trong `include/config.h`.
+- ESP32 khong tu ket luan AI score hay risk level.
+- Cau hinh `Wi-Fi`, endpoint, token dat trong `include/config.h`.
+- Khong commit token that vao repo.
+
+## Serial commands
+
+- `help`: hien danh sach lenh.
+- `status`: in state, mode, sequence hien tai.
+- `mode normal`
+- `mode occasional`
+- `mode critical`
+- `mode poor_signal`
+- `mode offline`

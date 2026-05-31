@@ -3,8 +3,9 @@ from decimal import Decimal
 from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
-from app.schemas.sensor_schema import SensorDataCreate
+from app.schemas.sensor_schema import IotTelemetryPayload, SensorDataCreate
 from app.core.database import database
+from app.core.config import settings
 from app.api.auth_api import get_user_from_token
 from app.ai.heart_ai import detect_abnormal
 from app.websocket.connection_manager import manager
@@ -45,6 +46,24 @@ async def ensure_patient_access(user: dict[str, Any], patient_id: str) -> None:
             raise HTTPException(status_code=403, detail="Bác sĩ chưa được phân công quản lý bệnh nhân này")
         return
     raise HTTPException(status_code=403, detail="Vai trò không hợp lệ")
+
+
+def detect_abnormal_iot(readings: Any) -> list[dict[str, str]]:
+    data = type(
+        "TelemetryForAI",
+        (),
+        {
+            "heart_rate": readings.heart_rate,
+            "spo2": readings.spo2,
+            "systolic_bp": readings.systolic_bp if readings.systolic_bp is not None else 0,
+            "diastolic_bp": readings.diastolic_bp if readings.diastolic_bp is not None else 0,
+            "ecg_value": readings.ecg_value,
+        },
+    )()
+    alerts = detect_abnormal(data)
+    if readings.systolic_bp is None or readings.diastolic_bp is None:
+        alerts = [a for a in alerts if a["alert_type"] != "HIGH_BLOOD_PRESSURE"]
+    return alerts
 
 
 @router.post("/sensor-data")
@@ -135,6 +154,145 @@ async def create_sensor_data(data: SensorDataCreate, authorization: Optional[str
         "message": "Sensor data saved successfully",
         "is_abnormal": len(alerts) > 0,
         "alerts": alerts
+    }
+
+
+@router.post("/iot/telemetry")
+async def create_iot_telemetry(
+    data: IotTelemetryPayload,
+    x_device_uid: str = Header(..., alias="X-Device-Uid"),
+    x_device_token: str = Header(..., alias="X-Device-Token"),
+):
+    shared_token = settings.IOT_DEVICE_SHARED_TOKEN.strip()
+    if not shared_token:
+        raise HTTPException(status_code=503, detail="IOT token is not configured")
+    if x_device_token != shared_token:
+        raise HTTPException(status_code=401, detail="Invalid device token")
+
+    device_row = await database.fetch_one(
+        """
+        SELECT id::text AS id, patient_id::text AS patient_id, status
+        FROM devices
+        WHERE name = :device_uid
+        LIMIT 1
+        """,
+        {"device_uid": x_device_uid},
+    )
+    if not device_row:
+        raise HTTPException(status_code=404, detail="Device not paired")
+
+    device_status = (device_row["status"] or "").lower()
+    if device_status in {"revoked", "inactive", "blocked"}:
+        raise HTTPException(status_code=403, detail="Device is not allowed to send telemetry")
+
+    patient_id = device_row["patient_id"]
+    if not patient_id:
+        raise HTTPException(status_code=404, detail="Device does not have assigned patient")
+
+    await database.execute(
+        """
+        UPDATE devices
+        SET status = :status,
+            battery = COALESCE(:battery, battery),
+            last_seen_at = :last_seen_at,
+            updated_at = :updated_at
+        WHERE id::text = :device_id
+        """,
+        {
+            "status": "online",
+            "battery": data.device.battery if data.device else None,
+            "last_seen_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
+            "device_id": device_row["id"],
+        },
+    )
+
+    await database.execute(
+        """
+        INSERT INTO sensor_data(
+            patient_id,
+            heart_rate,
+            spo2,
+            systolic_bp,
+            diastolic_bp,
+            ecg_value
+        )
+        VALUES (
+            :patient_id,
+            :heart_rate,
+            :spo2,
+            :systolic_bp,
+            :diastolic_bp,
+            :ecg_value
+        )
+        """,
+        {
+            "patient_id": patient_id,
+            "heart_rate": data.readings.heart_rate,
+            "spo2": data.readings.spo2,
+            "systolic_bp": data.readings.systolic_bp,
+            "diastolic_bp": data.readings.diastolic_bp,
+            "ecg_value": data.readings.ecg_value,
+        },
+    )
+
+    alerts = detect_abnormal_iot(data.readings)
+
+    for alert in alerts:
+        await database.execute(
+            """
+            INSERT INTO alerts(
+                patient_id,
+                alert_type,
+                message,
+                severity
+            )
+            VALUES (
+                :patient_id,
+                :alert_type,
+                :message,
+                :severity
+            )
+            """,
+            {
+                "patient_id": patient_id,
+                "alert_type": alert["alert_type"],
+                "message": alert["message"],
+                "severity": alert["severity"],
+            },
+        )
+
+    broadcast_data = {
+        "patient_id": patient_id,
+        "heart_rate": data.readings.heart_rate,
+        "spo2": data.readings.spo2,
+        "systolic_bp": data.readings.systolic_bp,
+        "diastolic_bp": data.readings.diastolic_bp,
+        "ecg_value": data.readings.ecg_value,
+        "is_abnormal": len(alerts) > 0,
+        "alerts": alerts,
+    }
+    await manager.broadcast_sensor_data(patient_id, broadcast_data)
+
+    for alert in alerts:
+        await manager.broadcast_alert(
+            patient_id,
+            {
+                "patient_id": patient_id,
+                "alert_type": alert["alert_type"],
+                "message": alert["message"],
+                "severity": alert["severity"],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+    return {
+        "message": "Telemetry accepted",
+        "patient_id": patient_id,
+        "device_uid": x_device_uid,
+        "is_abnormal": len(alerts) > 0,
+        "alerts": alerts,
+        "server_time": datetime.now(timezone.utc).isoformat(),
     }
 
 
