@@ -15,6 +15,7 @@ from app.api.admin_doctor_api import router as admin_doctor_router
 from app.api.email_api import router as email_router
 from app.api.chat_api import router as chat_router
 from app.services.otp_service import ensure_otp_table
+from app.services.db_optimization import ensure_performance_indexes
 
 
 app = FastAPI(
@@ -41,6 +42,7 @@ app.add_middleware(
 async def startup():
     await connect_db()
     await ensure_otp_table()
+    await ensure_performance_indexes()
 
 
 @app.on_event("shutdown")
