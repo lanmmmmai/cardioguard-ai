@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     BREVO_API_KEY: str = ""
     EMAIL_FROM_EMAIL: str = "noreply@cardioguard.ai"
     EMAIL_FROM_NAME: str = "CardioGuard AI"
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_NAME: str = ""
+    SMTP_FROM_EMAIL: str = ""
     OPENAI_API_KEY: str = ""
     SECRET_KEY: str = Field(..., min_length=32)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60

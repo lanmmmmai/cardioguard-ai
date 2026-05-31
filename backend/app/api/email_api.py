@@ -111,8 +111,18 @@ def send_brevo_email(
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
 ) -> bool:
-    """Gửi email qua Brevo API."""
+    """Gửi email qua Brevo API, hoặc fallback sang SMTP nếu không có Brevo API Key."""
     if not settings.BREVO_API_KEY:
+        if settings.SMTP_HOST:
+            from app.services.email_service import send_smtp_email_sync
+            return send_smtp_email_sync(
+                to_email=to_email,
+                to_name=to_name,
+                subject=subject,
+                html_body=html_body,
+                cc=cc,
+                bcc=bcc,
+            )
         print(f"[DEV EMAIL] To: {to_email} | Subject: {subject}")
         return False
 

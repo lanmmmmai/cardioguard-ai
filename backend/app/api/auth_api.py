@@ -102,12 +102,12 @@ async def get_user_from_token(authorization: Optional[str]):
     }
 
 
-def send_forgot_password_otp_email(email: str, full_name: str, otp: str) -> bool:
-    if not settings.BREVO_API_KEY:
-        print(f"[DEV OTP] Forgot Password OTP for {email}: {otp}")
-        return False
+from app.services.email_service import send_system_email
 
-    html_body = f"""
+
+async def send_forgot_password_otp_email(email: str, full_name: str, otp: str) -> bool:
+    fallback_subject = "CardioGuard AI - Mã OTP đặt lại mật khẩu"
+    fallback_html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
       <h2 style="color:#e11d48;margin-bottom:8px">CardioGuard AI</h2>
       <p style="color:#374151">Xin chào <strong>{full_name}</strong>,</p>
@@ -120,35 +120,19 @@ def send_forgot_password_otp_email(email: str, full_name: str, otp: str) -> bool
       <p style="color:#9ca3af;font-size:12px">CardioGuard AI</p>
     </div>
     """
-
-    try:
-        response = requests.post(
-            "https://api.brevo.com/v3/smtp/email",
-            headers={
-                "accept": "application/json",
-                "api-key": settings.BREVO_API_KEY,
-                "content-type": "application/json"
-            },
-            json={
-                "sender": {"name": settings.EMAIL_FROM_NAME, "email": settings.EMAIL_FROM_EMAIL},
-                "to": [{"email": email, "name": full_name}],
-                "subject": "CardioGuard AI - Mã OTP đặt lại mật khẩu",
-                "htmlContent": html_body
-            },
-            timeout=10
-        )
-        response.raise_for_status()
-        return True
-    except Exception as exc:
-        raise RuntimeError(f"Brevo API error: {exc}") from exc
+    return await send_system_email(
+        email_type="password_reset",
+        to_email=email,
+        to_name=full_name,
+        variables={"full_name": full_name, "otp": otp},
+        fallback_subject=fallback_subject,
+        fallback_html=fallback_html,
+    )
 
 
-def send_random_password_email(email: str, full_name: str, new_password: str) -> bool:
-    if not settings.BREVO_API_KEY:
-        print(f"[DEV EMAIL] New Password for {email}: {new_password}")
-        return False
-
-    html_body = f"""
+async def send_random_password_email(email: str, full_name: str, new_password: str) -> bool:
+    fallback_subject = "CardioGuard AI - Mật khẩu mới của bạn"
+    fallback_html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
       <h2 style="color:#e11d48;margin-bottom:8px">CardioGuard AI</h2>
       <p style="color:#374151">Xin chào <strong>{full_name}</strong>,</p>
@@ -161,35 +145,19 @@ def send_random_password_email(email: str, full_name: str, new_password: str) ->
       <p style="color:#9ca3af;font-size:12px">CardioGuard AI</p>
     </div>
     """
-
-    try:
-        response = requests.post(
-            "https://api.brevo.com/v3/smtp/email",
-            headers={
-                "accept": "application/json",
-                "api-key": settings.BREVO_API_KEY,
-                "content-type": "application/json"
-            },
-            json={
-                "sender": {"name": settings.EMAIL_FROM_NAME, "email": settings.EMAIL_FROM_EMAIL},
-                "to": [{"email": email, "name": full_name}],
-                "subject": "CardioGuard AI - Mật khẩu mới của bạn",
-                "htmlContent": html_body
-            },
-            timeout=10
-        )
-        response.raise_for_status()
-        return True
-    except Exception as exc:
-        raise RuntimeError(f"Brevo API error: {exc}") from exc
+    return await send_system_email(
+        email_type="password_reset",
+        to_email=email,
+        to_name=full_name,
+        variables={"full_name": full_name, "new_password": new_password, "otp": new_password},
+        fallback_subject=fallback_subject,
+        fallback_html=fallback_html,
+    )
 
 
-def send_register_otp_email(email: str, full_name: str, otp: str) -> bool:
-    if not settings.BREVO_API_KEY:
-        print(f"[DEV OTP] Register OTP for {email}: {otp}")
-        return False
-
-    html_body = f"""
+async def send_register_otp_email(email: str, full_name: str, otp: str) -> bool:
+    fallback_subject = "CardioGuard AI - Mã OTP đăng ký"
+    fallback_html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
       <h2 style="color:#e11d48;margin-bottom:8px">CardioGuard AI</h2>
       <p style="color:#374151">Xin chào <strong>{full_name}</strong>,</p>
@@ -202,27 +170,14 @@ def send_register_otp_email(email: str, full_name: str, otp: str) -> bool:
       <p style="color:#9ca3af;font-size:12px">CardioGuard AI — Hệ thống giám sát tim mạch thông minh</p>
     </div>
     """
-
-    try:
-        response = requests.post(
-            "https://api.brevo.com/v3/smtp/email",
-            headers={
-                "accept": "application/json",
-                "api-key": settings.BREVO_API_KEY,
-                "content-type": "application/json"
-            },
-            json={
-                "sender": {"name": settings.EMAIL_FROM_NAME, "email": settings.EMAIL_FROM_EMAIL},
-                "to": [{"email": email, "name": full_name}],
-                "subject": "CardioGuard AI - Mã OTP đăng ký",
-                "htmlContent": html_body
-            },
-            timeout=10
-        )
-        response.raise_for_status()
-        return True
-    except Exception as exc:
-        raise RuntimeError(f"Brevo API error: {exc}") from exc
+    return await send_system_email(
+        email_type="otp_register",
+        to_email=email,
+        to_name=full_name,
+        variables={"full_name": full_name, "otp": otp},
+        fallback_subject=fallback_subject,
+        fallback_html=fallback_html,
+    )
 
 
 
@@ -245,7 +200,7 @@ async def request_register_otp(data: RegisterOtpRequest):
     )
 
     try:
-        email_sent = send_register_otp_email(email, data.full_name, otp)
+        email_sent = await send_register_otp_email(email, data.full_name, otp)
     except Exception as exc:
         await invalidate_otp_tokens(purpose=OTP_PURPOSE_REGISTER, email=email)
         print(f"[SMTP ERROR] Unable to send OTP to {email}: {exc}")
@@ -377,7 +332,7 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest):
     )
 
     try:
-        send_forgot_password_otp_email(email, user["full_name"], otp)
+        await send_forgot_password_otp_email(email, user["full_name"], otp)
     except Exception as exc:
         print(f"[SMTP ERROR] Unable to send OTP to {email}: {exc}")
         if settings.BREVO_API_KEY:
@@ -439,7 +394,7 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest):
     if data.new_password:
         return {"message": "Password has been reset successfully."}
 
-    email_sent = send_random_password_email(email, user["full_name"], new_password)
+    email_sent = await send_random_password_email(email, user["full_name"], new_password)
     response = {"message": "Password has been reset. Please check your email for the new password.", "email_sent": email_sent}
     if not email_sent and should_expose_dev_auth_values():
         response["dev_new_password"] = new_password
