@@ -16,6 +16,7 @@ import { EmailCmsPage } from './components/cms/EmailCmsPage';
 import { PatientChatbot } from './pages/PatientChatbot';
 import { DoctorChatbot } from './pages/DoctorChatbot';
 import { DoctorsManager } from './components/DoctorsManager';
+import { UsersManager } from './components/UsersManager';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { defaultRouteByRole, normalizeRole, type UserRole } from './auth/roles';
@@ -70,6 +71,7 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/doctor/ai-assistant': { title: 'AI Command Center', subtitle: 'Trợ lý phân tích dữ liệu, tóm tắt bệnh án và phát hiện bất thường.' },
   '/doctor/chatbot': { title: 'Chatbot AI', subtitle: 'Giải đáp, phân tích và hỗ trợ tư vấn sức khỏe tim mạch.' },
   '/admin/doctors': { title: 'Quản lý bác sĩ', subtitle: 'Danh sách bác sĩ, phân công chuyên khoa và quyền truy cập.' },
+  '/admin/users': { title: 'Quản lý tài khoản', subtitle: 'Phân quyền hệ thống, theo dõi trạng thái hoạt động và quản trị toàn bộ tài khoản người dùng CardioGuard.' },
   '/admin/system-logs': { title: 'Nhật ký hệ thống', subtitle: 'Audit log, lịch sử đăng nhập và thao tác bảo mật.' },
   '/admin/settings': { title: 'Cài đặt hệ thống', subtitle: 'Cấu hình nền tảng, API token và trạng thái kết nối.' },
   '/admin/profile': { title: 'Hồ sơ cá nhân', subtitle: 'Thông tin tài khoản admin và đổi mật khẩu.' },
@@ -337,6 +339,8 @@ const AppContent: React.FC = () => {
         return <EmailCmsPage />;
       case '/admin/doctors':
         return <DoctorsManager />;
+      case '/admin/users':
+        return <UsersManager />;
       case '/doctor/ai-assistant':
       case '/doctor/chatbot':
         return <DoctorChatbot />;

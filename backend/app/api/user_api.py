@@ -5,7 +5,7 @@ from fastapi import APIRouter, Header, HTTPException
 from app.api.auth_api import get_user_from_token
 from app.core.database import database
 from app.core.security import hash_password, verify_password
-from app.schemas.user_schema import PasswordUpdate, PatientMeUpdate, UserMeUpdate
+from app.schemas.user_schema import PasswordUpdate, PatientMeUpdate, UserMeUpdate, UserAdminCreate, UserAdminUpdate
 
 router = APIRouter()
 
@@ -275,3 +275,236 @@ async def get_my_doctors(authorization: Optional[str] = Header(default=None)):
     WHERE dp.patient_id::text = :patient_id AND lower(d.role) = 'doctor'
     """
     return await database.fetch_all(query, {"patient_id": current_user["id"]})
+
+
+@router.get("/admin/users")
+async def list_users(
+    role: Optional[str] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    authorization: Optional[str] = Header(default=None)
+):
+    await require_admin(authorization)
+    
+    query = """
+    SELECT id::text as id, full_name, email, phone, role, status, created_at
+    FROM users
+    WHERE 1=1
+    """
+    params = {}
+    
+    if role:
+        query += " AND role = :role"
+        params["role"] = role.lower()
+        
+    if status:
+        query += " AND status = :status"
+        params["status"] = status.lower()
+        
+    if search:
+        query += " AND (lower(full_name) LIKE :search OR lower(email) LIKE :search OR phone LIKE :search)"
+        params["search"] = f"%{search.lower()}%"
+        
+    query += " ORDER BY created_at DESC"
+    
+    rows = await database.fetch_all(query, params)
+    return [row_to_dict(row) for row in rows]
+
+
+@router.post("/admin/users")
+async def create_user(
+    payload: UserAdminCreate,
+    authorization: Optional[str] = Header(default=None)
+):
+    await require_admin(authorization)
+    
+    email = payload.email.lower().strip()
+    
+    # Check email exists
+    check_query = "SELECT id FROM users WHERE email = :email"
+    existing_user = await database.fetch_one(check_query, {"email": email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email đã tồn tại trên hệ thống")
+        
+    insert_query = """
+    INSERT INTO users (full_name, email, phone, password_hash, role, status)
+    VALUES (:full_name, :email, :phone, :password_hash, :role, :status)
+    RETURNING id::text as id, full_name, email, phone, role, status, created_at
+    """
+    
+    try:
+        row = await database.fetch_one(
+            insert_query,
+            {
+                "full_name": payload.full_name.strip(),
+                "email": email,
+                "phone": payload.phone.strip() if payload.phone else None,
+                "password_hash": hash_password(payload.password),
+                "role": payload.role,
+                "status": payload.status or "active"
+            }
+        )
+        created_user = dict(row)
+        
+        # Nếu role là patient, tự động tạo hồ sơ trống trong bảng patients
+        if payload.role == "patient":
+            columns = await table_columns("patients")
+            patient_insert_vals = {
+                "id": created_user["id"],
+                "full_name": created_user["full_name"],
+                "phone": created_user["phone"]
+            }
+            if "user_id" in columns:
+                patient_insert_vals["user_id"] = created_user["id"]
+            
+            insert_columns = ", ".join(patient_insert_vals.keys())
+            bind_columns = ", ".join(f":{key}" for key in patient_insert_vals.keys())
+            
+            await database.execute(
+                f"INSERT INTO patients ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
+                patient_insert_vals
+            )
+            
+        return created_user
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi thêm tài khoản mới: {str(e)}")
+
+
+@router.put("/admin/users/{user_id}")
+async def update_user(
+    user_id: str,
+    payload: UserAdminUpdate,
+    authorization: Optional[str] = Header(default=None)
+):
+    await require_admin(authorization)
+    
+    # Check user exists
+    check_user = await database.fetch_one("SELECT id, role, full_name FROM users WHERE id::text = :user_id", {"user_id": user_id})
+    if not check_user:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+        
+    # If email changed, check if exists
+    if payload.email is not None:
+        email = payload.email.lower().strip()
+        existing_user = await database.fetch_one(
+            "SELECT id FROM users WHERE email = :email AND id::text != :user_id", 
+            {"email": email, "user_id": user_id}
+        )
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email đã tồn tại trên hệ thống")
+            
+    # Construct dynamic update query
+    update_fields = []
+    values = {"user_id": user_id}
+    
+    if payload.full_name is not None:
+        update_fields.append("full_name = :full_name")
+        values["full_name"] = payload.full_name.strip()
+    if payload.email is not None:
+        update_fields.append("email = :email")
+        values["email"] = payload.email.lower().strip()
+    if payload.phone is not None:
+        update_fields.append("phone = :phone")
+        values["phone"] = payload.phone.strip() if payload.phone else None
+    if payload.role is not None:
+        update_fields.append("role = :role")
+        values["role"] = payload.role
+    if payload.status is not None:
+        update_fields.append("status = :status")
+        values["status"] = payload.status
+    if payload.password is not None:
+        update_fields.append("password_hash = :password_hash")
+        values["password_hash"] = hash_password(payload.password)
+        
+    if not update_fields:
+        query = """
+        SELECT id::text as id, full_name, email, phone, role, status, created_at
+        FROM users
+        WHERE id::text = :user_id
+        """
+        row = await database.fetch_one(query, {"user_id": user_id})
+        return dict(row)
+        
+    update_query = f"""
+    UPDATE users
+    SET {", ".join(update_fields)}
+    WHERE id::text = :user_id
+    RETURNING id::text as id, full_name, email, phone, role, status, created_at
+    """
+    
+    try:
+        row = await database.fetch_one(update_query, values)
+        updated_user = dict(row)
+        
+        # Nếu đổi sang role patient hoặc cập nhật thông tin patient hiện tại, đồng bộ bảng patients
+        target_role = payload.role if payload.role is not None else check_user["role"]
+        if target_role == "patient":
+            columns = await table_columns("patients")
+            where_sql = "user_id::text = :user_id" if "user_id" in columns else "id::text = :user_id"
+            
+            # Check if patient record exists
+            patient_exists = await database.fetch_one(
+                f"SELECT id FROM patients WHERE {where_sql}",
+                {"user_id": user_id}
+            )
+            
+            if patient_exists:
+                # Cập nhật thông tin trong bảng patients
+                patient_update_vals = {}
+                patient_update_fields = []
+                
+                if payload.full_name is not None:
+                    patient_update_fields.append("full_name = :full_name")
+                    patient_update_vals["full_name"] = payload.full_name.strip()
+                if payload.phone is not None:
+                    patient_update_fields.append("phone = :phone")
+                    patient_update_vals["phone"] = payload.phone.strip() if payload.phone else None
+                    
+                if patient_update_fields:
+                    await database.execute(
+                        f"UPDATE patients SET {', '.join(patient_update_fields)} WHERE {where_sql}",
+                        {**patient_update_vals, "user_id": user_id}
+                    )
+            else:
+                # Tạo mới
+                patient_insert_vals = {
+                    "id": user_id,
+                    "full_name": payload.full_name.strip() if payload.full_name else check_user["full_name"],
+                    "phone": payload.phone.strip() if payload.phone else None
+                }
+                if "user_id" in columns:
+                    patient_insert_vals["user_id"] = user_id
+                
+                insert_columns = ", ".join(patient_insert_vals.keys())
+                bind_columns = ", ".join(f":{key}" for key in patient_insert_vals.keys())
+                
+                await database.execute(
+                    f"INSERT INTO patients ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
+                    patient_insert_vals
+                )
+                
+        return updated_user
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi cập nhật người dùng: {str(e)}")
+
+
+@router.delete("/admin/users/{user_id}")
+async def delete_user(
+    user_id: str,
+    authorization: Optional[str] = Header(default=None)
+):
+    await require_admin(authorization)
+    
+    # Check user exists
+    user = await database.fetch_one("SELECT id, role FROM users WHERE id::text = :user_id", {"user_id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+        
+    # Xóa dữ liệu liên quan ở bảng patients trước nếu có
+    if user["role"] == "patient":
+        columns = await table_columns("patients")
+        where_sql = "user_id::text = :user_id" if "user_id" in columns else "id::text = :user_id"
+        await database.execute(f"DELETE FROM patients WHERE {where_sql}", {"user_id": user_id})
+        
+    await database.execute("DELETE FROM users WHERE id::text = :user_id", {"user_id": user_id})
+    return {"message": "Xóa tài khoản thành công", "id": user_id}
