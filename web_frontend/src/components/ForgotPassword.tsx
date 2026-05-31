@@ -13,6 +13,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [resetComplete, setResetComplete] = useState(false);
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +24,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
 
     setError(null);
     setSuccess(null);
+    setResetComplete(false);
     setIsLoading(true);
 
     try {
@@ -74,7 +76,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
       }
 
       setSuccess('Mật khẩu tạm thời đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư để đăng nhập.');
-      setStep(1); // Reset form logically
+      setResetComplete(true);
       setOtp('');
       setTimeout(() => {
         onNavigateToLogin();
@@ -193,6 +195,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   style={{ paddingLeft: '45px', letterSpacing: '2px', fontFamily: 'monospace' }}
                   maxLength={6}
+                  disabled={isLoading || resetComplete}
                   required
                 />
               </div>
@@ -202,13 +205,15 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
               type="submit" 
               className="btn btn-primary" 
               style={{ width: '100%', justifyContent: 'center', height: '46px' }}
-              disabled={isLoading || otp.length !== 6}
+              disabled={isLoading || resetComplete || otp.length !== 6}
             >
               {isLoading ? (
                 <>
                   <Loader2 className="beat-animated" size={18} style={{ marginRight: '6px' }} />
                   Đang xử lý...
                 </>
+              ) : resetComplete ? (
+                'Đã xác nhận OTP'
               ) : (
                 'Xác nhận OTP'
               )}
@@ -218,9 +223,15 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
                 type="button" 
                 className="btn btn-secondary" 
                 style={{ width: '100%', justifyContent: 'center', height: '46px' }}
-                onClick={() => setStep(1)}
+                onClick={() => {
+                  if (resetComplete) {
+                    onNavigateToLogin();
+                  } else {
+                    setStep(1);
+                  }
+                }}
               >
-                Nhập lại email
+                {resetComplete ? 'Quay lại đăng nhập' : 'Nhập lại email'}
               </button>
             </div>
           </form>
