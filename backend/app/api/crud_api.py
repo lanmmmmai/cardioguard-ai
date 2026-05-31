@@ -4,9 +4,10 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 
 from app.api.auth_api import get_user_from_token
+from app.services.audit_service import log_activity
 from app.core.database import database
 from app.schemas.crud_schema import (
     AppointmentCreate,
@@ -282,7 +283,7 @@ async def trigger_websocket_broadcast(table: str, record: dict[str, Any]):
         print(f"Error triggering WebSocket broadcast for table {table}: {e}")
 
 
-async def create_record(table: str, payload: dict[str, Any], authorization: Optional[str]):
+async def create_record(table: str, payload: dict[str, Any], authorization: Optional[str], request: Optional[Request] = None):
     user = await get_user_from_token(authorization)
     columns = await table_columns(table)
     values = normalize_payload(payload)
@@ -303,10 +304,22 @@ async def create_record(table: str, payload: dict[str, Any], authorization: Opti
     )
     inserted_row = await fetch_authorized_row(table, str(record_id), columns, user)
     await trigger_websocket_broadcast(table, inserted_row)
+
+    # Ghi nhận audit log (tránh ghi log của chính audit_logs để ngăn đệ quy)
+    if table != "audit_logs":
+        ip_addr = request.client.host if request and request.client else "-"
+        await log_activity(
+            user_id=user["id"],
+            action="CREATE_RECORD",
+            entity_type=table,
+            entity_id=str(record_id),
+            ip_address=ip_addr
+        )
+
     return inserted_row
 
 
-async def update_record(table: str, record_id: str, payload: dict[str, Any], authorization: Optional[str]):
+async def update_record(table: str, record_id: str, payload: dict[str, Any], authorization: Optional[str], request: Optional[Request] = None):
     user = await get_user_from_token(authorization)
     columns = await table_columns(table)
     current = await fetch_authorized_row(table, record_id, columns, user)
@@ -327,10 +340,22 @@ async def update_record(table: str, record_id: str, payload: dict[str, Any], aut
     )
     updated_row = await fetch_authorized_row(table, record_id, columns, user)
     await trigger_websocket_broadcast(table, updated_row)
+
+    # Ghi nhận audit log
+    if table != "audit_logs":
+        ip_addr = request.client.host if request and request.client else "-"
+        await log_activity(
+            user_id=user["id"],
+            action="UPDATE_RECORD",
+            entity_type=table,
+            entity_id=str(record_id),
+            ip_address=ip_addr
+        )
+
     return updated_row
 
 
-async def delete_record(table: str, record_id: str, authorization: Optional[str]):
+async def delete_record(table: str, record_id: str, authorization: Optional[str], request: Optional[Request] = None):
     user = await get_user_from_token(authorization)
     columns = await table_columns(table)
     current = await fetch_authorized_row(table, record_id, columns, user)
@@ -339,6 +364,18 @@ async def delete_record(table: str, record_id: str, authorization: Optional[str]
         f"DELETE FROM {quote_identifier(table)} WHERE \"id\"::text = :record_id",
         {"record_id": record_id},
     )
+
+    # Ghi nhận audit log
+    if table != "audit_logs":
+        ip_addr = request.client.host if request and request.client else "-"
+        await log_activity(
+            user_id=user["id"],
+            action="DELETE_RECORD",
+            entity_type=table,
+            entity_id=str(record_id),
+            ip_address=ip_addr
+        )
+
     return {"deleted": True, "id": record_id}
 
 
@@ -376,19 +413,19 @@ def register_table_routes(table: str, path: str, create_model: type, update_mode
     ):
         return await list_records(table, authorization, limit, offset, patient_id)
 
-    async def create_endpoint(payload: create_model, authorization: Optional[str] = Header(default=None)):  # type: ignore[valid-type]
-        return await create_record(table, payload.model_dump(exclude_unset=True), authorization)
+    async def create_endpoint(payload: create_model, request: Request, authorization: Optional[str] = Header(default=None)):  # type: ignore[valid-type]
+        return await create_record(table, payload.model_dump(exclude_unset=True), authorization, request)
 
     async def get_endpoint(record_id: str, authorization: Optional[str] = Header(default=None)):
         columns = await table_columns(table)
         user = await get_user_from_token(authorization)
         return await fetch_authorized_row(table, record_id, columns, user)
 
-    async def update_endpoint(record_id: str, payload: update_model, authorization: Optional[str] = Header(default=None)):  # type: ignore[valid-type]
-        return await update_record(table, record_id, payload.model_dump(exclude_unset=True), authorization)
+    async def update_endpoint(record_id: str, payload: update_model, request: Request, authorization: Optional[str] = Header(default=None)):  # type: ignore[valid-type]
+        return await update_record(table, record_id, payload.model_dump(exclude_unset=True), authorization, request)
 
-    async def delete_endpoint(record_id: str, authorization: Optional[str] = Header(default=None)):
-        return await delete_record(table, record_id, authorization)
+    async def delete_endpoint(record_id: str, request: Request, authorization: Optional[str] = Header(default=None)):
+        return await delete_record(table, record_id, authorization, request)
 
     router.add_api_route(path, list_endpoint, methods=["GET"], tags=[table])
     router.add_api_route(path, create_endpoint, methods=["POST"], tags=[table])

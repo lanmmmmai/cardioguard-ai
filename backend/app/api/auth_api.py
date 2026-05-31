@@ -1,7 +1,7 @@
 import secrets
 import requests
 from typing import Optional
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from jose import JWTError, jwt
 from app.core.config import settings
 from app.core.database import database
@@ -17,6 +17,7 @@ from app.services.otp_service import (
     invalidate_otp_tokens,
     verify_otp_token,
 )
+from app.services.audit_service import log_activity
 router = APIRouter()
 
 VALID_ROLES = {"admin", "doctor", "patient"}
@@ -219,7 +220,7 @@ async def request_register_otp(data: RegisterOtpRequest):
 
 
 @router.post("/auth/register")
-async def register(data: RegisterRequest):
+async def register(data: RegisterRequest, request: Request):
     email = data.email.lower()
     otp_result = await verify_otp_token(
         purpose=OTP_PURPOSE_REGISTER,
@@ -256,11 +257,22 @@ async def register(data: RegisterRequest):
         }
     )
 
+    # Ghi nhận log đăng ký thành công
+    created_user = await database.fetch_one("SELECT id::text as id FROM users WHERE email = :email", {"email": email})
+    user_id = created_user["id"] if created_user else None
+    await log_activity(
+        user_id=user_id,
+        action="USER_REGISTER_SUCCESS",
+        entity_type="users",
+        entity_id=user_id,
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return {"message": "Register successfully"}
 
 
 @router.post("/auth/login")
-async def login(data: LoginRequest):
+async def login(data: LoginRequest, request: Request):
     global _users_columns_cache
     if _users_columns_cache is None:
         columns = await database.fetch_all(
@@ -293,13 +305,37 @@ async def login(data: LoginRequest):
         values={"email": data.email.lower()}
     )
 
+    ip_addr = request.client.host if request.client else "-"
+
     if not user:
+        await log_activity(
+            user_id=None,
+            action="USER_LOGIN_FAILED",
+            entity_type="users",
+            ip_address=ip_addr,
+            details={"email": data.email.lower(), "reason": "Email not found"}
+        )
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     if not verify_password(data.password, user["password_hash"]):
+        await log_activity(
+            user_id=None,
+            action="USER_LOGIN_FAILED",
+            entity_type="users",
+            ip_address=ip_addr,
+            details={"email": data.email.lower(), "reason": "Incorrect password"}
+        )
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     if (user["status"] or "").strip().lower() == "inactive":
+        await log_activity(
+            user_id=user["id"],
+            action="USER_LOGIN_FAILED",
+            entity_type="users",
+            entity_id=user["id"],
+            ip_address=ip_addr,
+            details={"email": data.email.lower(), "reason": "Account inactive"}
+        )
         raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
 
     token = create_access_token({
@@ -307,6 +343,15 @@ async def login(data: LoginRequest):
         "email": user["email"],
         "role": normalize_role(user["role"])
     })
+
+    # Ghi nhận đăng nhập thành công
+    await log_activity(
+        user_id=user["id"],
+        action="USER_LOGIN_SUCCESS",
+        entity_type="users",
+        entity_id=user["id"],
+        ip_address=ip_addr
+    )
 
     return {
         "access_token": token,
@@ -411,7 +456,7 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest):
 
 
 @router.post("/auth/change-password")
-async def change_password(data: ChangePasswordRequest, authorization: Optional[str] = Header(default=None)):
+async def change_password(data: ChangePasswordRequest, request: Request, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     
     user = await database.fetch_one(
@@ -429,6 +474,15 @@ async def change_password(data: ChangePasswordRequest, authorization: Optional[s
         WHERE id::text = :id
         """,
         {"password_hash": hash_password(data.new_password), "id": current_user["id"]}
+    )
+
+    # Ghi nhận log đổi mật khẩu thành công
+    await log_activity(
+        user_id=current_user["id"],
+        action="USER_PASSWORD_CHANGE",
+        entity_type="users",
+        entity_id=current_user["id"],
+        ip_address=request.client.host if request.client else "-"
     )
 
     return {"message": "Password changed successfully"}
