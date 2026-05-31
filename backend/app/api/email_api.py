@@ -86,21 +86,7 @@ async def require_admin(authorization: Optional[str]) -> dict[str, Any]:
     return user
 
 
-def render_template(html: str, variables: dict[str, str]) -> str:
-    """Thay thế biến động {{variable}} trong template HTML."""
-    # Thêm biến mặc định
-    defaults = {
-        "hospital_name": settings.EMAIL_FROM_NAME,
-        "current_date": datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M"),
-    }
-    merged = {**defaults, **variables}
-
-    # Thay thế tất cả {{variable_name}}
-    def replacer(match: re.Match) -> str:
-        key = match.group(1).strip()
-        return merged.get(key, match.group(0))  # Giữ nguyên nếu không có giá trị
-
-    return re.sub(r"\{\{(\w+)\}\}", replacer, html)
+from app.services.email_service import render_template
 
 
 def send_brevo_email(
