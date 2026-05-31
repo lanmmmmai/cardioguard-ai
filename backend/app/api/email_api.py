@@ -305,10 +305,11 @@ async def update_template(
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            text(f"UPDATE email_templates SET {set_sql} WHERE id::text = :id"),
+            text(f"UPDATE email_templates SET {set_sql} WHERE id::text = :id RETURNING id"),
             updates,
         )
-        if result.rowcount == 0:
+        row = result.mappings().first()
+        if not row:
             raise HTTPException(status_code=404, detail="Template không tồn tại")
         await session.commit()
 
@@ -325,10 +326,11 @@ async def delete_template(
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            text("DELETE FROM email_templates WHERE id::text = :id"),
+            text("DELETE FROM email_templates WHERE id::text = :id RETURNING id"),
             {"id": template_id},
         )
-        if result.rowcount == 0:
+        row = result.mappings().first()
+        if not row:
             raise HTTPException(status_code=404, detail="Template không tồn tại")
         await session.commit()
 

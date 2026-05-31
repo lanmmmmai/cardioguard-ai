@@ -22,11 +22,22 @@ from app.core.database import database
 
 def render_template(html: str, variables: dict[str, str]) -> str:
     """Thay thế các biến động dạng {{variable_name}} trong template HTML."""
+    # Làm giàu biến để tương thích chéo giữa otp, otp_code và new_password
+    enriched = dict(variables)
+    if "otp" in enriched:
+        enriched["otp_code"] = enriched["otp"]
+    elif "otp_code" in enriched:
+        enriched["otp"] = enriched["otp_code"]
+        
+    if "new_password" in enriched:
+        enriched["otp"] = enriched["new_password"]
+        enriched["otp_code"] = enriched["new_password"]
+
     defaults = {
         "hospital_name": settings.EMAIL_FROM_NAME or "CardioGuard AI",
         "current_date": datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M"),
     }
-    merged = {**defaults, **variables}
+    merged = {**defaults, **enriched}
 
     def replacer(match: re.Match) -> str:
         key = match.group(1).strip()
