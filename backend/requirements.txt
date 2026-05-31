@@ -141,7 +141,6 @@ pandas==2.3.3
 pandocfilters==1.5.1
 papermill==2.6.0
 parso==0.8.5
-passlib==1.7.4
 peft==0.17.1
 pexpect==4.9.0
 pillow==11.3.0
