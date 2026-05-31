@@ -9,6 +9,7 @@ Installed external skill:
 Project-local skill:
 
 - `cardioguard-healthcare-ui`: CardioGuard-specific guardrails for web and mobile UI changes. Use this alongside `redesign-existing-projects` so visual polish does not override clinical clarity, realtime readability, accessibility, or existing app architecture.
+- `cardioguard-backend-integration`: Quy tắc và hướng dẫn tích hợp cơ sở dữ liệu, APIs, đồng bộ người dùng, bảo mật phân quyền và quản lý an toàn kết nối WebSocket/DB.
 
 Selection notes:
 
