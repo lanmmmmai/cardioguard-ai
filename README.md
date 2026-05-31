@@ -1,142 +1,327 @@
-# 🫀 Hệ Thống Giám Sát Nhịp Tim & Chỉ Số Sinh Tồn Đa Nền Tảng (Smart Heart Patient Monitoring)
+# CardioGuard AI
 
-Hệ thống theo dõi sức khỏe và chỉ số sinh tồn của bệnh nhân (Nhịp tim, SpO2, Huyết áp, ECG) trong phòng hồi sức tích cực (ICU) thời gian thực. Dự án được chia tách thành cấu trúc phân rã kiến trúc (Multi-platform Clean Architecture) rõ ràng, hỗ trợ đầy đủ giao diện Web cao cấp và App di động chạy Native mượt mà.
+CardioGuard AI là hệ thống giám sát sức khỏe đa nền tảng cho bệnh nhân, bác sĩ và admin. Dự án gồm backend FastAPI, web dashboard React, mobile app Flutter, mô hình AI demo và pipeline AIoT cho thiết bị ESP32 gửi telemetry realtime.
 
----
+Các chỉ số chính đang được hỗ trợ:
 
-## 📂 Giao Diện & Cấu Trúc Thư Mục Dự Án
+- Nhịp tim
+- SpO2
+- Huyết áp
+- ECG
+- Cảnh báo bất thường
+- Trạng thái thiết bị IoT/AIoT
+- WebSocket realtime theo quyền patient/doctor/admin
+
+## Cấu Trúc Dự Án
 
 ```text
-heart-monitor-workspace/
-├── backend/                   # 🚀 Backend dịch vụ (Deploy lên Render)
-│   ├── app/                   # FastAPI source code (WebSocket, Telemetry Simulator)
-│   ├── .env                   # Thông tin cấu hình cơ sở dữ liệu Supabase
-│   └── requirements.txt       # Danh sách thư viện Python
-├── web_frontend/              # 🌐 Web Client (Deploy lên Vercel)
-│   ├── src/                   # ReactJS + TypeScript + Vite (Font Futura)
+cardioguard-ai/
+├── backend/                    # FastAPI API, auth, DB, realtime, IoT ingest
+│   ├── app/
+│   │   ├── api/                # REST/WebSocket routers
+│   │   ├── ai/                 # Rule-based abnormal detection
+│   │   ├── core/               # Config, database, security
+│   │   ├── models/             # SQLAlchemy table definitions
+│   │   ├── schemas/            # Pydantic schemas
+│   │   ├── services/           # Email, OTP, AI service
+│   │   └── websocket/          # WebSocket connection manager
+│   ├── migrations/             # SQL migrations
+│   ├── run_migration.py
+│   └── requirements.txt
+├── web_frontend/               # React 18 + TypeScript + Vite dashboard
+│   ├── src/
+│   ├── public/
 │   ├── package.json
-│   └── index.html
-├── mobile_app/                # 📱 Mobile App (Build ra Android APK / iOS)
-│   ├── lib/                   # Flutter App (Dart code - Font Futura)
-│   │   ├── screens/           # Giao diện chính (Dashboard, Camera, Patients, Stats, Auth...)
-│   │   ├── services/          # HTTP ApiService & WebSocket telemetry
-│   │   └── widgets/           # Vẽ ECG Live & Quả tim 3D co bóp
-│   ├── assets/fonts/          # Thư mục lưu trữ font Futura.ttf
-│   └── pubspec.yaml           # Đăng ký thư viện và tài nguyên app
-└── README.md                  # Hướng dẫn khởi chạy hệ thống
+│   └── vercel.json
+├── mobile_app/                 # Flutter app
+│   ├── lib/
+│   ├── assets/
+│   └── pubspec.yaml
+├── ai_model/                   # Training/demo model assets
+├── hardware/                   # ESP32-S3 SuperMini firmware and hardware docs
+│   └── esp32_s3_supermini/
+├── docs/iot/                   # AIoT API contract, runbook, UAT, security docs
+├── AGENTS.md
+├── vercel.json
+└── README.md
 ```
 
----
+## Backend
 
-## 🚀 Các Tính Năng Nổi Bật Trên Cả Web & App
+Backend dùng FastAPI, async database access, JWT auth, OTP, email service, realtime WebSocket và API ingest cho thiết bị AIoT.
 
-1. **Bật Tắt Chế Độ Sáng/Tối (Light/Dark Mode) 🌓**:
-   * Chuyển đổi giao diện bằng icon Mặt trời/Mặt trăng ngay trên thanh menu đầu, tự động ghi nhớ trạng thái vào `localStorage` (Web) hoặc bộ nhớ máy (App).
-   * Khi chuyển sang Light Mode, biểu đồ ECG tự động chuyển thành **giấy kẻ ô ly đỏ/trắng** cổ điển của bệnh viện để bác sĩ dễ đọc chỉ số.
+### Chạy backend
 
-2. **Quả Tim 3D Beat-sync Co Bóp 💓**:
-   * Điểm đám mây (Point-cloud) 3D tự động quay quanh trục, co bóp theo tần số nhịp tim thực tế (BPM) của bệnh nhân qua các phép toán hình học chiếu không gian vẽ trên Canvas/CustomPainter.
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m uvicorn app.main:app --reload
+```
 
-3. **Điện Tâm Đồ Live ECG Waveform 📈**:
-   * Vẽ chu kỳ sóng P-Q-R-S-T dạ quang mượt mà (60fps) giúp theo dõi sát sao nhịp tim sinh học.
+Nếu bạn đã có virtualenv ở thư mục root, có thể dùng:
 
-4. **Camera Giả Lập ICU 📹**:
-   * Chế độ camera hồng ngoại ban đêm (Night-Vision), giả lập nhịp thở phập phồng của bệnh nhân trên giường bệnh theo chu kỳ sóng Sin.
+```bash
+source ../.venv/bin/activate
+```
 
-5. **Thống Kê Tự Vẽ Custom SVG & fl_chart 📊**:
-   * Phân tích trực quan tỷ lệ cảnh báo nguy hiểm, xu hướng alarm 7 ngày qua của hệ thống.
+API chạy tại:
 
-6. **Dùng Chung Database Supabase**:
-   * Đồng bộ hóa dữ liệu bệnh nhân, hồ sơ bệnh lý, tài khoản đăng nhập giữa Web và App di động.
+```text
+http://localhost:8000
+```
 
----
+Swagger:
 
-## 🛠️ Hướng Dẫn Khởi Chạy Từng Thành Phần
+```text
+http://localhost:8000/docs
+```
 
-### 🚀 1. Khởi Chạy Backend (FastAPI)
+### Biến môi trường backend
 
-1. Mở cửa sổ Terminal và di chuyển vào thư mục `backend`:
-   ```bash
-   cd backend
-   ```
-2. Kích hoạt môi trường ảo Python (thư mục `.venv` nằm ở thư mục gốc):
-   * **Windows (PowerShell)**:
-     ```powershell
-     ..\.venv\Scripts\activate
-     ```
-   * **macOS/Linux**:
-     ```bash
-     source ../.venv/bin/activate
-     ```
-3. Cài đặt các thư viện (chỉ thực hiện ở lần đầu tiên):
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Khởi chạy Server:
-   ```bash
-   python -m uvicorn app.main:app --reload
-   ```
-   * *API hoạt động tại: `http://localhost:8000`*
-   * *Swagger tài liệu API: `http://localhost:8000/docs`*
+Tạo `backend/.env` dựa trên [backend/.env.example](/Users/doanlan/CNST/cardioguard-ai/backend/.env.example).
 
----
+Các biến quan trọng:
 
-### 🌐 2. Khởi Chạy Web Frontend (React)
+```env
+DATABASE_URL=postgresql+asyncpg://...
+SECRET_KEY=replace-with-a-strong-random-secret-at-least-32-characters
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+EXPOSE_DEV_OTP=false
+IOT_DEVICE_SHARED_TOKEN=
+OPENAI_API_KEY=
+```
 
-1. Mở cửa sổ Terminal thứ hai và di chuyển vào thư mục `web_frontend`:
-   ```bash
-   cd web_frontend
-   ```
-2. Cài đặt các thư viện Node modules:
-   ```bash
-   npm install
-   ```
-3. Khởi chạy Web Server:
-   ```bash
-   npm run dev
-   ```
-4. Mở trình duyệt web truy cập: **[http://localhost:5173](http://localhost:5173)**
+Ghi chú:
 
----
+- `IOT_DEVICE_SHARED_TOKEN` chỉ là fallback cho môi trường dev.
+- Production nên dùng token riêng từng thiết bị qua `device_token_hash`.
 
-### 📱 3. Khởi Chạy & Biên Dịch Mobile App (Flutter)
+## Database Migrations
 
-* **Yêu cầu**: Máy tính đã cài đặt [Flutter SDK](https://docs.flutter.dev/get-started/install) và cấu hình biến môi trường thành công.
-* **Cài Font**: Tải tệp tin `Futura.ttf` và lưu vào thư mục `mobile_app/assets/fonts/Futura.ttf` trước khi chạy.
+Chạy migration từ thư mục `backend`:
 
-1. Mở cửa sổ Terminal thứ ba và di chuyển vào thư mục `mobile_app`:
-   ```bash
-   cd mobile_app
-   ```
-2. Tải các gói thư viện Flutter:
-   ```bash
-   flutter pub get
-   ```
-3. Khởi chạy trên thiết bị ảo hoặc cắm cáp thiết bị thật:
-   ```bash
-   flutter run
-   ```
-4. Build xuất file APK cài đặt lên điện thoại Android:
-   ```bash
-   flutter build apk --release
-   ```
-   * *Tệp tin APK xuất ra tại: `build/app/outputs/flutter-apk/app-release.apk`*
+```bash
+cd backend
+python run_migration.py migrations/006_add_device_auth_columns.sql
+```
 
----
+Migration IoT quan trọng:
 
-## ⚠️ Lưu Ý Cấu Hình Địa Chỉ IP Khi Kiểm Thử App
+- [006_add_device_auth_columns.sql](/Users/doanlan/CNST/cardioguard-ai/backend/migrations/006_add_device_auth_columns.sql)
 
-* **Khi chạy trên Thiết bị giả lập (Android Emulator)**:
-  Ứng dụng đã được cấu hình mặc định trỏ về máy chủ phát triển qua địa chỉ IP `10.0.2.2:8000` (Localhost chuyển tiếp của Emulator). Bạn không cần thay đổi gì.
+Migration này thêm:
 
-* **Khi cắm cáp chạy trên Điện thoại thật**:
-  Điện thoại và máy tính chạy server của bạn **bắt buộc phải kết nối chung một mạng Wi-Fi**. Bạn cần:
-  1. Tìm địa chỉ IP mạng nội bộ của máy tính bạn (Ví dụ: `192.168.1.15`).
-  2. Mở file [api_service.dart](file:///D:/STCN/heart-monitor/mobile_app/lib/services/api_service.dart#L6) và sửa dòng cấu hình `baseUrl`:
-     ```dart
-     static String baseUrl = 'http://192.168.1.15:8000'; // Thay thế IP máy tính của bạn
-     ```
-  3. Mở file [websocket_service.dart](file:///D:/STCN/heart-monitor/mobile_app/lib/services/websocket_service.dart#L5) và sửa dòng cấu hình `wsUrl`:
-     ```dart
-     static String wsUrl = 'ws://192.168.1.15:8000/ws/realtime'; // Thay thế IP máy tính của bạn
-     ```
+- `devices.device_mac`
+- `devices.device_token_hash`
+- `devices.token_last_rotated_at`
+- `devices.firmware_version`
+- `devices.metadata`
+- unique index cho MAC đã normalize
+
+## Web Frontend
+
+Web dashboard dùng React 18, TypeScript, Vite và `lucide-react`.
+
+### Chạy web
+
+```bash
+cd web_frontend
+npm install
+npm run dev
+```
+
+Web chạy tại:
+
+```text
+http://localhost:5173
+```
+
+Build production:
+
+```bash
+npm run build
+```
+
+### Biến môi trường web
+
+Tạo `web_frontend/.env` dựa trên [web_frontend/.env.example](/Users/doanlan/CNST/cardioguard-ai/web_frontend/.env.example).
+
+```env
+VITE_API_URL=http://localhost:8000
+VITE_WS_URL=ws://localhost:8000
+```
+
+## Mobile App
+
+Mobile app dùng Flutter, Provider, HTTP API, WebSocket realtime, ECG painter và heart painter.
+
+### Chạy mobile
+
+```bash
+cd mobile_app
+flutter pub get
+flutter run
+```
+
+Build Android APK:
+
+```bash
+flutter build apk --release
+```
+
+## AIoT / ESP32-S3 SuperMini
+
+Phần cứng hiện tập trung vào prototype:
+
+- ESP32-S3 SuperMini
+- Random telemetry trước khi nối cảm biến thật
+- MAC-based device mapping
+- Per-device token
+- HTTP telemetry ingest
+- Offline buffer + retry/backoff
+
+Firmware nằm tại:
+
+- [hardware/esp32_s3_supermini/firmware](/Users/doanlan/CNST/cardioguard-ai/hardware/esp32_s3_supermini/firmware)
+
+Tài liệu vận hành phần cứng:
+
+- [operating-flow.md](/Users/doanlan/CNST/cardioguard-ai/hardware/esp32_s3_supermini/docs/operating-flow.md)
+- [wiring.md](/Users/doanlan/CNST/cardioguard-ai/hardware/esp32_s3_supermini/docs/wiring.md)
+
+### Chạy firmware
+
+Firmware dùng PlatformIO:
+
+```bash
+cd hardware/esp32_s3_supermini/firmware
+pio run
+pio run -t upload
+pio device monitor -b 115200
+```
+
+Các cấu hình cần chỉnh nằm trong:
+
+- [config.h](/Users/doanlan/CNST/cardioguard-ai/hardware/esp32_s3_supermini/firmware/include/config.h)
+
+Các giá trị cần thay trước khi flash:
+
+- `kWifiSsid`
+- `kWifiPassword`
+- `kTelemetryEndpoint`
+- `kDeviceToken`
+
+## AIoT API Chính
+
+### Gửi telemetry
+
+```http
+POST /iot/telemetry
+X-Device-Uid: CG-ESP32S3-0001
+X-Device-Mac: A8:42:E3:11:22:33
+X-Device-Token: cgdt_xxx
+Content-Type: application/json
+```
+
+Backend sẽ:
+
+1. Xác thực token thiết bị.
+2. Map `device_mac -> patient_id`.
+3. Lưu `sensor_data`.
+4. Chạy abnormal detection.
+5. Tạo `alerts` nếu cần.
+6. Broadcast WebSocket cho patient, doctor được phân công và admin.
+
+### Xem trạng thái thiết bị
+
+```http
+GET /iot/devices/{device_uid}/status
+Authorization: Bearer <jwt>
+```
+
+### Rotate token thiết bị
+
+```http
+POST /iot/devices/{device_uid}/rotate-token
+Authorization: Bearer <jwt>
+```
+
+Chỉ `admin` hoặc `doctor` có quyền rotate token.
+
+## Tài Liệu IoT
+
+Các tài liệu hỗ trợ triển khai:
+
+- [API contract](/Users/doanlan/CNST/cardioguard-ai/docs/iot/api-contract.md)
+- [Runbook](/Users/doanlan/CNST/cardioguard-ai/docs/iot/runbook.md)
+- [UAT checklist](/Users/doanlan/CNST/cardioguard-ai/docs/iot/uat-checklist.md)
+- [Security policy](/Users/doanlan/CNST/cardioguard-ai/docs/iot/security-policy.md)
+
+## Quyền Realtime
+
+WebSocket realtime gửi dữ liệu theo role:
+
+- `patient`: chỉ thấy dữ liệu của chính mình.
+- `doctor`: chỉ thấy bệnh nhân được phân công trong `doctor_patient`.
+- `admin`: thấy toàn bộ.
+
+Các event chính:
+
+- `health_metrics`
+- `emergency_alerts`
+- `appointments`
+- `notifications`
+- `chat`
+
+## AI Model
+
+Thư mục [ai_model](/Users/doanlan/CNST/cardioguard-ai/ai_model) chứa dữ liệu và model demo:
+
+- `heart_disease_clean.csv`
+- `heart_disease_model.pkl`
+- `train_model.py`
+- `app.py`
+
+Phần AI realtime hiện tại trong backend chủ yếu là rule-based abnormal detection tại:
+
+- [heart_ai.py](/Users/doanlan/CNST/cardioguard-ai/backend/app/ai/heart_ai.py)
+
+## Kiểm Tra Nhanh
+
+Backend syntax check:
+
+```bash
+python3 -m compileall backend/app
+```
+
+Web build:
+
+```bash
+cd web_frontend
+npm run build
+```
+
+Flutter:
+
+```bash
+cd mobile_app
+flutter analyze
+```
+
+Firmware:
+
+```bash
+cd hardware/esp32_s3_supermini/firmware
+pio run
+```
+
+## Ghi Chú Bảo Mật
+
+- Không commit `.env`.
+- Không commit token thiết bị thật.
+- Không dùng JWT user trong firmware.
+- Không tin `patient_id` do firmware gửi lên.
+- Token thiết bị chỉ hiển thị một lần khi rotate.
+- Production nên tắt shared token fallback và chỉ dùng `device_token_hash`.
