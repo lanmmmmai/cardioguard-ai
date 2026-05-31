@@ -1,5 +1,6 @@
 import secrets
 import requests
+from typing import Optional
 from fastapi import APIRouter, Header, HTTPException
 from jose import JWTError, jwt
 from app.core.config import settings
@@ -22,7 +23,7 @@ VALID_ROLES = {"admin", "doctor", "patient"}
 PRODUCTION_ENVIRONMENTS = {"prod", "production"}
 
 
-def normalize_role(role: str | None) -> str:
+def normalize_role(role: Optional[str]) -> str:
     normalized = (role or "").strip().lower()
     if normalized not in VALID_ROLES:
         raise HTTPException(status_code=403, detail="Tài khoản chưa được phân quyền")
@@ -41,13 +42,13 @@ def generic_forgot_password_response(email: str) -> dict[str, object]:
     }
 
 
-def extract_bearer_token(authorization: str | None) -> str:
+def extract_bearer_token(authorization: Optional[str]) -> str:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
     return authorization.split(" ", 1)[1].strip()
 
 
-async def get_user_from_token(authorization: str | None):
+async def get_user_from_token(authorization: Optional[str]):
     token = extract_bearer_token(authorization)
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -446,7 +447,7 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest):
 
 
 @router.post("/auth/change-password")
-async def change_password(data: ChangePasswordRequest, authorization: str | None = Header(default=None)):
+async def change_password(data: ChangePasswordRequest, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     
     user = await database.fetch_one(
@@ -471,5 +472,5 @@ async def change_password(data: ChangePasswordRequest, authorization: str | None
 
 
 @router.get("/auth/me")
-async def me(authorization: str | None = Header(default=None)):
+async def me(authorization: Optional[str] = Header(default=None)):
     return {"user": await get_user_from_token(authorization)}

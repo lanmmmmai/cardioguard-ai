@@ -1,15 +1,17 @@
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from datetime import datetime
+from typing import Optional
 from app.core.password_policy import validate_password
+
 
 class DoctorCreate(BaseModel):
     full_name: str
     email: EmailStr
-    phone: str | None = None
+    phone: Optional[str] = None
     password: str
     confirm_password: str
-    specialty: str | None = None
-    department: str | None = None
+    specialty: Optional[str] = None
+    department: Optional[str] = None
     status: str = "active"
 
     @field_validator("password")
@@ -30,26 +32,27 @@ class DoctorCreate(BaseModel):
             raise ValueError("Mật khẩu xác nhận không trùng khớp")
         return self
 
+
 class DoctorUpdate(BaseModel):
-    full_name: str | None = None
-    email: EmailStr | None = None
-    phone: str | None = None
-    password: str | None = None
-    confirm_password: str | None = None
-    specialty: str | None = None
-    department: str | None = None
-    status: str | None = None
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    password: Optional[str] = None
+    confirm_password: Optional[str] = None
+    specialty: Optional[str] = None
+    department: Optional[str] = None
+    status: Optional[str] = None
 
     @field_validator("password")
     @classmethod
-    def password_strength(cls, v: str | None) -> str | None:
+    def password_strength(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return None
         return validate_password(v)
 
     @field_validator("status")
     @classmethod
-    def validate_status(cls, v: str | None) -> str | None:
+    def validate_status(cls, v: Optional[str]) -> Optional[str]:
         if v is not None and v not in {"active", "inactive"}:
             raise ValueError("Trạng thái phải là active hoặc inactive")
         return v
@@ -61,12 +64,13 @@ class DoctorUpdate(BaseModel):
                 raise ValueError("Mật khẩu xác nhận không trùng khớp")
         return self
 
+
 class DoctorResponse(BaseModel):
     id: str
     full_name: str
     email: str
-    phone: str | None = None
-    specialty: str | None = None
-    department: str | None = None
+    phone: Optional[str] = None
+    specialty: Optional[str] = None
+    department: Optional[str] = None
     status: str
-    created_at: datetime | None = None
+    created_at: Optional[datetime] = None

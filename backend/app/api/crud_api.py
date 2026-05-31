@@ -2,7 +2,7 @@ import json
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
 
@@ -169,7 +169,7 @@ async def ensure_doctor_patient_access(doctor_id: str, patient_id: Any) -> None:
         raise HTTPException(status_code=403, detail="Doctor is not assigned to this patient")
 
 
-async def enforce_write_scope(table: str, columns: set[str], user: dict[str, str], payload: dict[str, Any], current: dict[str, Any] | None = None) -> None:
+async def enforce_write_scope(table: str, columns: set[str], user: dict[str, str], payload: dict[str, Any], current: Optional[dict[str, Any]] = None) -> None:
     role = user["role"]
     user_id = user["id"]
 
@@ -234,7 +234,7 @@ async def fetch_authorized_row(table: str, record_id: str, columns: set[str], us
     return row_to_dict(row)
 
 
-async def list_records(table: str, authorization: str | None, limit: int, offset: int, patient_id: str | None = None):
+async def list_records(table: str, authorization: Optional[str], limit: int, offset: int, patient_id: Optional[str] = None):
     user = await get_user_from_token(authorization)
     columns = await table_columns(table)
     access_sql, values = access_filter(table, columns, user)
@@ -282,7 +282,7 @@ async def trigger_websocket_broadcast(table: str, record: dict[str, Any]):
         print(f"Error triggering WebSocket broadcast for table {table}: {e}")
 
 
-async def create_record(table: str, payload: dict[str, Any], authorization: str | None):
+async def create_record(table: str, payload: dict[str, Any], authorization: Optional[str]):
     user = await get_user_from_token(authorization)
     columns = await table_columns(table)
     values = normalize_payload(payload)
@@ -306,7 +306,7 @@ async def create_record(table: str, payload: dict[str, Any], authorization: str 
     return inserted_row
 
 
-async def update_record(table: str, record_id: str, payload: dict[str, Any], authorization: str | None):
+async def update_record(table: str, record_id: str, payload: dict[str, Any], authorization: Optional[str]):
     user = await get_user_from_token(authorization)
     columns = await table_columns(table)
     current = await fetch_authorized_row(table, record_id, columns, user)
@@ -330,7 +330,7 @@ async def update_record(table: str, record_id: str, payload: dict[str, Any], aut
     return updated_row
 
 
-async def delete_record(table: str, record_id: str, authorization: str | None):
+async def delete_record(table: str, record_id: str, authorization: Optional[str]):
     user = await get_user_from_token(authorization)
     columns = await table_columns(table)
     current = await fetch_authorized_row(table, record_id, columns, user)
@@ -342,7 +342,7 @@ async def delete_record(table: str, record_id: str, authorization: str | None):
     return {"deleted": True, "id": record_id}
 
 
-async def reports_summary_data(authorization: str | None):
+async def reports_summary_data(authorization: Optional[str]):
     user = await get_user_from_token(authorization)
     report_columns = await table_columns("reports")
     report_access, report_values = access_filter("reports", report_columns, user)
@@ -369,25 +369,25 @@ async def reports_summary_data(authorization: str | None):
 
 def register_table_routes(table: str, path: str, create_model: type, update_model: type) -> None:
     async def list_endpoint(
-        authorization: str | None = Header(default=None),
+        authorization: Optional[str] = Header(default=None),
         limit: int = Query(default=100, ge=1, le=500),
         offset: int = Query(default=0, ge=0),
-        patient_id: str | None = Query(default=None),
+        patient_id: Optional[str] = Query(default=None),
     ):
         return await list_records(table, authorization, limit, offset, patient_id)
 
-    async def create_endpoint(payload: create_model, authorization: str | None = Header(default=None)):  # type: ignore[valid-type]
+    async def create_endpoint(payload: create_model, authorization: Optional[str] = Header(default=None)):  # type: ignore[valid-type]
         return await create_record(table, payload.model_dump(exclude_unset=True), authorization)
 
-    async def get_endpoint(record_id: str, authorization: str | None = Header(default=None)):
+    async def get_endpoint(record_id: str, authorization: Optional[str] = Header(default=None)):
         columns = await table_columns(table)
         user = await get_user_from_token(authorization)
         return await fetch_authorized_row(table, record_id, columns, user)
 
-    async def update_endpoint(record_id: str, payload: update_model, authorization: str | None = Header(default=None)):  # type: ignore[valid-type]
+    async def update_endpoint(record_id: str, payload: update_model, authorization: Optional[str] = Header(default=None)):  # type: ignore[valid-type]
         return await update_record(table, record_id, payload.model_dump(exclude_unset=True), authorization)
 
-    async def delete_endpoint(record_id: str, authorization: str | None = Header(default=None)):
+    async def delete_endpoint(record_id: str, authorization: Optional[str] = Header(default=None)):
         return await delete_record(table, record_id, authorization)
 
     router.add_api_route(path, list_endpoint, methods=["GET"], tags=[table])
@@ -398,7 +398,7 @@ def register_table_routes(table: str, path: str, create_model: type, update_mode
 
 
 @router.get("/reports/summary", tags=["reports"])
-async def reports_summary(authorization: str | None = Header(default=None)):
+async def reports_summary(authorization: Optional[str] = Header(default=None)):
     return await reports_summary_data(authorization)
 
 

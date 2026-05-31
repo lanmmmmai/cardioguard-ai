@@ -3,7 +3,7 @@ import io
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, File, Header, HTTPException, Query, Response, UploadFile
 from sqlalchemy import text
@@ -77,7 +77,7 @@ def module_config(module: str) -> dict[str, Any]:
     return config
 
 
-async def require_admin(authorization: str | None) -> dict[str, Any]:
+async def require_admin(authorization: Optional[str]) -> dict[str, Any]:
     user = await get_user_from_token(authorization)
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Only admin can access CMS")
@@ -213,7 +213,7 @@ def validate_payload(payload: dict[str, Any], columns: list[dict[str, Any]], con
     return values, errors
 
 
-def build_search(columns: list[dict[str, Any]], query: str | None, params: dict[str, Any]) -> str:
+def build_search(columns: list[dict[str, Any]], query: Optional[str], params: dict[str, Any]) -> str:
     if not query:
         return ""
     searchable = [column["column_name"] for column in columns if column["udt_name"] in TEXT_TYPES]
@@ -223,7 +223,7 @@ def build_search(columns: list[dict[str, Any]], query: str | None, params: dict[
     return "(" + " OR ".join(f"{quote_identifier(column)}::text ILIKE :q" for column in searchable) + ")"
 
 
-def build_filters(filter_value: str | None, columns: list[dict[str, Any]], params: dict[str, Any]) -> str:
+def build_filters(filter_value: Optional[str], columns: list[dict[str, Any]], params: dict[str, Any]) -> str:
     if not filter_value:
         return ""
     column_map = {column["column_name"]: column for column in columns}
@@ -244,12 +244,12 @@ def build_filters(filter_value: str | None, columns: list[dict[str, Any]], param
 @router.get("/{module}")
 async def list_cms_records(
     module: str,
-    authorization: str | None = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
     limit: int = Query(default=25, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    q: str | None = Query(default=None),
-    filter: str | None = Query(default=None),
-    sort_by: str | None = Query(default=None),
+    q: Optional[str] = Query(default=None),
+    filter: Optional[str] = Query(default=None),
+    sort_by: Optional[str] = Query(default=None),
     sort_dir: str = Query(default="desc", pattern="^(asc|desc)$"),
 ):
     await require_admin(authorization)
@@ -295,9 +295,9 @@ async def list_cms_records(
 @router.get("/{module}/export-csv")
 async def export_cms_csv(
     module: str,
-    authorization: str | None = Header(default=None),
-    q: str | None = Query(default=None),
-    filter: str | None = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+    q: Optional[str] = Query(default=None),
+    filter: Optional[str] = Query(default=None),
 ):
     await require_admin(authorization)
     data = await list_cms_records(module, authorization, limit=200, offset=0, q=q, filter=filter, sort_by=None, sort_dir="desc")
@@ -313,7 +313,7 @@ async def export_cms_csv(
 
 
 @router.get("/{module}/{record_id}")
-async def get_cms_record(module: str, record_id: str, authorization: str | None = Header(default=None)):
+async def get_cms_record(module: str, record_id: str, authorization: Optional[str] = Header(default=None)):
     await require_admin(authorization)
     config = module_config(module)
     table = config["table"]
@@ -332,7 +332,7 @@ async def get_cms_record(module: str, record_id: str, authorization: str | None 
 
 
 @router.post("/{module}")
-async def create_cms_record(module: str, payload: dict[str, Any], authorization: str | None = Header(default=None)):
+async def create_cms_record(module: str, payload: dict[str, Any], authorization: Optional[str] = Header(default=None)):
     await require_admin(authorization)
     config = module_config(module)
     table = config["table"]
@@ -361,7 +361,7 @@ async def create_cms_record(module: str, payload: dict[str, Any], authorization:
 
 
 @router.put("/{module}/{record_id}")
-async def update_cms_record(module: str, record_id: str, payload: dict[str, Any], authorization: str | None = Header(default=None)):
+async def update_cms_record(module: str, record_id: str, payload: dict[str, Any], authorization: Optional[str] = Header(default=None)):
     await require_admin(authorization)
     config = module_config(module)
     table = config["table"]
@@ -390,7 +390,7 @@ async def update_cms_record(module: str, record_id: str, payload: dict[str, Any]
 
 
 @router.delete("/{module}/{record_id}")
-async def delete_cms_record(module: str, record_id: str, authorization: str | None = Header(default=None)):
+async def delete_cms_record(module: str, record_id: str, authorization: Optional[str] = Header(default=None)):
     await require_admin(authorization)
     config = module_config(module)
     async with AsyncSessionLocal() as session:
@@ -405,7 +405,7 @@ async def delete_cms_record(module: str, record_id: str, authorization: str | No
 
 
 @router.post("/{module}/import-csv")
-async def import_cms_csv(module: str, file: UploadFile = File(...), authorization: str | None = Header(default=None)):
+async def import_cms_csv(module: str, file: UploadFile = File(...), authorization: Optional[str] = Header(default=None)):
     await require_admin(authorization)
     config = module_config(module)
     table = config["table"]

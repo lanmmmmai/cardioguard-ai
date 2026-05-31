@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Header, HTTPException, Depends
-from typing import List
+from typing import List, Optional
 from app.core.database import database
 from app.core.security import hash_password
 from app.api.auth_api import get_user_from_token
@@ -7,7 +7,7 @@ from app.schemas.admin_doctor_schema import DoctorCreate, DoctorUpdate, DoctorRe
 
 router = APIRouter(prefix="/admin", tags=["admin_doctors"])
 
-async def require_admin(authorization: str | None = Header(default=None)):
+async def require_admin(authorization: Optional[str] = Header(default=None)):
     user = await get_user_from_token(authorization)
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Chỉ admin mới có quyền thực hiện thao tác này")

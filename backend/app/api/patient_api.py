@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Header, HTTPException
 from app.schemas.patient_schema import PatientCreate
 from app.core.database import database
@@ -15,7 +16,7 @@ async def create_patient(patient: PatientCreate):
 
 
 @router.get("/patients")
-async def get_patients(authorization: str | None = Header(default=None)):
+async def get_patients(authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     role = current_user["role"]
 

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, Header, HTTPException
 from app.api.auth_api import get_user_from_token
 
@@ -8,7 +9,7 @@ AI_DISCLAIMER = "Kết quả AI chỉ mang tính tham khảo, cần bác sĩ xá
 
 
 @router.get("/dashboard/summary")
-async def dashboard_summary(authorization: str | None = Header(default=None)):
+async def dashboard_summary(authorization: Optional[str] = Header(default=None)):
     await get_user_from_token(authorization)
     return {
         "status": "running",
@@ -19,7 +20,7 @@ async def dashboard_summary(authorization: str | None = Header(default=None)):
 
 
 @router.post("/ai/health-analysis")
-async def health_analysis(payload: dict, authorization: str | None = Header(default=None)):
+async def health_analysis(payload: dict, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     if current_user["role"] not in {"admin", "doctor"}:
         raise HTTPException(status_code=403, detail="Chỉ admin hoặc bác sĩ mới có quyền phân tích AI")

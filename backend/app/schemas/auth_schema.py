@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
 from app.core.password_policy import validate_password
 
@@ -59,7 +60,7 @@ class ForgotPasswordRequest(BaseModel):
 class ForgotPasswordVerifyRequest(BaseModel):
     email: EmailStr
     otp: str
-    new_password: str | None = None
+    new_password: Optional[str] = None
 
     @field_validator("otp")
     @classmethod
@@ -70,7 +71,7 @@ class ForgotPasswordVerifyRequest(BaseModel):
 
     @field_validator("new_password")
     @classmethod
-    def new_password_strength(cls, value: str | None) -> str | None:
+    def new_password_strength(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
         return validate_password(value)

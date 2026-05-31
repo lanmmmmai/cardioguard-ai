@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from app.schemas.sensor_schema import SensorDataCreate
@@ -48,7 +48,7 @@ async def ensure_patient_access(user: dict[str, Any], patient_id: str) -> None:
 
 
 @router.post("/sensor-data")
-async def create_sensor_data(data: SensorDataCreate, authorization: str | None = Header(default=None)):
+async def create_sensor_data(data: SensorDataCreate, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     await ensure_patient_access(current_user, data.patient_id)
 
@@ -140,8 +140,8 @@ async def create_sensor_data(data: SensorDataCreate, authorization: str | None =
 
 @router.get("/sensor-data")
 async def get_sensor_data(
-    authorization: str | None = Header(default=None),
-    patient_id: str | None = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+    patient_id: Optional[str] = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ):
@@ -186,8 +186,8 @@ async def get_sensor_data(
 
 @router.get("/api/sensors/history")
 async def get_sensor_history(
-    authorization: str | None = Header(default=None),
-    patient_id: str | None = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+    patient_id: Optional[str] = Query(default=None),
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):

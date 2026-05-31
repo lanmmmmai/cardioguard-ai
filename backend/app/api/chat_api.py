@@ -42,7 +42,7 @@ def enforce_chat_role(current_user: dict[str, Any], chat_role: str) -> None:
         raise HTTPException(status_code=403, detail="Bạn không có quyền dùng chatbot với vai trò này")
 
 
-async def ensure_session_owner(session_id: str, user_id: str, role: str | None = None) -> None:
+async def ensure_session_owner(session_id: str, user_id: str, role: Optional[str] = None) -> None:
     query = """
     SELECT 1
     FROM chat_sessions
@@ -73,7 +73,7 @@ async def ensure_doctor_patient_access(doctor_id: str, patient_id: str) -> None:
 @router.post("/send")
 async def send_chat_message(
     request: ChatMessageRequest,
-    authorization: str | None = Header(default=None)
+    authorization: Optional[str] = Header(default=None)
 ):
     current_user = await get_user_from_token(authorization)
     user_id = current_user["id"]
@@ -140,7 +140,7 @@ async def send_chat_message(
 @router.get("/sessions")
 async def get_chat_sessions(
     role: str = "patient",
-    authorization: str | None = Header(default=None)
+    authorization: Optional[str] = Header(default=None)
 ):
     current_user = await get_user_from_token(authorization)
     role = normalize_chat_role(role)
@@ -152,7 +152,7 @@ async def get_chat_sessions(
 @router.get("/history/{session_id}")
 async def get_chat_history(
     session_id: str,
-    authorization: str | None = Header(default=None)
+    authorization: Optional[str] = Header(default=None)
 ):
     current_user = await get_user_from_token(authorization)
     await ensure_session_owner(session_id, current_user["id"])
@@ -168,7 +168,7 @@ async def get_chat_history(
 @router.post("/analyze-patient")
 async def analyze_patient(
     patient_id: str,
-    authorization: str | None = Header(default=None)
+    authorization: Optional[str] = Header(default=None)
 ):
     current_user = await get_user_from_token(authorization)
     # Only doctors/admins can analyze specific patients
@@ -199,7 +199,7 @@ async def analyze_patient(
 @router.get("/recommendations")
 async def get_recommendations(
     patient_id: Optional[str] = None,
-    authorization: str | None = Header(default=None)
+    authorization: Optional[str] = Header(default=None)
 ):
     current_user = await get_user_from_token(authorization)
     query = "SELECT id, severity, recommendation, created_at FROM ai_recommendations WHERE is_resolved = FALSE "

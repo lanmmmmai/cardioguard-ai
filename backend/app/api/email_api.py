@@ -9,7 +9,7 @@ import io
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 import requests
 from fastapi import APIRouter, File, Header, HTTPException, Query, Response, UploadFile
@@ -51,21 +51,21 @@ class TemplateCreate(BaseModel):
 
 
 class TemplateUpdate(BaseModel):
-    name: str | None = None
-    subject: str | None = None
-    html_content: str | None = None
-    text_content: str | None = None
-    type: str | None = None
-    is_active: bool | None = None
+    name: Optional[str] = None
+    subject: Optional[str] = None
+    html_content: Optional[str] = None
+    text_content: Optional[str] = None
+    type: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 class SendEmailRequest(BaseModel):
-    template_id: str | None = None      # Dùng template có sẵn
+    template_id: Optional[str] = None      # Dùng template có sẵn
     to_email: str
-    cc: str | None = None
-    bcc: str | None = None
-    subject: str | None = None          # Override subject nếu không dùng template
-    html_content: str | None = None     # Override html nếu không dùng template
+    cc: Optional[str] = None
+    bcc: Optional[str] = None
+    subject: Optional[str] = None          # Override subject nếu không dùng template
+    html_content: Optional[str] = None     # Override html nếu không dùng template
     variables: dict[str, str] = {}      # Biến động: {"full_name": "Nguyễn Văn A"}
 
 
@@ -78,7 +78,7 @@ class PreviewRequest(BaseModel):
 # Helper functions
 # -----------------------------------------------------------
 
-async def require_admin(authorization: str | None) -> dict[str, Any]:
+async def require_admin(authorization: Optional[str]) -> dict[str, Any]:
     """Kiểm tra quyền admin."""
     user = await get_user_from_token(authorization)
     if user["role"] != "admin":
@@ -108,8 +108,8 @@ def send_brevo_email(
     to_name: str,
     subject: str,
     html_body: str,
-    cc: str | None = None,
-    bcc: str | None = None,
+    cc: Optional[str] = None,
+    bcc: Optional[str] = None,
 ) -> bool:
     """Gửi email qua Brevo API."""
     if not settings.BREVO_API_KEY:
@@ -159,10 +159,10 @@ def normalize_template(row: dict[str, Any]) -> dict[str, Any]:
 
 @router.get("/templates")
 async def list_templates(
-    authorization: str | None = Header(default=None),
-    q: str | None = Query(default=None, description="Tìm theo tên hoặc subject"),
-    type: str | None = Query(default=None),
-    is_active: bool | None = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+    q: Optional[str] = Query(default=None, description="Tìm theo tên hoặc subject"),
+    type: Optional[str] = Query(default=None),
+    is_active: Optional[bool] = Query(default=None),
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
@@ -208,7 +208,7 @@ async def list_templates(
 @router.get("/templates/{template_id}")
 async def get_template(
     template_id: str,
-    authorization: str | None = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
 ):
     """Lấy chi tiết một template (bao gồm html_content)."""
     await require_admin(authorization)
@@ -228,7 +228,7 @@ async def get_template(
 @router.post("/templates")
 async def create_template(
     payload: TemplateCreate,
-    authorization: str | None = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
 ):
     """Tạo template mới."""
     await require_admin(authorization)
@@ -266,7 +266,7 @@ async def create_template(
 async def update_template(
     template_id: str,
     payload: TemplateUpdate,
-    authorization: str | None = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
 ):
     """Cập nhật template."""
     await require_admin(authorization)
@@ -308,7 +308,7 @@ async def update_template(
 @router.delete("/templates/{template_id}")
 async def delete_template(
     template_id: str,
-    authorization: str | None = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
 ):
     """Xóa template."""
     await require_admin(authorization)
@@ -328,7 +328,7 @@ async def delete_template(
 @router.post("/templates/{template_id}/duplicate")
 async def duplicate_template(
     template_id: str,
-    authorization: str | None = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
 ):
     """Nhân bản template."""
     await require_admin(authorization)
@@ -358,7 +358,7 @@ async def duplicate_template(
 @router.post("/templates/{template_id}/toggle")
 async def toggle_template(
     template_id: str,
-    authorization: str | None = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
 ):
     """Bật/Tắt template."""
     await require_admin(authorization)
@@ -388,7 +388,7 @@ async def toggle_template(
 @router.post("/preview")
 async def preview_template(
     payload: PreviewRequest,
-    authorization: str | None = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
 ):
     """Render HTML với biến động (không gửi email)."""
     await require_admin(authorization)
@@ -399,7 +399,7 @@ async def preview_template(
 @router.post("/send")
 async def send_email(
     payload: SendEmailRequest,
-    authorization: str | None = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
 ):
     """Gửi email thủ công từ CMS."""
     admin = await require_admin(authorization)
@@ -484,9 +484,9 @@ async def send_email(
 
 @router.get("/logs")
 async def list_logs(
-    authorization: str | None = Header(default=None),
-    q: str | None = Query(default=None, description="Tìm theo email hoặc subject"),
-    status: str | None = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+    q: Optional[str] = Query(default=None, description="Tìm theo email hoặc subject"),
+    status: Optional[str] = Query(default=None),
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
@@ -532,7 +532,7 @@ async def list_logs(
 @router.post("/logs/{log_id}/retry")
 async def retry_email(
     log_id: str,
-    authorization: str | None = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
 ):
     """Thử gửi lại email bị lỗi."""
     admin = await require_admin(authorization)
@@ -588,8 +588,8 @@ async def retry_email(
 
 @router.get("/export-logs")
 async def export_logs_csv(
-    authorization: str | None = Header(default=None),
-    status: str | None = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+    status: Optional[str] = Query(default=None),
 ):
     """Xuất lịch sử gửi email ra file CSV."""
     await require_admin(authorization)
@@ -611,7 +611,7 @@ async def export_logs_csv(
 @router.post("/import-recipients")
 async def import_recipients(
     file: UploadFile = File(...),
-    authorization: str | None = Header(default=None),
+    authorization: Optional[str] = Header(default=None),
 ):
     """Import danh sách email từ CSV (format: email,full_name,role,status)."""
     await require_admin(authorization)
@@ -647,7 +647,7 @@ async def import_recipients(
 
 
 @router.get("/variables")
-async def list_variables(authorization: str | None = Header(default=None)):
+async def list_variables(authorization: Optional[str] = Header(default=None)):
     """Lấy danh sách biến động được hỗ trợ."""
     await require_admin(authorization)
 

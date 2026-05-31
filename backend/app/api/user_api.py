@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional, Dict
 
 from fastapi import APIRouter, Header, HTTPException
 
@@ -31,7 +31,7 @@ async def table_columns(table: str) -> set[str]:
     return columns
 
 
-def row_to_dict(row: Any | None) -> dict[str, Any] | None:
+def row_to_dict(row: Optional[Any]) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     return {key: row[key] for key in row.keys()}
@@ -61,7 +61,7 @@ async def fetch_current_user(user_id: str) -> dict[str, Any]:
     return row_to_dict(row) or {}
 
 
-async def fetch_patient_profile(user_id: str) -> dict[str, Any] | None:
+async def fetch_patient_profile(user_id: str) -> Optional[Dict[str, Any]]:
     columns = await table_columns("patients")
     select_columns = [
         "id::text as id",
@@ -87,7 +87,7 @@ async def fetch_patient_profile(user_id: str) -> dict[str, Any] | None:
 
 
 @router.put("/users/me")
-async def update_user_me(payload: UserMeUpdate, authorization: str | None = Header(default=None)):
+async def update_user_me(payload: UserMeUpdate, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     columns = await table_columns("users")
     values = payload.model_dump(exclude_unset=True)
@@ -105,7 +105,7 @@ async def update_user_me(payload: UserMeUpdate, authorization: str | None = Head
 
 
 @router.put("/users/me/password")
-async def update_user_password(payload: PasswordUpdate, authorization: str | None = Header(default=None)):
+async def update_user_password(payload: PasswordUpdate, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     row = await database.fetch_one(
         "SELECT password_hash FROM users WHERE id::text = :user_id",
@@ -124,7 +124,7 @@ async def update_user_password(payload: PasswordUpdate, authorization: str | Non
 
 
 @router.get("/patients/me")
-async def get_patient_me(authorization: str | None = Header(default=None)):
+async def get_patient_me(authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     if current_user["role"] != "patient":
         raise HTTPException(status_code=403, detail="Only patients can access patient profile")
@@ -136,7 +136,7 @@ async def get_patient_me(authorization: str | None = Header(default=None)):
 
 
 @router.put("/patients/me")
-async def update_patient_me(payload: PatientMeUpdate, authorization: str | None = Header(default=None)):
+async def update_patient_me(payload: PatientMeUpdate, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     if current_user["role"] != "patient":
         raise HTTPException(status_code=403, detail="Only patients can update patient profile")
@@ -184,14 +184,14 @@ class AssignmentCreate(BaseModel):
     doctor_id: str
     patient_id: str
 
-async def require_admin(authorization: str | None = Header(default=None)):
+async def require_admin(authorization: Optional[str] = Header(default=None)):
     user = await get_user_from_token(authorization)
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Chỉ Admin mới có quyền truy cập chức năng này")
     return user
 
 @router.get("/admin/assignments")
-async def get_assignments(authorization: str | None = Header(default=None)):
+async def get_assignments(authorization: Optional[str] = Header(default=None)):
     await require_admin(authorization)
     query = """
     SELECT 
@@ -208,7 +208,7 @@ async def get_assignments(authorization: str | None = Header(default=None)):
     return await database.fetch_all(query)
 
 @router.post("/admin/assignments")
-async def create_assignment(payload: AssignmentCreate, authorization: str | None = Header(default=None)):
+async def create_assignment(payload: AssignmentCreate, authorization: Optional[str] = Header(default=None)):
     await require_admin(authorization)
     
     # Verify doctor exists and has doctor role
@@ -243,7 +243,7 @@ async def create_assignment(payload: AssignmentCreate, authorization: str | None
     return {"message": "Phân công bác sĩ thành công", "doctor_id": payload.doctor_id, "patient_id": payload.patient_id}
 
 @router.delete("/admin/assignments/{doctor_id}/{patient_id}")
-async def delete_assignment(doctor_id: str, patient_id: str, authorization: str | None = Header(default=None)):
+async def delete_assignment(doctor_id: str, patient_id: str, authorization: Optional[str] = Header(default=None)):
     await require_admin(authorization)
     
     # Check if assignment exists
@@ -263,7 +263,7 @@ async def delete_assignment(doctor_id: str, patient_id: str, authorization: str 
 
 
 @router.get("/patients/me/doctors")
-async def get_my_doctors(authorization: str | None = Header(default=None)):
+async def get_my_doctors(authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     if current_user["role"] != "patient":
         raise HTTPException(status_code=403, detail="Chỉ bệnh nhân mới có thể xem bác sĩ phụ trách")

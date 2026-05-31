@@ -4,7 +4,7 @@ import json
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Optional, Dict
 from uuid import uuid4
 
 from app.core.config import settings
@@ -80,7 +80,7 @@ async def create_otp_token(
     *,
     purpose: str,
     email: str,
-    metadata: dict[str, Any] | None = None,
+    metadata: Optional[Dict[str, Any]] = None,
     ttl_minutes: int = OTP_TTL_MINUTES,
     max_attempts: int = OTP_MAX_ATTEMPTS,
 ) -> str:
