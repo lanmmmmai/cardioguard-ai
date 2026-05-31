@@ -41,10 +41,65 @@ cardioguard-ai/
 ├── hardware/                   # ESP32-S3 SuperMini firmware and hardware docs
 │   └── esp32_s3_supermini/
 ├── docs/iot/                   # AIoT API contract, runbook, UAT, security docs
+├── docker-compose.yml          # Chạy backend + web bằng Docker Compose
 ├── AGENTS.md
 ├── vercel.json
 └── README.md
 ```
+
+## Chạy Backend + Web Bằng Docker
+
+Yêu cầu:
+
+- Docker Desktop đang chạy.
+- Có `.env` ở root hoặc `backend/.env` chứa cấu hình backend thật.
+- `DATABASE_URL` trỏ tới database truy cập được từ container.
+
+Tạo file env mẫu nếu chưa có:
+
+```bash
+cp .env.docker.example .env
+```
+
+Build image:
+
+```bash
+docker compose build
+```
+
+Chạy backend và web:
+
+```bash
+docker compose up -d
+```
+
+Kiểm tra trạng thái:
+
+```bash
+docker compose ps
+docker compose logs -f backend
+docker compose logs -f web
+```
+
+URL sau khi chạy:
+
+```text
+Backend API: http://localhost:8000
+Backend docs: http://localhost:8000/docs
+Web: http://localhost:5173
+```
+
+Dừng hệ thống:
+
+```bash
+docker compose down
+```
+
+Ghi chú:
+
+- `docker-compose.yml` đọc `.env` và `backend/.env` nếu các file này tồn tại.
+- Web trong Docker được build với `VITE_API_URL` và `VITE_WS_URL` từ env. Mặc định là `http://localhost:8000` và `ws://localhost:8000/ws/realtime`.
+- Không đưa `.env` thật vào image hoặc commit lên git.
 
 ## Backend
 
