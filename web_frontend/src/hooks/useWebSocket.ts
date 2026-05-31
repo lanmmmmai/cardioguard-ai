@@ -32,9 +32,12 @@ export const useWebSocket = (
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const intentionalCloseRef = useRef<boolean>(false);
 
   const connect = useCallback(() => {
     if (socketRef.current?.readyState === WebSocket.OPEN) return;
+
+    intentionalCloseRef.current = false;
 
     // Resolve URL dynamically if window is available
     let wsUrl = url;
@@ -69,6 +72,7 @@ export const useWebSocket = (
 
       socket.onclose = () => {
         setIsConnected(false);
+        if (intentionalCloseRef.current) return; // Bỏ qua nếu chủ động đóng
         if (!onMessageReceived) return;
         console.log('Realtime WebSocket disconnected, retrying connection in 3 seconds...');
         // Attempt to reconnect after 3 seconds
@@ -78,6 +82,7 @@ export const useWebSocket = (
       };
 
       socket.onerror = (error) => {
+        if (intentionalCloseRef.current) return; // Bỏ qua thông báo lỗi khi unmount trong StrictMode
         console.error('WebSocket connection error:', error);
         socket.close();
       };
@@ -96,7 +101,7 @@ export const useWebSocket = (
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (socketRef.current) {
-        socketRef.current.onclose = null; // Prevent reconnect on cleanup
+        intentionalCloseRef.current = true; // Đánh dấu chủ động đóng trong React cleanup
         socketRef.current.close();
       }
     };
