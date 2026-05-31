@@ -19,3 +19,4 @@ Do not use `gpt-taste`, image-first workflows, GSAP-heavy motion, or marketing-p
 Before adding a dependency, check the relevant package file first. Keep existing icon libraries unless there is a concrete project reason to change them.
 
 - **Git Commit Policy**: Always compile, verify, and commit changes to git immediately after making any modifications or completing a task. Never leave unstaged or uncommitted changes in the workspace when finishing a response.
+- **Language Policy**: Always communicate with the user in Vietnamese (Luôn luôn giao tiếp với người dùng bằng tiếng Việt).
