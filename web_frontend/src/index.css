@@ -503,8 +503,8 @@ body {
   height: 240px;
   border-radius: 12px;
   overflow: hidden;
-  background-color: rgba(5, 7, 10, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--glass-border);
 }
 
 .ecg-grid-overlay {
@@ -1644,38 +1644,7 @@ body {
   margin-bottom: 12px;
 }
 
-/* Tabular Nums & Vitals Readability helper */
-.tabular-nums {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: normal !important;
-}
-
-.metric-status-badge {
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.metric-status-badge.high {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--color-critical);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
-.metric-status-badge.low {
-  background: rgba(59, 130, 246, 0.12);
-  color: var(--color-info);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-}
-
-.metric-status-badge.normal {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--color-safe);
-  border: 1px solid rgba(16, 185, 129, 0.15);
-}
+/* NOTE: .tabular-nums and .metric-status-badge base rules consolidated below (see ~line 3750+) */
 
 /* Standardized Alert Strip border mappings */
 .alert-strip.critical {
@@ -3772,6 +3741,12 @@ body {
   animation: pulse-border 1.5s infinite;
 }
 
+.metric-status-badge.low {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--color-info);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
 .metric-range {
   font-size: 0.75rem;
   color: var(--text-muted);
@@ -3790,6 +3765,7 @@ body {
 /* Tabular numbers formatting */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+  letter-spacing: normal !important;
   -moz-font-feature-settings: "tnum";
   -webkit-font-feature-settings: "tnum";
   font-feature-settings: "tnum";
@@ -3832,13 +3808,7 @@ body {
   border: 1px solid var(--glass-border);
 }
 
-.ecg-canvas-wrapper {
-  position: relative;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 12px;
-  border: 1px solid var(--glass-border);
-  overflow: hidden;
-}
+/* NOTE: .ecg-canvas-wrapper consolidated above (see ~line 500) */
 
 /* Simulation Controls Redesign */
 .simulation-controls-panel {
@@ -3914,4 +3884,196 @@ body {
   gap: 1.5rem;
 }
 
+/* ── Dashboard Inline Style Cleanup ── */
+
+.dashboard-empty-state {
+  text-align: center;
+  padding: 4rem 1.5rem;
+}
+
+.dashboard-empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1.5rem;
+  color: var(--text-muted);
+}
+
+.patient-selector-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.patient-selector-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.patient-selector {
+  width: 220px;
+  height: 42px;
+  padding: 6px 12px;
+}
+
+/* Connection Status Badges */
+.connection-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.connection-badge.offline {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-critical);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.connection-badge.stale {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.connection-badge.live {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-safe);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.connection-badge.waiting {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  border: 1px solid var(--glass-border);
+}
+
+.realtime-status-highlight {
+  color: var(--text-primary);
+}
+
+.metric-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metric-value--muted {
+  color: var(--text-muted);
+}
+
+.heart-panel-center {
+  padding: 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+/* Patient Info Section */
+.patient-summary-title {
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 8px;
+}
+
+.patient-info-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  margin-bottom: 4px;
+}
+
+.patient-info-meta {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.patient-info-label {
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.patient-info-address {
+  display: block;
+  max-height: 44px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.patient-info-medical {
+  color: var(--color-warning);
+  font-weight: 500;
+}
+
+/* Alert Section Layout */
+.alert-section-title {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-section-icon {
+  color: var(--color-primary);
+}
+
+.alert-empty-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.alert-list-scroll {
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+/* Alert Strip — Complete Severity Styling */
+.alert-strip.warning {
+  border-left: 3px solid var(--color-warning);
+  background: rgba(245, 158, 11, 0.03);
+}
+
+.alert-strip.critical .alert-strip-icon { color: var(--color-critical); }
+.alert-strip.warning .alert-strip-icon { color: var(--color-warning); }
+.alert-strip.low .alert-strip-icon { color: var(--color-info); }
+
+.alert-strip.critical .alert-strip-title { color: var(--color-critical); font-weight: 800; }
+.alert-strip.high .alert-strip-title { color: var(--color-critical); font-weight: 700; }
+.alert-strip.warning .alert-strip-title { color: var(--color-warning); font-weight: 600; }
+.alert-strip.low .alert-strip-title { color: var(--color-info); font-weight: 500; }
+
+.alert-severity-badge {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.alert-strip.critical .alert-severity-badge { color: var(--color-critical); border: 1px solid rgba(239, 68, 68, 0.27); }
+.alert-strip.high .alert-severity-badge { color: var(--color-critical); border: 1px solid rgba(239, 68, 68, 0.27); }
+.alert-strip.warning .alert-severity-badge { color: var(--color-warning); border: 1px solid rgba(245, 158, 11, 0.27); }
+.alert-strip.low .alert-severity-badge { color: var(--color-info); border: 1px solid rgba(59, 130, 246, 0.27); }
+
+/* Simulation Controls */
+.sim-description {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 8px 0 16px;
+}
+
+.sim-buttons-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-abnormal {
+  background: linear-gradient(135deg, var(--color-critical), #c2003c);
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.25);
+}
 
