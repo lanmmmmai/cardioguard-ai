@@ -34,6 +34,7 @@ export const ApiDataPage: React.FC<ApiDataPageProps> = ({ title, subtitle, endpo
   };
 
   useEffect(() => {
+    setRows([]);
     fetchRows();
   }, [accessToken, endpoint]);
 

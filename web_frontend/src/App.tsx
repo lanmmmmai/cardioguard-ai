@@ -363,10 +363,10 @@ const AppContent: React.FC = () => {
       case '/admin/devices':
         return <FeatureHub type="devices" role="admin" patients={patients} />;
       case '/admin/cameras':
-        return <ApiDataPage title="Quản lý camera" subtitle="Danh sách camera thật từ bảng cameras theo quyền hiện tại." endpoint="/cameras" />;
+        return <ApiDataPage key={normalizedPath} title="Quản lý camera" subtitle="Danh sách camera thật từ bảng cameras theo quyền hiện tại." endpoint="/cameras" />;
       case '/admin/reports':
       case '/doctor/reports':
-        return <ApiDataPage title="Báo cáo" subtitle="Danh sách báo cáo thật từ bảng reports theo quyền hiện tại." endpoint="/reports" />;
+        return <ApiDataPage key={normalizedPath} title="Báo cáo" subtitle="Danh sách báo cáo thật từ bảng reports theo quyền hiện tại." endpoint="/reports" />;
       case '/doctor/dashboard':
         return <DoctorDashboard patients={patients} alerts={alerts} />;
       case '/doctor/appointments':
@@ -376,15 +376,15 @@ const AppContent: React.FC = () => {
         return <FeatureHub type="records" role="doctor" patients={patients} />;
       case '/doctor/prescriptions':
       case '/patient/prescriptions':
-        return <ApiDataPage title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/prescriptions" />;
+        return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/prescriptions" />;
       case '/doctor/chat':
       case '/doctor/messages':
       case '/patient/chat':
-        return <ApiDataPage title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/chat-messages" />;
+        return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/chat-messages" />;
       case '/patient/notifications':
-        return <ApiDataPage title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/notifications" />;
+        return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/notifications" />;
       case '/admin/system-logs':
-        return <ApiDataPage title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/audit-logs" />;
+        return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/audit-logs" />;
       case '/admin/profile':
       case '/doctor/profile':
       case '/patient/profile':
