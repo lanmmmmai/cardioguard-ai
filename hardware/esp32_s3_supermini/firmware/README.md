@@ -36,6 +36,7 @@ Muc tieu giai doan nay:
 - ESP32 khong tu ket luan AI score hay risk level.
 - Cau hinh `Wi-Fi`, endpoint, token dat trong `include/config.h`.
 - Khong commit token that vao repo.
+- Firmware gui them header `X-Device-Mac` (lay tu `WiFi.macAddress()`), backend co the map MAC -> benh nhan.
 
 ## Serial commands
 

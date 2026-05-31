@@ -13,6 +13,10 @@ from app.websocket.connection_manager import manager
 router = APIRouter()
 
 
+def normalize_device_identifier(value: str) -> str:
+    return value.strip().lower().replace(":", "").replace("-", "")
+
+
 def to_jsonable(value: Any) -> Any:
     if isinstance(value, (datetime, date)):
         return value.isoformat()
@@ -49,6 +53,7 @@ async def ensure_patient_access(user: dict[str, Any], patient_id: str) -> None:
 
 
 async def ensure_device_access(user: dict[str, Any], device_uid: str) -> dict[str, Any]:
+    device_key = normalize_device_identifier(device_uid)
     device_row = await database.fetch_one(
         """
         SELECT
@@ -61,10 +66,11 @@ async def ensure_device_access(user: dict[str, Any], device_uid: str) -> dict[st
             device_type,
             updated_at
         FROM devices
-        WHERE name = :device_uid
+        WHERE lower(replace(replace(name, ':', ''), '-', '')) = :device_key
+           OR lower(name) = :device_uid_lower
         LIMIT 1
         """,
-        {"device_uid": device_uid},
+        {"device_key": device_key, "device_uid_lower": device_uid.lower()},
     )
     if not device_row:
         raise HTTPException(status_code=404, detail="Device not found")
@@ -190,6 +196,7 @@ async def create_sensor_data(data: SensorDataCreate, authorization: Optional[str
 async def create_iot_telemetry(
     data: IotTelemetryPayload,
     x_device_uid: str = Header(..., alias="X-Device-Uid"),
+    x_device_mac: str = Header(..., alias="X-Device-Mac"),
     x_device_token: str = Header(..., alias="X-Device-Token"),
 ):
     shared_token = settings.IOT_DEVICE_SHARED_TOKEN.strip()
@@ -198,14 +205,18 @@ async def create_iot_telemetry(
     if x_device_token != shared_token:
         raise HTTPException(status_code=401, detail="Invalid device token")
 
+    device_key = normalize_device_identifier(x_device_mac)
+    if len(device_key) != 12:
+        raise HTTPException(status_code=400, detail="Invalid device MAC address")
+
     device_row = await database.fetch_one(
         """
         SELECT id::text AS id, patient_id::text AS patient_id, status
         FROM devices
-        WHERE name = :device_uid
+        WHERE lower(replace(replace(name, ':', ''), '-', '')) = :device_key
         LIMIT 1
         """,
-        {"device_uid": x_device_uid},
+        {"device_key": device_key},
     )
     if not device_row:
         raise HTTPException(status_code=404, detail="Device not paired")
@@ -319,6 +330,7 @@ async def create_iot_telemetry(
         "message": "Telemetry accepted",
         "patient_id": patient_id,
         "device_uid": x_device_uid,
+        "device_mac": x_device_mac,
         "is_abnormal": len(alerts) > 0,
         "alerts": alerts,
         "server_time": datetime.now(timezone.utc).isoformat(),

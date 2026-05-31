@@ -12,6 +12,7 @@ uint16_t g_buffer_count = 0;
 unsigned long g_last_wifi_attempt_ms = 0UL;
 unsigned long g_backoff_until_ms = 0UL;
 uint16_t g_backoff_ms = kBackoffMinMs;
+String g_device_mac;
 
 void PushBufferedPayload(const String &payload) {
   if (g_buffer_count < kOfflineBufferMaxFrames) {
@@ -42,6 +43,9 @@ int PostPayload(const String &payload) {
   http.begin(kTelemetryEndpoint);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Uid", kDeviceUid);
+  if (g_device_mac.length() > 0) {
+    http.addHeader("X-Device-Mac", g_device_mac);
+  }
   http.addHeader("X-Device-Token", kDeviceToken);
   const int status_code = http.POST(reinterpret_cast<const uint8_t *>(payload.c_str()), payload.length());
   http.end();
@@ -55,6 +59,7 @@ bool IsRetryableStatus(int status_code) {
 
 void InitializeTelemetrySender() {
   WiFi.mode(WIFI_STA);
+  g_device_mac = WiFi.macAddress();
   WiFi.begin(kWifiSsid, kWifiPassword);
   g_last_wifi_attempt_ms = millis();
 }
@@ -75,6 +80,9 @@ void MaintainConnectivity() {
 }
 
 bool IsWifiConnected() {
+  if (g_device_mac.length() == 0) {
+    g_device_mac = WiFi.macAddress();
+  }
   return WiFi.status() == WL_CONNECTED;
 }
 
