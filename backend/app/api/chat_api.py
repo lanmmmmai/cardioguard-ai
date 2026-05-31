@@ -102,10 +102,10 @@ async def send_chat_message(
         {"session_id": session_id},
     )
     
-    # 3. Get history for context
-    query_history = "SELECT sender, message FROM chat_messages WHERE session_id = :session_id ORDER BY created_at ASC LIMIT 10"
+    # 3. Get history for context (Lấy 10 tin nhắn mới nhất và đảo ngược về thứ tự ASC)
+    query_history = "SELECT sender, message FROM chat_messages WHERE session_id::text = :session_id ORDER BY created_at DESC LIMIT 10"
     history_res = await database.fetch_all(query=query_history, values={"session_id": session_id})
-    history = [{"sender": row["sender"], "message": row["message"]} for row in history_res]
+    history = [{"sender": row["sender"], "message": row["message"]} for row in reversed(history_res)]
 
     # 4. Generate AI response
     ai_response_text = await ai_service.generate_chat_response(
@@ -189,7 +189,7 @@ async def analyze_patient(
     sensor_data = [dict(row) for row in sensor_res]
 
     # Fetch 3 recent alerts
-    query_alert = "SELECT severity, message, created_at FROM alerts WHERE patient_id = :pid ORDER BY created_at DESC LIMIT 3"
+    query_alert = "SELECT severity, message, created_at FROM alerts WHERE patient_id::text = :pid ORDER BY created_at DESC LIMIT 3"
     alert_res = await database.fetch_all(query=query_alert, values={"pid": patient_id})
     alerts = [dict(row) for row in alert_res]
 

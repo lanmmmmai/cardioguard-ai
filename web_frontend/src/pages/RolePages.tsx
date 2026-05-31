@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, AlertTriangle, BarChart3, CalendarDays, Cpu, HeartPulse, MessageCircle, Pill, ShieldAlert, Stethoscope, Users, Radio, WifiOff } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { API_URL } from '../config';
 
 interface Patient {
   id: string;
@@ -130,9 +131,11 @@ export const PatientHome: React.FC<{
   alerts: Alert[];
   isConnected?: boolean;
 }> = ({ latestTelemetry, alerts, isConnected = false }) => {
-  const { user } = useAuth();
+  const { accessToken, user } = useAuth();
   const [lastTelemetryTime, setLastTelemetryTime] = useState<Date | null>(null);
   const [isStale, setIsStale] = useState(true);
+  const [isSendingSos, setIsSendingSos] = useState(false);
+  const [showSosConfirm, setShowSosConfirm] = useState(false);
   const [currentMetrics, setCurrentMetrics] = useState<{
     heartRate: number | null;
     spo2: number | null;
@@ -148,6 +151,32 @@ export const PatientHome: React.FC<{
     ecgValue: null,
     updatedAt: null
   });
+
+  const handleTriggerSos = async () => {
+    if (!accessToken) return;
+    setIsSendingSos(true);
+    try {
+      const response = await fetch(`${API_URL}/alerts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ message: 'Bệnh nhân yêu cầu hỗ trợ khẩn cấp (SOS)' })
+      });
+      if (response.ok) {
+        alert('Cảnh báo SOS khẩn cấp đã được phát đi thành công tới hệ thống và các bác sĩ phụ trách!');
+        setShowSosConfirm(false);
+      } else {
+        const data = await response.json();
+        alert(data.detail || 'Lỗi gửi yêu cầu SOS khẩn cấp');
+      }
+    } catch (err) {
+      alert('Lỗi kết nối máy chủ khi gửi tín hiệu SOS khẩn cấp');
+    } finally {
+      setIsSendingSos(false);
+    }
+  };
 
   useEffect(() => {
     // Only update if latestTelemetry matches logged in user or we are in patient session
@@ -184,7 +213,7 @@ export const PatientHome: React.FC<{
           <h1 className="page-title">Trang chủ bệnh nhân</h1>
           <p className="page-subtitle">Chỉ số sức khỏe thời gian thực, lịch hẹn và cảnh báo y tế.</p>
         </div>
-        <button className="sos-button">SOS khẩn cấp</button>
+        <button className="sos-button" onClick={() => setShowSosConfirm(true)}>SOS khẩn cấp</button>
       </div>
 
       {/* WebSocket Connection / Vitals Stale Status Banner */}
@@ -361,6 +390,35 @@ export const PatientHome: React.FC<{
           </div>
         </section>
       </div>
+
+      {/* SOS Confirmation Modal */}
+      {showSosConfirm && (
+        <div className="modal-overlay">
+          <div className="modal-content panel" style={{ maxWidth: '440px', textAlign: 'center' }}>
+            <div style={{ margin: '0 auto 1rem', width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AlertTriangle size={32} style={{ color: 'var(--color-critical)' }} className="pulse-animated" />
+            </div>
+            <h2 className="auth-title" style={{ color: 'var(--color-critical)', marginBottom: '0.75rem' }}>XÁC NHẬN CẢNH BÁO SOS</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '2rem' }}>
+              Hành động này sẽ gửi một cảnh báo nguy hiểm khẩn cấp (SOS) ngay lập tức tới tất cả các Bác sĩ điều trị phụ trách và Quản trị viên hệ thống. Bạn có chắc chắn muốn phát tín hiệu hỗ trợ không?
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowSosConfirm(false)} disabled={isSendingSos}>
+                Hủy bỏ
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ background: 'linear-gradient(135deg, var(--color-critical), #c2003c)', fontWeight: 600 }}
+                onClick={handleTriggerSos}
+                disabled={isSendingSos}
+              >
+                {isSendingSos ? 'Đang gửi...' : 'Gửi SOS ngay'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

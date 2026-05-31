@@ -500,11 +500,10 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
         
-    # Xóa dữ liệu liên quan ở bảng patients trước nếu có
-    if user["role"] == "patient":
-        columns = await table_columns("patients")
-        where_sql = "user_id::text = :user_id" if "user_id" in columns else "id::text = :user_id"
-        await database.execute(f"DELETE FROM patients WHERE {where_sql}", {"user_id": user_id})
-        
-    await database.execute("DELETE FROM users WHERE id::text = :user_id", {"user_id": user_id})
-    return {"message": "Xóa tài khoản thành công", "id": user_id}
+    # Dọn dẹp phân công doctor_patient trước để tránh lỗi FK
+    await database.execute("DELETE FROM doctor_patient WHERE patient_id::text = :user_id OR doctor_id::text = :user_id", {"user_id": user_id})
+    
+    # Thực hiện Soft Delete: chuyển trạng thái thành 'inactive'
+    await database.execute("UPDATE users SET status = 'inactive' WHERE id::text = :user_id", {"user_id": user_id})
+    
+    return {"message": "Vô hiệu hóa tài khoản thành công (Soft Delete)", "id": user_id, "status": "inactive"}

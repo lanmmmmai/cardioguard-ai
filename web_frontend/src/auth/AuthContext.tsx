@@ -34,7 +34,15 @@ const normalizeUser = (user: any): AuthUser | null => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [accessToken, setAccessToken] = useState<string | null>(() => localStorage.getItem('token'));
-  const [user, setUser] = useState<AuthUser | null>(() => normalizeUser(JSON.parse(localStorage.getItem('user') || 'null')));
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      return stored ? normalizeUser(JSON.parse(stored)) : null;
+    } catch {
+      localStorage.removeItem('user');
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 

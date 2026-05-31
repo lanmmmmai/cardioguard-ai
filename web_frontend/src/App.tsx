@@ -149,16 +149,26 @@ const AppContent: React.FC = () => {
   }, [theme]);
 
   useEffect(() => {
-    if (path === '/' && !loading) {
-      navigate(role ? defaultRouteByRole[role] : '/login', true);
-    }
-  }, [loading, path, role]);
+    if (loading) return;
 
-  useEffect(() => {
-    if (!loading && isAuthenticated && role && ['/login', '/register', '/forgot-password'].includes(path)) {
-      navigate(defaultRouteByRole[role], true);
+    if (path === '/' || !routeRole) {
+      if (path === '/' || !['/login', '/register', '/forgot-password', '/change-password'].includes(path)) {
+        if (!pageTitles[normalizedPath]) {
+          navigate(role ? defaultRouteByRole[role] : '/login', true);
+        }
+      }
     }
-  }, [isAuthenticated, loading, path, role]);
+
+    if (path === '/change-password') {
+      if (!isAuthenticated || !role) {
+        navigate('/login', true);
+      }
+    } else if (['/login', '/register', '/forgot-password'].includes(path)) {
+      if (isAuthenticated && role) {
+        navigate(defaultRouteByRole[role], true);
+      }
+    }
+  }, [loading, path, role, isAuthenticated, routeRole]);
 
   const fetchPatients = async () => {
     try {
@@ -405,7 +415,6 @@ const AppContent: React.FC = () => {
 
   if (path === '/change-password') {
     if (!isAuthenticated || !role) {
-      navigate('/login', true);
       return null;
     }
     return <ChangePassword onNavigateNext={() => {
@@ -426,12 +435,10 @@ const AppContent: React.FC = () => {
         onNavigateToForgotPassword={() => navigate('/forgot-password')}
       />;
     }
-    navigate(role ? defaultRouteByRole[role] : '/login', true);
     return null;
   }
 
   if (!routeContent) {
-    navigate(role ? defaultRouteByRole[role] : '/login', true);
     return null;
   }
 

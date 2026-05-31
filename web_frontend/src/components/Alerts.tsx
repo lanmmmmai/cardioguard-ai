@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { Search, Filter, ShieldCheck, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Filter, ShieldCheck, Calendar, CheckCircle, Loader2 } from 'lucide-react';
 import { getSeverityMeta } from '../utils/severity';
+import { useAuth } from '../auth/AuthContext';
+import { API_URL } from '../config';
 
 interface Alert {
   id?: string;
@@ -18,18 +20,55 @@ interface AlertsProps {
 }
 
 export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
+  const { accessToken, role } = useAuth();
+  const [localAlerts, setLocalAlerts] = useState<Alert[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('unresolved'); // mặc định xem chưa xử lý
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLocalAlerts(alerts);
+  }, [alerts]);
+
+  const handleResolve = async (alertId: string) => {
+    if (!accessToken || !alertId) return;
+    setResolvingId(alertId);
+    try {
+      const response = await fetch(`${API_URL}/alerts/${alertId}/resolve`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
+      if (response.ok) {
+        setLocalAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_resolved: true } : a));
+      } else {
+        const data = await response.json();
+        alert(data.detail || 'Không thể xác nhận xử lý cảnh báo');
+      }
+    } catch (err) {
+      alert('Lỗi kết nối máy chủ khi xử lý cảnh báo');
+    } finally {
+      setResolvingId(null);
+    }
+  };
 
   // Filter alerts
-  const filteredAlerts = alerts.filter(a => {
+  const filteredAlerts = localAlerts.filter(a => {
     const matchesSearch = (a.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                           a.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           a.alert_type.toLowerCase().includes(searchQuery.toLowerCase());
                           
     const matchesSeverity = severityFilter === 'all' ? true : a.severity === severityFilter;
+    
+    const matchesStatus = statusFilter === 'all' 
+      ? true 
+      : statusFilter === 'resolved' 
+        ? a.is_resolved === true 
+        : a.is_resolved !== true;
 
-    return matchesSearch && matchesSeverity;
+    return matchesSearch && matchesSeverity && matchesStatus;
   });
 
   return (
@@ -37,12 +76,14 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
       <div className="page-header">
         <div>
           <h1 className="page-title">Nhật Ký Cảnh Báo</h1>
-          <p className="page-subtitle">Xem toàn bộ lịch sử cảnh báo bất thường trong hệ thống ({alerts.length})</p>
+          <p className="page-subtitle">Xem toàn bộ lịch sử cảnh báo bất thường trong hệ thống ({localAlerts.length})</p>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="panel" style={{ marginBottom: '1.5rem', padding: '16px 20px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+      <div className="panel" style={{ marginBottom: '1.5rem', padding: '16px 20px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        
+        {/* Search */}
         <div style={{ position: 'relative', flex: 1, minWidth: '240px', display: 'flex', alignItems: 'center' }}>
           <Search size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
           <input
@@ -55,6 +96,7 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
           />
         </div>
 
+        {/* Severity Filter */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Filter size={16} style={{ color: 'var(--text-muted)' }} />
           <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Mức độ:</span>
@@ -62,13 +104,28 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
             className="form-control"
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value)}
-            style={{ width: '180px', height: '38px', padding: '4px 10px' }}
+            style={{ width: '150px', height: '36px', padding: '4px 10px' }}
           >
             <option value="all">Tất cả mức độ</option>
             <option value="critical">Nguy kịch (Critical)</option>
             <option value="high">Nghiêm trọng (High)</option>
             <option value="medium">Cảnh báo (Medium)</option>
             <option value="low">Theo dõi (Low)</option>
+          </select>
+        </div>
+
+        {/* Status Filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Trạng thái:</span>
+          <select
+            className="form-control"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{ width: '150px', height: '36px', padding: '4px 10px' }}
+          >
+            <option value="unresolved">Chưa xử lý</option>
+            <option value="resolved">Đã xử lý</option>
+            <option value="all">Tất cả trạng thái</option>
           </select>
         </div>
       </div>
@@ -79,7 +136,7 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
           <div className="panel" style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
             <ShieldCheck size={48} style={{ color: 'var(--color-bp)', opacity: 0.8, marginBottom: '1rem' }} />
             <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>Không có cảnh báo nào</div>
-            <p className="page-subtitle">Hệ thống hoạt động ổn định. Chưa ghi nhận bất kỳ cảnh báo nào khớp với bộ lọc.</p>
+            <p className="page-subtitle">Hệ thống ổn định hoặc không có cảnh báo phù hợp với bộ lọc hiện tại.</p>
           </div>
         ) : (
           filteredAlerts.map((alert, index) => {
@@ -88,18 +145,25 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
             return (
               <div 
                 key={alert.id || index} 
-                className={`panel alert-strip ${severityMeta.key}`}
+                className={`panel alert-strip ${severityMeta.key} ${alert.is_resolved ? 'resolved' : ''}`}
                 style={{ 
                   display: 'flex', 
                   alignItems: 'flex-start', 
                   padding: '16px 20px', 
                   margin: 0,
-                  borderLeft: `3px solid ${severityMeta.colorVar}`,
-                  background: severityMeta.bgVar
+                  borderLeft: `3px solid ${alert.is_resolved ? '#10b981' : severityMeta.colorVar}`,
+                  background: alert.is_resolved ? 'rgba(16, 185, 129, 0.02)' : severityMeta.bgVar,
+                  opacity: alert.is_resolved ? 0.75 : 1,
+                  transition: 'all 0.2s ease'
                 }}
               >
-                <AlertIcon className="alert-strip-icon" size={20} style={{ marginRight: '16px', color: severityMeta.colorVar }} />
-                <div className="alert-strip-body">
+                {alert.is_resolved ? (
+                  <CheckCircle className="alert-strip-icon" size={20} style={{ marginRight: '16px', color: '#10b981' }} />
+                ) : (
+                  <AlertIcon className="alert-strip-icon" size={20} style={{ marginRight: '16px', color: severityMeta.colorVar }} />
+                )}
+                
+                <div className="alert-strip-body" style={{ width: '100%' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '6px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: '1rem', fontFamily: 'var(--font-display)' }}>
@@ -108,9 +172,15 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
                       <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', textTransform: 'none' }}>
                         BN ID: {alert.patient_id.slice(0, 8)}...
                       </span>
-                      <span className="badge" style={{ background: severityMeta.bgVar, color: severityMeta.colorVar, border: severityMeta.borderVar, fontWeight: severityMeta.weight }}>
-                        {severityMeta.label}
-                      </span>
+                      {!alert.is_resolved ? (
+                        <span className="badge" style={{ background: severityMeta.bgVar, color: severityMeta.colorVar, border: severityMeta.borderVar, fontWeight: severityMeta.weight }}>
+                          {severityMeta.label}
+                        </span>
+                      ) : (
+                        <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.2)', fontWeight: 600 }}>
+                          Đã xử lý
+                        </span>
+                      )}
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -126,9 +196,47 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
                   <div style={{ color: 'var(--text-primary)', fontSize: '0.92rem', fontWeight: 500, marginBottom: '4px' }}>
                     {alert.alert_type}
                   </div>
-                  <div className="alert-strip-desc" style={{ fontSize: '0.88rem' }}>
+                  <div className="alert-strip-desc" style={{ fontSize: '0.88rem', marginBottom: '8px' }}>
                     {alert.message}
                   </div>
+
+                  {/* Nút Resolve cảnh báo dành cho bác sĩ/admin */}
+                  {!alert.is_resolved && (role === 'doctor' || role === 'admin') && (
+                    <button 
+                      className="btn btn-secondary" 
+                      style={{ 
+                        padding: '5px 12px', 
+                        height: 'auto', 
+                        fontSize: '0.75rem', 
+                        background: 'rgba(16, 185, 129, 0.1)', 
+                        color: '#10b981', 
+                        border: '1px solid rgba(16, 185, 129, 0.2)',
+                        borderRadius: '6px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleResolve(alert.id!)}
+                      disabled={resolvingId === alert.id}
+                    >
+                      {resolvingId === alert.id ? (
+                        <>
+                          <Loader2 size={12} className="beat-animated" /> Đang xử lý...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle size={12} /> Xác nhận đã xử lý
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {alert.is_resolved && (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#10b981', fontSize: '0.8rem', fontWeight: 600, marginTop: '4px' }}>
+                      <CheckCircle size={12} /> Đã được bác sĩ/admin xác nhận xử lý thành công
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -138,3 +246,5 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
     </div>
   );
 };
+
+export default Alerts;

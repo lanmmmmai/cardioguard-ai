@@ -137,6 +137,9 @@ async def delete_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
     if not check_doctor:
         raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
 
-    delete_query = "DELETE FROM users WHERE role = 'doctor' AND id::text = :doctor_id"
-    await database.execute(delete_query, {"doctor_id": doctor_id})
-    return {"message": "Xóa bác sĩ thành công", "id": doctor_id}
+    # Dọn dẹp phân công doctor_patient trước để tránh lỗi FK
+    await database.execute("DELETE FROM doctor_patient WHERE doctor_id::text = :doctor_id", {"doctor_id": doctor_id})
+    
+    # Thực hiện Soft Delete
+    await database.execute("UPDATE users SET status = 'inactive' WHERE role = 'doctor' AND id::text = :doctor_id", {"doctor_id": doctor_id})
+    return {"message": "Vô hiệu hóa bác sĩ thành công (Soft Delete)", "id": doctor_id}
