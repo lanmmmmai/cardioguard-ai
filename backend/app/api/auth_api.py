@@ -368,7 +368,7 @@ async def login(data: LoginRequest, request: Request):
 
 
 @router.post("/auth/forgot-password/request-otp")
-async def request_forgot_password_otp(data: ForgotPasswordRequest):
+async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Request):
     email = data.email.lower()
     response = generic_forgot_password_response(email)
     user = await database.fetch_one(
@@ -392,11 +392,20 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest):
         if settings.BREVO_API_KEY:
             await invalidate_otp_tokens(purpose=OTP_PURPOSE_FORGOT_PASSWORD, email=email)
 
+    # Ghi nhận log yêu cầu OTP quên mật khẩu
+    await log_activity(
+        user_id=user["id"],
+        action="PASSWORD_RESET_REQUEST_OTP",
+        entity_type="users",
+        entity_id=user["id"],
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return response
 
 
 @router.post("/auth/forgot-password/verify-otp")
-async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest):
+async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request: Request):
     email = data.email.lower()
     otp_result = await verify_otp_token(
         purpose=OTP_PURPOSE_FORGOT_PASSWORD,
@@ -443,6 +452,15 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest):
         WHERE id = :id
         """,
         {"password_hash": hashed_password, "must_change_password": must_change_password, "id": user["id"]}
+    )
+
+    # Ghi nhận log khôi phục mật khẩu thành công qua OTP
+    await log_activity(
+        user_id=str(user["id"]),
+        action="PASSWORD_RESET_VERIFY_OTP",
+        entity_type="users",
+        entity_id=str(user["id"]),
+        ip_address=request.client.host if request.client else "-"
     )
 
     if data.new_password:

@@ -12,13 +12,14 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import requests
-from fastapi import APIRouter, File, Header, HTTPException, Query, Response, UploadFile
+from fastapi import APIRouter, File, Header, HTTPException, Query, Response, UploadFile, Request
 from pydantic import BaseModel
 from sqlalchemy import text
 
 from app.api.auth_api import get_user_from_token
 from app.core.config import settings
 from app.core.sqlalchemy_async import AsyncSessionLocal
+from app.services.audit_service import log_activity
 
 router = APIRouter(prefix="/email", tags=["email"])
 
@@ -224,10 +225,11 @@ async def get_template(
 @router.post("/templates")
 async def create_template(
     payload: TemplateCreate,
+    request: Request,
     authorization: Optional[str] = Header(default=None),
 ):
     """Tạo template mới."""
-    await require_admin(authorization)
+    admin = await require_admin(authorization)
 
     if payload.type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"Loại template không hợp lệ: {payload.type}")
@@ -255,6 +257,15 @@ async def create_template(
         )
         await session.commit()
 
+    # Ghi nhận log tạo mẫu email mới
+    await log_activity(
+        user_id=admin["id"],
+        action="EMAIL_TEMPLATE_CREATE",
+        entity_type="email_templates",
+        entity_id=new_id,
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return await get_template(new_id, authorization)
 
 
@@ -262,10 +273,11 @@ async def create_template(
 async def update_template(
     template_id: str,
     payload: TemplateUpdate,
+    request: Request,
     authorization: Optional[str] = Header(default=None),
 ):
     """Cập nhật template."""
-    await require_admin(authorization)
+    admin = await require_admin(authorization)
 
     updates: dict[str, Any] = {}
     if payload.name is not None:
@@ -299,16 +311,26 @@ async def update_template(
             raise HTTPException(status_code=404, detail="Template không tồn tại")
         await session.commit()
 
+    # Ghi nhận log cập nhật mẫu email
+    await log_activity(
+        user_id=admin["id"],
+        action="EMAIL_TEMPLATE_UPDATE",
+        entity_type="email_templates",
+        entity_id=template_id,
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return await get_template(template_id, authorization)
 
 
 @router.delete("/templates/{template_id}")
 async def delete_template(
     template_id: str,
+    request: Request,
     authorization: Optional[str] = Header(default=None),
 ):
     """Xóa template."""
-    await require_admin(authorization)
+    admin = await require_admin(authorization)
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -320,16 +342,26 @@ async def delete_template(
             raise HTTPException(status_code=404, detail="Template không tồn tại")
         await session.commit()
 
+    # Ghi nhận log xóa mẫu email
+    await log_activity(
+        user_id=admin["id"],
+        action="EMAIL_TEMPLATE_DELETE",
+        entity_type="email_templates",
+        entity_id=template_id,
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return {"deleted": True, "id": template_id}
 
 
 @router.post("/templates/{template_id}/duplicate")
 async def duplicate_template(
     template_id: str,
+    request: Request,
     authorization: Optional[str] = Header(default=None),
 ):
     """Nhân bản template."""
-    await require_admin(authorization)
+    admin = await require_admin(authorization)
     original = await get_template(template_id, authorization)
 
     new_id = str(uuid.uuid4())
@@ -350,16 +382,26 @@ async def duplicate_template(
         )
         await session.commit()
 
+    # Ghi nhận log nhân bản mẫu email
+    await log_activity(
+        user_id=admin["id"],
+        action="EMAIL_TEMPLATE_DUPLICATE",
+        entity_type="email_templates",
+        entity_id=new_id,
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return await get_template(new_id, authorization)
 
 
 @router.post("/templates/{template_id}/toggle")
 async def toggle_template(
     template_id: str,
+    request: Request,
     authorization: Optional[str] = Header(default=None),
 ):
     """Bật/Tắt template."""
-    await require_admin(authorization)
+    admin = await require_admin(authorization)
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
@@ -375,6 +417,15 @@ async def toggle_template(
         if not row:
             raise HTTPException(status_code=404, detail="Template không tồn tại")
         await session.commit()
+
+    # Ghi nhận log kích hoạt/vô hiệu hóa mẫu email
+    await log_activity(
+        user_id=admin["id"],
+        action="EMAIL_TEMPLATE_TOGGLE",
+        entity_type="email_templates",
+        entity_id=template_id,
+        ip_address=request.client.host if request.client else "-"
+    )
 
     return {"id": template_id, "is_active": row["is_active"]}
 
@@ -397,6 +448,7 @@ async def preview_template(
 @router.post("/send")
 async def send_email(
     payload: SendEmailRequest,
+    request: Request,
     authorization: Optional[str] = Header(default=None),
 ):
     """Gửi email thủ công từ CMS."""
@@ -464,6 +516,15 @@ async def send_email(
         )
         await session.commit()
 
+    # Ghi nhận log Admin gửi email
+    await log_activity(
+        user_id=admin["id"],
+        action="EMAIL_CMS_SEND",
+        entity_type="email_logs",
+        entity_id=log_id,
+        ip_address=request.client.host if request.client else "-"
+    )
+
     if status == "failed":
         raise HTTPException(status_code=502, detail=f"Gửi email thất bại: {error_message}")
 
@@ -530,6 +591,7 @@ async def list_logs(
 @router.post("/logs/{log_id}/retry")
 async def retry_email(
     log_id: str,
+    request: Request,
     authorization: Optional[str] = Header(default=None),
 ):
     """Thử gửi lại email bị lỗi."""
@@ -581,6 +643,15 @@ async def retry_email(
         )
         await session.commit()
 
+    # Ghi nhận log gửi lại email lỗi
+    await log_activity(
+        user_id=admin["id"],
+        action="EMAIL_LOG_RETRY",
+        entity_type="email_logs",
+        entity_id=log_id,
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return {"success": status == "sent", "status": status, "log_id": log_id}
 
 
@@ -608,11 +679,12 @@ async def export_logs_csv(
 
 @router.post("/import-recipients")
 async def import_recipients(
+    request: Request,
     file: UploadFile = File(...),
     authorization: Optional[str] = Header(default=None),
 ):
     """Import danh sách email từ CSV (format: email,full_name,role,status)."""
-    await require_admin(authorization)
+    admin = await require_admin(authorization)
 
     content = (await file.read()).decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(content))
@@ -635,6 +707,15 @@ async def import_recipients(
             "role": (row.get("role") or "").strip(),
             "status": (row.get("status") or "active").strip(),
         })
+
+    # Ghi nhận log import danh sách người nhận
+    await log_activity(
+        user_id=admin["id"],
+        action="EMAIL_IMPORT_RECIPIENTS",
+        entity_type="users",
+        entity_id=admin["id"],
+        ip_address=request.client.host if request.client else "-"
+    )
 
     return {
         "valid_count": len(valid),

@@ -1,8 +1,9 @@
 from typing import Any, Optional, Dict
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 
 from app.api.auth_api import get_user_from_token
+from app.services.audit_service import log_activity
 from app.core.database import database
 from app.core.security import hash_password, verify_password
 from app.schemas.user_schema import PasswordUpdate, PatientMeUpdate, UserMeUpdate, UserAdminCreate, UserAdminUpdate
@@ -87,7 +88,7 @@ async def fetch_patient_profile(user_id: str) -> Optional[Dict[str, Any]]:
 
 
 @router.put("/users/me")
-async def update_user_me(payload: UserMeUpdate, authorization: Optional[str] = Header(default=None)):
+async def update_user_me(payload: UserMeUpdate, request: Request, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     columns = await table_columns("users")
     values = payload.model_dump(exclude_unset=True)
@@ -101,11 +102,21 @@ async def update_user_me(payload: UserMeUpdate, authorization: Optional[str] = H
         f"UPDATE users SET {set_sql} WHERE id::text = :user_id",
         {**update_values, "user_id": current_user["id"]},
     )
+
+    # Ghi nhận log cập nhật thông tin cá nhân
+    await log_activity(
+        user_id=current_user["id"],
+        action="USER_UPDATE_PROFILE",
+        entity_type="users",
+        entity_id=current_user["id"],
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return {"user": await fetch_current_user(current_user["id"])}
 
 
 @router.put("/users/me/password")
-async def update_user_password(payload: PasswordUpdate, authorization: Optional[str] = Header(default=None)):
+async def update_user_password(payload: PasswordUpdate, request: Request, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     row = await database.fetch_one(
         "SELECT password_hash FROM users WHERE id::text = :user_id",
@@ -120,6 +131,16 @@ async def update_user_password(payload: PasswordUpdate, authorization: Optional[
         "UPDATE users SET password_hash = :password_hash WHERE id::text = :user_id",
         {"password_hash": hash_password(payload.new_password), "user_id": current_user["id"]},
     )
+
+    # Ghi nhận log đổi mật khẩu thành công
+    await log_activity(
+        user_id=current_user["id"],
+        action="USER_PASSWORD_CHANGE",
+        entity_type="users",
+        entity_id=current_user["id"],
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return {"message": "Password updated successfully"}
 
 
@@ -136,7 +157,7 @@ async def get_patient_me(authorization: Optional[str] = Header(default=None)):
 
 
 @router.put("/patients/me")
-async def update_patient_me(payload: PatientMeUpdate, authorization: Optional[str] = Header(default=None)):
+async def update_patient_me(payload: PatientMeUpdate, request: Request, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     if current_user["role"] != "patient":
         raise HTTPException(status_code=403, detail="Only patients can update patient profile")
@@ -154,6 +175,15 @@ async def update_patient_me(payload: PatientMeUpdate, authorization: Optional[st
                 f"UPDATE patients SET {set_sql} WHERE {where_sql}",
                 {**values, "user_id": current_user["id"]},
             )
+        
+        # Ghi nhận log cập nhật hồ sơ bệnh nhân
+        await log_activity(
+            user_id=current_user["id"],
+            action="PATIENT_UPDATE_PROFILE",
+            entity_type="patients",
+            entity_id=current_user["id"],
+            ip_address=request.client.host if request.client else "-"
+        )
         return {"patient": await fetch_patient_profile(current_user["id"])}
 
     insert_values = dict(values)
@@ -175,6 +205,16 @@ async def update_patient_me(payload: PatientMeUpdate, authorization: Optional[st
         f"INSERT INTO patients ({insert_columns}) VALUES ({bind_columns})",
         insert_values,
     )
+
+    # Ghi nhận log tạo hồ sơ bệnh nhân mới
+    await log_activity(
+        user_id=current_user["id"],
+        action="PATIENT_UPDATE_PROFILE",
+        entity_type="patients",
+        entity_id=current_user["id"],
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return {"patient": await fetch_patient_profile(current_user["id"])}
 
 
@@ -208,8 +248,8 @@ async def get_assignments(authorization: Optional[str] = Header(default=None)):
     return await database.fetch_all(query)
 
 @router.post("/admin/assignments")
-async def create_assignment(payload: AssignmentCreate, authorization: Optional[str] = Header(default=None)):
-    await require_admin(authorization)
+async def create_assignment(payload: AssignmentCreate, request: Request, authorization: Optional[str] = Header(default=None)):
+    user = await require_admin(authorization)
     
     # Verify doctor exists and has doctor role
     doctor = await database.fetch_one(
@@ -240,11 +280,21 @@ async def create_assignment(payload: AssignmentCreate, authorization: Optional[s
         "INSERT INTO doctor_patient (doctor_id, patient_id) VALUES (:doctor_id, :patient_id)",
         {"doctor_id": payload.doctor_id, "patient_id": payload.patient_id}
     )
+
+    # Ghi nhận log phân công
+    await log_activity(
+        user_id=user["id"],
+        action="ADMIN_CREATE_ASSIGNMENT",
+        entity_type="doctor_patient",
+        entity_id=payload.patient_id,
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return {"message": "Phân công bác sĩ thành công", "doctor_id": payload.doctor_id, "patient_id": payload.patient_id}
 
 @router.delete("/admin/assignments/{doctor_id}/{patient_id}")
-async def delete_assignment(doctor_id: str, patient_id: str, authorization: Optional[str] = Header(default=None)):
-    await require_admin(authorization)
+async def delete_assignment(doctor_id: str, patient_id: str, request: Request, authorization: Optional[str] = Header(default=None)):
+    user = await require_admin(authorization)
     
     # Check if assignment exists
     existing = await database.fetch_one(
@@ -259,6 +309,16 @@ async def delete_assignment(doctor_id: str, patient_id: str, authorization: Opti
         "DELETE FROM doctor_patient WHERE doctor_id::text = :doctor_id AND patient_id::text = :patient_id",
         {"doctor_id": doctor_id, "patient_id": patient_id}
     )
+
+    # Ghi nhận log hủy phân công
+    await log_activity(
+        user_id=user["id"],
+        action="ADMIN_DELETE_ASSIGNMENT",
+        entity_type="doctor_patient",
+        entity_id=patient_id,
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return {"message": "Hủy phân công bác sĩ thành công", "doctor_id": doctor_id, "patient_id": patient_id}
 
 
@@ -314,9 +374,10 @@ async def list_users(
 @router.post("/admin/users")
 async def create_user(
     payload: UserAdminCreate,
+    request: Request,
     authorization: Optional[str] = Header(default=None)
 ):
-    await require_admin(authorization)
+    user = await require_admin(authorization)
     
     email = payload.email.lower().strip()
     
@@ -364,6 +425,15 @@ async def create_user(
                 f"INSERT INTO patients ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
                 patient_insert_vals
             )
+
+        # Ghi nhận log Admin tạo user mới
+        await log_activity(
+            user_id=user["id"],
+            action="ADMIN_CREATE_USER",
+            entity_type="users",
+            entity_id=created_user["id"],
+            ip_address=request.client.host if request.client else "-"
+        )
             
         return created_user
     except Exception as e:
@@ -374,9 +444,10 @@ async def create_user(
 async def update_user(
     user_id: str,
     payload: UserAdminUpdate,
+    request: Request,
     authorization: Optional[str] = Header(default=None)
 ):
-    await require_admin(authorization)
+    user = await require_admin(authorization)
     
     # Check user exists
     check_user = await database.fetch_one("SELECT id, role, full_name FROM users WHERE id::text = :user_id", {"user_id": user_id})
@@ -482,6 +553,15 @@ async def update_user(
                     f"INSERT INTO patients ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
                     patient_insert_vals
                 )
+
+        # Ghi nhận log Admin chỉnh sửa user
+        await log_activity(
+            user_id=user["id"],
+            action="ADMIN_UPDATE_USER",
+            entity_type="users",
+            entity_id=user_id,
+            ip_address=request.client.host if request.client else "-"
+        )
                 
         return updated_user
     except Exception as e:
@@ -491,13 +571,14 @@ async def update_user(
 @router.delete("/admin/users/{user_id}")
 async def delete_user(
     user_id: str,
+    request: Request,
     authorization: Optional[str] = Header(default=None)
 ):
-    await require_admin(authorization)
+    user = await require_admin(authorization)
     
     # Check user exists
-    user = await database.fetch_one("SELECT id, role FROM users WHERE id::text = :user_id", {"user_id": user_id})
-    if not user:
+    check_user = await database.fetch_one("SELECT id, role FROM users WHERE id::text = :user_id", {"user_id": user_id})
+    if not check_user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
         
     # Dọn dẹp phân công doctor_patient trước để tránh lỗi FK
@@ -505,5 +586,14 @@ async def delete_user(
     
     # Thực hiện Soft Delete: chuyển trạng thái thành 'inactive'
     await database.execute("UPDATE users SET status = 'inactive' WHERE id::text = :user_id", {"user_id": user_id})
+
+    # Ghi nhận log Admin xóa user (vô hiệu hóa)
+    await log_activity(
+        user_id=user["id"],
+        action="ADMIN_DELETE_USER",
+        entity_type="users",
+        entity_id=user_id,
+        ip_address=request.client.host if request.client else "-"
+    )
     
     return {"message": "Vô hiệu hóa tài khoản thành công (Soft Delete)", "id": user_id, "status": "inactive"}

@@ -2,7 +2,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 from app.schemas.sensor_schema import IotTelemetryPayload, SensorDataCreate
 from app.core.database import database
 from app.core.config import settings
@@ -10,6 +10,7 @@ from app.api.auth_api import get_user_from_token
 from app.ai.heart_ai import detect_abnormal
 from app.core.security import hash_password, verify_password
 from app.websocket.connection_manager import manager
+from app.services.audit_service import log_activity
 import secrets
 
 router = APIRouter()
@@ -186,30 +187,31 @@ def detect_abnormal_iot(readings: Any) -> list[dict[str, str]]:
 
 
 @router.post("/sensor-data")
-async def create_sensor_data(data: SensorDataCreate, authorization: Optional[str] = Header(default=None)):
+async def create_sensor_data(data: SensorDataCreate, request: Request, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     await ensure_patient_access(current_user, data.patient_id)
 
     insert_sensor_query = """
     INSERT INTO sensor_data(
-        patient_id,
-        heart_rate,
-        spo2,
-        systolic_bp,
-        diastolic_bp,
-        ecg_value
+         patient_id,
+         heart_rate,
+         spo2,
+         systolic_bp,
+         diastolic_bp,
+         ecg_value
     )
     VALUES (
-        :patient_id,
-        :heart_rate,
-        :spo2,
-        :systolic_bp,
-        :diastolic_bp,
-        :ecg_value
+         :patient_id,
+         :heart_rate,
+         :spo2,
+         :systolic_bp,
+         :diastolic_bp,
+         :ecg_value
     )
+    RETURNING id
     """
 
-    await database.execute(
+    new_row = await database.fetch_one(
         query=insert_sensor_query,
         values={
             "patient_id": data.patient_id,
@@ -219,6 +221,16 @@ async def create_sensor_data(data: SensorDataCreate, authorization: Optional[str
             "diastolic_bp": data.diastolic_bp,
             "ecg_value": data.ecg_value
         }
+    )
+    sensor_id = str(new_row["id"]) if new_row else str(data.patient_id)
+
+    # Ghi nhận log gửi chỉ số đo thủ công
+    await log_activity(
+        user_id=current_user["id"],
+        action="PATIENT_MANUAL_TELEM_SUBMIT",
+        entity_type="sensor_data",
+        entity_id=sensor_id,
+        ip_address=request.client.host if request.client else "-"
     )
 
     alerts = detect_abnormal(data)
@@ -430,7 +442,7 @@ async def get_iot_device_status(device_uid: str, authorization: Optional[str] = 
 
 
 @router.post("/iot/devices/{device_uid}/rotate-token")
-async def rotate_iot_device_token(device_uid: str, authorization: Optional[str] = Header(default=None)):
+async def rotate_iot_device_token(device_uid: str, request: Request, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     if current_user["role"] not in {"admin", "doctor"}:
         raise HTTPException(status_code=403, detail="Chỉ admin hoặc bác sĩ mới được xoay token thiết bị")
@@ -456,6 +468,15 @@ async def rotate_iot_device_token(device_uid: str, authorization: Optional[str] 
             "updated_at": rotated_at,
             "device_id": device_row["id"],
         },
+    )
+
+    # Ghi nhận log xoay token thiết bị IoT
+    await log_activity(
+        user_id=current_user["id"],
+        action="IOT_ROTATE_TOKEN",
+        entity_type="devices",
+        entity_id=device_row["id"],
+        ip_address=request.client.host if request.client else "-"
     )
 
     return {
