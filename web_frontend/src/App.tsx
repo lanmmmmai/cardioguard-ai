@@ -361,7 +361,7 @@ const AppContent: React.FC = () => {
       case '/doctor/alerts':
         return <Alerts alerts={alerts} />;
       case '/admin/devices':
-        return <FeatureHub type="devices" role="admin" patients={patients} />;
+        return <FeatureHub key={normalizedPath} type="devices" role="admin" patients={patients} />;
       case '/admin/cameras':
         return <ApiDataPage key={normalizedPath} title="Quản lý camera" subtitle="Danh sách camera thật từ bảng cameras theo quyền hiện tại." endpoint="/cameras" />;
       case '/admin/reports':
@@ -371,9 +371,9 @@ const AppContent: React.FC = () => {
         return <DoctorDashboard patients={patients} alerts={alerts} />;
       case '/doctor/appointments':
       case '/patient/appointments':
-        return <FeatureHub type="appointments" role={routeRole || 'doctor'} patients={patients} />;
+        return <FeatureHub key={normalizedPath} type="appointments" role={routeRole || 'doctor'} patients={patients} />;
       case '/doctor/medical-records':
-        return <FeatureHub type="records" role="doctor" patients={patients} />;
+        return <FeatureHub key={normalizedPath} type="records" role="doctor" patients={patients} />;
       case '/doctor/prescriptions':
       case '/patient/prescriptions':
         return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/prescriptions" />;

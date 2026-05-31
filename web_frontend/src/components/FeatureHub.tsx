@@ -95,6 +95,123 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
     return keys.filter((key) => key !== 'updated_at').slice(0, 6);
   }, [records]);
 
+  // Helper dịch tiêu đề cột sang tiếng Việt chuyên nghiệp cho lâm sàng/IoT
+  const formatHeader = (col: string) => {
+    const dict: Record<string, string> = {
+      id: 'ID',
+      patient_id: 'Mã bệnh nhân',
+      doctor_id: 'Mã bác sĩ',
+      title: 'Tiêu đề lịch khám',
+      status: 'Trạng thái',
+      channel: 'Hình thức khám',
+      scheduled_at: 'Thời gian hẹn',
+      appointment_date: 'Thời gian hẹn',
+      reason: 'Lý do khám',
+      notes: 'Ghi chú',
+      note: 'Ghi chú',
+      type: 'Phân loại',
+      record_type: 'Phân loại',
+      diagnosis: 'Chẩn đoán y khoa',
+      summary: 'Tóm tắt lâm sàng',
+      clinical_summary: 'Tóm tắt lâm sàng',
+      treatment_plan: 'Phác đồ điều trị',
+      symptoms: 'Triệu chứng',
+      files: 'Tệp đính kèm',
+      device_name: 'Tên thiết bị',
+      device_type: 'Loại thiết bị',
+      battery_level: 'Dung lượng pin',
+      last_seen: 'Lần cuối trực tuyến',
+      created_at: 'Ngày tạo',
+    };
+    return dict[col] || col.charAt(0).toUpperCase() + col.slice(1).replace(/_/g, ' ');
+  };
+
+  // Helper định dạng hiển thị giá trị lâm sàng/IoT thông minh
+  const formatValue = (col: string, val: any) => {
+    if (val === null || val === undefined) return '-';
+    
+    // 1. Định dạng Ngày tháng năm tiếng Việt
+    if (col === 'scheduled_at' || col === 'appointment_date' || col === 'last_seen' || col === 'created_at') {
+      try {
+        return (
+          <span className="tabular-nums" style={{ fontSize: '0.85rem' }}>
+            {new Date(val).toLocaleString('vi-VN', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            })}
+          </span>
+        );
+      } catch {
+        return String(val);
+      }
+    }
+    
+    // 2. Huy hiệu Trạng thái sinh động
+    if (col === 'status') {
+      const statusStr = String(val).toLowerCase();
+      if (statusStr === 'online' || statusStr === 'active' || statusStr === 'success' || statusStr === 'confirmed') {
+        return (
+          <span className="patient-status normal" style={{ display: 'inline-flex', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700 }}>
+            {statusStr === 'confirmed' ? 'ĐÃ XÁC NHẬN' : String(val).toUpperCase()}
+          </span>
+        );
+      }
+      if (statusStr === 'offline' || statusStr === 'inactive' || statusStr === 'failed' || statusStr === 'pending') {
+        return (
+          <span className="patient-status critical" style={{ display: 'inline-flex', padding: '2px 8px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700, background: statusStr === 'pending' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(255, 51, 102, 0.1)', color: statusStr === 'pending' ? '#f59e0b' : 'var(--color-critical)', border: statusStr === 'pending' ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid rgba(255, 51, 102, 0.2)' }}>
+            {statusStr === 'pending' ? 'CHỜ XÁC NHẬN' : String(val).toUpperCase()}
+          </span>
+        );
+      }
+    }
+    
+    // 3. Rút ngắn mã UUID phức tạp kèm tooltip
+    if (String(val).length > 30 && /^[0-9a-fA-F-]{36}$/.test(String(val))) {
+      return (
+        <span title={String(val)} className="tabular-nums" style={{ fontFamily: 'monospace', opacity: 0.85, fontSize: '0.82rem', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+          {String(val).slice(0, 8)}...
+        </span>
+      );
+    }
+    
+    // 4. Pin (Battery level) hiển thị kèm %
+    if (col === 'battery_level') {
+      const bat = Number(val);
+      const color = bat > 50 ? 'var(--color-bp)' : bat > 20 ? '#f59e0b' : 'var(--color-critical)';
+      return (
+        <span style={{ fontWeight: 700, color, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          🔋 {bat}%
+        </span>
+      );
+    }
+
+    // 5. Định dạng File y tế JSON
+    if (col === 'files') {
+      try {
+        const parsed = typeof val === 'string' ? JSON.parse(val) : val;
+        if (Array.isArray(parsed)) {
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {parsed.map((f: any, i) => (
+                <a key={i} href={f.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontSize: '0.8rem', textDecoration: 'none', fontWeight: 600 }}>
+                  📄 {f.name || 'Tệp đính kèm'}
+                </a>
+              ))}
+            </div>
+          );
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    
+    return String(val);
+  };
+
   return (
     <div>
       <div className="page-header" style={{ gap: '16px', flexWrap: 'wrap' }}>
@@ -109,15 +226,19 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
         </span>
       </div>
 
-      <div className="panel" style={{ marginBottom: '1.5rem' }}>
-        <div className="metric-header" style={{ marginBottom: '1rem' }}>
-          <span className="metric-title">Dữ liệu thật từ Supabase</span>
+      <div className="panel" style={{ marginBottom: '1.5rem', padding: '20px' }}>
+        <div className="metric-header" style={{ marginBottom: '1.25rem' }}>
+          <span className="metric-title" style={{ fontSize: '0.95rem', fontWeight: 700 }}>Dữ liệu thật từ Supabase</span>
           <button type="button" className="btn btn-secondary" onClick={fetchRecords} disabled={loading}>
             <RefreshCw size={14} /> Làm mới
           </button>
         </div>
+        
         {loading ? (
-          <div style={{ color: 'var(--text-muted)', padding: '1rem 0' }}>Đang tải dữ liệu...</div>
+          <div style={{ padding: '2rem 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
+            <RefreshCw size={24} className="beat-animated" style={{ margin: '0 auto 10px', color: 'var(--color-primary)' }} />
+            Đang tải dữ liệu thực tế từ máy chủ...
+          </div>
         ) : error ? (
           <div className="alert-strip high">
             <AlertTriangle size={16} className="alert-strip-icon" />
@@ -127,20 +248,33 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
             </div>
           </div>
         ) : records.length === 0 ? (
-          <div style={{ color: 'var(--text-muted)', padding: '1rem 0' }}>
-            Chưa có bản ghi thật trong bảng này theo quyền hiện tại.
+          <div style={{ padding: '3rem 0', textAlign: 'center', color: 'var(--text-muted)' }}>
+            Chưa có bản ghi thật nào trong bảng này theo phân quyền của bạn.
           </div>
         ) : (
-          <div className="activity-list">
-            {records.slice(0, 12).map((record) => (
-              <div key={String(record.id)}>
-                {primaryColumns.map((column) => (
-                  <span key={column} style={{ marginRight: '12px' }}>
-                    <strong>{column}:</strong> {String(record[column] ?? '')}
-                  </span>
+          <div className="cms-table-wrap" style={{ border: '1px solid var(--glass-border)', borderRadius: '12px', background: 'rgba(0,0,0,0.1)' }}>
+            <table className="cms-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  {primaryColumns.map((column) => (
+                    <th key={column} style={{ padding: '14px 16px', color: 'var(--text-secondary)', fontWeight: 700, borderBottom: '1px solid var(--glass-border)', textTransform: 'none' }}>
+                      {formatHeader(column)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {records.slice(0, 12).map((record, index) => (
+                  <tr key={String(record.id || index)} className="table-row-hover" style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                    {primaryColumns.map((column) => (
+                      <td key={column} style={{ padding: '14px 16px', verticalAlign: 'middle', color: 'var(--text-primary)' }}>
+                        {formatValue(column, record[column])}
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-              </div>
-            ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

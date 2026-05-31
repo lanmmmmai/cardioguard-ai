@@ -60,7 +60,6 @@ async def main():
 
         # 1. Bảng cameras
         cameras_cols = await get_real_columns("cameras")
-        print(f"Cột thực tế của bảng 'cameras': {cameras_cols}")
         if cameras_cols:
             camera_count = await database.fetch_val("SELECT COUNT(*) FROM cameras")
             print(f"Số lượng camera hiện tại: {camera_count}")
@@ -116,7 +115,6 @@ async def main():
 
         # 2. Bảng reports
         reports_cols = await get_real_columns("reports")
-        print(f"Cột thực tế của bảng 'reports': {reports_cols}")
         if reports_cols:
             report_count = await database.fetch_val("SELECT COUNT(*) FROM reports")
             print(f"Số lượng báo cáo hiện tại: {report_count}")
@@ -126,7 +124,6 @@ async def main():
                 # Bản ghi 1
                 rep_data1 = {}
                 if "id" in reports_cols: rep_data1["id"] = str(uuid.uuid4())
-                
                 if "title" in reports_cols: rep_data1["title"] = "Báo cáo Đánh giá Chỉ số Nhịp tim & ECG Định kỳ"
                 elif "report_title" in reports_cols: rep_data1["report_title"] = "Báo cáo Đánh giá Chỉ số Nhịp tim & ECG Định kỳ"
                 
@@ -154,7 +151,6 @@ async def main():
                 # Bản ghi 2
                 rep_data2 = {}
                 if "id" in reports_cols: rep_data2["id"] = str(uuid.uuid4())
-                
                 if "title" in reports_cols: rep_data2["title"] = "Báo cáo Phân tích Cảnh báo Huyết áp & SpO2 Tuần 22"
                 elif "report_title" in reports_cols: rep_data2["report_title"] = "Báo cáo Phân tích Cảnh báo Huyết áp & SpO2 Tuần 22"
                 
@@ -182,7 +178,6 @@ async def main():
 
         # 3. Bảng audit_logs
         audit_cols = await get_real_columns("audit_logs")
-        print(f"Cột thực tế của bảng 'audit_logs': {audit_cols}")
         if audit_cols:
             log_count = await database.fetch_val("SELECT COUNT(*) FROM audit_logs")
             print(f"Số lượng nhật ký hệ thống hiện tại: {log_count}")
@@ -227,6 +222,139 @@ async def main():
                     log_data2
                 )
                 print("Đã seed thành công 2 nhật ký hệ thống mẫu!")
+
+        # 4. Bảng devices
+        devices_cols = await get_real_columns("devices")
+        if devices_cols:
+            device_count = await database.fetch_val("SELECT COUNT(*) FROM devices")
+            print(f"Số lượng thiết bị IoT hiện tại: {device_count}")
+            if device_count == 0:
+                print("Đang seed dữ liệu cho bảng 'devices'...")
+                
+                # Bản ghi 1
+                dev1 = {}
+                if "id" in devices_cols: dev1["id"] = str(uuid.uuid4())
+                
+                if "device_name" in devices_cols: dev1["device_name"] = "Apple Watch Ultra 2"
+                elif "name" in devices_cols: dev1["name"] = "Apple Watch Ultra 2"
+                
+                if "device_type" in devices_cols: dev1["device_type"] = "Smartwatch"
+                if "status" in devices_cols: dev1["status"] = "online"
+                
+                if "battery_level" in devices_cols: dev1["battery_level"] = 88
+                elif "battery" in devices_cols: dev1["battery"] = 88
+                
+                if "last_seen" in devices_cols: dev1["last_seen"] = datetime.now()
+                elif "last_seen_at" in devices_cols: dev1["last_seen_at"] = datetime.now()
+                
+                if "created_at" in devices_cols: dev1["created_at"] = datetime.now()
+                if "updated_at" in devices_cols: dev1["updated_at"] = datetime.now()
+                
+                if "patient_id" in devices_cols: dev1["patient_id"] = target_patient_id
+                elif "assigned_patient_id" in devices_cols: dev1["assigned_patient_id"] = target_patient_id
+                
+                insert_cols1 = ", ".join(dev1.keys())
+                bind_cols1 = ", ".join(f":{k}" for k in dev1.keys())
+                await database.execute(f"INSERT INTO devices ({insert_cols1}) VALUES ({bind_cols1})", dev1)
+                
+                # Bản ghi 2
+                dev2 = {}
+                if "id" in devices_cols: dev2["id"] = str(uuid.uuid4())
+                
+                if "device_name" in devices_cols: dev2["device_name"] = "Samsung Galaxy Fit 3"
+                elif "name" in devices_cols: dev2["name"] = "Samsung Galaxy Fit 3"
+                
+                if "device_type" in devices_cols: dev2["device_type"] = "Fitness Band"
+                if "status" in devices_cols: dev2["status"] = "online"
+                
+                if "battery_level" in devices_cols: dev2["battery_level"] = 45
+                elif "battery" in devices_cols: dev2["battery"] = 45
+                
+                if "last_seen" in devices_cols: dev2["last_seen"] = datetime.now()
+                elif "last_seen_at" in devices_cols: dev2["last_seen_at"] = datetime.now()
+                
+                if "created_at" in devices_cols: dev2["created_at"] = datetime.now()
+                if "updated_at" in devices_cols: dev2["updated_at"] = datetime.now()
+                
+                if "patient_id" in devices_cols: dev2["patient_id"] = target_patient_id
+                elif "assigned_patient_id" in devices_cols: dev2["assigned_patient_id"] = target_patient_id
+                
+                insert_cols2 = ", ".join(dev2.keys())
+                bind_cols2 = ", ".join(f":{k}" for k in dev2.keys())
+                await database.execute(f"INSERT INTO devices ({insert_cols2}) VALUES ({bind_cols2})", dev2)
+                print("Đã seed thành công 2 thiết bị IoT đeo mẫu!")
+
+        # 5. Bảng appointments
+        app_cols = await get_real_columns("appointments")
+        if app_cols:
+            app_count = await database.fetch_val("SELECT COUNT(*) FROM appointments")
+            print(f"Số lượng lịch hẹn hiện tại: {app_count}")
+            if app_count == 0:
+                print("Đang seed dữ liệu cho bảng 'appointments'...")
+                
+                app1 = {}
+                if "id" in app_cols: app1["id"] = str(uuid.uuid4())
+                
+                if "reason" in app_cols: app1["reason"] = "Tư vấn điện tâm đồ và ECG định kỳ"
+                elif "title" in app_cols: app1["title"] = "Tư vấn điện tâm đồ và ECG định kỳ"
+                
+                if "status" in app_cols: app1["status"] = "confirmed"
+                if "channel" in app_cols: app1["channel"] = "Video Call trực tuyến"
+                
+                if "appointment_date" in app_cols: app1["appointment_date"] = datetime.now() + timedelta(days=2)
+                elif "scheduled_at" in app_cols: app1["scheduled_at"] = datetime.now() + timedelta(days=2)
+                
+                if "note" in app_cols: app1["note"] = "Bệnh nhân có tiền sử suy tim độ 2, khám để điều chỉnh liều lượng thuốc."
+                elif "notes" in app_cols: app1["notes"] = "Bệnh nhân có tiền sử suy tim độ 2, khám để điều chỉnh liều lượng thuốc."
+                
+                if "created_at" in app_cols: app1["created_at"] = datetime.now()
+                if "updated_at" in app_cols: app1["updated_at"] = datetime.now()
+                
+                if "patient_id" in app_cols: app1["patient_id"] = target_patient_id
+                elif "assigned_patient_id" in app_cols: app1["assigned_patient_id"] = target_patient_id
+                
+                if "doctor_id" in app_cols and target_doctor_id:
+                    app1["doctor_id"] = target_doctor_id
+                
+                insert_cols1 = ", ".join(app1.keys())
+                bind_cols1 = ", ".join(f":{k}" for k in app1.keys())
+                await database.execute(f"INSERT INTO appointments ({insert_cols1}) VALUES ({bind_cols1})", app1)
+                print("Đã seed thành công 1 lịch hẹn mẫu!")
+
+        # 6. Bảng medical_records
+        rec_cols = await get_real_columns("medical_records")
+        print(f"Cột thực tế của bảng 'medical_records': {rec_cols}")
+        if rec_cols:
+            rec_count = await database.fetch_val("SELECT COUNT(*) FROM medical_records")
+            print(f"Số lượng bệnh án hiện tại: {rec_count}")
+            if rec_count == 0:
+                print("Đang seed dữ liệu cho bảng 'medical_records'...")
+                
+                rec1 = {}
+                if "id" in rec_cols: rec1["id"] = str(uuid.uuid4())
+                
+                if "record_type" in rec_cols: rec1["record_type"] = "Chẩn đoán lâm sàng"
+                elif "type" in rec_cols: rec1["type"] = "Chẩn đoán lâm sàng"
+                
+                if "diagnosis" in rec_cols: rec1["diagnosis"] = "Suy tim sung huyết mức độ 2, Cao huyết áp mãn tính"
+                
+                if "clinical_summary" in rec_cols: rec1["clinical_summary"] = "Nhịp tim không đều. ECG phát hiện ngoại tâm thu thất. Đã kê đơn thuốc và yêu cầu đeo Apple Watch giám sát 24/7."
+                elif "summary" in rec_cols: rec1["summary"] = "Nhịp tim không đều. ECG phát hiện ngoại tâm thu thất. Đã kê đơn thuốc và yêu cầu đeo Apple Watch giám sát 24/7."
+                
+                if "files" in rec_cols: rec1["files"] = json.dumps([{"name": "Kết quả ECG.pdf", "url": "https://example.com/ecg_result.pdf"}])
+                if "created_at" in rec_cols: rec1["created_at"] = datetime.now() - timedelta(days=5)
+                if "updated_at" in rec_cols: rec1["updated_at"] = datetime.now() - timedelta(days=5)
+                
+                if "patient_id" in rec_cols: rec1["patient_id"] = target_patient_id
+                elif "assigned_patient_id" in rec_cols: rec1["assigned_patient_id"] = target_patient_id
+                
+                if "doctor_id" in rec_cols and target_doctor_id:
+                    rec1["doctor_id"] = target_doctor_id
+                
+                insert_cols1 = ", ".join(rec1.keys())
+                bind_cols1 = ", ".join(f":{k}" for k in rec1.keys())
+                await database.execute(f"INSERT INTO medical_records ({insert_cols1}) VALUES ({bind_cols1})", rec1)
+                print("Đã seed thành công 1 bệnh án lâm sàng mẫu!")
             
     except Exception as e:
         print(f"Lỗi khi seed dữ liệu: {e}")
