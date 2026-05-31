@@ -3684,3 +3684,234 @@ body {
   to { transform: translateY(0); }
 }
 
+
+/* Realtime Status Strip (Clinical Dashboard Polish) */
+.realtime-status-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  background: rgba(12, 14, 18, 0.6);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.realtime-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.realtime-status-indicator::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.realtime-status-indicator.live {
+  color: var(--color-safe);
+}
+.realtime-status-indicator.live::before {
+  background-color: var(--color-safe);
+  box-shadow: 0 0 8px var(--color-safe);
+  animation: pulse-indicator 1.5s infinite;
+}
+
+.realtime-status-indicator.waiting {
+  color: var(--text-secondary);
+}
+.realtime-status-indicator.waiting::before {
+  background-color: var(--text-muted);
+}
+
+.realtime-status-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+}
+
+@keyframes pulse-indicator {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Metric Status Badges & Polish */
+.metric-status-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.metric-status-badge.normal {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-safe);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.metric-status-badge.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.metric-status-badge.critical,
+.metric-status-badge.high {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-critical);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  animation: pulse-border 1.5s infinite;
+}
+
+.metric-range {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.metric-source {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.bp-value {
+  font-size: clamp(2rem, 4.5vw, 2.75rem) !important;
+}
+
+/* Tabular numbers formatting */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  -moz-font-feature-settings: "tnum";
+  -webkit-font-feature-settings: "tnum";
+  font-feature-settings: "tnum";
+}
+
+/* ECG Panel Header Polish */
+.ecg-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ecg-panel-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ecg-panel-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ecg-status-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid var(--glass-border);
+}
+
+.ecg-canvas-wrapper {
+  position: relative;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  overflow: hidden;
+}
+
+/* Simulation Controls Redesign */
+.simulation-controls-panel {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px dashed var(--glass-border);
+  background: rgba(255, 255, 255, 0.01);
+  border-radius: var(--border-radius);
+}
+
+.simulation-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 0.5rem;
+}
+
+/* Accessibility & Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .beat-animated,
+  .critical-pulse,
+  .realtime-status-indicator.live::before {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+.btn:focus-visible,
+.form-control:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 2px;
+}
+
+@keyframes pulse-border {
+  0% { border-color: rgba(239, 68, 68, 0.3); }
+  50% { border-color: rgba(239, 68, 68, 0.8); }
+  100% { border-color: rgba(239, 68, 68, 0.3); }
+}
+
+/* Layout Classes to reduce inline styles */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.dashboard-header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.patient-summary-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.patient-summary-row {
+  font-size: 0.85rem;
+}
+
+.dashboard-side-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+

@@ -62,6 +62,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isSimulating, setIsSimulating] = useState(false);
   const [lastTelemetryTime, setLastTelemetryTime] = useState<Date | null>(null);
   const [isStale, setIsStale] = useState(true);
+
+  // Derived UI states for clinical realtime tracking
+  const hasTelemetryForSelectedPatient = latestTelemetry?.patient_id === selectedPatientId;
+  const isRealtimeActive = hasTelemetryForSelectedPatient && !isStale;
+  const metricsSourceLabel = hasTelemetryForSelectedPatient ? 'Cảm biến realtime (WebSocket)' : 'Chờ tín hiệu kết nối từ thiết bị đeo';
+
+  const getAlertSeverityClass = (severity: string) => {
+    const s = severity?.toLowerCase() || '';
+    if (s === 'critical') return 'critical';
+    if (s === 'high') return 'high';
+    if (s === 'warning' || s === 'medium') return 'warning';
+    if (s === 'low' || s === 'info') return 'low';
+    return 'low';
+  };
+
+  const getAlertSeverityLabel = (severity: string) => {
+    const s = severity?.toLowerCase() || '';
+    if (s === 'critical') return 'Nguy kịch';
+    if (s === 'high') return 'Nghiêm trọng';
+    if (s === 'warning' || s === 'medium') return 'Cảnh báo';
+    if (s === 'low' || s === 'info') return 'Theo dõi';
+    return 'Chưa phân loại';
+  };
   
   // Clinical Metric State: Initialize all values as null when there is no telemetry
   const [currentMetrics, setCurrentMetrics] = useState<{
@@ -216,13 +239,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div>
       {/* Header and Controls */}
-      <div className="page-header responsive-header" style={{ flexWrap: 'wrap', gap: '16px' }}>
+      <div className="dashboard-header">
         <div>
           <h1 className="page-title">Hệ Thống Giám Sát</h1>
           <p className="page-subtitle">Xem chỉ số sinh tồn và tín hiệu điện tâm đồ thời gian thực</p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="dashboard-header-actions">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Bệnh nhân:</span>
             <select
@@ -258,45 +281,73 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
+      {/* Realtime Status Strip (Mục 2) */}
+      <div className="realtime-status-strip">
+        <div className="realtime-status-indicator-wrapper">
+          <span className={`realtime-status-indicator ${isRealtimeActive ? 'live' : 'waiting'}`}>
+            {isRealtimeActive ? 'ĐANG NHẬN REALTIME (Live Feed)' : 'ĐANG CHỜ TÍN HIỆU CẢM BIẾN'}
+          </span>
+        </div>
+        <div className="realtime-status-meta">
+          Bệnh nhân: <strong style={{ color: 'var(--text-primary)' }}>{activePatient?.full_name}</strong> • 
+          Trạng thái nguồn: <strong style={{ color: 'var(--text-primary)' }}>{metricsSourceLabel}</strong>
+        </div>
+      </div>
+
       {/* Telemetry Staleness warning overlay banner */}
       {isConnected && isStale && currentMetrics.heartRate !== null && (
-        <div className="stale-vitals-banner">
+        <div className="stale-vitals-banner" style={{ marginBottom: '1.5rem' }}>
           <Clock size={16} />
           <span>Cảnh báo: Dữ liệu giám sát sinh hiệu có thể đã cũ (lần cập nhật cuối cách đây hơn 30 giây).</span>
         </div>
       )}
 
       {/* Real-time Metric Cards Grid */}
-      <div className="grid-3">
+      <div className="grid-3 vitals-grid">
         {/* Heart Rate Card */}
         {(() => {
-          const isCritical = currentMetrics.heartRate !== null && (currentMetrics.heartRate > 120 || currentMetrics.heartRate < 50);
-          const hrStatus = currentMetrics.heartRate === null ? 'normal' : isCritical ? 'high' : 'normal';
-          const statusText = currentMetrics.heartRate === null ? '' : isCritical ? 'Bất thường' : 'Bình thường';
+          const hasData = currentMetrics.heartRate !== null;
+          const isHigh = hasData && currentMetrics.heartRate! > 120;
+          const isLow = hasData && currentMetrics.heartRate! < 50;
+          const isCritical = isHigh || isLow;
+          
+          const hrStatus = !hasData ? 'normal' : isCritical ? 'critical' : 'normal';
+          const statusText = !hasData 
+            ? 'Chờ tín hiệu' 
+            : isHigh 
+              ? 'Nhịp tim cao' 
+              : isLow 
+                ? 'Nhịp tim thấp' 
+                : 'Bình thường';
+          
           return (
             <div className={`panel metric-card heartrate ${isCritical ? 'critical-pulse' : ''}`}>
               <div className="metric-header">
                 <span className="metric-title">Nhịp Tim</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {statusText && <span className={`metric-status-badge ${hrStatus}`}>{statusText}</span>}
+                  <span className={`metric-status-badge ${hrStatus}`}>{statusText}</span>
                   <div className="metric-icon-box">
-                    <Heart className={currentMetrics.heartRate !== null ? 'beat-animated' : ''} size={20} />
+                    <Heart className={hasData ? 'beat-animated' : ''} size={20} />
                   </div>
                 </div>
               </div>
               <div className="metric-body">
-                {currentMetrics.heartRate !== null ? (
+                {hasData ? (
                   <>
                     <span className="metric-value tabular-nums">{currentMetrics.heartRate}</span>
                     <span className="metric-unit">BPM</span>
                   </>
                 ) : (
-                  <span className="metric-unit" style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>Chưa có dữ liệu</span>
+                  <>
+                    <span className="metric-value tabular-nums" style={{ color: 'var(--text-muted)' }}>--</span>
+                    <span className="metric-unit">BPM</span>
+                  </>
                 )}
               </div>
               <div className="metric-footer">
-                <Radio size={12} className={currentMetrics.heartRate !== null ? 'beat-animated' : ''} style={{ color: 'var(--color-primary)' }} />
-                <span>Khoảng an toàn: 50 - 120 BPM {currentMetrics.updatedAt && `• Cập nhật: ${currentMetrics.updatedAt}`}</span>
+                <Radio size={12} className={hasData ? 'beat-animated' : ''} style={{ color: 'var(--color-primary)' }} />
+                <span className="metric-range">Khoảng an toàn: 50 - 120 BPM</span>
+                {currentMetrics.updatedAt && <span className="metric-source">• {currentMetrics.updatedAt}</span>}
               </div>
             </div>
           );
@@ -304,33 +355,47 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         {/* SpO2 Card */}
         {(() => {
-          const isCritical = currentMetrics.spo2 !== null && currentMetrics.spo2 < 92;
-          const o2Status = currentMetrics.spo2 === null ? 'normal' : isCritical ? 'high' : 'normal';
-          const statusText = currentMetrics.spo2 === null ? '' : isCritical ? 'Nguy hiểm' : 'An toàn';
+          const hasData = currentMetrics.spo2 !== null;
+          const isCritical = hasData && currentMetrics.spo2! < 92;
+          const isWarning = hasData && currentMetrics.spo2! >= 92 && currentMetrics.spo2! < 95;
+          
+          const o2Status = !hasData ? 'normal' : isCritical ? 'critical' : isWarning ? 'warning' : 'normal';
+          const statusText = !hasData 
+            ? 'Chờ tín hiệu' 
+            : isCritical 
+              ? 'SpO2 thấp nguy kịch' 
+              : isWarning 
+                ? 'Cần theo dõi' 
+                : 'Bình thường';
+                
           return (
             <div className={`panel metric-card spo2 ${isCritical ? 'critical-pulse' : ''}`}>
               <div className="metric-header">
                 <span className="metric-title">Nồng độ Oxy SpO2</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {statusText && <span className={`metric-status-badge ${o2Status}`}>{statusText}</span>}
+                  <span className={`metric-status-badge ${o2Status}`}>{statusText}</span>
                   <div className="metric-icon-box">
                     <Activity size={20} />
                   </div>
                 </div>
               </div>
               <div className="metric-body">
-                {currentMetrics.spo2 !== null ? (
+                {hasData ? (
                   <>
                     <span className="metric-value tabular-nums">{currentMetrics.spo2}</span>
                     <span className="metric-unit">%</span>
                   </>
                 ) : (
-                  <span className="metric-unit" style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>Chưa có dữ liệu</span>
+                  <>
+                    <span className="metric-value tabular-nums" style={{ color: 'var(--text-muted)' }}>--</span>
+                    <span className="metric-unit">%</span>
+                  </>
                 )}
               </div>
               <div className="metric-footer">
                 <Radio size={12} style={{ color: 'var(--color-spo2)' }} />
-                <span>Khoảng an toàn: &ge; 92% {currentMetrics.updatedAt && `• Cập nhật: ${currentMetrics.updatedAt}`}</span>
+                <span className="metric-range">Khoảng an toàn: &ge; 95%</span>
+                {currentMetrics.updatedAt && <span className="metric-source">• {currentMetrics.updatedAt}</span>}
               </div>
             </div>
           );
@@ -338,33 +403,48 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         {/* Blood Pressure Card */}
         {(() => {
-          const isCritical = currentMetrics.systolicBp !== null && (currentMetrics.systolicBp > 140 || currentMetrics.diastolicBp! > 90);
-          const bpStatus = currentMetrics.systolicBp === null ? 'normal' : isCritical ? 'high' : 'normal';
-          const statusText = currentMetrics.systolicBp === null ? '' : isCritical ? 'Cao' : 'Bình thường';
+          const hasData = currentMetrics.systolicBp !== null;
+          const isHigh = hasData && (currentMetrics.systolicBp! >= 140 || currentMetrics.diastolicBp! >= 90);
+          const isLow = hasData && (currentMetrics.systolicBp! < 90 || currentMetrics.diastolicBp! < 60);
+          const isCritical = isHigh || isLow;
+          
+          const bpStatus = !hasData ? 'normal' : isCritical ? 'critical' : 'normal';
+          const statusText = !hasData 
+            ? 'Chờ tín hiệu' 
+            : isHigh 
+              ? 'Huyết áp cao' 
+              : isLow 
+                ? 'Huyết áp thấp' 
+                : 'Bình thường';
+                
           return (
             <div className={`panel metric-card bp ${isCritical ? 'critical-pulse' : ''}`}>
               <div className="metric-header">
                 <span className="metric-title">Huyết Áp</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {statusText && <span className={`metric-status-badge ${bpStatus}`}>{statusText}</span>}
+                  <span className={`metric-status-badge ${bpStatus}`}>{statusText}</span>
                   <div className="metric-icon-box">
                     <Activity size={20} />
                   </div>
                 </div>
               </div>
               <div className="metric-body">
-                {currentMetrics.systolicBp !== null ? (
+                {hasData ? (
                   <>
-                    <span className="metric-value tabular-nums">{currentMetrics.systolicBp}/{currentMetrics.diastolicBp}</span>
+                    <span className="metric-value bp-value tabular-nums">{currentMetrics.systolicBp}/{currentMetrics.diastolicBp}</span>
                     <span className="metric-unit">mmHg</span>
                   </>
                 ) : (
-                  <span className="metric-unit" style={{ fontSize: '1.2rem', color: 'var(--text-muted)' }}>Chưa có dữ liệu</span>
+                  <>
+                    <span className="metric-value bp-value tabular-nums" style={{ color: 'var(--text-muted)' }}>--/--</span>
+                    <span className="metric-unit">mmHg</span>
+                  </>
                 )}
               </div>
               <div className="metric-footer">
                 <Radio size={12} style={{ color: 'var(--color-bp)' }} />
-                <span>Khoảng an toàn: &lt; 140/90 {currentMetrics.updatedAt && `• Cập nhật: ${currentMetrics.updatedAt}`}</span>
+                <span className="metric-range">Khoảng an toàn: 90/60 - 140/90</span>
+                {currentMetrics.updatedAt && <span className="metric-source">• {currentMetrics.updatedAt}</span>}
               </div>
             </div>
           );
@@ -373,20 +453,41 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* ECG Graphic and Patient Info Layout */}
       <div className="grid-2-3">
-        {/* ECG Waveform panel */}
+        {/* ECG Waveform panel with clinical context (Mục 6) */}
         <div className="panel">
-          <ECGChart liveEcgValue={currentMetrics.ecgValue !== null ? currentMetrics.ecgValue : undefined} heartRate={currentMetrics.heartRate !== null ? currentMetrics.heartRate : 75} />
+          <div className="ecg-panel-header">
+            <h3 className="ecg-panel-title">
+              <Activity className={isRealtimeActive ? 'beat-animated' : ''} size={18} style={{ color: 'var(--color-spo2)' }} />
+              Điện Tâm Đồ Realtime (ECG)
+            </h3>
+            <div className="ecg-panel-meta">
+              <span className="ecg-status-badge">
+                {isRealtimeActive ? 'Đang nhận tín hiệu' : 'Waveform đang chờ dữ liệu realtime'}
+              </span>
+              {currentMetrics.heartRate !== null && (
+                <span className="tabular-nums" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-primary)' }}>
+                  {currentMetrics.heartRate} BPM
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="ecg-canvas-wrapper">
+            <ECGChart 
+              liveEcgValue={currentMetrics.ecgValue !== null ? currentMetrics.ecgValue : undefined} 
+              heartRate={currentMetrics.heartRate !== null ? currentMetrics.heartRate : 75} 
+            />
+          </div>
         </div>
 
         {/* Right column stacking 3D Heart and Patient Details */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div className="dashboard-side-column">
           {/* Beating Heart 3D holographic panel */}
           <div className="panel" style={{ padding: '1rem', display: 'flex', justifyContent: 'center' }}>
             <BeatingHeart3D heartRate={currentMetrics.heartRate !== null ? currentMetrics.heartRate : 0} />
           </div>
 
-          {/* Patient Details Panel */}
-          <div className="panel" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Patient Details Panel (Mục 10) */}
+          <div className="panel patient-summary-panel">
             <h3 className="metric-title" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '8px' }}>
               Thông Tin Bệnh Nhân
             </h3>
@@ -402,19 +503,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 </div>
 
-                <div style={{ fontSize: '0.85rem' }}>
+                <div className="patient-summary-row">
                   <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Điện thoại</span>
                   <span>{activePatient.phone || 'Chưa cung cấp'}</span>
                 </div>
 
-                <div style={{ fontSize: '0.85rem' }}>
+                <div className="patient-summary-row">
                   <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Địa chỉ</span>
                   <span style={{ display: 'block', maxHeight: '44px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {activePatient.address || 'Chưa cung cấp'}
                   </span>
                 </div>
 
-                <div style={{ fontSize: '0.85rem' }}>
+                <div className="patient-summary-row">
                   <span style={{ color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>Lịch sử bệnh án</span>
                   <span style={{ color: 'var(--color-warning)', fontWeight: 500 }}>
                     {activePatient.medical_history || 'Không ghi nhận tiền sử bệnh'}
@@ -426,7 +527,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Warnings & Alerts Grid */}
+      {/* Warnings & Alerts Grid (Mục 5) */}
       <div className="panel">
         <h3 className="metric-title" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <AlertTriangle size={16} style={{ color: 'var(--color-primary)' }} /> Cảnh Báo Gần Đây của bệnh nhân
@@ -434,19 +535,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
         
         {activePatientAlerts.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Không có cảnh báo bất thường nào được ghi nhận cho bệnh nhân này.
+            Không có cảnh báo bất thường nào được ghi nhận cho bệnh nhân đang chọn.
           </div>
         ) : (
           <div style={{ maxHeight: '200px', overflowY: 'auto', paddingRight: '8px' }}>
             {activePatientAlerts.slice(0, 5).map((alert, index) => {
               const severityMeta = getSeverityMeta(alert.severity);
               const AlertIcon = severityMeta.icon;
+              const severityClass = getAlertSeverityClass(alert.severity);
+              const severityLabel = getAlertSeverityLabel(alert.severity);
+              
               return (
-                <div key={index} className={`alert-strip ${severityMeta.key}`} style={{ borderLeft: `3px solid ${severityMeta.colorVar}`, background: severityMeta.bgVar }}>
+                <div key={index} className={`alert-strip ${severityClass}`} style={{ borderLeft: `3px solid ${severityMeta.colorVar}`, background: severityMeta.bgVar }}>
                   <AlertIcon className="alert-strip-icon" size={16} style={{ color: severityMeta.colorVar }} />
                   <div className="alert-strip-body">
                     <div className="alert-strip-title" style={{ color: severityMeta.colorVar, fontWeight: severityMeta.weight }}>
-                      {alert.alert_type} ({severityMeta.label})
+                      {alert.alert_type} <span className="alert-severity-badge" style={{ color: severityMeta.colorVar, border: `1px solid ${severityMeta.colorVar}44` }}>{severityLabel}</span>
                     </div>
                     <div className="alert-strip-desc">{alert.message}</div>
                     <div className="alert-strip-time tabular-nums">
@@ -460,9 +564,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
-      {/* TESTING SIMULATION PLATFORM DRAWER (Collapsible/Dedicated Test Panel) */}
-      <div className="panel" style={{ marginTop: '1.5rem', border: '1px dashed var(--glass-border)', background: 'rgba(255, 255, 255, 0.01)' }}>
-        <h4 className="metric-title" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+      {/* TESTING SIMULATION PLATFORM DRAWER (Mục 7) */}
+      <div className="simulation-controls-panel">
+        <h4 className="simulation-label">
           <Radio size={14} className="beat-animated" style={{ color: 'var(--color-primary)' }} /> CÔNG CỤ KIỂM THỬ (DEVELOPER TESTING TOOLS)
         </h4>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '8px 0 16px' }}>
