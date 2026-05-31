@@ -1,5 +1,5 @@
-import React from 'react';
-import { Activity, LogOut, Menu, Moon, Sun } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Activity, LogOut, Menu, Moon, Sun, MoreHorizontal, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { roleLabel, type UserRole } from '../auth/roles';
 import { roleMenus } from '../navigation/roleMenus';
@@ -11,6 +11,7 @@ interface RoleLayoutProps {
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   children: React.ReactNode;
+  isConnected?: boolean;
 }
 
 const layoutTitle: Record<UserRole, string> = {
@@ -26,9 +27,22 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
   theme,
   onToggleTheme,
   children,
+  isConnected = false,
 }) => {
   const { user, logout } = useAuth();
   const menuItems = roleMenus[role];
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Close mobile drawer when pressing Escape key for accessibility
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -75,10 +89,16 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
       <div className="role-main">
         <header className="role-header">
           <div className="role-header-left">
-            <Menu size={20} className="role-mobile-icon" />
+            <Menu size={20} className="role-mobile-icon" onClick={() => setIsMobileMenuOpen(true)} />
             <div>
               <div className="role-header-kicker">{roleLabel[role]}</div>
-              <h1>{layoutTitle[role]}</h1>
+              <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {layoutTitle[role]}
+                <span 
+                  className={`connection-status-dot ${isConnected ? 'connected' : 'disconnected'}`} 
+                  title={isConnected ? 'Đang kết nối realtime (Trực tuyến)' : 'Mất kết nối realtime (Ngoại tuyến)'}
+                />
+              </h1>
             </div>
           </div>
 
@@ -108,7 +128,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
         <main className="role-content">{children}</main>
 
         <nav className="role-mobile-nav" aria-label={`Mobile menu ${roleLabel[role]}`}>
-          {menuItems.slice(0, 5).map((item) => {
+          {menuItems.slice(0, 4).map((item) => {
             const Icon = item.icon;
             return (
               <button
@@ -122,8 +142,65 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
               </button>
             );
           })}
+          <button
+            type="button"
+            className={`role-mobile-nav-item ${isMobileMenuOpen ? 'active' : ''}`}
+            onClick={() => setIsMobileMenuOpen(true)}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="mobile-navigation-drawer"
+            aria-label="Mở tất cả menu chức năng"
+          >
+            <MoreHorizontal size={18} />
+            <span>Thêm</span>
+          </button>
         </nav>
       </div>
+
+      {isMobileMenuOpen && (
+        <>
+          <div className="mobile-drawer-overlay" onClick={() => setIsMobileMenuOpen(false)} />
+          <div 
+            id="mobile-navigation-drawer"
+            className="mobile-drawer" 
+            role="dialog" 
+            aria-modal="true" 
+            aria-labelledby="drawer-title"
+          >
+            <div className="mobile-drawer-handle" />
+            <div className="mobile-drawer-header">
+              <h2 id="drawer-title" className="mobile-drawer-title">Tất cả chức năng</h2>
+              <button 
+                type="button" 
+                className="mobile-drawer-close-btn" 
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-label="Đóng menu"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="mobile-drawer-grid">
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentPath === item.path;
+                return (
+                  <button
+                    key={item.path}
+                    type="button"
+                    className={`mobile-drawer-item ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      navigate(item.path);
+                      setIsMobileMenuOpen(false);
+                    }}
+                  >
+                    <Icon size={20} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -131,3 +208,4 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
 export const AdminLayout = (props: Omit<RoleLayoutProps, 'role'>) => <RoleLayout {...props} role="admin" />;
 export const DoctorLayout = (props: Omit<RoleLayoutProps, 'role'>) => <RoleLayout {...props} role="doctor" />;
 export const PatientLayout = (props: Omit<RoleLayoutProps, 'role'>) => <RoleLayout {...props} role="patient" />;
+

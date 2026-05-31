@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, User, Heart, Activity, AlertTriangle, Phone, MapPin, Calendar, Clipboard } from 'lucide-react';
+import { getSeverityMeta } from '../utils/severity';
 
 interface Patient {
   id: string;
@@ -58,24 +59,9 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
 }) => {
   const [history, setHistory] = useState<HistoryPoint[]>([]);
 
-  // 1. Pre-populate history with realistic vitals so it doesn't start empty
+  // Clinical Vitals Safety: DO NOT pre-populate with mock telemetry. Reset history on patient change.
   useEffect(() => {
-    const initialHistory: HistoryPoint[] = [];
-    const baseHR = 70 + Math.floor(Math.random() * 15);
-    const baseSpO2 = 97 + Math.floor(Math.random() * 3);
-    
-    for (let i = 9; i >= 0; i--) {
-      const time = new Date();
-      time.setSeconds(time.getSeconds() - i * 3);
-      const timeLabel = time.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      
-      initialHistory.push({
-        heartRate: baseHR + Math.floor((Math.random() - 0.5) * 6),
-        spo2: Math.min(100, baseSpO2 + Math.floor((Math.random() - 0.5) * 2)),
-        timeLabel
-      });
-    }
-    setHistory(initialHistory);
+    setHistory([]);
   }, [patient.id]);
 
   // 2. Append new real-time telemetry if it matches this patient
@@ -200,8 +186,8 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
                   150
                 )
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'center', height: '100%', color: 'var(--text-muted)' }}>
-                  Đang thu thập dữ liệu...
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  Chưa đủ dữ liệu để vẽ xu hướng
                 </div>
               )}
             </div>
@@ -222,8 +208,8 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
                   100
                 )
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyItems: 'center', height: '100%', color: 'var(--text-muted)' }}>
-                  Đang thu thập dữ liệu...
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  Chưa đủ dữ liệu để vẽ xu hướng
                 </div>
               )}
             </div>
@@ -241,20 +227,24 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
               </div>
             ) : (
               <div style={{ maxHeight: '200px', overflowY: 'auto', paddingRight: '8px' }}>
-                {patientAlerts.map((alert, index) => (
-                  <div key={index} className={`alert-strip ${alert.severity === 'high' ? 'high' : 'medium'}`}>
-                    <AlertTriangle size={16} className="alert-strip-icon" />
-                    <div className="alert-strip-body">
-                      <div className="alert-strip-title" style={{ textTransform: 'uppercase' }}>
-                        {alert.alert_type} ({alert.severity})
-                      </div>
-                      <div className="alert-strip-desc">{alert.message}</div>
-                      <div className="alert-strip-time">
-                        {alert.created_at ? new Date(alert.created_at).toLocaleString() : 'Vừa xong'}
+                {patientAlerts.map((alert, index) => {
+                  const severityMeta = getSeverityMeta(alert.severity);
+                  const AlertIcon = severityMeta.icon;
+                  return (
+                    <div key={index} className={`alert-strip ${severityMeta.key}`} style={{ borderLeft: `3px solid ${severityMeta.colorVar}`, background: severityMeta.bgVar }}>
+                      <AlertIcon className="alert-strip-icon" size={16} style={{ color: severityMeta.colorVar }} />
+                      <div className="alert-strip-body">
+                        <div className="alert-strip-title" style={{ color: severityMeta.colorVar, fontWeight: severityMeta.weight }}>
+                          {alert.alert_type} ({severityMeta.label})
+                        </div>
+                        <div className="alert-strip-desc">{alert.message}</div>
+                        <div className="alert-strip-time tabular-nums">
+                          {alert.created_at ? new Date(alert.created_at).toLocaleString('vi-VN') : 'Vừa xong'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

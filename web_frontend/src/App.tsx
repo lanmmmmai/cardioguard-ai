@@ -128,7 +128,13 @@ const AppContent: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [latestTelemetry, setLatestTelemetry] = useState<SensorData | null>(null);
-  const [activeBanner, setActiveBanner] = useState<{ message: string; patientName: string; severity: string } | null>(null);
+  const [activeBanner, setActiveBanner] = useState<{
+    message: string;
+    patientName: string;
+    patientId: string;
+    severity: string;
+    timestamp: string;
+  } | null>(null);
   const [showAddPatientModal, setShowAddPatientModal] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
@@ -202,8 +208,24 @@ const AppContent: React.FC = () => {
     const matchingPatient = patients.find((patient) => patient.id === data.patient_id);
     const patientName = matchingPatient?.full_name || 'Bệnh nhân';
 
-    setActiveBanner({ message: firstAlert.message, patientName, severity: firstAlert.severity });
-    window.setTimeout(() => setActiveBanner(null), 7000);
+    const severity = firstAlert.severity || 'high';
+    const timestamp = new Date().toLocaleTimeString('vi-VN');
+
+    setActiveBanner({
+      message: firstAlert.message,
+      patientName,
+      patientId: data.patient_id,
+      severity,
+      timestamp
+    });
+
+    // Persistent for critical or high alarms (no auto-timeout)
+    const isPersistent = ['critical', 'high'].includes(severity.toLowerCase());
+    if (!isPersistent) {
+      window.setTimeout(() => {
+        setActiveBanner((prev) => prev && prev.patientId === data.patient_id && prev.message === firstAlert.message ? null : prev);
+      }, 7000);
+    }
 
     setAlerts((prev) => [
       ...data.alerts.map((alert) => ({
@@ -239,13 +261,29 @@ const AppContent: React.FC = () => {
       } as Alert;
       const matchingPatient = patients.find((patient) => patient.id === alert.patient_id);
       const patientName = alert.full_name || matchingPatient?.full_name || 'Bệnh nhân';
-      setActiveBanner({ message: alert.message, patientName, severity: alert.severity });
-      window.setTimeout(() => setActiveBanner(null), 7000);
+      const severity = alert.severity || 'high';
+      const timestamp = new Date().toLocaleTimeString('vi-VN');
+
+      setActiveBanner({
+        message: alert.message,
+        patientName,
+        patientId: alert.patient_id,
+        severity,
+        timestamp
+      });
+
+      // Persistent for critical or high alarms (no auto-timeout)
+      const isPersistent = ['critical', 'high'].includes(severity.toLowerCase());
+      if (!isPersistent) {
+        window.setTimeout(() => {
+          setActiveBanner((prev) => prev && prev.patientId === alert.patient_id && prev.message === alert.message ? null : prev);
+        }, 7000);
+      }
       setAlerts((prev) => [{ ...alert, full_name: patientName }, ...prev]);
     }
   }, [handleSensorTelemetry, patients]);
 
-  useWebSocket(WS_URL, accessToken ? handleRealtimeMessage : undefined, accessToken);
+  const { isConnected } = useWebSocket(WS_URL, accessToken ? handleRealtimeMessage : undefined, accessToken);
 
   const handleLoginSuccess = (token: string, userData: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean }) => {
     const userRole = normalizeRole(userData.role);
@@ -338,10 +376,10 @@ const AppContent: React.FC = () => {
       case '/patient/profile':
         return <ProfilePage role={routeRole || 'patient'} />;
       case '/doctor/realtime-monitoring':
-        return <Dashboard patients={patients} latestTelemetry={latestTelemetry} alerts={alerts} onAddPatientClick={() => navigate('/doctor/patients')} />;
+        return <Dashboard patients={patients} latestTelemetry={latestTelemetry} alerts={alerts} onAddPatientClick={() => navigate('/doctor/patients')} isConnected={isConnected} />;
       case '/patient/home':
       case '/patient/dashboard':
-        return <PatientHome latestTelemetry={latestTelemetry} alerts={alerts} />;
+        return <PatientHome latestTelemetry={latestTelemetry} alerts={alerts} isConnected={isConnected} />;
       default: {
         const meta = pageTitles[normalizedPath];
         return meta ? <PlaceholderPage title={meta.title} subtitle={meta.subtitle} /> : null;
@@ -398,6 +436,7 @@ const AppContent: React.FC = () => {
     navigate,
     theme,
     onToggleTheme: () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark')),
+    isConnected,
   };
 
   const layout = routeRole === 'admin'
@@ -406,15 +445,54 @@ const AppContent: React.FC = () => {
       ? <DoctorLayout {...layoutProps}>{routeContent}</DoctorLayout>
       : <PatientLayout {...layoutProps}>{routeContent}</PatientLayout>;
 
+  const handleViewPatientDetail = (patientId: string) => {
+    setSelectedPatientId(patientId);
+    if (role === 'doctor') {
+      navigate('/doctor/patients');
+    } else if (role === 'admin') {
+      navigate('/admin/patients');
+    }
+    setActiveBanner(null);
+  };
+
   return (
     <ProtectedRoute allowedRoles={routeRole ? [routeRole] : []} currentPath={normalizedPath} navigate={navigate}>
       {activeBanner && (
-        <div className="global-notification-bar">
-          <AlertOctagon className="beat-animated" size={18} />
-          <span>
-            <strong>CẢNH BÁO ({activeBanner.severity.toUpperCase()}):</strong> {activeBanner.patientName} - {activeBanner.message}
-          </span>
-          <button type="button" onClick={() => setActiveBanner(null)}>Đóng</button>
+        <div className={`global-notification-bar ${activeBanner.severity.toLowerCase()}`} role="alert" aria-live="assertive">
+          <div className="banner-header">
+            <div className="banner-title-box">
+              <AlertOctagon className="beat-animated" size={18} style={{ color: 'var(--color-critical)' }} />
+              <span>CẢNH BÁO LÂM SÀNG</span>
+            </div>
+            <button className="banner-close-btn" type="button" onClick={() => setActiveBanner(null)} aria-label="Đóng cảnh báo">
+              Đóng
+            </button>
+          </div>
+          <div className="banner-body">
+            <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>
+              {activeBanner.patientName}
+            </p>
+            <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)' }}>
+              {activeBanner.message}
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Độ nghiêm trọng: <span className={`metric-status-badge ${activeBanner.severity.toLowerCase()}`} style={{ display: 'inline-block', padding: '2px 6px', fontSize: '0.7rem' }}>
+                {activeBanner.severity.toUpperCase()}
+              </span> • {activeBanner.timestamp}
+            </p>
+          </div>
+          {(role === 'doctor' || role === 'admin') && (
+            <div className="banner-footer">
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px' }}
+                onClick={() => handleViewPatientDetail(activeBanner.patientId)}
+              >
+                Xem chi tiết
+              </button>
+            </div>
+          )}
         </div>
       )}
       {layout}

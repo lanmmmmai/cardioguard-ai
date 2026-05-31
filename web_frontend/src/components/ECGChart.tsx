@@ -188,7 +188,12 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
         <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>TÍN HIỆU ĐIỆN TÂM ĐỒ (ECG)</span>
         <span className="badge" style={{ background: 'var(--color-spo2-glow)', color: 'var(--color-spo2)' }}>LIVE MONITOR</span>
       </div>
-      <div className="ecg-canvas-wrapper">
+      <div className="ecg-canvas-wrapper" style={{ position: 'relative' }}>
+        {liveEcgValue === undefined && (
+          <span className="badge" style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(245, 158, 11, 0.1)', color: 'var(--color-warning)', border: '1px solid rgba(245, 158, 11, 0.2)', fontSize: '0.75rem', zIndex: 10 }}>
+            Dạng sóng mô phỏng (Demo Waveform)
+          </span>
+        )}
         <div className="ecg-grid-overlay"></div>
         <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
       </div>

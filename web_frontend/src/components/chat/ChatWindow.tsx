@@ -98,8 +98,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
         {messages.length === 0 && (
           <div className="chat-empty-state">
             <Sparkles size={48} className="chat-empty-icon" />
-            <h3>CardioGuard AI</h3>
-            <p>Xin chào! Tôi có thể giúp gì cho bạn hôm nay?</p>
+            <h3>Trợ lý Sức khỏe CardioGuard AI</h3>
+            <p>Xin chào! Tôi là Trợ lý AI chuyên khoa tim mạch của bạn. Bạn muốn phân tích chỉ số, giải đáp thắc mắc sức khỏe hay tóm tắt thông tin nào hôm nay?</p>
+            <div style={{ marginTop: '16px', fontSize: '0.8rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--glass-border)', maxWidth: '480px', textAlign: 'center', margin: '16px auto 0' }}>
+              <strong>Lưu ý quan trọng:</strong> Trợ lý AI chỉ cung cấp thông tin mang tính hỗ trợ tham khảo lâm sàng và không thay thế cho các chẩn đoán chuyên môn, tư vấn hay phác đồ điều trị trực tiếp từ Bác sĩ phụ trách.
+            </div>
           </div>
         )}
         
@@ -124,8 +127,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
             onChange={(e) => setInput(e.target.value)}
             placeholder={placeholder}
             disabled={loading}
+            aria-label="Nội dung câu hỏi gửi tới trợ lý AI"
           />
-          <button type="submit" className="chat-send-btn" disabled={!input.trim() || loading}>
+          <button type="submit" className="chat-send-btn" disabled={!input.trim() || loading} aria-label="Gửi tin nhắn">
             <Send size={18} />
           </button>
         </form>

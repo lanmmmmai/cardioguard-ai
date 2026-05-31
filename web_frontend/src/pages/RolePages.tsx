@@ -1,5 +1,6 @@
-import React from 'react';
-import { Activity, AlertTriangle, BarChart3, CalendarDays, Cpu, HeartPulse, MessageCircle, Pill, ShieldAlert, Stethoscope, Users } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Activity, AlertTriangle, BarChart3, CalendarDays, Cpu, HeartPulse, MessageCircle, Pill, ShieldAlert, Stethoscope, Users, Radio, WifiOff } from 'lucide-react';
+import { useAuth } from '../auth/AuthContext';
 
 interface Patient {
   id: string;
@@ -124,27 +125,216 @@ export const DoctorDashboard: React.FC<{ patients: Patient[]; alerts: Alert[] }>
   </div>
 );
 
-export const PatientHome: React.FC<{ latestTelemetry: SensorData | null; alerts: Alert[] }> = ({ latestTelemetry, alerts }) => {
-  const heartRate = latestTelemetry ? `${latestTelemetry.heart_rate} bpm` : 'Chưa có dữ liệu';
-  const spo2 = latestTelemetry ? `${latestTelemetry.spo2}%` : 'Chưa có dữ liệu';
-  const bp = latestTelemetry ? `${latestTelemetry.systolic_bp}/${latestTelemetry.diastolic_bp}` : 'Chưa có dữ liệu';
-  const ecg = latestTelemetry ? latestTelemetry.ecg_value : 'Chưa có dữ liệu';
+export const PatientHome: React.FC<{
+  latestTelemetry: SensorData | null;
+  alerts: Alert[];
+  isConnected?: boolean;
+}> = ({ latestTelemetry, alerts, isConnected = false }) => {
+  const { user } = useAuth();
+  const [lastTelemetryTime, setLastTelemetryTime] = useState<Date | null>(null);
+  const [isStale, setIsStale] = useState(true);
+  const [currentMetrics, setCurrentMetrics] = useState<{
+    heartRate: number | null;
+    spo2: number | null;
+    systolicBp: number | null;
+    diastolicBp: number | null;
+    ecgValue: number | null;
+    updatedAt: string | null;
+  }>({
+    heartRate: null,
+    spo2: null,
+    systolicBp: null,
+    diastolicBp: null,
+    ecgValue: null,
+    updatedAt: null
+  });
+
+  useEffect(() => {
+    // Only update if latestTelemetry matches logged in user or we are in patient session
+    if (latestTelemetry && (!user?.id || latestTelemetry.patient_id === user.id)) {
+      setCurrentMetrics({
+        heartRate: latestTelemetry.heart_rate,
+        spo2: latestTelemetry.spo2,
+        systolicBp: latestTelemetry.systolic_bp,
+        diastolicBp: latestTelemetry.diastolic_bp,
+        ecgValue: latestTelemetry.ecg_value,
+        updatedAt: new Date().toLocaleTimeString('vi-VN')
+      });
+      setLastTelemetryTime(new Date());
+      setIsStale(false);
+    }
+  }, [latestTelemetry, user?.id]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (lastTelemetryTime) {
+        const diffSeconds = (new Date().getTime() - lastTelemetryTime.getTime()) / 1000;
+        setIsStale(diffSeconds > 30);
+      } else {
+        setIsStale(true);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [lastTelemetryTime]);
 
   return (
     <div className="role-page-stack">
       <div className="page-header">
         <div>
           <h1 className="page-title">Trang chủ bệnh nhân</h1>
-          <p className="page-subtitle">Chỉ số sức khỏe mới nhất, lịch hẹn, đơn thuốc và hỗ trợ khẩn cấp.</p>
+          <p className="page-subtitle">Chỉ số sức khỏe thời gian thực, lịch hẹn và cảnh báo y tế.</p>
         </div>
         <button className="sos-button">SOS khẩn cấp</button>
       </div>
 
-      <div className="role-stat-grid">
-        <Card icon={<HeartPulse size={22} />} label="Heart Rate" value={heartRate} hint="Nhịp tim gần nhất" />
-        <Card icon={<Activity size={22} />} label="SpO2" value={spo2} hint="Độ bão hòa oxy" />
-        <Card icon={<BarChart3 size={22} />} label="Huyết áp" value={bp} hint="mmHg" />
-        <Card icon={<Activity size={22} />} label="ECG" value={ecg} hint="Tín hiệu realtime" />
+      {/* WebSocket Connection / Vitals Stale Status Banner */}
+      {!isConnected ? (
+        <div className="alert-strip danger" style={{ marginBottom: '1.5rem' }}>
+          <WifiOff size={16} className="alert-strip-icon pulse-animated" />
+          <div className="alert-strip-body">
+            <div className="alert-strip-title">Mất kết nối thời gian thực</div>
+            <div className="alert-strip-desc">Ứng dụng đang ngoại tuyến. Các chỉ số hiển thị bên dưới có thể không phản ánh trạng thái hiện tại.</div>
+          </div>
+        </div>
+      ) : isStale && currentMetrics.heartRate !== null ? (
+        <div className="stale-vitals-banner" style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <AlertTriangle size={16} className="pulse-animated" />
+          <span>Cảnh báo: Dữ liệu giám sát sinh hiệu có thể đã cũ (lần cập nhật cuối cách đây hơn 30 giây).</span>
+        </div>
+      ) : null}
+
+      <div className="role-stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+        {/* Heart Rate Card */}
+        {(() => {
+          const isCritical = currentMetrics.heartRate !== null && (currentMetrics.heartRate > 120 || currentMetrics.heartRate < 50);
+          const hrStatus = currentMetrics.heartRate === null ? 'normal' : isCritical ? 'high' : 'normal';
+          const statusText = currentMetrics.heartRate === null ? '' : isCritical ? 'Bất thường' : 'Bình thường';
+          return (
+            <div className={`panel metric-card heartrate ${isCritical ? 'critical-pulse' : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px', borderRadius: '16px' }}>
+              <div className="metric-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span className="metric-title" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Nhịp Tim</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {statusText && <span className={`metric-status-badge ${hrStatus}`}>{statusText}</span>}
+                  <div className="metric-icon-box" style={{ background: 'rgba(255, 51, 102, 0.1)', color: 'var(--color-primary)', padding: '6px', borderRadius: '8px' }}>
+                    <HeartPulse className={currentMetrics.heartRate !== null && isConnected && !isStale ? 'beat-animated' : ''} size={18} />
+                  </div>
+                </div>
+              </div>
+              <div className="metric-body" style={{ margin: '8px 0' }}>
+                {currentMetrics.heartRate !== null ? (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                    <span className="metric-value tabular-nums" style={{ fontSize: '2rem', fontWeight: 700 }}>{currentMetrics.heartRate}</span>
+                    <span className="metric-unit" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>BPM</span>
+                  </div>
+                ) : (
+                  <span className="metric-unit" style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>Chưa có dữ liệu</span>
+                )}
+              </div>
+              <div className="metric-footer" style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '8px', fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Radio size={12} className={currentMetrics.heartRate !== null && isConnected && !isStale ? 'beat-animated' : ''} style={{ color: 'var(--color-primary)' }} />
+                <span>An toàn: 50-120 {currentMetrics.updatedAt && `• ${currentMetrics.updatedAt}`}</span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* SpO2 Card */}
+        {(() => {
+          const isCritical = currentMetrics.spo2 !== null && currentMetrics.spo2 < 92;
+          const o2Status = currentMetrics.spo2 === null ? 'normal' : isCritical ? 'high' : 'normal';
+          const statusText = currentMetrics.spo2 === null ? '' : isCritical ? 'Nguy hiểm' : 'An toàn';
+          return (
+            <div className={`panel metric-card spo2 ${isCritical ? 'critical-pulse' : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px', borderRadius: '16px' }}>
+              <div className="metric-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span className="metric-title" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>SpO2</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {statusText && <span className={`metric-status-badge ${o2Status}`}>{statusText}</span>}
+                  <div className="metric-icon-box" style={{ background: 'rgba(56, 189, 248, 0.1)', color: 'var(--color-spo2)', padding: '6px', borderRadius: '8px' }}>
+                    <Activity size={18} />
+                  </div>
+                </div>
+              </div>
+              <div className="metric-body" style={{ margin: '8px 0' }}>
+                {currentMetrics.spo2 !== null ? (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                    <span className="metric-value tabular-nums" style={{ fontSize: '2rem', fontWeight: 700 }}>{currentMetrics.spo2}</span>
+                    <span className="metric-unit" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>%</span>
+                  </div>
+                ) : (
+                  <span className="metric-unit" style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>Chưa có dữ liệu</span>
+                )}
+              </div>
+              <div className="metric-footer" style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '8px', fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Radio size={12} style={{ color: 'var(--color-spo2)' }} />
+                <span>An toàn: &ge; 92% {currentMetrics.updatedAt && `• ${currentMetrics.updatedAt}`}</span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Huyết áp Card */}
+        {(() => {
+          const isCritical = currentMetrics.systolicBp !== null && (currentMetrics.systolicBp > 140 || currentMetrics.diastolicBp! > 90);
+          const bpStatus = currentMetrics.systolicBp === null ? 'normal' : isCritical ? 'high' : 'normal';
+          const statusText = currentMetrics.systolicBp === null ? '' : isCritical ? 'Cao' : 'Bình thường';
+          return (
+            <div className={`panel metric-card bp ${isCritical ? 'critical-pulse' : ''}`} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px', borderRadius: '16px' }}>
+              <div className="metric-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span className="metric-title" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Huyết áp</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {statusText && <span className={`metric-status-badge ${bpStatus}`}>{statusText}</span>}
+                  <div className="metric-icon-box" style={{ background: 'rgba(16, 185, 129, 0.1)', color: 'var(--color-safe)', padding: '6px', borderRadius: '8px' }}>
+                    <Activity size={18} />
+                  </div>
+                </div>
+              </div>
+              <div className="metric-body" style={{ margin: '8px 0' }}>
+                {currentMetrics.systolicBp !== null ? (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                    <span className="metric-value tabular-nums" style={{ fontSize: '2rem', fontWeight: 700 }}>{currentMetrics.systolicBp}/{currentMetrics.diastolicBp}</span>
+                    <span className="metric-unit" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>mmHg</span>
+                  </div>
+                ) : (
+                  <span className="metric-unit" style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>Chưa có dữ liệu</span>
+                )}
+              </div>
+              <div className="metric-footer" style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '8px', fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Radio size={12} style={{ color: 'var(--color-safe)' }} />
+                <span>An toàn: 90-140/60-90 {currentMetrics.updatedAt && `• ${currentMetrics.updatedAt}`}</span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ECG Card */}
+        {(() => {
+          return (
+            <div className="panel metric-card ecg" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px', borderRadius: '16px' }}>
+              <div className="metric-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span className="metric-title" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>ECG (Điện tâm đồ)</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div className="metric-icon-box" style={{ background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)', padding: '6px', borderRadius: '8px' }}>
+                    <Activity size={18} />
+                  </div>
+                </div>
+              </div>
+              <div className="metric-body" style={{ margin: '8px 0' }}>
+                {currentMetrics.ecgValue !== null ? (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                    <span className="metric-value tabular-nums" style={{ fontSize: '2rem', fontWeight: 700 }}>{currentMetrics.ecgValue}</span>
+                    <span className="metric-unit" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>mV</span>
+                  </div>
+                ) : (
+                  <span className="metric-unit" style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>Chưa có dữ liệu</span>
+                )}
+              </div>
+              <div className="metric-footer" style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '8px', fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Radio size={12} className={currentMetrics.ecgValue !== null && isConnected && !isStale ? 'beat-animated' : ''} />
+                <span>Tín hiệu realtime {currentMetrics.updatedAt && `• ${currentMetrics.updatedAt}`}</span>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       <div className="role-page-grid">

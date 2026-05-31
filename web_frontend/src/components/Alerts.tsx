@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Search, Filter, ShieldCheck, Calendar } from 'lucide-react';
+import { Search, Filter, ShieldCheck, Calendar } from 'lucide-react';
+import { getSeverityMeta } from '../utils/severity';
 
 interface Alert {
   id?: string;
@@ -61,12 +62,13 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
             className="form-control"
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value)}
-            style={{ width: '150px', height: '38px', padding: '4px 10px' }}
+            style={{ width: '180px', height: '38px', padding: '4px 10px' }}
           >
             <option value="all">Tất cả mức độ</option>
-            <option value="high">Nguy kịch (High)</option>
-            <option value="medium">Cần chú ý (Medium)</option>
-            <option value="low">Bình thường (Low)</option>
+            <option value="critical">Nguy kịch (Critical)</option>
+            <option value="high">Nghiêm trọng (High)</option>
+            <option value="medium">Cảnh báo (Medium)</option>
+            <option value="low">Theo dõi (Low)</option>
           </select>
         </div>
       </div>
@@ -80,46 +82,57 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
             <p className="page-subtitle">Hệ thống hoạt động ổn định. Chưa ghi nhận bất kỳ cảnh báo nào khớp với bộ lọc.</p>
           </div>
         ) : (
-          filteredAlerts.map((alert, index) => (
-            <div 
-              key={alert.id || index} 
-              className={`panel alert-strip ${alert.severity === 'high' ? 'high' : 'medium'}`}
-              style={{ display: 'flex', alignItems: 'flex-start', padding: '16px 20px', margin: 0 }}
-            >
-              <AlertTriangle className="alert-strip-icon" size={20} style={{ marginRight: '16px' }} />
-              <div className="alert-strip-body">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 700, fontSize: '1rem', fontFamily: 'var(--font-display)' }}>
-                      {alert.full_name || 'Bệnh nhân ẩn danh'}
-                    </span>
-                    <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', textTransform: 'none' }}>
-                      BN ID: {alert.patient_id.slice(0, 8)}...
-                    </span>
-                    <span className={`badge ${alert.severity === 'high' ? 'high' : 'medium'}`}>
-                      {alert.severity}
-                    </span>
+          filteredAlerts.map((alert, index) => {
+            const severityMeta = getSeverityMeta(alert.severity);
+            const AlertIcon = severityMeta.icon;
+            return (
+              <div 
+                key={alert.id || index} 
+                className={`panel alert-strip ${severityMeta.key}`}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-start', 
+                  padding: '16px 20px', 
+                  margin: 0,
+                  borderLeft: `3px solid ${severityMeta.colorVar}`,
+                  background: severityMeta.bgVar
+                }}
+              >
+                <AlertIcon className="alert-strip-icon" size={20} style={{ marginRight: '16px', color: severityMeta.colorVar }} />
+                <div className="alert-strip-body">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 700, fontSize: '1rem', fontFamily: 'var(--font-display)' }}>
+                        {alert.full_name || 'Bệnh nhân ẩn danh'}
+                      </span>
+                      <span className="badge" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)', textTransform: 'none' }}>
+                        BN ID: {alert.patient_id.slice(0, 8)}...
+                      </span>
+                      <span className="badge" style={{ background: severityMeta.bgVar, color: severityMeta.colorVar, border: severityMeta.borderVar, fontWeight: severityMeta.weight }}>
+                        {severityMeta.label}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      <Calendar size={12} />
+                      <span className="tabular-nums">
+                        {alert.created_at 
+                          ? new Date(alert.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: '2-digit' }) 
+                          : 'Vừa xong'}
+                      </span>
+                    </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    <Calendar size={12} />
-                    <span>
-                      {alert.created_at 
-                        ? new Date(alert.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: '2-digit' }) 
-                        : 'Vừa xong'}
-                    </span>
+                  <div style={{ color: 'var(--text-primary)', fontSize: '0.92rem', fontWeight: 500, marginBottom: '4px' }}>
+                    {alert.alert_type}
                   </div>
-                </div>
-
-                <div style={{ color: 'var(--text-primary)', fontSize: '0.92rem', fontWeight: 500, marginBottom: '4px' }}>
-                  {alert.alert_type}
-                </div>
-                <div className="alert-strip-desc" style={{ fontSize: '0.88rem' }}>
-                  {alert.message}
+                  <div className="alert-strip-desc" style={{ fontSize: '0.88rem' }}>
+                    {alert.message}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
