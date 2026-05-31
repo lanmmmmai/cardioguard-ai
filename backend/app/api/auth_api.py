@@ -48,6 +48,9 @@ def extract_bearer_token(authorization: Optional[str]) -> str:
     return authorization.split(" ", 1)[1].strip()
 
 
+_users_columns_cache: Optional[set[str]] = None
+
+
 async def get_user_from_token(authorization: Optional[str]):
     token = extract_bearer_token(authorization)
     try:
@@ -59,14 +62,17 @@ async def get_user_from_token(authorization: Optional[str]):
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
-    columns = await database.fetch_all(
-        """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = 'users'
-        """
-    )
-    user_columns = {column["column_name"] for column in columns}
+    global _users_columns_cache
+    if _users_columns_cache is None:
+        columns = await database.fetch_all(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'users'
+            """
+        )
+        _users_columns_cache = {column["column_name"] for column in columns}
+    user_columns = _users_columns_cache
     select_columns = [
         "id::text as id",
         "full_name",
@@ -255,14 +261,17 @@ async def register(data: RegisterRequest):
 
 @router.post("/auth/login")
 async def login(data: LoginRequest):
-    columns = await database.fetch_all(
-        """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema = 'public' AND table_name = 'users'
-        """
-    )
-    user_columns = {column["column_name"] for column in columns}
+    global _users_columns_cache
+    if _users_columns_cache is None:
+        columns = await database.fetch_all(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'users'
+            """
+        )
+        _users_columns_cache = {column["column_name"] for column in columns}
+    user_columns = _users_columns_cache
     select_cols = "id::text as id, full_name, email, password_hash, role"
     if "must_change_password" in user_columns:
         select_cols += ", must_change_password"

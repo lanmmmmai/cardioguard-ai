@@ -90,7 +90,12 @@ def quote_identifier(value: str) -> str:
     return f'"{value}"'
 
 
+_cms_columns_cache: dict[str, list[dict[str, Any]]] = {}
+
+
 async def get_columns(table: str) -> list[dict[str, Any]]:
+    if table in _cms_columns_cache:
+        return _cms_columns_cache[table]
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             text(
@@ -106,7 +111,9 @@ async def get_columns(table: str) -> list[dict[str, Any]]:
         rows = result.mappings().all()
     if not rows:
         raise HTTPException(status_code=500, detail=f"Table {table} not found")
-    return [dict(row) for row in rows]
+    cols = [dict(row) for row in rows]
+    _cms_columns_cache[table] = cols
+    return cols
 
 
 def visible_columns(columns: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:

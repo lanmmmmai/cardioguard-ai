@@ -31,7 +31,13 @@ def row_to_dict(row: Any) -> dict[str, Any]:
     return {key: to_jsonable(row[key]) for key in row.keys()}
 
 
+_devices_columns_cache: Optional[set[str]] = None
+
+
 async def get_devices_table_columns() -> set[str]:
+    global _devices_columns_cache
+    if _devices_columns_cache is not None:
+        return _devices_columns_cache
     rows = await database.fetch_all(
         """
         SELECT column_name
@@ -39,9 +45,8 @@ async def get_devices_table_columns() -> set[str]:
         WHERE table_schema = 'public' AND table_name = 'devices'
         """
     )
-    return {row["column_name"] for row in rows}
-
-
+    _devices_columns_cache = {row["column_name"] for row in rows}
+    return _devices_columns_cache
 async def ensure_patient_access(user: dict[str, Any], patient_id: str) -> None:
     role = user["role"]
     if role == "admin":
