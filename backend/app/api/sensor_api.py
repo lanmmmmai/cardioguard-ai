@@ -156,6 +156,12 @@ def verify_iot_device_token(device_row: dict[str, Any], device_token: str) -> bo
     return bool(shared_token and device_token == shared_token)
 
 
+def has_any_iot_token_config(device_row: dict[str, Any]) -> bool:
+    if device_row["device_token_hash"]:
+        return True
+    return bool(settings.IOT_DEVICE_SHARED_TOKEN.strip())
+
+
 def detect_abnormal_iot(readings: Any) -> list[dict[str, str]]:
     data = type(
         "TelemetryForAI",
@@ -279,6 +285,8 @@ async def create_iot_telemetry(
     device_row = await get_device_by_mac(x_device_mac)
     if not device_row:
         raise HTTPException(status_code=404, detail="Device not paired")
+    if not has_any_iot_token_config(device_row):
+        raise HTTPException(status_code=503, detail="IOT device token is not configured")
     if not verify_iot_device_token(device_row, x_device_token):
         raise HTTPException(status_code=401, detail="Invalid device token")
 
@@ -419,6 +427,8 @@ async def get_iot_device_status(device_uid: str, authorization: Optional[str] = 
 @router.post("/iot/devices/{device_uid}/rotate-token")
 async def rotate_iot_device_token(device_uid: str, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
+    if current_user["role"] not in {"admin", "doctor"}:
+        raise HTTPException(status_code=403, detail="Chỉ admin hoặc bác sĩ mới được xoay token thiết bị")
     device_row = await ensure_device_access(current_user, device_uid)
     columns = await get_devices_table_columns()
     if "device_token_hash" not in columns:
