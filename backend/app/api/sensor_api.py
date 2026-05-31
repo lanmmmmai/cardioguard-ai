@@ -48,6 +48,35 @@ async def ensure_patient_access(user: dict[str, Any], patient_id: str) -> None:
     raise HTTPException(status_code=403, detail="Vai trò không hợp lệ")
 
 
+async def ensure_device_access(user: dict[str, Any], device_uid: str) -> dict[str, Any]:
+    device_row = await database.fetch_one(
+        """
+        SELECT
+            id::text AS id,
+            patient_id::text AS patient_id,
+            name,
+            status,
+            battery,
+            last_seen_at,
+            device_type,
+            updated_at
+        FROM devices
+        WHERE name = :device_uid
+        LIMIT 1
+        """,
+        {"device_uid": device_uid},
+    )
+    if not device_row:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    patient_id = device_row["patient_id"]
+    if not patient_id:
+        raise HTTPException(status_code=404, detail="Device does not have assigned patient")
+
+    await ensure_patient_access(user, patient_id)
+    return device_row
+
+
 def detect_abnormal_iot(readings: Any) -> list[dict[str, str]]:
     data = type(
         "TelemetryForAI",
@@ -293,6 +322,22 @@ async def create_iot_telemetry(
         "is_abnormal": len(alerts) > 0,
         "alerts": alerts,
         "server_time": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/iot/devices/{device_uid}/status")
+async def get_iot_device_status(device_uid: str, authorization: Optional[str] = Header(default=None)):
+    current_user = await get_user_from_token(authorization)
+    device_row = await ensure_device_access(current_user, device_uid)
+    return {
+        "device_uid": device_uid,
+        "device_id": device_row["id"],
+        "patient_id": device_row["patient_id"],
+        "status": device_row["status"],
+        "battery": device_row["battery"],
+        "last_seen_at": to_jsonable(device_row["last_seen_at"]),
+        "device_type": device_row["device_type"],
+        "updated_at": to_jsonable(device_row["updated_at"]),
     }
 
 
