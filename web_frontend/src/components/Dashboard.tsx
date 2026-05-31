@@ -564,33 +564,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* TESTING SIMULATION PLATFORM DRAWER (Mục 7) */}
-      <div className="simulation-controls-panel">
-        <h4 className="simulation-label">
-          <Radio size={14} className="beat-animated" style={{ color: 'var(--color-primary)' }} /> CÔNG CỤ KIỂM THỬ (DEVELOPER TESTING TOOLS)
-        </h4>
-        <p className="sim-description">
-          Sử dụng bảng mô phỏng thiết bị đeo dưới đây để gửi tín hiệu nhịp sinh học lên Backend, hỗ trợ kiểm tra đường ống truyền nhận WebSocket realtime.
-        </p>
-        <div className="sim-buttons-row">
-          <button 
-            className="btn btn-secondary" 
-            onClick={() => handleSimulateTelemetry(false)}
-            disabled={isSimulating}
-            title="Gửi dữ liệu bình thường đến Backend để kiểm tra"
-          >
-            <Play size={16} /> Giả lập Bình thường
-          </button>
-          
-          <button 
-            className="btn btn-primary btn-abnormal" 
-            onClick={() => handleSimulateTelemetry(true)}
-            disabled={isSimulating}
-            title="Gửi dữ liệu bất thường đến Backend để kiểm tra cảnh báo"
-          >
-            <AlertTriangle size={16} /> Giả lập Bất thường
-          </button>
+      {import.meta.env.DEV && (
+        <div className="simulation-controls-panel">
+          <h4 className="simulation-label">
+            <Radio size={14} className="beat-animated" style={{ color: 'var(--color-primary)' }} /> CÔNG CỤ KIỂM THỬ (DEVELOPER TESTING TOOLS)
+          </h4>
+          <p className="sim-description">
+            Sử dụng bảng mô phỏng thiết bị đeo dưới đây để gửi tín hiệu nhịp sinh học lên Backend, hỗ trợ kiểm tra đường ống truyền nhận WebSocket realtime.
+          </p>
+          <div className="sim-buttons-row">
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => handleSimulateTelemetry(false)}
+              disabled={isSimulating}
+              title="Gửi dữ liệu bình thường đến Backend để kiểm tra"
+            >
+              <Play size={16} /> Giả lập Bình thường
+            </button>
+            
+            <button 
+              className="btn btn-primary btn-abnormal" 
+              onClick={() => handleSimulateTelemetry(true)}
+              disabled={isSimulating}
+              title="Gửi dữ liệu bất thường đến Backend để kiểm tra cảnh báo"
+            >
+              <AlertTriangle size={16} /> Giả lập Bất thường
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
