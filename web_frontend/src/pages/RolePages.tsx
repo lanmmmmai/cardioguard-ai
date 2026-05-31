@@ -187,19 +187,18 @@ export const PlaceholderPage: React.FC<{ title: string; subtitle: string }> = ({
     <div className="module-detail-grid">
       <section className="panel module-hero-card">
         <div className="module-hero-mark">CG</div>
-        <h2>Module đã sẵn sàng trong hệ thống</h2>
+        <h2>Tính năng đang được phát triển / Đang chờ tích hợp backend</h2>
         <p>
-          Trang này đã có route, layout theo quyền và trạng thái rỗng rõ ràng. Khi backend có dữ liệu thật,
-          có thể nối API vào các vùng bên dưới mà không đổi cấu trúc menu.
+          Trang này đã được thiết lập route và phân quyền truy cập. Tính năng này hiện tại chưa có dữ liệu thật hoặc đang trong quá trình chờ tích hợp đầy đủ từ backend. Vui lòng không sử dụng cho mục đích vận hành lâm sàng thực tế.
         </p>
       </section>
 
       <section className="panel">
         <h3 className="metric-title">Luồng xử lý</h3>
         <div className="activity-list">
-          <div>1. Nhận dữ liệu từ API thật theo role hiện tại.</div>
-          <div>2. Hiển thị loading, empty state và error state thay vì màn hình trắng.</div>
-          <div>3. Ghi audit log cho thao tác quan trọng khi backend hỗ trợ.</div>
+          <div>1. Kết nối và nhận dữ liệu thực từ các dịch vụ API backend.</div>
+          <div>2. Hiển thị trạng thái tải (loading), dữ liệu rỗng (empty state) và xử lý lỗi thay vì màn hình trắng.</div>
+          <div>3. Tự động ghi lại nhật ký kiểm toán (audit log) cho các thao tác lâm sàng quan trọng.</div>
         </div>
       </section>
     </div>
