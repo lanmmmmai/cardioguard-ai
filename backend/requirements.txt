@@ -247,3 +247,4 @@ xxhash==3.6.0
 yarl==1.22.0
 zipp==3.23.0
 email-validator==2.3.0
+greenlet==3.5.1
