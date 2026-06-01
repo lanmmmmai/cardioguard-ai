@@ -689,6 +689,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     Text(title, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: textMuted, letterSpacing: 0.5)),
                     const SizedBox(height: 4),
                     Row(
+                      textBaseline: TextBaseline.alphabetic,
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       children: [
                         Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: textColor)),
