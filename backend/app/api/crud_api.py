@@ -380,20 +380,28 @@ async def delete_record(table: str, record_id: str, authorization: Optional[str]
 
 async def reports_summary_data(authorization: Optional[str]):
     user = await get_user_from_token(authorization)
-    report_columns = await table_columns("reports")
-    report_access, report_values = access_filter("reports", report_columns, user)
-    report_where = f"WHERE {report_access}" if report_access else ""
-
-    rows = await database.fetch_all(
-        f"""
-        SELECT report_type, COUNT(*)::int AS total
-        FROM reports
-        {report_where}
-        GROUP BY report_type
-        ORDER BY total DESC
-        """,
-        report_values,
-    )
+    
+    if user["role"] == "admin":
+        # Tài khoản Admin: Truy vấn trực tiếp từ Materialized View tính toán sẵn (cực nhanh!)
+        rows = await database.fetch_all(
+            "SELECT report_type, total FROM reports_summary_mv ORDER BY total DESC"
+        )
+    else:
+        # Bác sĩ / Bệnh nhân: Truy vấn có lọc phân quyền bảo mật riêng tư
+        report_columns = await table_columns("reports")
+        report_access, report_values = access_filter("reports", report_columns, user)
+        report_where = f"WHERE {report_access}" if report_access else ""
+        rows = await database.fetch_all(
+            f"""
+            SELECT report_type, COUNT(*)::int AS total
+            FROM reports
+            {report_where}
+            GROUP BY report_type
+            ORDER BY total DESC
+            """,
+            report_values,
+        )
+        
     total = sum(row["total"] for row in rows)
     return {
         "total_reports": total,

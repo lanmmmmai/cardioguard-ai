@@ -667,3 +667,28 @@ async def get_audit_logs(
                 pass
         result.append(d)
     return result
+
+
+@router.get("/admin/db-performance", tags=["admin"])
+async def db_performance(authorization: Optional[str] = Header(default=None)):
+    await require_admin(authorization)
+    try:
+        rows = await database.fetch_all(
+            """
+            SELECT 
+                query,
+                calls,
+                total_exec_time::double precision as total_exec_time_ms,
+                mean_exec_time::double precision as mean_exec_time_ms,
+                rows::bigint as rows_processed
+            FROM pg_stat_statements
+            ORDER BY total_exec_time DESC
+            LIMIT 10
+            """
+        )
+        return [dict(row) for row in rows]
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Không thể lấy thông số hiệu năng DB. Vui lòng đảm bảo pg_stat_statements đã được kích hoạt và chạy migration. Lỗi: {str(e)}"
+        )
