@@ -89,11 +89,23 @@ Backend docs: http://localhost:8000/docs
 Web: http://localhost:5173
 ```
 
-Dừng hệ thống:
+### Các câu lệnh quản lý Docker hữu ích
 
-```bash
-docker compose down
-```
+Dưới đây là bảng tổng hợp các lệnh hữu ích để quản lý hệ thống CardioGuard AI khi chạy qua Docker:
+
+| Mục tiêu | Câu lệnh |
+| :--- | :--- |
+| **Biên dịch & Khởi chạy trực tiếp** | `docker compose up --build` |
+| **Chạy dưới chế độ nền (ngầm)** | `docker compose up -d` |
+| **Dừng các dịch vụ tạm thời** | `docker compose stop` |
+| **Dừng và xóa bỏ container, mạng ảo** | `docker compose down` |
+| **Xóa sạch hoàn toàn (cả ổ đĩa Volume dữ liệu)** | `docker compose down -v` |
+| **Xem logs trực tiếp toàn bộ hệ thống** | `docker compose logs -f` |
+| **Xem logs trực tiếp của Backend** | `docker compose logs -f backend` |
+| **Xem logs trực tiếp của Web Frontend** | `docker compose logs -f web` |
+| **Truy cập vào Terminal của Backend** | `docker compose exec backend sh` |
+| **Gieo dữ liệu mẫu (Seeder) trong Docker** | `docker compose exec backend python seed_data.py` |
+| **Giải phóng dung lượng rác của Docker** | `docker system prune -a --volumes` |
 
 Ghi chú:
 
