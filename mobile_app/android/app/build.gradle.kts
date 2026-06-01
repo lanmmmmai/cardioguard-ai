@@ -40,7 +40,7 @@ android {
         applicationId = "com.example.heart_monitor_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 21
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -48,6 +48,7 @@ android {
 
     buildTypes {
         release {
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Use release keystore in CI/production, fallback to debug for local manual testing.
             signingConfig = if (hasReleaseSigning) {
                 signingConfigs.create("release") {
