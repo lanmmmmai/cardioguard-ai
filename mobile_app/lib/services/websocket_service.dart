@@ -9,6 +9,7 @@ class WebSocketService {
   static String wsUrl = AppConfig.wsUrl;
   static WebSocketChannel? _channel;
   static bool _isConnected = false;
+  static bool _isIntentionalDisconnect = false;
   static final List<Function(Map<String, dynamic>)> _listeners = [];
 
   static void setWsUrl(String url) {
@@ -27,6 +28,7 @@ class WebSocketService {
 
   static Future<void> connect() async {
     if (_isConnected) return;
+    _isIntentionalDisconnect = false;
 
     try {
       final token = await SecureStorage().getToken();
@@ -69,9 +71,14 @@ class WebSocketService {
     _isConnected = false;
     _channel = null;
     
+    if (_isIntentionalDisconnect) {
+      AppLogger.log('WebSocket disconnected intentionally, skipping auto-reconnect.');
+      return;
+    }
+    
     // Auto-reconnect after 3 seconds
     Future.delayed(const Duration(seconds: 3), () async {
-      if (!_isConnected) {
+      if (!_isConnected && !_isIntentionalDisconnect) {
         AppLogger.log('Attempting to reconnect WebSocket...');
         await connect();
       }
@@ -79,10 +86,9 @@ class WebSocketService {
   }
 
   static void disconnect() {
+    _isIntentionalDisconnect = true;
     _channel?.sink.close();
     _isConnected = false;
     _channel = null;
   }
 }
-
-

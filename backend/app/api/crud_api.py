@@ -39,7 +39,6 @@ TABLES = {
     "devices": {"path": "/devices", "create": DeviceCreate, "update": DeviceUpdate},
     "notifications": {"path": "/notifications", "create": NotificationCreate, "update": NotificationUpdate},
     "chat_messages": {"path": "/chat-messages", "create": ChatMessageCreate, "update": ChatMessageUpdate},
-    "audit_logs": {"path": "/audit-logs", "create": AuditLogCreate, "update": AuditLogUpdate},
     "cameras": {"path": "/cameras", "create": CameraCreate, "update": CameraUpdate},
     "reports": {"path": "/reports", "create": ReportCreate, "update": ReportUpdate},
 }

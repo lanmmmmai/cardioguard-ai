@@ -4,6 +4,7 @@ import '../core/api_client.dart';
 import '../core/secure_storage.dart';
 import '../models/models.dart';
 import '../config/app_config.dart';
+import '../services/websocket_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiClient _apiClient = ApiClient();
@@ -173,6 +174,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _setLoading(true);
     try {
+      WebSocketService.disconnect();
       await _secureStorage.clearSession();
       _currentUser = null;
       _isAuthenticated = false;
@@ -186,6 +188,7 @@ class AuthProvider extends ChangeNotifier {
 
   // Silent logout on 401
   void _logoutSilent() {
+    WebSocketService.disconnect();
     _currentUser = null;
     _isAuthenticated = false;
     _errorMessage = 'Phiên làm việc hết hạn. Vui lòng đăng nhập lại.';
