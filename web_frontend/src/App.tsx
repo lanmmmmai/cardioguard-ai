@@ -17,6 +17,7 @@ import { PatientChatbot } from './pages/PatientChatbot';
 import { DoctorChatbot } from './pages/DoctorChatbot';
 import { DoctorsManager } from './components/DoctorsManager';
 import { UsersManager } from './components/UsersManager';
+import { SystemSettings } from './components/SystemSettings';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { defaultRouteByRole, normalizeRole } from './auth/roles';
@@ -330,6 +331,8 @@ const AppContent: React.FC = () => {
         return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/notifications" />;
       case '/admin/system-logs':
         return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/audit-logs" />;
+      case '/admin/settings':
+        return <SystemSettings />;
       case '/admin/profile':
       case '/doctor/profile':
       case '/patient/profile':
