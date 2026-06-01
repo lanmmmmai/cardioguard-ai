@@ -20,6 +20,7 @@ class PatientsScreen extends StatefulWidget {
 class _PatientsScreenState extends State<PatientsScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  Map<String, dynamic>? _selectedPatient;
 
   @override
   void initState() {
@@ -328,113 +329,168 @@ class _PatientsScreenState extends State<PatientsScreen> {
               ),
             )
           : null,
-      body: Column(
-        children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: TextField(
-              controller: _searchController,
-              style: TextStyle(color: textColor),
-              decoration: InputDecoration(
-                hintText: 'Tìm kiếm tên hoặc bệnh lý...',
-                hintStyle: TextStyle(color: textMuted),
-                prefixIcon:
-                    Icon(LucideIcons.search, color: textMuted, size: 18),
-                filled: true,
-                fillColor: cardBg,
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: borderColor),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFFF3366)),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isTablet = constraints.maxWidth >= 600;
+
+          final listColumnWidget = Column(
+            children: [
+              // Search Bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: TextField(
+                  controller: _searchController,
+                  style: TextStyle(color: textColor),
+                  decoration: InputDecoration(
+                    hintText: 'Tìm kiếm tên hoặc bệnh lý...',
+                    hintStyle: TextStyle(color: textMuted),
+                    prefixIcon:
+                        Icon(LucideIcons.search, color: textMuted, size: 18),
+                    filled: true,
+                    fillColor: cardBg,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: borderColor),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFFFF3366)),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 12),
+              const SizedBox(height: 12),
 
-          // Patients List
-          Expanded(
-            child: patientProvider.isLoading
-                ? const CgInlineState(
-                    type: CgStateType.loading,
-                    title: 'Đang tải danh sách bệnh nhân',
-                    message: 'Vui lòng chờ hệ thống đồng bộ hồ sơ.',
-                  )
-                : filtered.isEmpty
+              // Patients List
+              Expanded(
+                child: patientProvider.isLoading
                     ? const CgInlineState(
-                        type: CgStateType.empty,
-                        title: 'Không có bệnh nhân',
-                        message:
-                            'Không tìm thấy bệnh nhân phù hợp với điều kiện hiện tại.',
+                        type: CgStateType.loading,
+                        title: 'Đang tải danh sách bệnh nhân',
+                        message: 'Vui lòng chờ hệ thống đồng bộ hồ sơ.',
                       )
-                    : RefreshIndicator(
-                        onRefresh: patientProvider.fetchPatients,
-                        color: CgColors.primary,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, index) {
-                            final p = filtered[index];
-                            final String initials = p.fullName.isNotEmpty
-                                ? p.fullName.substring(0, 1).toUpperCase()
-                                : '?';
+                    : filtered.isEmpty
+                        ? const CgInlineState(
+                            type: CgStateType.empty,
+                            title: 'Không có bệnh nhân',
+                            message:
+                                'Không tìm thấy bệnh nhân phù hợp với điều kiện hiện tại.',
+                          )
+                        : RefreshIndicator(
+                            onRefresh: patientProvider.fetchPatients,
+                            color: CgColors.primary,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              itemCount: filtered.length,
+                              itemBuilder: (context, index) {
+                                final p = filtered[index];
+                                final String initials = p.fullName.isNotEmpty
+                                    ? p.fullName.substring(0, 1).toUpperCase()
+                                    : '?';
 
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(
-                                color: cardBg,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: borderColor),
-                              ),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 8),
-                                leading: CircleAvatar(
-                                  backgroundColor: isDark
-                                      ? const Color(0xFF1A212D)
-                                      : const Color(0xFFEAECF0),
-                                  radius: 22,
-                                  child: Text(
-                                    initials,
-                                    style: TextStyle(
-                                        color: textColor,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                                title: Text(p.fullName,
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: textColor)),
-                                subtitle: Text(
-                                  '${p.gender} - ${p.age} tuổi\nSĐT: ${p.phone}',
-                                  style:
-                                      TextStyle(color: textMuted, fontSize: 12),
-                                ),
-                                trailing: const Icon(LucideIcons.chevronRight,
-                                    color: Color(0xFFFF3366), size: 18),
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => PatientDetailScreen(
-                                        patient: p.toJson(),
-                                        isDarkTheme: isDark,
-                                      ),
+                                final isSelected = _selectedPatient != null && _selectedPatient!['id'] == p.id;
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: isSelected && isTablet
+                                        ? const Color(0xFFFF3366).withValues(alpha: 0.08)
+                                        : cardBg,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: isSelected && isTablet
+                                          ? const Color(0xFFFF3366)
+                                          : borderColor,
                                     ),
-                                  );
-                                },
-                              ),
-                            );
-                          },
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: ListTile(
+                                      contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 8),
+                                      leading: CircleAvatar(
+                                        backgroundColor: isDark
+                                            ? const Color(0xFF1A212D)
+                                            : const Color(0xFFEAECF0),
+                                        radius: 22,
+                                        child: Text(
+                                          initials,
+                                          style: TextStyle(
+                                              color: textColor,
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                      title: Text(p.fullName,
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: textColor)),
+                                      subtitle: Text(
+                                        '${p.gender} - ${p.age} tuổi\nSĐT: ${p.phone}',
+                                        style:
+                                            TextStyle(color: textMuted, fontSize: 12),
+                                      ),
+                                      trailing: const Icon(LucideIcons.chevronRight,
+                                          color: Color(0xFFFF3366), size: 18),
+                                      onTap: () {
+                                        if (isTablet) {
+                                          setState(() {
+                                            _selectedPatient = p.toJson();
+                                          });
+                                        } else {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => PatientDetailScreen(
+                                                patient: p.toJson(),
+                                                isDarkTheme: isDark,
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+              ),
+            ],
+          );
+
+          if (isTablet) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Left Column: List
+                Expanded(
+                  flex: 4,
+                  child: listColumnWidget,
+                ),
+                VerticalDivider(width: 1, thickness: 0.8, color: borderColor),
+                // Right Column: Detail
+                Expanded(
+                  flex: 6,
+                  child: _selectedPatient == null
+                      ? const CgInlineState(
+                          type: CgStateType.empty,
+                          title: 'Chưa chọn bệnh nhân',
+                          message: 'Vui lòng chọn một bệnh nhân từ danh sách bên trái để xem hồ sơ và chỉ số realtime.',
+                        )
+                      : PatientDetailScreen(
+                          key: ValueKey(_selectedPatient!['id']),
+                          patient: _selectedPatient!,
+                          isDarkTheme: isDark,
+                          showBackButton: false,
                         ),
-                      ),
-          ),
-        ],
+                ),
+              ],
+            );
+          } else {
+            return listColumnWidget;
+          }
+        },
       ),
     );
   }

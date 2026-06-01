@@ -8,6 +8,7 @@ import 'screens/register_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/patients_screen.dart';
 import 'screens/alerts_screen.dart';
+import 'screens/appointments_screen.dart';
 import 'screens/icu_camera_screen.dart';
 import 'screens/settings_screen.dart';
 
@@ -127,6 +128,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
         ),
         PatientsScreen(isDarkTheme: widget.isDarkTheme),
         AlertsScreen(isDarkTheme: widget.isDarkTheme),
+        AppointmentsScreen(isDarkTheme: widget.isDarkTheme),
         IcuCameraScreen(isDarkTheme: widget.isDarkTheme),
         SettingsScreen(
           isDarkTheme: widget.isDarkTheme,
@@ -137,6 +139,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
         {'icon': LucideIcons.layoutDashboard, 'label': 'Giám sát'},
         {'icon': LucideIcons.users, 'label': 'Bệnh nhân'},
         {'icon': LucideIcons.bell, 'label': 'Cảnh báo'},
+        {'icon': LucideIcons.calendar, 'label': 'Lịch hẹn'},
         {'icon': LucideIcons.video, 'label': 'Phòng ICU'},
         {'icon': LucideIcons.user, 'label': 'Cá nhân'},
       ];
@@ -148,6 +151,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
           onToggleTheme: widget.onToggleTheme,
         ),
         AlertsScreen(isDarkTheme: widget.isDarkTheme),
+        AppointmentsScreen(isDarkTheme: widget.isDarkTheme),
         SettingsScreen(
           isDarkTheme: widget.isDarkTheme,
           onToggleTheme: widget.onToggleTheme,
@@ -156,6 +160,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
       tabConfig = [
         {'icon': LucideIcons.heart, 'label': 'Chỉ số'},
         {'icon': LucideIcons.bellRing, 'label': 'Cảnh báo'},
+        {'icon': LucideIcons.calendar, 'label': 'Lịch hẹn'},
         {'icon': LucideIcons.user, 'label': 'Cá nhân'},
       ];
     }

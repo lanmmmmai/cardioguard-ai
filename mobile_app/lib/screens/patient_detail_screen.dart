@@ -13,11 +13,13 @@ import '../ui/cg_tokens.dart';
 class PatientDetailScreen extends StatefulWidget {
   final Map<String, dynamic> patient;
   final bool isDarkTheme;
+  final bool showBackButton;
 
   const PatientDetailScreen({
     super.key,
     required this.patient,
     required this.isDarkTheme,
+    this.showBackButton = true,
   });
 
   @override
@@ -319,10 +321,12 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          leading: IconButton(
-            icon: Icon(LucideIcons.arrowLeft, color: textColor),
-            onPressed: () => Navigator.pop(context),
-          ),
+          leading: widget.showBackButton
+              ? IconButton(
+                  icon: Icon(LucideIcons.arrowLeft, color: textColor),
+                  onPressed: () => Navigator.pop(context),
+                )
+              : null,
           title: Text(
             p['full_name'],
             style: TextStyle(
