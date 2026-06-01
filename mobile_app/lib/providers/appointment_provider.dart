@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/app_logger.dart';
 import '../core/api_client.dart';
 import '../models/models.dart';
 
@@ -28,7 +29,7 @@ class AppointmentProvider extends ChangeNotifier {
         _appointments.sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
       }
     } catch (e) {
-      print('Fetch appointments error: $e');
+      AppLogger.log('Fetch appointments error: $e');
     } finally {
       _setLoading(false);
     }
@@ -64,7 +65,7 @@ class AppointmentProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     } catch (e) {
-      print('Book appointment error: $e');
+      AppLogger.log('Book appointment error: $e');
       _setLoading(false);
       return false;
     }
@@ -84,7 +85,7 @@ class AppointmentProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print('Update appointment status error: $e');
+      AppLogger.log('Update appointment status error: $e');
       return false;
     }
   }
@@ -95,7 +96,7 @@ class AppointmentProvider extends ChangeNotifier {
       final appt = Appointment.fromJson(apptJson);
       _addOrUpdateLocal(appt);
     } catch (e) {
-      print('Error parsing realtime appointment: $e');
+      AppLogger.log('Error parsing realtime appointment: $e');
     }
   }
 
@@ -110,3 +111,4 @@ class AppointmentProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
+

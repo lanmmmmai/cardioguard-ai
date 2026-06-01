@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../core/app_logger.dart';
 import '../core/api_client.dart';
 import '../core/secure_storage.dart';
 import '../models/models.dart';
 import '../config/app_config.dart';
+import '../services/websocket_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiClient _apiClient = ApiClient();
@@ -55,7 +57,7 @@ class AuthProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = response.data;
         if (data != null && data['dev_otp'] != null) {
-          print('[DEV MODE] OTP generated: ${data['dev_otp']}');
+          AppLogger.log('[DEV MODE] OTP generated: ${data['dev_otp']}');
         }
         return true;
       }
@@ -155,7 +157,7 @@ class AuthProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print('Auto login error: $e');
+      AppLogger.log('Auto login error: $e');
       // If network fails but token exists, we can still load from cache user
       final cachedUser = await _secureStorage.getUser();
       if (cachedUser != null) {
@@ -172,12 +174,13 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _setLoading(true);
     try {
+      WebSocketService.disconnect();
       await _secureStorage.clearSession();
       _currentUser = null;
       _isAuthenticated = false;
       _setError(null);
     } catch (e) {
-      print('Logout error: $e');
+      AppLogger.log('Logout error: $e');
     } finally {
       _setLoading(false);
     }
@@ -185,9 +188,11 @@ class AuthProvider extends ChangeNotifier {
 
   // Silent logout on 401
   void _logoutSilent() {
+    WebSocketService.disconnect();
     _currentUser = null;
     _isAuthenticated = false;
     _errorMessage = 'Phiên làm việc hết hạn. Vui lòng đăng nhập lại.';
     notifyListeners();
   }
 }
+

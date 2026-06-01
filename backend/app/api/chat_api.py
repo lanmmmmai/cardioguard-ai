@@ -9,6 +9,8 @@ import json
 
 router = APIRouter()
 VALID_CHAT_ROLES = {"patient", "doctor"}
+CHAT_SESSIONS_TABLE = "chat_sessions"
+CHAT_MESSAGES_TABLE = "chatbot_messages"
 
 class ChatMessageRequest(BaseModel):
     message: str
@@ -43,9 +45,9 @@ def enforce_chat_role(current_user: dict[str, Any], chat_role: str) -> None:
 
 
 async def ensure_session_owner(session_id: str, user_id: str, role: Optional[str] = None) -> None:
-    query = """
+    query = f"""
     SELECT 1
-    FROM chat_sessions
+    FROM {CHAT_SESSIONS_TABLE}
     WHERE id::text = :session_id AND user_id::text = :user_id
     """
     values = {"session_id": session_id, "user_id": user_id}
@@ -84,26 +86,26 @@ async def send_chat_message(
     # 1. Create or get session
     if not session_id:
         title = request.message[:30] + "..." if len(request.message) > 30 else request.message
-        query = "INSERT INTO chat_sessions (user_id, role, title) VALUES (:user_id, :role, :title) RETURNING id"
+        query = f"INSERT INTO {CHAT_SESSIONS_TABLE} (user_id, role, title) VALUES (:user_id, :role, :title) RETURNING id"
         session_id = await database.execute(query=query, values={"user_id": user_id, "role": chat_role, "title": title})
         session_id = str(session_id)
     else:
         await ensure_session_owner(session_id, user_id, chat_role)
 
     # 2. Save user message
-    query_msg = "INSERT INTO chat_messages (session_id, sender, message, context) VALUES (:session_id, 'user', :message, :context)"
+    query_msg = f"INSERT INTO {CHAT_MESSAGES_TABLE} (session_id, sender, message, context) VALUES (:session_id, 'user', :message, :context)"
     await database.execute(query=query_msg, values={
         "session_id": session_id,
         "message": request.message,
         "context": json.dumps(request.context_data) if request.context_data else None
     })
     await database.execute(
-        "UPDATE chat_sessions SET updated_at = NOW() WHERE id::text = :session_id",
+        f"UPDATE {CHAT_SESSIONS_TABLE} SET updated_at = NOW() WHERE id::text = :session_id",
         {"session_id": session_id},
     )
     
     # 3. Get history for context (Lấy 10 tin nhắn mới nhất và đảo ngược về thứ tự ASC)
-    query_history = "SELECT sender, message FROM chat_messages WHERE session_id::text = :session_id ORDER BY created_at DESC LIMIT 10"
+    query_history = f"SELECT sender, message FROM {CHAT_MESSAGES_TABLE} WHERE session_id::text = :session_id ORDER BY created_at DESC LIMIT 10"
     history_res = await database.fetch_all(query=query_history, values={"session_id": session_id})
     history = [{"sender": row["sender"], "message": row["message"]} for row in reversed(history_res)]
 
@@ -116,10 +118,10 @@ async def send_chat_message(
     )
 
     # 5. Save AI response
-    query_ai_msg = "INSERT INTO chat_messages (session_id, sender, message) VALUES (:session_id, 'ai', :message) RETURNING id, created_at"
+    query_ai_msg = f"INSERT INTO {CHAT_MESSAGES_TABLE} (session_id, sender, message) VALUES (:session_id, 'ai', :message) RETURNING id, created_at"
     ai_msg_id = await database.execute(query=query_ai_msg, values={"session_id": session_id, "message": ai_response_text})
     await database.execute(
-        "UPDATE chat_sessions SET updated_at = NOW() WHERE id::text = :session_id",
+        f"UPDATE {CHAT_SESSIONS_TABLE} SET updated_at = NOW() WHERE id::text = :session_id",
         {"session_id": session_id},
     )
     
@@ -145,7 +147,7 @@ async def get_chat_sessions(
     current_user = await get_user_from_token(authorization)
     role = normalize_chat_role(role)
     enforce_chat_role(current_user, role)
-    query = "SELECT id, title, created_at FROM chat_sessions WHERE user_id = :user_id AND role = :role ORDER BY updated_at DESC LIMIT 20"
+    query = f"SELECT id, title, created_at FROM {CHAT_SESSIONS_TABLE} WHERE user_id = :user_id AND role = :role ORDER BY updated_at DESC LIMIT 20"
     res = await database.fetch_all(query=query, values={"user_id": current_user["id"], "role": role})
     return [ChatSessionResponse(id=str(row["id"]), title=row["title"], created_at=row["created_at"]) for row in res]
 
@@ -156,9 +158,9 @@ async def get_chat_history(
 ):
     current_user = await get_user_from_token(authorization)
     await ensure_session_owner(session_id, current_user["id"])
-    query = """
+    query = f"""
     SELECT id, sender, message, created_at
-    FROM chat_messages
+    FROM {CHAT_MESSAGES_TABLE}
     WHERE session_id::text = :session_id
     ORDER BY created_at ASC
     """

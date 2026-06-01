@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../core/app_logger.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import '../core/secure_storage.dart';
@@ -8,6 +9,7 @@ class WebSocketService {
   static String wsUrl = AppConfig.wsUrl;
   static WebSocketChannel? _channel;
   static bool _isConnected = false;
+  static bool _isIntentionalDisconnect = false;
   static final List<Function(Map<String, dynamic>)> _listeners = [];
 
   static void setWsUrl(String url) {
@@ -26,15 +28,18 @@ class WebSocketService {
 
   static Future<void> connect() async {
     if (_isConnected) return;
+    _isIntentionalDisconnect = false;
 
     try {
       final token = await SecureStorage().getToken();
-      final uriStr = token != null ? '$wsUrl?token=$token' : wsUrl;
-      final uri = Uri.parse(uriStr);
+      final uri = Uri.parse(wsUrl);
 
       _channel = IOWebSocketChannel.connect(uri);
       _isConnected = true;
-      print('WebSocket authenticated connection opened to $wsUrl');
+      AppLogger.log('WebSocket authenticated connection opened to $wsUrl');
+      if (token != null && token.isNotEmpty) {
+        _channel!.sink.add(json.encode({"type": "auth", "token": token}));
+      }
 
       _channel!.stream.listen(
         (message) {
@@ -44,20 +49,20 @@ class WebSocketService {
               listener(data);
             }
           } catch (e) {
-            print('Error parsing WebSocket message: $e');
+            AppLogger.log('Error parsing WebSocket message: $e');
           }
         },
         onError: (err) {
-          print('WebSocket error: $err');
+          AppLogger.log('WebSocket error: $err');
           _handleDisconnect();
         },
         onDone: () {
-          print('WebSocket connection closed.');
+          AppLogger.log('WebSocket connection closed.');
           _handleDisconnect();
         },
       );
     } catch (e) {
-      print('WebSocket connection failed: $e');
+      AppLogger.log('WebSocket connection failed: $e');
       _handleDisconnect();
     }
   }
@@ -66,16 +71,22 @@ class WebSocketService {
     _isConnected = false;
     _channel = null;
     
+    if (_isIntentionalDisconnect) {
+      AppLogger.log('WebSocket disconnected intentionally, skipping auto-reconnect.');
+      return;
+    }
+    
     // Auto-reconnect after 3 seconds
     Future.delayed(const Duration(seconds: 3), () async {
-      if (!_isConnected) {
-        print('Attempting to reconnect WebSocket...');
+      if (!_isConnected && !_isIntentionalDisconnect) {
+        AppLogger.log('Attempting to reconnect WebSocket...');
         await connect();
       }
     });
   }
 
   static void disconnect() {
+    _isIntentionalDisconnect = true;
     _channel?.sink.close();
     _isConnected = false;
     _channel = null;

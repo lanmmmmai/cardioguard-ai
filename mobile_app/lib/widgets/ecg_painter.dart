@@ -25,7 +25,7 @@ class EcgPainter extends CustomPainter {
 
     // Small grids (every 10px)
     final gridPaintSmall = Paint()
-      ..color = const Color(0xFFFF3366).withOpacity(0.04)
+      ..color = const Color(0xFFFF3366).withValues(alpha: 0.04)
       ..strokeWidth = 0.5
       ..style = PaintingStyle.stroke;
 
@@ -38,7 +38,7 @@ class EcgPainter extends CustomPainter {
 
     // Large grid squares (every 50px)
     final gridPaintLarge = Paint()
-      ..color = const Color(0xFFFF3366).withOpacity(0.12)
+      ..color = const Color(0xFFFF3366).withValues(alpha: 0.12)
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
 
@@ -66,7 +66,7 @@ class EcgPainter extends CustomPainter {
 
     // Neon Glow background path
     final glowPaint = Paint()
-      ..color = const Color(0xFF00F2FE).withOpacity(0.4)
+      ..color = const Color(0xFF00F2FE).withValues(alpha: 0.4)
       ..strokeWidth = 5.0
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
@@ -91,7 +91,7 @@ class EcgPainter extends CustomPainter {
 
     // Glow dot
     final dotGlow = Paint()
-      ..color = const Color(0xFFFFFFFF).withOpacity(0.8)
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.8)
       ..style = PaintingStyle.fill
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0);
     canvas.drawCircle(Offset(lastX - 4, lastY), 8.0, dotGlow);
@@ -108,3 +108,4 @@ class EcgPainter extends CustomPainter {
     return oldDelegate.dataPoints != dataPoints || oldDelegate.isDarkTheme != isDarkTheme;
   }
 }
+

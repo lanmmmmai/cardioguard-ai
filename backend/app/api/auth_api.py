@@ -6,6 +6,7 @@ from jose import JWTError, jwt
 from app.core.config import settings
 from app.core.database import database
 from app.core.security import ALGORITHM, SECRET_KEY, hash_password, verify_password, create_access_token
+from app.core.rate_limit import check_rate_limit
 from app.schemas.auth_schema import (
     RegisterRequest, LoginRequest, RegisterOtpRequest,
     ForgotPasswordRequest, ForgotPasswordVerifyRequest, ChangePasswordRequest
@@ -189,8 +190,11 @@ async def send_register_otp_email(email: str, full_name: str, otp: str) -> bool:
 
 
 @router.post("/auth/register/request-otp")
-async def request_register_otp(data: RegisterOtpRequest):
+async def request_register_otp(data: RegisterOtpRequest, request: Request):
+    ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
+    check_rate_limit(ip, email, "/auth/register/request-otp", max_requests=5, window_seconds=60)
+
     check_query = "SELECT id FROM users WHERE email = :email"
     existing_user = await database.fetch_one(
         query=check_query,
@@ -273,6 +277,10 @@ async def register(data: RegisterRequest, request: Request):
 
 @router.post("/auth/login")
 async def login(data: LoginRequest, request: Request):
+    ip = request.client.host if request.client else "unknown"
+    email = data.email.lower()
+    check_rate_limit(ip, email, "/auth/login", max_requests=5, window_seconds=60)
+
     global _users_columns_cache
     if _users_columns_cache is None:
         columns = await database.fetch_all(
@@ -369,7 +377,10 @@ async def login(data: LoginRequest, request: Request):
 
 @router.post("/auth/forgot-password/request-otp")
 async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Request):
+    ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
+    check_rate_limit(ip, email, "/auth/forgot-password/request-otp", max_requests=5, window_seconds=60)
+
     response = generic_forgot_password_response(email)
     user = await database.fetch_one(
         "SELECT id::text AS id, full_name FROM users WHERE email = :email",
@@ -406,7 +417,10 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Requ
 
 @router.post("/auth/forgot-password/verify-otp")
 async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request: Request):
+    ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
+    check_rate_limit(ip, email, "/auth/forgot-password/verify-otp", max_requests=5, window_seconds=60)
+
     otp_result = await verify_otp_token(
         purpose=OTP_PURPOSE_FORGOT_PASSWORD,
         email=email,

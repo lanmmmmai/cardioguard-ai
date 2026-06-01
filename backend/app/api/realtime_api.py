@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+import asyncio
+import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from jose import JWTError, jwt
 from app.websocket.connection_manager import manager
@@ -9,8 +11,30 @@ router = APIRouter()
 
 @router.websocket("/ws/realtime")
 async def websocket_endpoint(websocket: WebSocket):
-    # Fetch token from query parameters: ws://.../ws/realtime?token=JWT_TOKEN
-    token = websocket.query_params.get("token")
+    token = None
+    selected_subprotocol = None
+    protocols_header = websocket.headers.get("sec-websocket-protocol", "")
+    for proto in [p.strip() for p in protocols_header.split(",") if p.strip()]:
+        if proto.startswith("cardioguard.jwt."):
+            token = proto[len("cardioguard.jwt.") :]
+            selected_subprotocol = proto
+            break
+
+    await websocket.accept(subprotocol=selected_subprotocol)
+
+    # Backward compatibility fallback for older clients.
+    if not token:
+        token = websocket.query_params.get("token")
+
+    if not token:
+        try:
+            first_message = await asyncio.wait_for(websocket.receive_text(), timeout=8)
+            payload = json.loads(first_message)
+            if payload.get("type") == "auth":
+                token = payload.get("token")
+        except Exception:
+            token = None
+
     if not token:
         await websocket.close(code=1008, reason="Missing authentication token")
         return
@@ -35,7 +59,6 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=1008, reason="Expired or invalid token")
         return
 
-    # Accept connection and register user details
     await manager.connect(websocket, user_info)
     
     await websocket.send_json({

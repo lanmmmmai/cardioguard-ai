@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/app_logger.dart';
 import '../core/api_client.dart';
 import '../models/models.dart';
 
@@ -31,7 +32,7 @@ class ChatProvider extends ChangeNotifier {
         _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       }
     } catch (e) {
-      print('Fetch chat history error: $e');
+      AppLogger.log('Fetch chat history error: $e');
     } finally {
       _setLoading(false);
     }
@@ -65,7 +66,7 @@ class ChatProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print('Send message error: $e');
+      AppLogger.log('Send message error: $e');
       return false;
     }
   }
@@ -76,7 +77,7 @@ class ChatProvider extends ChangeNotifier {
       final msg = ChatMessage.fromJson(messageJson);
       _appendMessageIfNotExists(msg);
     } catch (e) {
-      print('Error parsing realtime message: $e');
+      AppLogger.log('Error parsing realtime message: $e');
     }
   }
 
@@ -89,3 +90,4 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 }
+

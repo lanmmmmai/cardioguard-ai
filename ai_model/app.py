@@ -36,9 +36,15 @@ app = FastAPI(
 )
 
 # Cho phép frontend gọi API (CORS)
+allowed_origins_raw = os.getenv(
+    "AI_ALLOWED_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,https://cardioguard-ai.vercel.app",
+)
+allowed_origins = [origin.strip() for origin in allowed_origins_raw.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # Trong production nên giới hạn origin
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

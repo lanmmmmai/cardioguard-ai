@@ -121,7 +121,7 @@ class Heart3dPainter extends CustomPainter {
       double depthAlpha = (1.0 - (p.z + 18.0) / 36.0).clamp(0.15, 1.0);
 
       final paint = Paint()
-        ..color = const Color(0xFFFF3366).withOpacity(depthAlpha * 0.85)
+        ..color = const Color(0xFFFF3366).withValues(alpha: depthAlpha * 0.85)
         ..style = PaintingStyle.fill;
 
       double radius = (1.5 * p.scale).clamp(0.6, 4.0);
@@ -130,7 +130,7 @@ class Heart3dPainter extends CustomPainter {
       // Highlight front-most nodes
       if (p.z < -10.0 && randomHighlight.nextDouble() < 0.04) {
         final highlightPaint = Paint()
-          ..color = Colors.white.withOpacity(depthAlpha * 0.9)
+          ..color = Colors.white.withValues(alpha: depthAlpha * 0.9)
           ..style = PaintingStyle.fill;
         canvas.drawCircle(Offset(p.x, p.y), radius * 1.3, highlightPaint);
       }
@@ -145,3 +145,4 @@ class Heart3dPainter extends CustomPainter {
         oldDelegate.isDarkTheme != isDarkTheme;
   }
 }
+

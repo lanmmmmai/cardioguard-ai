@@ -1,7 +1,8 @@
-from fastapi import FastAPI
+import json
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.core.database import connect_db, disconnect_db
+from app.core.database import connect_db, disconnect_db, database
 from app.api.patient_api import router as patient_router
 from app.api.sensor_api import router as sensor_router
 from app.api.alert_api import router as alert_router
@@ -61,6 +62,32 @@ app.include_router(admin_doctor_router)
 app.include_router(email_router)
 app.include_router(feature_router)
 app.include_router(chat_router, prefix="/api/chat", tags=["Chatbot"])
+
+
+@app.get("/health", tags=["System"])
+async def health():
+    try:
+        # Kiểm tra kết nối cơ sở dữ liệu thật
+        await database.execute("SELECT 1")
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "services": {
+                "web_server": "running"
+            }
+        }
+    except Exception as e:
+        return Response(
+            content=json.dumps({
+                "status": "unhealthy",
+                "database": f"error: {str(e)}",
+                "services": {
+                    "web_server": "running"
+                }
+            }),
+            status_code=500,
+            media_type="application/json"
+        )
 
 
 @app.get("/")

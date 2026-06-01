@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'app_logger.dart';
 import 'package:dio/dio.dart';
 import '../config/app_config.dart';
 import 'secure_storage.dart';
@@ -38,7 +39,7 @@ class ApiClient {
         onError: (DioException e, handler) async {
           // Check for 401 Unauthorized
           if (e.response?.statusCode == 401) {
-            print('Session expired (401 Unauthorized)');
+            AppLogger.log('Session expired (401 Unauthorized)');
             // Clear credentials in background
             await SecureStorage().clearSession();
             // Trigger logout redirect if callback registered
@@ -152,6 +153,7 @@ class ApiClient {
         message = 'Đã xảy ra lỗi không xác định.';
         break;
     }
-    print('[Dio API Client Error] $message');
+    AppLogger.log('[Dio API Client Error] $message');
   }
 }
+

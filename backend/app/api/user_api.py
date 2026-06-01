@@ -1,3 +1,4 @@
+import json
 from typing import Any, Optional, Dict
 
 from fastapi import APIRouter, Header, HTTPException, Request
@@ -627,3 +628,67 @@ async def delete_user(
             "id": user_id, 
             "status": "inactive"
         }
+
+
+@router.get("/audit-logs", tags=["admin"])
+async def get_audit_logs(
+    limit: int = 100,
+    offset: int = 0,
+    authorization: Optional[str] = Header(default=None)
+):
+    await require_admin(authorization)
+    rows = await database.fetch_all(
+        """
+        SELECT 
+            id::text as id,
+            user_id::text as user_id,
+            action,
+            entity_type,
+            entity_id,
+            details,
+            ip_address,
+            created_at
+        FROM audit_logs
+        ORDER BY created_at DESC
+        LIMIT :limit OFFSET :offset
+        """,
+        {"limit": limit, "offset": offset}
+    )
+    
+    # helper convert rows to json-friendly list of dicts
+    result = []
+    for row in rows:
+        d = dict(row)
+        # Parse details if it is stringified JSON
+        if d.get("details") and isinstance(d["details"], str):
+            try:
+                d["details"] = json.loads(d["details"])
+            except Exception:
+                pass
+        result.append(d)
+    return result
+
+
+@router.get("/admin/db-performance", tags=["admin"])
+async def db_performance(authorization: Optional[str] = Header(default=None)):
+    await require_admin(authorization)
+    try:
+        rows = await database.fetch_all(
+            """
+            SELECT 
+                query,
+                calls,
+                total_exec_time::double precision as total_exec_time_ms,
+                mean_exec_time::double precision as mean_exec_time_ms,
+                rows::bigint as rows_processed
+            FROM pg_stat_statements
+            ORDER BY total_exec_time DESC
+            LIMIT 10
+            """
+        )
+        return [dict(row) for row in rows]
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Không thể lấy thông số hiệu năng DB. Vui lòng đảm bảo pg_stat_statements đã được kích hoạt và chạy migration. Lỗi: {str(e)}"
+        )

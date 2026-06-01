@@ -59,7 +59,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 height: 90,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFFF3366).withOpacity(0.1),
+                  color: const Color(0xFFFF3366).withValues(alpha: 0.1),
                 ),
                 child: const Icon(
                   Icons.favorite,
@@ -81,7 +81,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 'Hệ thống giám sát sức khỏe thông minh',
                 style: TextStyle(
                   fontSize: 13,
-                  color: isDark ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5),
+                  color: isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.5),
                 ),
               ),
               const SizedBox(height: 48),
@@ -100,3 +100,4 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
+

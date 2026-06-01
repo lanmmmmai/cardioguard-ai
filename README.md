@@ -217,7 +217,7 @@ Tạo `web_frontend/.env` dựa trên [web_frontend/.env.example](/Users/doanlan
 
 ```env
 VITE_API_URL=http://localhost:8000
-VITE_WS_URL=ws://localhost:8000
+VITE_WS_URL=ws://localhost:8000/ws/realtime
 ```
 
 ## Mobile App
@@ -231,6 +231,22 @@ cd mobile_app
 flutter pub get
 flutter run
 ```
+
+Chạy trên điện thoại thật cùng mạng LAN với backend:
+
+```bash
+cd backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+```bash
+cd mobile_app
+flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8000
+```
+
+Ghi chú:
+- `10.0.2.2` chỉ dùng cho Android emulator.
+- Có thể override WebSocket riêng nếu cần: `--dart-define=WS_URL=ws://192.168.1.10:8000/ws/realtime`
 
 Build Android APK:
 

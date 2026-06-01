@@ -1,7 +1,25 @@
 class AppConfig {
-  // Use 10.0.2.2 for Android emulator to access localhost of host machine, or localhost for web/iOS/physical device
-  static const String baseUrl = 'http://10.0.2.2:8000';
-  static const String wsUrl = 'ws://10.0.2.2:8000/ws/realtime';
+  // Android emulator default. Override on real device:
+  // flutter run --dart-define=API_BASE_URL=http://192.168.x.x:8000
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://10.0.2.2:8000',
+  );
+
+  static String get wsUrl {
+    const wsOverride = String.fromEnvironment('WS_URL');
+    if (wsOverride.isNotEmpty) {
+      return wsOverride;
+    }
+    final uri = Uri.parse(baseUrl);
+    final wsScheme = uri.scheme == 'https' ? 'wss' : 'ws';
+    return Uri(
+      scheme: wsScheme,
+      host: uri.host,
+      port: uri.hasPort ? uri.port : null,
+      path: '/ws/realtime',
+    ).toString();
+  }
 
   // API Endpoints
   static const String loginEndpoint = '/auth/login';
