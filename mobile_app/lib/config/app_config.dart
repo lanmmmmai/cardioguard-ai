@@ -36,6 +36,6 @@ class AppConfig {
   static const String keyUser = 'authenticated_user_profile';
 
   // Network Settings
-  static const int connectTimeoutMs = 10000; // 10 seconds
+  static const int connectTimeoutMs = 45000; // 45 seconds (increased for Render free tier cold start)
   static const int receiveTimeoutMs = 15000; // 15 seconds
 }
