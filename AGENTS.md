@@ -11,6 +11,7 @@ For UI/UX redesign or visual polish tasks, read and apply:
 
 - `.codex/skills/cardioguard-healthcare-ui/SKILL.md`
 - `.codex/skills/redesign-existing-projects/SKILL.md`
+- `.codex/skills/full-output-enforcement/SKILL.md` (when implementation requires complete, non-truncated output)
 
 The CardioGuard skill overrides generic taste-skill advice when there is a conflict. This app is a clinical dashboard/product interface, not a landing page.
 
