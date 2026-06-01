@@ -553,7 +553,6 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           Text(title, style: TextStyle(color: textMuted, fontSize: 8, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Row(
-            baseline: TextBaseline.alphabetic,
             crossAxisAlignment: CrossAxisAlignment.baseline,
             children: [
               Text(value, style: TextStyle(color: color, fontSize: 15, fontWeight: FontWeight.bold)),

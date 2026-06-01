@@ -37,10 +37,10 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
 
   void _updateTime() {
     final now = DateTime.now();
-    final ms = String.value(now.millisecond).padLeft(3, '0');
-    final seconds = String.value(now.second).padLeft(2, '0');
-    final minutes = String.value(now.minute).padLeft(2, '0');
-    final hours = String.value(now.hour).padLeft(2, '0');
+    final ms = now.millisecond.toString().padLeft(3, '0');
+    final seconds = now.second.toString().padLeft(2, '0');
+    final minutes = now.minute.toString().padLeft(2, '0');
+    final hours = now.hour.toString().padLeft(2, '0');
     if (mounted) {
       setState(() {
         _timeString = '$hours:$minutes:$seconds.$ms';
