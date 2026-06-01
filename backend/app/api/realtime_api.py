@@ -15,7 +15,8 @@ async def websocket_endpoint(websocket: WebSocket):
     token = None
     selected_subprotocol = None
     protocols_header = websocket.headers.get("sec-websocket-protocol", "")
-    print(f"[WS Debug] New WebSocket handshake initiated. Subprotocols: {protocols_header}")
+    print("🔌 [WS Handshake] Đang yêu cầu kết nối từ thiết bị...")
+    print(f"   └─ Subprotocols: {protocols_header}")
     
     for proto in [p.strip() for p in protocols_header.split(",") if p.strip()]:
         if proto.startswith("cardioguard.jwt."):
@@ -39,7 +40,7 @@ async def websocket_endpoint(websocket: WebSocket):
             token = None
 
     if not token:
-        print("[WS Debug] Connection closed: Missing authentication token.")
+        print("🔴 [WS Rejected] Kết nối bị từ chối: Thiếu mã xác thực (Token)!")
         await websocket.close(code=1008, reason="Missing authentication token")
         return
 
@@ -49,7 +50,7 @@ async def websocket_endpoint(websocket: WebSocket):
         user_id = payload.get("sub")
         
         if not user_id:
-            print("[WS Debug] Connection closed: Invalid token payload (missing sub).")
+            print("🔴 [WS Rejected] Kết nối bị từ chối: Token không có user ID (sub)!")
             await websocket.close(code=1008, reason="Invalid token payload")
             return
 
@@ -62,18 +63,18 @@ async def websocket_endpoint(websocket: WebSocket):
             {"user_id": user_id},
         )
         if not user_row:
-            print(f"[WS Debug] Connection closed: User with ID {user_id} not found in database.")
+            print(f"🔴 [WS Rejected] Kết nối bị từ chối: Không tìm thấy User ID {user_id} trong database!")
             await websocket.close(code=1008, reason="User not found")
             return
         if (user_row["status"] or "").strip().lower() == "inactive":
-            print(f"[WS Debug] Connection closed: Account for User {user_row['email']} is inactive.")
+            print(f"🔴 [WS Rejected] Kết nối bị từ chối: Tài khoản {user_row['email']} đang bị khóa!")
             await websocket.close(code=1008, reason="Account inactive")
             return
 
         email = user_row["email"]
         role = (user_row["role"] or "").strip().lower()
         if role not in {"admin", "doctor", "patient"}:
-            print(f"[WS Debug] Connection closed: User {email} has invalid role: {role}.")
+            print(f"🔴 [WS Rejected] Kết nối bị từ chối: Tài khoản {email} có vai trò không hợp lệ: {role}!")
             await websocket.close(code=1008, reason="Invalid user role")
             return
 
@@ -83,11 +84,14 @@ async def websocket_endpoint(websocket: WebSocket):
             "role": role
         }
     except JWTError as je:
-        print(f"[WS Debug] Connection closed: Expired or invalid JWT token. Error: {je}")
+        print(f"🔴 [WS Rejected] Kết nối bị từ chối: Token hết hạn hoặc không hợp lệ! (Lỗi: {je})")
         await websocket.close(code=1008, reason="Expired or invalid token")
         return
 
-    print(f"[WS Debug] WebSocket successfully authenticated & opened: User {email} (Role: {role})")
+    print("🟢 [WS Connected] Thiết bị đã kết nối và xác thực thành công!")
+    print(f"   ├─ Người dùng : {email}")
+    print(f"   ├─ Vai trò    : {role.upper()}")
+    print(f"   └─ ID Người Dùng: {user_id}")
     await manager.connect(websocket, user_info)
     
     await websocket.send_json({
@@ -100,14 +104,14 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             message = await websocket.receive_text()
             if message == "ping":
-                print(f"[WS Debug] Received ping from {email}")
+                print(f"⚡ [WS Heartbeat] Nhận tín hiệu giữ kết nối (ping) từ {email}")
                 await websocket.send_json({
                     "type": "pong",
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 })
     except WebSocketDisconnect:
-        print(f"[WS Debug] WebSocket disconnected gracefully for User {email}")
+        print(f"❌ [WS Disconnected] Kết nối đóng chủ động từ phía người dùng: {email}")
         manager.disconnect(websocket)
     except Exception as e:
-        print(f"[WS Debug] WebSocket connection error for {email}: {e}")
+        print(f"⚠️ [WS Error] Lỗi kết nối đột ngột cho {email}: {e}")
         manager.disconnect(websocket)

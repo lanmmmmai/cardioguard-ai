@@ -190,7 +190,13 @@ def detect_abnormal_iot(readings: Any) -> list[dict[str, str]]:
 async def create_sensor_data(data: SensorDataCreate, request: Request, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     await ensure_patient_access(current_user, data.patient_id)
-    print(f"[Sensor Debug] Received manual sensor data submit request from User {current_user['email']} for Patient {data.patient_id}. Readings: HR={data.heart_rate}, SpO2={data.spo2}, BP={data.systolic_bp}/{data.diastolic_bp}, ECG={data.ecg_value}")
+    print("📥 [Sensor Data] Nhận dữ liệu đo thủ công từ điện thoại:")
+    print(f"   ├─ Người gửi  : {current_user['email']}")
+    print(f"   ├─ Bệnh nhân  : {data.patient_id}")
+    print(f"   ├─ Nhịp tim   : {data.heart_rate} bpm")
+    print(f"   ├─ SpO2       : {data.spo2} %")
+    print(f"   ├─ Huyết áp   : {data.systolic_bp}/{data.diastolic_bp} mmHg")
+    print(f"   └─ ECG Value  : {data.ecg_value}")
 
     insert_sensor_query = """
     INSERT INTO sensor_data(
@@ -282,7 +288,10 @@ async def create_sensor_data(data: SensorDataCreate, request: Request, authoriza
             "created_at": datetime.now(timezone.utc).isoformat()
         })
 
-    print(f"[Sensor Debug] Manually submitted data saved. Alerts: {alerts}")
+    print(f"💾 [Sensor DB] Đã lưu dữ liệu đo thủ công thành công. (Bất thường: {len(alerts) > 0})")
+    if alerts:
+        print(f"⚠️ [Sensor Alert] PHÁT HIỆN CHỈ SỐ BẤT THƯỜNG! Cảnh báo: {alerts}")
+    print(f"🚀 [WS Broadcast] Đã phát sóng dữ liệu realtime tới kênh bệnh nhân: {data.patient_id}")
     return {
         "message": "Sensor data saved successfully",
         "is_abnormal": len(alerts) > 0,
@@ -317,7 +326,13 @@ async def create_iot_telemetry(
     if not patient_id:
         raise HTTPException(status_code=404, detail="Device does not have assigned patient")
 
-    print(f"[Sensor Debug] Received IoT Telemetry from MAC: {x_device_mac}, UID: {x_device_uid} for Patient {patient_id}. Readings: HR={data.readings.heart_rate}, SpO2={data.readings.spo2}, BP={data.readings.systolic_bp}/{data.readings.diastolic_bp}, ECG={data.readings.ecg_value}")
+    print("📡 [IoT Telemetry] Nhận dữ liệu tự động từ thiết bị IoT:")
+    print(f"   ├─ MAC Thiết bị: {x_device_mac}")
+    print(f"   ├─ Bệnh nhân   : {patient_id}")
+    print(f"   ├─ Nhịp tim    : {data.readings.heart_rate} bpm")
+    print(f"   ├─ SpO2        : {data.readings.spo2} %")
+    print(f"   ├─ Huyết áp    : {data.readings.systolic_bp}/{data.readings.diastolic_bp} mmHg")
+    print(f"   └─ ECG Value   : {data.readings.ecg_value}")
 
     await database.execute(
         """
@@ -416,7 +431,10 @@ async def create_iot_telemetry(
             },
         )
 
-    print(f"[Sensor Debug] IoT Telemetry saved and broadcasted. Alerts generated: {alerts}")
+    print(f"💾 [Sensor DB] Đã lưu dữ liệu telemetry từ thiết bị {x_device_mac} thành công. (Bất thường: {len(alerts) > 0})")
+    if alerts:
+        print(f"⚠️ [Sensor Alert] PHÁT HIỆN CHỈ SỐ BẤT THƯỜNG! Cảnh báo: {alerts}")
+    print(f"🚀 [WS Broadcast] Đã phát sóng dữ liệu realtime tới kênh bệnh nhân: {patient_id}")
     return {
         "message": "Telemetry accepted",
         "patient_id": patient_id,
