@@ -490,7 +490,7 @@ async def send_email(
             cc=payload.cc,
             bcc=payload.bcc,
         )
-        status = "sent" if email_sent else "sent"  # Dev mode cũng tính là sent
+        status = "sent" if email_sent else "simulated"
         sent_at = datetime.now(timezone.utc)
     except Exception as exc:
         status = "failed"

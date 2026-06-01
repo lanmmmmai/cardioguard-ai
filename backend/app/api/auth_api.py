@@ -98,6 +98,9 @@ async def get_user_from_token(authorization: Optional[str]):
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
+    if (user["status"] or "").strip().lower() == "inactive":
+        raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
+
     return {
         "id": user["id"],
         "full_name": user["full_name"],
@@ -261,9 +264,37 @@ async def register(data: RegisterRequest, request: Request):
         }
     )
 
-    # Ghi nhận log đăng ký thành công
-    created_user = await database.fetch_one("SELECT id::text as id FROM users WHERE email = :email", {"email": email})
+    # Đồng bộ hồ sơ patient ngay sau đăng ký để tránh /patients/me trả null.
+    created_user = await database.fetch_one(
+        "SELECT id::text as id, full_name FROM users WHERE email = :email",
+        {"email": email},
+    )
     user_id = created_user["id"] if created_user else None
+    if created_user:
+        patient_columns = await database.fetch_all(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'patients'
+            """
+        )
+        patient_cols = {row["column_name"] for row in patient_columns}
+        patient_values = {
+            "id": user_id,
+            "full_name": created_user["full_name"],
+        }
+        if "user_id" in patient_cols:
+            patient_values["user_id"] = user_id
+        if "phone" in patient_cols:
+            patient_values["phone"] = None
+        insert_columns = ", ".join(patient_values.keys())
+        bind_columns = ", ".join(f":{key}" for key in patient_values.keys())
+        await database.execute(
+            f"INSERT INTO patients ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
+            patient_values,
+        )
+
+    # Ghi nhận log đăng ký thành công
     await log_activity(
         user_id=user_id,
         action="USER_REGISTER_SUCCESS",

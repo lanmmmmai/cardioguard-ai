@@ -78,6 +78,15 @@ def module_config(module: str) -> dict[str, Any]:
     return config
 
 
+def ensure_module_write_allowed(module: str) -> None:
+    # users phải đi qua user_api để giữ đồng bộ patients + soft-delete policy
+    if module == "users":
+        raise HTTPException(
+            status_code=403,
+            detail="Module users chỉ cho phép ghi qua /admin/users để đảm bảo nghiệp vụ an toàn.",
+        )
+
+
 async def require_admin(authorization: Optional[str]) -> dict[str, Any]:
     user = await get_user_from_token(authorization)
     if user["role"] != "admin":
@@ -361,6 +370,7 @@ async def get_cms_record(module: str, record_id: str, authorization: Optional[st
 @router.post("/{module}")
 async def create_cms_record(module: str, payload: dict[str, Any], request: Request, authorization: Optional[str] = Header(default=None)):
     user = await require_admin(authorization)
+    ensure_module_write_allowed(module)
     config = module_config(module)
     table = config["table"]
     columns = await get_columns(table)
@@ -401,6 +411,7 @@ async def create_cms_record(module: str, payload: dict[str, Any], request: Reque
 @router.put("/{module}/{record_id}")
 async def update_cms_record(module: str, record_id: str, payload: dict[str, Any], request: Request, authorization: Optional[str] = Header(default=None)):
     user = await require_admin(authorization)
+    ensure_module_write_allowed(module)
     config = module_config(module)
     table = config["table"]
     columns = await get_columns(table)
@@ -441,6 +452,7 @@ async def update_cms_record(module: str, record_id: str, payload: dict[str, Any]
 @router.delete("/{module}/{record_id}")
 async def delete_cms_record(module: str, record_id: str, request: Request, authorization: Optional[str] = Header(default=None)):
     user = await require_admin(authorization)
+    ensure_module_write_allowed(module)
     config = module_config(module)
     table = config["table"]
     async with AsyncSessionLocal() as session:
@@ -468,6 +480,7 @@ async def delete_cms_record(module: str, record_id: str, request: Request, autho
 @router.post("/{module}/import-csv")
 async def import_cms_csv(module: str, request: Request, file: UploadFile = File(...), authorization: Optional[str] = Header(default=None)):
     user = await require_admin(authorization)
+    ensure_module_write_allowed(module)
     config = module_config(module)
     table = config["table"]
     columns = await get_columns(table)

@@ -5,12 +5,16 @@ class User {
   final String fullName;
   final String email;
   final String role;
+  final String status;
+  final bool mustChangePassword;
 
   User({
     required this.id,
     required this.fullName,
     required this.email,
     required this.role,
+    required this.status,
+    required this.mustChangePassword,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -19,6 +23,8 @@ class User {
       fullName: json['full_name'] ?? '',
       email: json['email'] ?? '',
       role: json['role'] ?? 'patient',
+      status: (json['status'] ?? 'active').toString(),
+      mustChangePassword: json['must_change_password'] == true,
     );
   }
 
@@ -27,6 +33,8 @@ class User {
         'full_name': fullName,
         'email': email,
         'role': role,
+        'status': status,
+        'must_change_password': mustChangePassword,
       };
 }
 
@@ -53,7 +61,9 @@ class Patient {
     return Patient(
       id: json['id'] ?? '',
       fullName: json['full_name'] ?? '',
-      age: json['age'] is int ? json['age'] : int.tryParse(json['age']?.toString() ?? '0') ?? 0,
+      age: json['age'] is int
+          ? json['age']
+          : int.tryParse(json['age']?.toString() ?? '0') ?? 0,
       gender: json['gender'] ?? 'Chưa cập nhật',
       phone: json['phone'] ?? json['email'] ?? '',
       address: json['address'] ?? 'Chưa cập nhật',
@@ -101,8 +111,8 @@ class Appointment {
       title: json['title'] ?? '',
       status: json['status'] ?? 'pending',
       channel: json['channel'] ?? 'offline',
-      scheduledAt: json['scheduled_at'] != null 
-          ? DateTime.parse(json['scheduled_at']) 
+      scheduledAt: json['scheduled_at'] != null
+          ? DateTime.parse(json['scheduled_at'])
           : DateTime.now(),
       notes: json['notes'] ?? '',
     );
@@ -150,8 +160,8 @@ class MedicalRecord {
       diagnosis: json['diagnosis'] ?? '',
       summary: json['summary'] ?? '',
       files: json['files'],
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : DateTime.now(),
     );
   }
@@ -201,8 +211,8 @@ class Prescription {
       frequency: json['frequency'] ?? '',
       instructions: json['instructions'] ?? '',
       status: json['status'] ?? 'active',
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : DateTime.now(),
     );
   }
@@ -250,8 +260,8 @@ class ChatMessage {
       recipientId: json['recipient_id'] ?? '',
       message: json['message'] ?? '',
       isRead: json['is_read'] ?? false,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : DateTime.now(),
     );
   }
@@ -298,8 +308,8 @@ class Alert {
       message: json['message'] ?? '',
       severity: json['severity'] ?? 'warning',
       isResolved: json['is_resolved'] ?? false,
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at']) 
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'])
           : DateTime.now(),
     );
   }

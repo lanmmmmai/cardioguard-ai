@@ -5,6 +5,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from jose import JWTError, jwt
 from app.websocket.connection_manager import manager
 from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.database import database
 
 router = APIRouter()
 
@@ -43,17 +44,36 @@ async def websocket_endpoint(websocket: WebSocket):
         # Decode and verify the JWT token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
-        email = payload.get("email")
-        role = payload.get("role")
         
-        if not user_id or not role:
+        if not user_id:
             await websocket.close(code=1008, reason="Invalid token payload")
             return
-            
+
+        user_row = await database.fetch_one(
+            """
+            SELECT email, role, status
+            FROM users
+            WHERE id::text = :user_id
+            """,
+            {"user_id": user_id},
+        )
+        if not user_row:
+            await websocket.close(code=1008, reason="User not found")
+            return
+        if (user_row["status"] or "").strip().lower() == "inactive":
+            await websocket.close(code=1008, reason="Account inactive")
+            return
+
+        email = user_row["email"]
+        role = (user_row["role"] or "").strip().lower()
+        if role not in {"admin", "doctor", "patient"}:
+            await websocket.close(code=1008, reason="Invalid user role")
+            return
+
         user_info = {
             "id": user_id,
             "email": email,
-            "role": role.strip().lower()
+            "role": role
         }
     except JWTError:
         await websocket.close(code=1008, reason="Expired or invalid token")

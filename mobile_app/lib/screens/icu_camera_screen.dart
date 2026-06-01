@@ -11,7 +11,8 @@ class IcuCameraScreen extends StatefulWidget {
   State<IcuCameraScreen> createState() => _IcuCameraScreenState();
 }
 
-class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProviderStateMixin {
+class _IcuCameraScreenState extends State<IcuCameraScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   Timer? _timer;
   String _timeString = '';
@@ -58,11 +59,17 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDarkTheme;
-    final primaryBg = isDark ? const Color(0xFF07080A) : const Color(0xFFF5F6F8);
-    final cardBg = isDark ? const Color(0xFF11151D).withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.9);
+    final primaryBg =
+        isDark ? const Color(0xFF07080A) : const Color(0xFFF5F6F8);
+    final cardBg = isDark
+        ? const Color(0xFF11151D).withValues(alpha: 0.7)
+        : Colors.white.withValues(alpha: 0.9);
     final textColor = isDark ? Colors.white : const Color(0xFF1D2939);
-    final textMuted = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08);
+    final textMuted =
+        isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.07)
+        : Colors.black.withValues(alpha: 0.08);
 
     final double timestamp = DateTime.now().millisecondsSinceEpoch.toDouble();
 
@@ -82,35 +89,44 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
                     children: [
                       Text(
                         'Camera Giả Lập ICU',
-                        style: TextStyle(fontSize: 22,
+                        style: TextStyle(
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: textColor,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Theo dõi luồng video trực tiếp từ giường bệnh hồi sức',
-                        style: TextStyle(color: textMuted, fontSize: 13,),
+                        'Màn hình mô phỏng camera ICU phục vụ demo giao diện',
+                        style: TextStyle(
+                          color: textMuted,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xFF39FF14).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF39FF14).withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color:
+                              const Color(0xFF39FF14).withValues(alpha: 0.3)),
                     ),
                     child: const Row(
                       children: [
-                        Icon(LucideIcons.radio, size: 12, color: Color(0xFF39FF14)),
+                        Icon(LucideIcons.radio,
+                            size: 12, color: Color(0xFF39FF14)),
                         SizedBox(width: 6),
                         Text(
-                          'LIVE STREAM',
+                          'SIMULATED FEED',
                           style: TextStyle(
                             fontSize: 10,
                             color: Color(0xFF39FF14),
-                            fontWeight: FontWeight.bold,),
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
@@ -122,7 +138,8 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
             // Camera viewport wrapper
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Container(
                   width: double.infinity,
                   decoration: BoxDecoration(
@@ -165,7 +182,7 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
                 ),
               ),
             ),
-            
+
             // Camera details info
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -178,14 +195,16 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
                 ),
                 child: Row(
                   children: [
-                    const Icon(LucideIcons.alertCircle, color: Color(0xFF39FF14), size: 18),
+                    const Icon(LucideIcons.alertCircle,
+                        color: Color(0xFF39FF14), size: 18),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Hệ thống đang hiển thị tín hiệu hồng ngoại từ Giường 04. Cảm biến lồng ngực thở (biên độ chest rise) đang hoạt động tự động.',
+                        'Luồng hiển thị đang ở chế độ mô phỏng. Không sử dụng như nguồn camera lâm sàng thực tế.',
                         style: TextStyle(
                           color: textMuted,
-                          fontSize: 12,),
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ],
@@ -233,17 +252,39 @@ class _IcuCameraPainter extends CustomPainter {
     const double len = 15.0;
 
     // Top Left
-    canvas.drawPath(Path()..moveTo(margin + len, margin)..lineTo(margin, margin)..lineTo(margin, margin + len), bracketPaint);
+    canvas.drawPath(
+        Path()
+          ..moveTo(margin + len, margin)
+          ..lineTo(margin, margin)
+          ..lineTo(margin, margin + len),
+        bracketPaint);
     // Top Right
-    canvas.drawPath(Path()..moveTo(width - margin - len, margin)..lineTo(width - margin, margin)..lineTo(width - margin, margin + len), bracketPaint);
+    canvas.drawPath(
+        Path()
+          ..moveTo(width - margin - len, margin)
+          ..lineTo(width - margin, margin)
+          ..lineTo(width - margin, margin + len),
+        bracketPaint);
     // Bottom Left
-    canvas.drawPath(Path()..moveTo(margin + len, height - margin)..lineTo(margin, height - margin)..lineTo(margin, height - margin - len), bracketPaint);
+    canvas.drawPath(
+        Path()
+          ..moveTo(margin + len, height - margin)
+          ..lineTo(margin, height - margin)
+          ..lineTo(margin, height - margin - len),
+        bracketPaint);
     // Bottom Right
-    canvas.drawPath(Path()..moveTo(width - margin - len, height - margin)..lineTo(width - margin, height - margin)..lineTo(width - margin, height - margin - len), bracketPaint);
+    canvas.drawPath(
+        Path()
+          ..moveTo(width - margin - len, height - margin)
+          ..lineTo(width - margin, height - margin)
+          ..lineTo(width - margin, height - margin - len),
+        bracketPaint);
 
     // 3. Draw center crosshair
-    canvas.drawLine(Offset(width / 2 - 10, height / 2), Offset(width / 2 + 10, height / 2), bracketPaint);
-    canvas.drawLine(Offset(width / 2, height / 2 - 10), Offset(width / 2, height / 2 + 10), bracketPaint);
+    canvas.drawLine(Offset(width / 2 - 10, height / 2),
+        Offset(width / 2 + 10, height / 2), bracketPaint);
+    canvas.drawLine(Offset(width / 2, height / 2 - 10),
+        Offset(width / 2, height / 2 + 10), bracketPaint);
 
     // 4. Draw Bed & Silhouette
     final bedPaint = Paint()
@@ -257,9 +298,12 @@ class _IcuCameraPainter extends CustomPainter {
 
     // Bed base frame & legs
     canvas.drawLine(Offset(bedX1, bedY), Offset(bedX2, bedY), bedPaint);
-    canvas.drawLine(Offset(bedX1 + 30, bedY), Offset(bedX1 + 30, bedY + 45), bedPaint);
-    canvas.drawLine(Offset(bedX2 - 30, bedY), Offset(bedX2 - 30, bedY + 45), bedPaint);
-    canvas.drawLine(Offset(bedX1, bedY), Offset(bedX1 - 12, bedY - 30), bedPaint); // headrest
+    canvas.drawLine(
+        Offset(bedX1 + 30, bedY), Offset(bedX1 + 30, bedY + 45), bedPaint);
+    canvas.drawLine(
+        Offset(bedX2 - 30, bedY), Offset(bedX2 - 30, bedY + 45), bedPaint);
+    canvas.drawLine(Offset(bedX1, bedY), Offset(bedX1 - 12, bedY - 30),
+        bedPaint); // headrest
 
     // Chest rise animation expansion (sine wave breathing)
     final breathTime = timestamp / 4000.0;
@@ -276,13 +320,19 @@ class _IcuCameraPainter extends CustomPainter {
     final pChestY = bedY - 15;
 
     // Pillow
-    canvas.drawArc(Rect.fromCircle(center: Offset(pHeadX - 10, bedY - 8), radius: 10), math.pi, math.pi, false, bedPaint);
-    
+    canvas.drawArc(
+        Rect.fromCircle(center: Offset(pHeadX - 10, bedY - 8), radius: 10),
+        math.pi,
+        math.pi,
+        false,
+        bedPaint);
+
     // Head
     canvas.drawCircle(Offset(pHeadX, pHeadY), 10.0, patientPaint);
-    
+
     // Neck & Shoulder
-    canvas.drawLine(Offset(pHeadX + 8, pHeadY + 5), Offset(pHeadX + 16, bedY - 8), patientPaint);
+    canvas.drawLine(Offset(pHeadX + 8, pHeadY + 5),
+        Offset(pHeadX + 16, bedY - 8), patientPaint);
 
     // Chest & body path with breathing
     final bodyPath = Path()
@@ -300,8 +350,10 @@ class _IcuCameraPainter extends CustomPainter {
     // IV Stand
     final ivX = pHeadX - 25;
     canvas.drawLine(Offset(ivX, bedY + 30), Offset(ivX, bedY - 90), bedPaint);
-    canvas.drawLine(Offset(ivX - 10, bedY - 90), Offset(ivX + 10, bedY - 90), bedPaint);
-    canvas.drawRect(Rect.fromLTWH(ivX - 8, bedY - 82, 6, 14), bedPaint); // fluid bag
+    canvas.drawLine(
+        Offset(ivX - 10, bedY - 90), Offset(ivX + 10, bedY - 90), bedPaint);
+    canvas.drawRect(
+        Rect.fromLTWH(ivX - 8, bedY - 82, 6, 14), bedPaint); // fluid bag
     // drip wire
     final wirePath = Path()
       ..moveTo(ivX - 5, bedY - 68)
@@ -315,11 +367,16 @@ class _IcuCameraPainter extends CustomPainter {
     final bool isRecFlash = (timestamp ~/ 600) % 2 == 0;
     if (isRecFlash) {
       // Red dot
-      canvas.drawCircle(const Offset(margin + 10, margin + 12), 4.0, Paint()..color = const Color(0xFFFF073A));
-      
+      canvas.drawCircle(const Offset(margin + 10, margin + 12), 4.0,
+          Paint()..color = const Color(0xFFFF073A));
+
       textPainter.text = const TextSpan(
         text: 'REC',
-        style: TextStyle(color: Color(0xFFFF3366), fontSize: 10, fontWeight: FontWeight.bold,),
+        style: TextStyle(
+          color: Color(0xFFFF3366),
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
       );
       textPainter.layout();
       textPainter.paint(canvas, const Offset(margin + 20, margin + 6));
@@ -328,7 +385,11 @@ class _IcuCameraPainter extends CustomPainter {
     // Camera name
     textPainter.text = const TextSpan(
       text: 'CAM 04 - ICU ROOM',
-      style: TextStyle(color: Color(0xFF39FF14), fontSize: 10, fontWeight: FontWeight.bold,),
+      style: TextStyle(
+        color: Color(0xFF39FF14),
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+      ),
     );
     textPainter.layout();
     textPainter.paint(canvas, const Offset(margin + 10, margin + 26));
@@ -336,7 +397,11 @@ class _IcuCameraPainter extends CustomPainter {
     // Connection status
     textPainter.text = const TextSpan(
       text: 'CONN: ACTIVE',
-      style: TextStyle(color: Color(0xFF39FF14), fontSize: 9, fontWeight: FontWeight.bold,),
+      style: TextStyle(
+        color: Color(0xFF39FF14),
+        fontSize: 9,
+        fontWeight: FontWeight.bold,
+      ),
     );
     textPainter.layout();
     textPainter.paint(canvas, Offset(width - margin - 80, margin + 10));
@@ -344,7 +409,11 @@ class _IcuCameraPainter extends CustomPainter {
     // Clock Timecode
     textPainter.text = TextSpan(
       text: timeString,
-      style: const TextStyle(color: Color(0xFF39FF14), fontSize: 10, fontWeight: FontWeight.bold,),
+      style: const TextStyle(
+        color: Color(0xFF39FF14),
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+      ),
     );
     textPainter.layout();
     textPainter.paint(canvas, Offset(margin + 10, height - margin - 15));
@@ -352,7 +421,8 @@ class _IcuCameraPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _IcuCameraPainter oldDelegate) {
-    return oldDelegate.timestamp != timestamp || oldDelegate.timeString != timeString;
+    return oldDelegate.timestamp != timestamp ||
+        oldDelegate.timeString != timeString;
   }
 }
 
@@ -374,11 +444,12 @@ class _CrtOverlayPainter extends CustomPainter {
 
     final double speed = (timestamp / 12) % height;
     canvas.drawLine(Offset(0, speed), Offset(width, speed), scanlinePaint);
-    canvas.drawLine(Offset(0, (speed + 8) % height), Offset(width, (speed + 8) % height), scanlinePaint..color = const Color(0xFF39FF14).withValues(alpha: 0.04));
+    canvas.drawLine(
+        Offset(0, (speed + 8) % height),
+        Offset(width, (speed + 8) % height),
+        scanlinePaint..color = const Color(0xFF39FF14).withValues(alpha: 0.04));
   }
 
   @override
   bool shouldRepaint(covariant _CrtOverlayPainter oldDelegate) => true;
 }
-
-

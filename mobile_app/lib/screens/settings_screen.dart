@@ -35,6 +35,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isChangingPassword = false;
   bool _isSavingProfile = false;
 
+  String? _validatePasswordPolicy(String? value) {
+    final v = value ?? '';
+    if (v.length < 8 || v.length > 72) {
+      return 'Mật khẩu phải từ 8 đến 72 ký tự';
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(v)) {
+      return 'Mật khẩu phải có ít nhất 1 chữ hoa';
+    }
+    if (!RegExp(r'[A-Za-z]').hasMatch(v)) {
+      return 'Mật khẩu phải chứa chữ cái';
+    }
+    if (!RegExp(r'\d').hasMatch(v)) {
+      return 'Mật khẩu phải có ít nhất 1 chữ số';
+    }
+    if (!RegExp(r'[^A-Za-z\d]').hasMatch(v)) {
+      return 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt';
+    }
+    return null;
+  }
+
   @override
   void dispose() {
     _currentPasswordController.dispose();
@@ -54,7 +74,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       if (authProvider.currentUser?.role == 'patient') {
-        final patientProvider = Provider.of<PatientProvider>(context, listen: false);
+        final patientProvider =
+            Provider.of<PatientProvider>(context, listen: false);
         patientProvider.fetchMyProfile().then((_) {
           final profile = patientProvider.currentPatientProfile;
           if (profile != null) {
@@ -90,13 +111,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _newPasswordController.clear();
         _confirmPasswordController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đổi mật khẩu thành công!'), backgroundColor: Colors.green),
+          const SnackBar(
+              content: Text('Đổi mật khẩu thành công!'),
+              backgroundColor: Colors.green),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mật khẩu hiện tại không đúng.'), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text('Mật khẩu hiện tại không đúng.'),
+            backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) {
@@ -109,7 +134,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!_profileFormKey.currentState!.validate()) return;
     setState(() => _isSavingProfile = true);
 
-    final patientProvider = Provider.of<PatientProvider>(context, listen: false);
+    final patientProvider =
+        Provider.of<PatientProvider>(context, listen: false);
     final age = int.tryParse(_ageController.text) ?? 0;
 
     final success = await patientProvider.updateMyProfile(
@@ -125,11 +151,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cập nhật hồ sơ thành công!'), backgroundColor: Colors.green),
+        const SnackBar(
+            content: Text('Cập nhật hồ sơ thành công!'),
+            backgroundColor: Colors.green),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lỗi cập nhật hồ sơ.'), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text('Lỗi cập nhật hồ sơ.'), backgroundColor: Colors.red),
       );
     }
   }
@@ -145,11 +174,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     final cardBg = isDark ? const Color(0xFF11151D) : Colors.white;
-    final textMuted = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.5);
+    final textMuted = isDark
+        ? Colors.white.withValues(alpha: 0.5)
+        : Colors.black.withValues(alpha: 0.5);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cài đặt tài khoản', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Cài đặt tài khoản',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
@@ -165,15 +197,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: cardBg,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.07)
+                      : Colors.black.withValues(alpha: 0.08),
                 ),
               ),
               child: Row(
                 children: [
                   CircleAvatar(
                     radius: 30,
-                    backgroundColor: const Color(0xFFFF3366).withValues(alpha: 0.1),
-                    child: const Icon(LucideIcons.user, color: Color(0xFFFF3366), size: 30),
+                    backgroundColor:
+                        const Color(0xFFFF3366).withValues(alpha: 0.1),
+                    child: const Icon(LucideIcons.user,
+                        color: Color(0xFFFF3366), size: 30),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -182,7 +218,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         Text(
                           currentUser.fullName,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -191,9 +228,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         const SizedBox(height: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF3366).withValues(alpha: 0.1),
+                            color:
+                                const Color(0xFFFF3366).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -215,7 +254,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // Profile Edit Form (only for Patient role)
             if (currentUser.role == 'patient') ...[
-              const Text('HỒ SƠ CÁ NHÂN', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFF3366))),
+              const Text('HỒ SƠ CÁ NHÂN',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFFF3366))),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(16),
@@ -223,7 +266,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: cardBg,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08),
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.07)
+                        : Colors.black.withValues(alpha: 0.08),
                   ),
                 ),
                 child: Form(
@@ -234,31 +279,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         controller: _ageController,
                         decoration: const InputDecoration(labelText: 'Tuổi'),
                         keyboardType: TextInputType.number,
-                        validator: (v) => (v == null || v.isEmpty) ? 'Vui lòng nhập tuổi' : null,
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Vui lòng nhập tuổi'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _genderController,
-                        decoration: const InputDecoration(labelText: 'Giới tính'),
-                        validator: (v) => (v == null || v.isEmpty) ? 'Vui lòng nhập giới tính' : null,
+                        decoration:
+                            const InputDecoration(labelText: 'Giới tính'),
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Vui lòng nhập giới tính'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _phoneController,
-                        decoration: const InputDecoration(labelText: 'Số điện thoại'),
+                        decoration:
+                            const InputDecoration(labelText: 'Số điện thoại'),
                         keyboardType: TextInputType.phone,
-                        validator: (v) => (v == null || v.isEmpty) ? 'Vui lòng nhập SĐT' : null,
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Vui lòng nhập SĐT'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _addressController,
                         decoration: const InputDecoration(labelText: 'Địa chỉ'),
-                        validator: (v) => (v == null || v.isEmpty) ? 'Vui lòng nhập địa chỉ' : null,
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Vui lòng nhập địa chỉ'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _historyController,
-                        decoration: const InputDecoration(labelText: 'Tiền sử bệnh án'),
+                        decoration:
+                            const InputDecoration(labelText: 'Tiền sử bệnh án'),
                         maxLines: 2,
                       ),
                       const SizedBox(height: 16),
@@ -266,14 +322,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: _isSavingProfile ? null : _savePatientProfile,
+                          onPressed:
+                              _isSavingProfile ? null : _savePatientProfile,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFFF3366),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
                           ),
                           child: _isSavingProfile
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text('Lưu thông tin hồ sơ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white)
+                              : const Text('Lưu thông tin hồ sơ',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
@@ -284,18 +346,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
 
             // Theme Options
-            const Text('HỆ THỐNG', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFF3366))),
+            const Text('HỆ THỐNG',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFFF3366))),
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
                 color: cardBg,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.07)
+                      : Colors.black.withValues(alpha: 0.08),
                 ),
               ),
               child: SwitchListTile(
-                title: const Text('Chế độ tối (Dark Mode)', style: TextStyle(fontWeight: FontWeight.w600)),
+                title: const Text('Chế độ tối (Dark Mode)',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
                 value: widget.isDarkTheme,
                 activeThumbColor: const Color(0xFFFF3366),
                 onChanged: (_) => widget.onToggleTheme(),
@@ -304,7 +373,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 24),
 
             // Change Password Form
-            const Text('ĐỔI MẬT KHẨU', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFF3366))),
+            const Text('ĐỔI MẬT KHẨU',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFFF3366))),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(16),
@@ -312,7 +385,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: cardBg,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.07)
+                      : Colors.black.withValues(alpha: 0.08),
                 ),
               ),
               child: Form(
@@ -321,25 +396,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     TextFormField(
                       controller: _currentPasswordController,
-                      decoration: const InputDecoration(labelText: 'Mật khẩu hiện tại'),
+                      decoration:
+                          const InputDecoration(labelText: 'Mật khẩu hiện tại'),
                       obscureText: true,
-                      validator: (v) => (v == null || v.length < 6) ? 'Mật khẩu phải từ 6 ký tự' : null,
+                      validator: _validatePasswordPolicy,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _newPasswordController,
-                      decoration: const InputDecoration(labelText: 'Mật khẩu mới'),
+                      decoration:
+                          const InputDecoration(labelText: 'Mật khẩu mới'),
                       obscureText: true,
-                      validator: (v) => (v == null || v.length < 6) ? 'Mật khẩu phải từ 6 ký tự' : null,
+                      validator: _validatePasswordPolicy,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _confirmPasswordController,
-                      decoration: const InputDecoration(labelText: 'Xác nhận mật khẩu mới'),
+                      decoration: const InputDecoration(
+                          labelText: 'Xác nhận mật khẩu mới'),
                       obscureText: true,
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Vui lòng xác nhận mật khẩu';
-                        if (v != _newPasswordController.text) return 'Mật khẩu xác nhận không khớp';
+                        if (v == null || v.isEmpty) {
+                          return 'Vui lòng xác nhận mật khẩu';
+                        }
+                        if (v != _newPasswordController.text) {
+                          return 'Mật khẩu xác nhận không khớp';
+                        }
                         return null;
                       },
                     ),
@@ -351,11 +433,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         onPressed: _isChangingPassword ? null : _changePassword,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFF3366),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                         child: _isChangingPassword
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : const Text('Cập nhật mật khẩu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            ? const CircularProgressIndicator(
+                                color: Colors.white)
+                            : const Text('Cập nhật mật khẩu',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
@@ -372,14 +459,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onPressed: () async {
                   await authProvider.logout();
                   if (context.mounted) {
-                    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                    Navigator.pushNamedAndRemoveUntil(
+                        context, '/login', (route) => false);
                   }
                 },
                 icon: const Icon(LucideIcons.logOut, color: Color(0xFFFF3366)),
-                label: const Text('Đăng xuất tài khoản', style: TextStyle(color: Color(0xFFFF3366), fontWeight: FontWeight.bold)),
+                label: const Text('Đăng xuất tài khoản',
+                    style: TextStyle(
+                        color: Color(0xFFFF3366), fontWeight: FontWeight.bold)),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFFFF3366)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
@@ -390,5 +481,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-
-

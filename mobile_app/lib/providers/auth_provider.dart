@@ -22,6 +22,8 @@ class AuthProvider extends ChangeNotifier {
   bool _isAuthenticated = false;
   bool get isAuthenticated => _isAuthenticated;
 
+  bool get requiresPasswordChange => _currentUser?.mustChangePassword == true;
+
   // Initialize and register 401 callback
   void init() {
     ApiClient.onUnauthorized = () {
@@ -52,7 +54,7 @@ class AuthProvider extends ChangeNotifier {
         },
       );
       _setLoading(false);
-      
+
       // In development mode, the response may contain the dev_otp key
       if (response.statusCode == 200) {
         final data = response.data;
@@ -122,7 +124,12 @@ class AuthProvider extends ChangeNotifier {
           // Save to secure storage
           await _secureStorage.saveToken(token);
           await _secureStorage.saveUser(userJson);
-          
+
+          if (_currentUser?.mustChangePassword == true) {
+            _setError(
+                'Bạn phải đổi mật khẩu trước khi tiếp tục sử dụng hệ thống.');
+          }
+
           _setLoading(false);
           return true;
         }
@@ -158,14 +165,11 @@ class AuthProvider extends ChangeNotifier {
       return false;
     } catch (e) {
       AppLogger.log('Auto login error: $e');
-      // If network fails but token exists, we can still load from cache user
-      final cachedUser = await _secureStorage.getUser();
-      if (cachedUser != null) {
-        _currentUser = User.fromJson(cachedUser);
-        _isAuthenticated = true;
-        notifyListeners();
-        return true;
-      }
+      _currentUser = null;
+      _isAuthenticated = false;
+      _errorMessage =
+          'Không thể xác minh phiên đăng nhập. Vui lòng kiểm tra mạng và đăng nhập lại.';
+      notifyListeners();
       return false;
     }
   }
@@ -195,4 +199,3 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
-
