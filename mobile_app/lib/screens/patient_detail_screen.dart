@@ -6,7 +6,6 @@ import 'package:fl_chart/fl_chart.dart';
 import '../providers/auth_provider.dart';
 import '../providers/patient_provider.dart';
 import '../providers/chat_provider.dart';
-import '../models/models.dart';
 import '../services/websocket_service.dart';
 
 class PatientDetailScreen extends StatefulWidget {

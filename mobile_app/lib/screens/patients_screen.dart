@@ -73,7 +73,6 @@ class _PatientsScreenState extends State<PatientsScreen> {
             }
 
             final patientProvider = Provider.of<PatientProvider>(context);
-            final primaryBg = widget.isDarkTheme ? const Color(0xFF07080A) : const Color(0xFFF5F6F8);
             final itemBg = widget.isDarkTheme ? const Color(0xFF1C222D) : Colors.black.withOpacity(0.02);
 
             return Padding(
