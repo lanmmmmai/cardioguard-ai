@@ -2,7 +2,7 @@ import json
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.core.database import connect_db, disconnect_db
+from app.core.database import connect_db, disconnect_db, database
 from app.api.patient_api import router as patient_router
 from app.api.sensor_api import router as sensor_router
 from app.api.alert_api import router as alert_router

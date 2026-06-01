@@ -23,6 +23,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _passwordFormKey = GlobalKey<FormState>();
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   final _profileFormKey = GlobalKey<FormState>();
   final _ageController = TextEditingController();
@@ -38,6 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     _ageController.dispose();
     _genderController.dispose();
     _phoneController.dispose();
@@ -78,6 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         data: {
           'current_password': _currentPasswordController.text,
           'new_password': _newPasswordController.text,
+          'confirm_password': _confirmPasswordController.text,
         },
       );
 
@@ -85,6 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (!mounted) return;
         _currentPasswordController.clear();
         _newPasswordController.clear();
+        _confirmPasswordController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Đổi mật khẩu thành công!'), backgroundColor: Colors.green),
         );
@@ -327,6 +331,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       decoration: const InputDecoration(labelText: 'Mật khẩu mới'),
                       obscureText: true,
                       validator: (v) => (v == null || v.length < 6) ? 'Mật khẩu phải từ 6 ký tự' : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _confirmPasswordController,
+                      decoration: const InputDecoration(labelText: 'Xác nhận mật khẩu mới'),
+                      obscureText: true,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Vui lòng xác nhận mật khẩu';
+                        if (v != _newPasswordController.text) return 'Mật khẩu xác nhận không khớp';
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
                     SizedBox(

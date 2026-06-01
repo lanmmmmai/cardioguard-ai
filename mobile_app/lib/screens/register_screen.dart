@@ -22,6 +22,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _localError;
   String? _successMessage;
 
+  String? _validatePassword(String? value) {
+    final v = (value ?? '').trim();
+    if (v.length < 8) return 'Mật khẩu phải từ 8 ký tự';
+    if (!RegExp(r'[A-Z]').hasMatch(v)) return 'Mật khẩu cần ít nhất 1 chữ hoa';
+    if (!RegExp(r'[a-zA-Z]').hasMatch(v)) return 'Mật khẩu cần chứa chữ cái';
+    if (!RegExp(r'\d').hasMatch(v)) return 'Mật khẩu cần ít nhất 1 chữ số';
+    if (!RegExp(r'[^A-Za-z\d]').hasMatch(v)) return 'Mật khẩu cần ít nhất 1 ký tự đặc biệt';
+    return null;
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -62,7 +72,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     final otp = _otpController.text.trim();
-    if (otp.isEmpty || otp.length < 6) {
+    if (!RegExp(r'^\d{6}$').hasMatch(otp)) {
       setState(() => _localError = 'Vui lòng nhập mã OTP gồm 6 chữ số');
       return;
     }
@@ -269,7 +279,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     labelStyle: TextStyle(color: textMutedColor),
                                     prefixIcon: Icon(LucideIcons.lock, color: textMutedColor.withValues(alpha: 0.8), size: 18),
                                   ),
-                                  validator: (v) => (v == null || v.length < 6) ? 'Mật khẩu phải từ 6 ký tự' : null,
+                                  validator: _validatePassword,
                                 ),
                                 
                                 // Step 2 input (Visible only after OTP is sent)
