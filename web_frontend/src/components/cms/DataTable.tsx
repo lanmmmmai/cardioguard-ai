@@ -55,15 +55,23 @@ export const DataTable: React.FC<DataTableProps> = ({
       <table className="cms-table">
         <thead>
           <tr>
-            {orderedNames.map((column) => (
-              <th key={column}>
-                <button type="button" onClick={() => onSort(column)}>
-                  {column}
-                  {sortBy === column ? (sortDir === 'asc' ? <ArrowUpAZ size={14} /> : <ArrowDownAZ size={14} />) : null}
-                </button>
-              </th>
-            ))}
-            <th>Actions</th>
+            {orderedNames.map((column) => {
+              const isSorted = sortBy === column;
+              const ariaSort = isSorted ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none';
+              return (
+                <th key={column} aria-sort={ariaSort}>
+                  <button 
+                    type="button" 
+                    onClick={() => onSort(column)}
+                    aria-label={`Sắp xếp theo cột ${column}. ${isSorted ? (sortDir === 'asc' ? 'Đang sắp xếp tăng dần' : 'Đang sắp xếp giảm dần') : 'Chưa sắp xếp'}`}
+                  >
+                    {column}
+                    {isSorted ? (sortDir === 'asc' ? <ArrowUpAZ size={14} /> : <ArrowDownAZ size={14} />) : null}
+                  </button>
+                </th>
+              );
+            })}
+            <th>Thao tác</th>
           </tr>
         </thead>
         <tbody>
@@ -74,10 +82,40 @@ export const DataTable: React.FC<DataTableProps> = ({
               ))}
               <td>
                 <div className="cms-row-actions">
-                  <button type="button" title="Chi tiết" onClick={() => onView(row)}><Eye size={15} /></button>
-                  {onAssignPatient && <button type="button" title="Assign patient" onClick={() => onAssignPatient(row)}>Assign</button>}
-                  <button type="button" title="Sửa" onClick={() => onEdit(row)}><Pencil size={15} /></button>
-                  <button type="button" title="Xóa" onClick={() => onDelete(row)}><Trash2 size={15} /></button>
+                  <button 
+                    type="button" 
+                    title="Chi tiết" 
+                    onClick={() => onView(row)}
+                    aria-label={`Xem chi tiết bản ghi ID ${row.id || ''}`}
+                  >
+                    <Eye size={15} />
+                  </button>
+                  {onAssignPatient && (
+                    <button 
+                      type="button" 
+                      title="Assign patient" 
+                      onClick={() => onAssignPatient(row)}
+                      aria-label={`Phân công bệnh nhân cho bản ghi ID ${row.id || ''}`}
+                    >
+                      Assign
+                    </button>
+                  )}
+                  <button 
+                    type="button" 
+                    title="Sửa" 
+                    onClick={() => onEdit(row)}
+                    aria-label={`Chỉnh sửa bản ghi ID ${row.id || ''}`}
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button 
+                    type="button" 
+                    title="Xóa" 
+                    onClick={() => onDelete(row)}
+                    aria-label={`Xóa bản ghi ID ${row.id || ''}`}
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               </td>
             </tr>

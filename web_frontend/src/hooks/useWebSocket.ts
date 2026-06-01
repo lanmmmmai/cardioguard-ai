@@ -32,9 +32,18 @@ export const useWebSocket = (
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const intentionalCloseRef = useRef<boolean>(false);
+
+  // Sử dụng ref để giữ tham chiếu callback mới nhất, tránh tình trạng re-connect liên tục khi callback thay đổi
+  const onMessageReceivedRef = useRef(onMessageReceived);
+  useEffect(() => {
+    onMessageReceivedRef.current = onMessageReceived;
+  }, [onMessageReceived]);
 
   const connect = useCallback(() => {
     if (socketRef.current?.readyState === WebSocket.OPEN) return;
+
+    intentionalCloseRef.current = false;
 
     // Resolve URL dynamically if window is available
     let wsUrl = url;
@@ -59,8 +68,8 @@ export const useWebSocket = (
       socket.onmessage = (event) => {
         try {
           const parsedData = JSON.parse(event.data) as RealtimeEnvelope | SensorTelemetryMessage;
-          if (onMessageReceived) {
-            onMessageReceived(parsedData);
+          if (onMessageReceivedRef.current) {
+            onMessageReceivedRef.current(parsedData);
           }
         } catch (err) {
           console.error('Error parsing WebSocket message data:', err);
@@ -69,7 +78,8 @@ export const useWebSocket = (
 
       socket.onclose = () => {
         setIsConnected(false);
-        if (!onMessageReceived) return;
+        if (intentionalCloseRef.current) return; // Bỏ qua nếu chủ động đóng
+        if (!onMessageReceivedRef.current) return;
         console.log('Realtime WebSocket disconnected, retrying connection in 3 seconds...');
         // Attempt to reconnect after 3 seconds
         reconnectTimeoutRef.current = window.setTimeout(() => {
@@ -78,16 +88,17 @@ export const useWebSocket = (
       };
 
       socket.onerror = (error) => {
+        if (intentionalCloseRef.current) return; // Bỏ qua thông báo lỗi khi unmount trong StrictMode
         console.error('WebSocket connection error:', error);
         socket.close();
       };
     } catch (e) {
       console.error('Failed to initialize WebSocket connection:', e);
     }
-  }, [url, onMessageReceived, token]);
+  }, [url, token]);
 
   useEffect(() => {
-    if (!onMessageReceived) return;
+    if (!token) return;
 
     connect();
 
@@ -96,11 +107,11 @@ export const useWebSocket = (
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (socketRef.current) {
-        socketRef.current.onclose = null; // Prevent reconnect on cleanup
+        intentionalCloseRef.current = true; // Đánh dấu chủ động đóng trong React cleanup
         socketRef.current.close();
       }
     };
-  }, [connect]);
+  }, [connect, token]);
 
   return { isConnected };
 };

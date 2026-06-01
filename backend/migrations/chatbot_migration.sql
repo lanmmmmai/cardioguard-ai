@@ -30,7 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created
 -- 3. Bảng ai_recommendations
 CREATE TABLE IF NOT EXISTS ai_recommendations (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    patient_id      UUID        NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+    patient_id      UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     severity        TEXT        NOT NULL DEFAULT 'info', -- info | warning | critical
     recommendation  TEXT        NOT NULL,
     generated_by    TEXT        NOT NULL DEFAULT 'system_ai',

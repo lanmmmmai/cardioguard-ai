@@ -1,15 +1,23 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from typing import Any
+from typing import Any, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Query
-from app.schemas.sensor_schema import SensorDataCreate
+from fastapi import APIRouter, Header, HTTPException, Query, Request
+from app.schemas.sensor_schema import IotTelemetryPayload, SensorDataCreate
 from app.core.database import database
+from app.core.config import settings
 from app.api.auth_api import get_user_from_token
 from app.ai.heart_ai import detect_abnormal
+from app.core.security import hash_password, verify_password
 from app.websocket.connection_manager import manager
+from app.services.audit_service import log_activity
+import secrets
 
 router = APIRouter()
+
+
+def normalize_device_identifier(value: str) -> str:
+    return value.strip().lower().replace(":", "").replace("-", "")
 
 
 def to_jsonable(value: Any) -> Any:
@@ -24,6 +32,22 @@ def row_to_dict(row: Any) -> dict[str, Any]:
     return {key: to_jsonable(row[key]) for key in row.keys()}
 
 
+_devices_columns_cache: Optional[set[str]] = None
+
+
+async def get_devices_table_columns() -> set[str]:
+    global _devices_columns_cache
+    if _devices_columns_cache is not None:
+        return _devices_columns_cache
+    rows = await database.fetch_all(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'devices'
+        """
+    )
+    _devices_columns_cache = {row["column_name"] for row in rows}
+    return _devices_columns_cache
 async def ensure_patient_access(user: dict[str, Any], patient_id: str) -> None:
     role = user["role"]
     if role == "admin":
@@ -47,31 +71,147 @@ async def ensure_patient_access(user: dict[str, Any], patient_id: str) -> None:
     raise HTTPException(status_code=403, detail="Vai trò không hợp lệ")
 
 
+async def ensure_device_access(user: dict[str, Any], device_uid: str) -> dict[str, Any]:
+    columns = await get_devices_table_columns()
+    device_key = normalize_device_identifier(device_uid)
+    uses_device_mac = "device_mac" in columns
+    device_match_sql = (
+        "lower(replace(replace(device_mac, ':', ''), '-', '')) = :device_key"
+        if uses_device_mac
+        else "lower(replace(replace(name, ':', ''), '-', '')) = :device_key"
+    )
+    device_row = await database.fetch_one(
+        """
+        SELECT
+            id::text AS id,
+            patient_id::text AS patient_id,
+            name,
+            {device_mac_select}
+            status,
+            battery,
+            last_seen_at,
+            device_type,
+            {firmware_version_select}
+            updated_at
+        FROM devices
+        WHERE ({device_match_sql})
+           OR lower(name) = :device_uid_lower
+        LIMIT 1
+        """.format(
+            device_match_sql=device_match_sql,
+            device_mac_select="device_mac," if uses_device_mac else "NULL::text AS device_mac,",
+            firmware_version_select=(
+                "firmware_version," if "firmware_version" in columns else "NULL::text AS firmware_version,"
+            ),
+        ),
+        {"device_key": device_key, "device_uid_lower": device_uid.lower()},
+    )
+    if not device_row:
+        raise HTTPException(status_code=404, detail="Device not found")
+
+    patient_id = device_row["patient_id"]
+    if not patient_id:
+        raise HTTPException(status_code=404, detail="Device does not have assigned patient")
+
+    await ensure_patient_access(user, patient_id)
+    return device_row
+
+
+async def get_device_by_mac(device_mac: str) -> dict[str, Any] | None:
+    columns = await get_devices_table_columns()
+    device_key = normalize_device_identifier(device_mac)
+    uses_device_mac = "device_mac" in columns
+    device_match_sql = (
+        "lower(replace(replace(device_mac, ':', ''), '-', '')) = :device_key"
+        if uses_device_mac
+        else "lower(replace(replace(name, ':', ''), '-', '')) = :device_key"
+    )
+    query = """
+    SELECT
+        id::text AS id,
+        patient_id::text AS patient_id,
+        status,
+        {device_mac_select}
+        {device_token_hash_select}
+        {token_last_rotated_at_select}
+        {firmware_version_select}
+    FROM devices
+    WHERE {device_match_sql}
+    LIMIT 1
+    """.format(
+        device_match_sql=device_match_sql,
+        device_mac_select="device_mac," if uses_device_mac else "NULL::text AS device_mac,",
+        device_token_hash_select=(
+            "device_token_hash," if "device_token_hash" in columns else "NULL::text AS device_token_hash,"
+        ),
+        token_last_rotated_at_select=(
+            "token_last_rotated_at," if "token_last_rotated_at" in columns else "NULL::timestamptz AS token_last_rotated_at,"
+        ),
+        firmware_version_select=(
+            "firmware_version" if "firmware_version" in columns else "NULL::text AS firmware_version"
+        ),
+    )
+    return await database.fetch_one(query, {"device_key": device_key})
+
+
+def verify_iot_device_token(device_row: dict[str, Any], device_token: str) -> bool:
+    token_hash = device_row["device_token_hash"]
+    if token_hash:
+        return verify_password(device_token, token_hash)
+    shared_token = settings.IOT_DEVICE_SHARED_TOKEN.strip()
+    return bool(shared_token and device_token == shared_token)
+
+
+def has_any_iot_token_config(device_row: dict[str, Any]) -> bool:
+    if device_row["device_token_hash"]:
+        return True
+    return bool(settings.IOT_DEVICE_SHARED_TOKEN.strip())
+
+
+def detect_abnormal_iot(readings: Any) -> list[dict[str, str]]:
+    data = type(
+        "TelemetryForAI",
+        (),
+        {
+            "heart_rate": readings.heart_rate,
+            "spo2": readings.spo2,
+            "systolic_bp": readings.systolic_bp if readings.systolic_bp is not None else 0,
+            "diastolic_bp": readings.diastolic_bp if readings.diastolic_bp is not None else 0,
+            "ecg_value": readings.ecg_value,
+        },
+    )()
+    alerts = detect_abnormal(data)
+    if readings.systolic_bp is None or readings.diastolic_bp is None:
+        alerts = [a for a in alerts if a["alert_type"] != "HIGH_BLOOD_PRESSURE"]
+    return alerts
+
+
 @router.post("/sensor-data")
-async def create_sensor_data(data: SensorDataCreate, authorization: str | None = Header(default=None)):
+async def create_sensor_data(data: SensorDataCreate, request: Request, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     await ensure_patient_access(current_user, data.patient_id)
 
     insert_sensor_query = """
     INSERT INTO sensor_data(
-        patient_id,
-        heart_rate,
-        spo2,
-        systolic_bp,
-        diastolic_bp,
-        ecg_value
+         patient_id,
+         heart_rate,
+         spo2,
+         systolic_bp,
+         diastolic_bp,
+         ecg_value
     )
     VALUES (
-        :patient_id,
-        :heart_rate,
-        :spo2,
-        :systolic_bp,
-        :diastolic_bp,
-        :ecg_value
+         :patient_id,
+         :heart_rate,
+         :spo2,
+         :systolic_bp,
+         :diastolic_bp,
+         :ecg_value
     )
+    RETURNING id
     """
 
-    await database.execute(
+    new_row = await database.fetch_one(
         query=insert_sensor_query,
         values={
             "patient_id": data.patient_id,
@@ -81,6 +221,16 @@ async def create_sensor_data(data: SensorDataCreate, authorization: str | None =
             "diastolic_bp": data.diastolic_bp,
             "ecg_value": data.ecg_value
         }
+    )
+    sensor_id = str(new_row["id"]) if new_row else str(data.patient_id)
+
+    # Ghi nhận log gửi chỉ số đo thủ công
+    await log_activity(
+        user_id=current_user["id"],
+        action="PATIENT_MANUAL_TELEM_SUBMIT",
+        entity_type="sensor_data",
+        entity_id=sensor_id,
+        ip_address=request.client.host if request.client else "-"
     )
 
     alerts = detect_abnormal(data)
@@ -138,10 +288,209 @@ async def create_sensor_data(data: SensorDataCreate, authorization: str | None =
     }
 
 
+@router.post("/iot/telemetry")
+async def create_iot_telemetry(
+    data: IotTelemetryPayload,
+    x_device_uid: str = Header(..., alias="X-Device-Uid"),
+    x_device_mac: str = Header(..., alias="X-Device-Mac"),
+    x_device_token: str = Header(..., alias="X-Device-Token"),
+):
+    device_key = normalize_device_identifier(x_device_mac)
+    if len(device_key) != 12:
+        raise HTTPException(status_code=400, detail="Invalid device MAC address")
+
+    device_row = await get_device_by_mac(x_device_mac)
+    if not device_row:
+        raise HTTPException(status_code=404, detail="Device not paired")
+    if not has_any_iot_token_config(device_row):
+        raise HTTPException(status_code=503, detail="IOT device token is not configured")
+    if not verify_iot_device_token(device_row, x_device_token):
+        raise HTTPException(status_code=401, detail="Invalid device token")
+
+    device_status = (device_row["status"] or "").lower()
+    if device_status in {"revoked", "inactive", "blocked"}:
+        raise HTTPException(status_code=403, detail="Device is not allowed to send telemetry")
+
+    patient_id = device_row["patient_id"]
+    if not patient_id:
+        raise HTTPException(status_code=404, detail="Device does not have assigned patient")
+
+    await database.execute(
+        """
+        UPDATE devices
+        SET status = :status,
+            battery = COALESCE(:battery, battery),
+            last_seen_at = :last_seen_at,
+            updated_at = :updated_at
+        WHERE id::text = :device_id
+        """,
+        {
+            "status": "online",
+            "battery": data.device.battery if data.device else None,
+            "last_seen_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
+            "device_id": device_row["id"],
+        },
+    )
+
+    await database.execute(
+        """
+        INSERT INTO sensor_data(
+            patient_id,
+            heart_rate,
+            spo2,
+            systolic_bp,
+            diastolic_bp,
+            ecg_value
+        )
+        VALUES (
+            :patient_id,
+            :heart_rate,
+            :spo2,
+            :systolic_bp,
+            :diastolic_bp,
+            :ecg_value
+        )
+        """,
+        {
+            "patient_id": patient_id,
+            "heart_rate": data.readings.heart_rate,
+            "spo2": data.readings.spo2,
+            "systolic_bp": data.readings.systolic_bp,
+            "diastolic_bp": data.readings.diastolic_bp,
+            "ecg_value": data.readings.ecg_value,
+        },
+    )
+
+    alerts = detect_abnormal_iot(data.readings)
+
+    for alert in alerts:
+        await database.execute(
+            """
+            INSERT INTO alerts(
+                patient_id,
+                alert_type,
+                message,
+                severity
+            )
+            VALUES (
+                :patient_id,
+                :alert_type,
+                :message,
+                :severity
+            )
+            """,
+            {
+                "patient_id": patient_id,
+                "alert_type": alert["alert_type"],
+                "message": alert["message"],
+                "severity": alert["severity"],
+            },
+        )
+
+    broadcast_data = {
+        "patient_id": patient_id,
+        "heart_rate": data.readings.heart_rate,
+        "spo2": data.readings.spo2,
+        "systolic_bp": data.readings.systolic_bp,
+        "diastolic_bp": data.readings.diastolic_bp,
+        "ecg_value": data.readings.ecg_value,
+        "is_abnormal": len(alerts) > 0,
+        "alerts": alerts,
+    }
+    await manager.broadcast_sensor_data(patient_id, broadcast_data)
+
+    for alert in alerts:
+        await manager.broadcast_alert(
+            patient_id,
+            {
+                "patient_id": patient_id,
+                "alert_type": alert["alert_type"],
+                "message": alert["message"],
+                "severity": alert["severity"],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+    return {
+        "message": "Telemetry accepted",
+        "patient_id": patient_id,
+        "device_uid": x_device_uid,
+        "device_mac": x_device_mac,
+        "is_abnormal": len(alerts) > 0,
+        "alerts": alerts,
+        "server_time": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/iot/devices/{device_uid}/status")
+async def get_iot_device_status(device_uid: str, authorization: Optional[str] = Header(default=None)):
+    current_user = await get_user_from_token(authorization)
+    device_row = await ensure_device_access(current_user, device_uid)
+    return {
+        "device_uid": device_uid,
+        "device_id": device_row["id"],
+        "patient_id": device_row["patient_id"],
+        "device_mac": device_row["device_mac"],
+        "status": device_row["status"],
+        "battery": device_row["battery"],
+        "last_seen_at": to_jsonable(device_row["last_seen_at"]),
+        "device_type": device_row["device_type"],
+        "firmware_version": device_row["firmware_version"],
+        "updated_at": to_jsonable(device_row["updated_at"]),
+    }
+
+
+@router.post("/iot/devices/{device_uid}/rotate-token")
+async def rotate_iot_device_token(device_uid: str, request: Request, authorization: Optional[str] = Header(default=None)):
+    current_user = await get_user_from_token(authorization)
+    if current_user["role"] not in {"admin", "doctor"}:
+        raise HTTPException(status_code=403, detail="Chỉ admin hoặc bác sĩ mới được xoay token thiết bị")
+    device_row = await ensure_device_access(current_user, device_uid)
+    columns = await get_devices_table_columns()
+    if "device_token_hash" not in columns:
+        raise HTTPException(status_code=409, detail="Database has not been migrated for per-device token")
+
+    new_token = f"cgdt_{secrets.token_urlsafe(24)}"
+    new_token_hash = hash_password(new_token)
+    rotated_at = datetime.now(timezone.utc)
+    await database.execute(
+        """
+        UPDATE devices
+        SET device_token_hash = :device_token_hash,
+            token_last_rotated_at = :rotated_at,
+            updated_at = :updated_at
+        WHERE id::text = :device_id
+        """,
+        {
+            "device_token_hash": new_token_hash,
+            "rotated_at": rotated_at,
+            "updated_at": rotated_at,
+            "device_id": device_row["id"],
+        },
+    )
+
+    # Ghi nhận log xoay token thiết bị IoT
+    await log_activity(
+        user_id=current_user["id"],
+        action="IOT_ROTATE_TOKEN",
+        entity_type="devices",
+        entity_id=device_row["id"],
+        ip_address=request.client.host if request.client else "-"
+    )
+
+    return {
+        "device_uid": device_uid,
+        "device_id": device_row["id"],
+        "device_token": new_token,
+        "token_last_rotated_at": rotated_at.isoformat(),
+    }
+
+
 @router.get("/sensor-data")
 async def get_sensor_data(
-    authorization: str | None = Header(default=None),
-    patient_id: str | None = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+    patient_id: Optional[str] = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ):
@@ -186,8 +535,8 @@ async def get_sensor_data(
 
 @router.get("/api/sensors/history")
 async def get_sensor_history(
-    authorization: str | None = Header(default=None),
-    patient_id: str | None = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+    patient_id: Optional[str] = Query(default=None),
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):

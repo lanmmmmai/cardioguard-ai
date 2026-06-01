@@ -22,6 +22,15 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({ title, columns
     setForm(Object.fromEntries(editableColumns.map((column) => [column.name, record?.[column.name] ?? ''])));
   }, [record, columns]);
 
+  // Accessibility: Dismiss modal on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const validate = () => {
     if ('email' in form && form.email && !String(form.email).includes('@')) return 'Email không hợp lệ.';
     if ('phone' in form && form.phone && String(form.phone).length < 7) return 'Số điện thoại không hợp lệ.';
@@ -50,25 +59,55 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({ title, columns
   };
 
   return (
-    <div className="modal-overlay">
-      <form className="modal-content cms-modal" onSubmit={submit}>
-        <button type="button" className="cms-modal-close" onClick={onClose}><X size={18} /></button>
-        <h2>{title}</h2>
-        {error && <div className="cms-inline-error">{error}</div>}
+    <div className="modal-overlay" onClick={onClose}>
+      <form 
+        className="modal-content cms-modal" 
+        onSubmit={submit}
+        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking modal content
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
+        <button 
+          type="button" 
+          className="cms-modal-close" 
+          onClick={onClose}
+          aria-label="Đóng biểu mẫu"
+        >
+          <X size={18} />
+        </button>
+        <h2 id="modal-title">{title}</h2>
+        {error && <div className="cms-inline-error" role="alert">{error}</div>}
         <div className="cms-form-grid">
           {editableColumns.map((column) => (
             <div className="form-group" key={column.name}>
-              <label>{column.name}</label>
+              <label htmlFor={`form-input-${column.name}`}>{column.name}</label>
               {column.type === 'bool' ? (
-                <select className="form-control" value={String(form[column.name] ?? '')} onChange={(event) => setForm((prev) => ({ ...prev, [column.name]: event.target.value }))}>
+                <select 
+                  id={`form-input-${column.name}`}
+                  className="form-control" 
+                  value={String(form[column.name] ?? '')} 
+                  onChange={(event) => setForm((prev) => ({ ...prev, [column.name]: event.target.value }))}
+                >
                   <option value="">Null</option>
                   <option value="true">true</option>
                   <option value="false">false</option>
                 </select>
               ) : shouldUseTextarea(column.name) ? (
-                <textarea className="form-control" rows={3} value={form[column.name] ?? ''} onChange={(event) => setForm((prev) => ({ ...prev, [column.name]: event.target.value }))} />
+                <textarea 
+                  id={`form-input-${column.name}`}
+                  className="form-control" 
+                  rows={3} 
+                  value={form[column.name] ?? ''} 
+                  onChange={(event) => setForm((prev) => ({ ...prev, [column.name]: event.target.value }))} 
+                />
               ) : (
-                <input className="form-control" value={form[column.name] ?? ''} onChange={(event) => setForm((prev) => ({ ...prev, [column.name]: event.target.value }))} />
+                <input 
+                  id={`form-input-${column.name}`}
+                  className="form-control" 
+                  value={form[column.name] ?? ''} 
+                  onChange={(event) => setForm((prev) => ({ ...prev, [column.name]: event.target.value }))} 
+                />
               )}
             </div>
           ))}

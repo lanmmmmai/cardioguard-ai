@@ -1,0 +1,39 @@
+.git
+.gitignore
+.DS_Store
+
+# Local environments and secrets
+.env
+.env.*
+backend/.env
+backend/.env.*
+web_frontend/.env
+web_frontend/.env.*
+
+# Python
+**/.venv
+**/venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+
+# Node
+**/node_modules
+web_frontend/dist
+web_frontend/.vite
+
+# Mobile / generated build outputs
+mobile_app/build
+mobile_app/.dart_tool
+mobile_app/.gradle
+
+# Large non-runtime areas for Docker backend/web builds
+ai_model
+hardware
+docs
+
+# Editor and local artifacts
+.codex
+.vscode
+*.log

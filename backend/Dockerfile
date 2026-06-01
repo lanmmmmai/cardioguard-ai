@@ -1,0 +1,19 @@
+FROM python:3.11-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /workspace/backend
+
+COPY backend/requirements.runtime.txt ./requirements.runtime.txt
+RUN pip install --upgrade pip && \
+    pip install -r requirements.runtime.txt
+
+COPY backend/app ./app
+COPY backend/migrations ./migrations
+COPY backend/run_migration.py ./run_migration.py
+
+EXPOSE 8000
+
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

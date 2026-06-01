@@ -3,13 +3,15 @@ import io
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Optional
 
-from fastapi import APIRouter, File, Header, HTTPException, Query, Response, UploadFile
+from fastapi import APIRouter, File, Header, HTTPException, Query, Response, UploadFile, Request
 from sqlalchemy import text
 
 from app.api.auth_api import get_user_from_token
+from app.services.audit_service import log_activity
 from app.core.sqlalchemy_async import AsyncSessionLocal
+from app.core.password_policy import validate_password
 from app.core.security import hash_password
 
 router = APIRouter(prefix="/cms", tags=["cms"])
@@ -76,7 +78,7 @@ def module_config(module: str) -> dict[str, Any]:
     return config
 
 
-async def require_admin(authorization: str | None) -> dict[str, Any]:
+async def require_admin(authorization: Optional[str]) -> dict[str, Any]:
     user = await get_user_from_token(authorization)
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Only admin can access CMS")
@@ -89,7 +91,12 @@ def quote_identifier(value: str) -> str:
     return f'"{value}"'
 
 
+_cms_columns_cache: dict[str, list[dict[str, Any]]] = {}
+
+
 async def get_columns(table: str) -> list[dict[str, Any]]:
+    if table in _cms_columns_cache:
+        return _cms_columns_cache[table]
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             text(
@@ -105,7 +112,9 @@ async def get_columns(table: str) -> list[dict[str, Any]]:
         rows = result.mappings().all()
     if not rows:
         raise HTTPException(status_code=500, detail=f"Table {table} not found")
-    return [dict(row) for row in rows]
+    cols = [dict(row) for row in rows]
+    _cms_columns_cache[table] = cols
+    return cols
 
 
 def visible_columns(columns: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
@@ -176,10 +185,10 @@ def validate_payload(payload: dict[str, Any], columns: list[dict[str, Any]], con
 
     for key, value in normalized.items():
         if key == "password" and "password_hash" in column_map:
-            if not value or len(str(value)) < 8:
-                errors.append("password must be at least 8 characters")
-            else:
-                values["password_hash"] = hash_password(str(value))
+            try:
+                values["password_hash"] = hash_password(validate_password(str(value or "")))
+            except ValueError as exc:
+                errors.append(str(exc))
             continue
         if key not in column_map:
             errors.append(f"Unknown column: {key}")
@@ -212,7 +221,7 @@ def validate_payload(payload: dict[str, Any], columns: list[dict[str, Any]], con
     return values, errors
 
 
-def build_search(columns: list[dict[str, Any]], query: str | None, params: dict[str, Any]) -> str:
+def build_search(columns: list[dict[str, Any]], query: Optional[str], params: dict[str, Any]) -> str:
     if not query:
         return ""
     searchable = [column["column_name"] for column in columns if column["udt_name"] in TEXT_TYPES]
@@ -222,7 +231,7 @@ def build_search(columns: list[dict[str, Any]], query: str | None, params: dict[
     return "(" + " OR ".join(f"{quote_identifier(column)}::text ILIKE :q" for column in searchable) + ")"
 
 
-def build_filters(filter_value: str | None, columns: list[dict[str, Any]], params: dict[str, Any]) -> str:
+def build_filters(filter_value: Optional[str], columns: list[dict[str, Any]], params: dict[str, Any]) -> str:
     if not filter_value:
         return ""
     column_map = {column["column_name"]: column for column in columns}
@@ -243,15 +252,16 @@ def build_filters(filter_value: str | None, columns: list[dict[str, Any]], param
 @router.get("/{module}")
 async def list_cms_records(
     module: str,
-    authorization: str | None = Header(default=None),
+    request: Request,
+    authorization: Optional[str] = Header(default=None),
     limit: int = Query(default=25, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    q: str | None = Query(default=None),
-    filter: str | None = Query(default=None),
-    sort_by: str | None = Query(default=None),
+    q: Optional[str] = Query(default=None),
+    filter: Optional[str] = Query(default=None),
+    sort_by: Optional[str] = Query(default=None),
     sort_dir: str = Query(default="desc", pattern="^(asc|desc)$"),
 ):
-    await require_admin(authorization)
+    user = await require_admin(authorization)
     config = module_config(module)
     table = config["table"]
     columns = await get_columns(table)
@@ -288,22 +298,40 @@ async def list_cms_records(
         )
         items = [normalize_row(dict(row)) for row in rows_result.mappings().all()]
 
+    # Ghi nhận log (tránh ghi log audit_logs để ngăn đệ quy)
+    if table != "audit_logs":
+        await log_activity(
+            user_id=user["id"],
+            action="CMS_VIEW_LIST",
+            entity_type=table,
+            ip_address=request.client.host if request.client else "-"
+        )
+
     return {"items": items, "total": total, "limit": limit, "offset": offset, "columns": visible}
 
 
 @router.get("/{module}/export-csv")
 async def export_cms_csv(
     module: str,
-    authorization: str | None = Header(default=None),
-    q: str | None = Query(default=None),
-    filter: str | None = Query(default=None),
+    request: Request,
+    authorization: Optional[str] = Header(default=None),
+    q: Optional[str] = Query(default=None),
+    filter: Optional[str] = Query(default=None),
 ):
-    await require_admin(authorization)
-    data = await list_cms_records(module, authorization, limit=200, offset=0, q=q, filter=filter, sort_by=None, sort_dir="desc")
+    user = await require_admin(authorization)
+    data = await list_cms_records(module, request, authorization, limit=200, offset=0, q=q, filter=filter, sort_by=None, sort_dir="desc")
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=[column["name"] for column in data["columns"]])
     writer.writeheader()
     writer.writerows(data["items"])
+
+    # Ghi nhận log xuất CSV dữ liệu y tế nhạy cảm
+    await log_activity(
+        user_id=user["id"],
+        action="CMS_EXPORT_CSV",
+        entity_type=module_config(module)["table"],
+        ip_address=request.client.host if request.client else "-"
+    )
     return Response(
         content=output.getvalue(),
         media_type="text/csv",
@@ -312,7 +340,7 @@ async def export_cms_csv(
 
 
 @router.get("/{module}/{record_id}")
-async def get_cms_record(module: str, record_id: str, authorization: str | None = Header(default=None)):
+async def get_cms_record(module: str, record_id: str, authorization: Optional[str] = Header(default=None)):
     await require_admin(authorization)
     config = module_config(module)
     table = config["table"]
@@ -331,8 +359,8 @@ async def get_cms_record(module: str, record_id: str, authorization: str | None 
 
 
 @router.post("/{module}")
-async def create_cms_record(module: str, payload: dict[str, Any], authorization: str | None = Header(default=None)):
-    await require_admin(authorization)
+async def create_cms_record(module: str, payload: dict[str, Any], request: Request, authorization: Optional[str] = Header(default=None)):
+    user = await require_admin(authorization)
     config = module_config(module)
     table = config["table"]
     columns = await get_columns(table)
@@ -356,12 +384,23 @@ async def create_cms_record(module: str, payload: dict[str, Any], authorization:
             values,
         )
         await session.commit()
+
+    # Ghi nhận log tạo bản ghi
+    if table != "audit_logs":
+        await log_activity(
+            user_id=user["id"],
+            action="CMS_CREATE_RECORD",
+            entity_type=table,
+            entity_id=str(values.get("id")),
+            ip_address=request.client.host if request.client else "-"
+        )
+
     return await get_cms_record(module, str(values.get("id")), authorization)
 
 
 @router.put("/{module}/{record_id}")
-async def update_cms_record(module: str, record_id: str, payload: dict[str, Any], authorization: str | None = Header(default=None)):
-    await require_admin(authorization)
+async def update_cms_record(module: str, record_id: str, payload: dict[str, Any], request: Request, authorization: Optional[str] = Header(default=None)):
+    user = await require_admin(authorization)
     config = module_config(module)
     table = config["table"]
     columns = await get_columns(table)
@@ -385,27 +424,50 @@ async def update_cms_record(module: str, record_id: str, payload: dict[str, Any]
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Record not found")
         await session.commit()
+
+    # Ghi nhận log cập nhật bản ghi
+    if table != "audit_logs":
+        await log_activity(
+            user_id=user["id"],
+            action="CMS_UPDATE_RECORD",
+            entity_type=table,
+            entity_id=record_id,
+            ip_address=request.client.host if request.client else "-"
+        )
+
     return await get_cms_record(module, record_id, authorization)
 
 
 @router.delete("/{module}/{record_id}")
-async def delete_cms_record(module: str, record_id: str, authorization: str | None = Header(default=None)):
-    await require_admin(authorization)
+async def delete_cms_record(module: str, record_id: str, request: Request, authorization: Optional[str] = Header(default=None)):
+    user = await require_admin(authorization)
     config = module_config(module)
+    table = config["table"]
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            text(f"DELETE FROM {quote_identifier(config['table'])} WHERE id::text = :record_id"),
+            text(f"DELETE FROM {quote_identifier(table)} WHERE id::text = :record_id"),
             {"record_id": record_id},
         )
         if result.rowcount == 0:
             raise HTTPException(status_code=404, detail="Record not found")
         await session.commit()
+
+    # Ghi nhận log xóa bản ghi
+    if table != "audit_logs":
+        await log_activity(
+            user_id=user["id"],
+            action="CMS_DELETE_RECORD",
+            entity_type=table,
+            entity_id=record_id,
+            ip_address=request.client.host if request.client else "-"
+        )
+
     return {"deleted": True, "id": record_id}
 
 
 @router.post("/{module}/import-csv")
-async def import_cms_csv(module: str, file: UploadFile = File(...), authorization: str | None = Header(default=None)):
-    await require_admin(authorization)
+async def import_cms_csv(module: str, request: Request, file: UploadFile = File(...), authorization: Optional[str] = Header(default=None)):
+    user = await require_admin(authorization)
     config = module_config(module)
     table = config["table"]
     columns = await get_columns(table)
@@ -449,4 +511,13 @@ async def import_cms_csv(module: str, file: UploadFile = File(...), authorizatio
             await session.rollback()
             return {"imported": 0, "errors": row_errors}
         await session.commit()
+
+    # Ghi nhận log nhập dữ liệu hàng loạt từ CSV
+    await log_activity(
+        user_id=user["id"],
+        action="CMS_IMPORT_CSV",
+        entity_type=table,
+        ip_address=request.client.host if request.client else "-"
+    )
+
     return {"imported": imported, "errors": []}

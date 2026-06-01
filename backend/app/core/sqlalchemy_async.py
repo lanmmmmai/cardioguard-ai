@@ -17,7 +17,8 @@ def async_database_url() -> str:
 async_engine = create_async_engine(
     async_database_url(),
     connect_args={"statement_cache_size": 0},
-    poolclass=NullPool,
+    pool_size=10,
+    max_overflow=20,
     pool_pre_ping=True,
 )
 AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False)

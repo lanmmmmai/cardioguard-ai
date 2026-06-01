@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Header
 from app.core.database import database
 from app.api.auth_api import get_user_from_token
@@ -6,7 +7,7 @@ router = APIRouter()
 
 
 @router.get("/alerts")
-async def get_alerts(authorization: str | None = Header(default=None)):
+async def get_alerts(authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     role = current_user["role"]
     where_sql = ""
@@ -49,7 +50,7 @@ async def get_alerts(authorization: str | None = Header(default=None)):
 from fastapi import HTTPException
 
 @router.patch("/alerts/{alert_id}/resolve")
-async def resolve_alert(alert_id: str, authorization: str | None = Header(default=None)):
+async def resolve_alert(alert_id: str, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     role = current_user["role"]
     
@@ -113,7 +114,7 @@ class AlertCreate(BaseModel):
     message: str = "Yêu cầu hỗ trợ khẩn cấp (SOS)"
 
 @router.post("/alerts")
-async def create_sos_alert(payload: AlertCreate, authorization: str | None = Header(default=None)):
+async def create_sos_alert(payload: AlertCreate, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     if current_user["role"] != "patient":
         raise HTTPException(status_code=403, detail="Chỉ bệnh nhân mới có thể gửi cảnh báo SOS")

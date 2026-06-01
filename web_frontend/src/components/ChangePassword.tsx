@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Activity, Lock, Loader2, CheckCircle2 } from 'lucide-react';
 import { API_URL } from '../config';
 import { useAuth } from '../auth/AuthContext';
+import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
 
 interface ChangePasswordProps {
   onNavigateNext: () => void;
@@ -28,6 +29,10 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }
     }
     if (newPassword === oldPassword) {
       setError('Mật khẩu mới phải khác mật khẩu hiện tại');
+      return;
+    }
+    if (!isStrongPassword(newPassword)) {
+      setError(passwordPolicyMessage);
       return;
     }
 
@@ -192,7 +197,7 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }
             type="submit"
             className="btn btn-primary"
             style={{ width: '100%', justifyContent: 'center', height: '46px' }}
-            disabled={isLoading || success || !!(confirmPassword && confirmPassword !== newPassword)}
+            disabled={isLoading || success || !isStrongPassword(newPassword) || !!(confirmPassword && confirmPassword !== newPassword)}
           >
             {isLoading ? (
               <>

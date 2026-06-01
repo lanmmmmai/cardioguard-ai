@@ -85,20 +85,57 @@ class AIService:
         """Fallback mock responses for testing without API keys."""
         msg_lower = message.lower()
         
+        # Nếu có context_data của bệnh nhân, chúng ta sẽ đọc dữ liệu thật để phân tích đơn giản (rule-based)
+        patient_data_summary = ""
+        if context_data and "recent_sensor_data" in context_data and context_data["recent_sensor_data"]:
+            recent_list = context_data["recent_sensor_data"]
+            if len(recent_list) > 0:
+                recent = recent_list[0]
+                hr = recent.get("heart_rate", "N/A")
+                spo2 = recent.get("spo2", "N/A")
+                sys_bp = recent.get("systolic_bp", "N/A")
+                dia_bp = recent.get("diastolic_bp", "N/A")
+                
+                is_abnormal = False
+                alerts_found = []
+                if hr != "N/A" and (hr > 120 or hr < 50):
+                    is_abnormal = True
+                    alerts_found.append(f"Nhịp tim bất thường ({hr} bpm, an toàn: 50-120)")
+                if spo2 != "N/A" and spo2 < 92:
+                    is_abnormal = True
+                    alerts_found.append(f"SpO2 nguy hiểm ({spo2}%, an toàn: >=92%)")
+                if sys_bp != "N/A" and dia_bp != "N/A" and (sys_bp > 140 or dia_bp > 90):
+                    is_abnormal = True
+                    alerts_found.append(f"Huyết áp cao ({sys_bp}/{dia_bp} mmHg, an toàn: 90-140/60-90)")
+                
+                patient_data_summary = f"\n\n**[Phân tích chỉ số thực của bệnh nhân]**:\n"
+                patient_data_summary += f"- **Nhịp tim**: {hr} BPM\n"
+                patient_data_summary += f"- **SpO2**: {spo2}%\n"
+                patient_data_summary += f"- **Huyết áp**: {sys_bp}/{dia_bp} mmHg\n"
+                patient_data_summary += f"- **Trạng thái**: { '⚠️ CẦN CHÚ Ý LÂM SÀNG' if is_abnormal else '✅ Ổn định' }\n"
+                if alerts_found:
+                    patient_data_summary += "- **Cảnh báo phát hiện**:\n"
+                    for a in alerts_found:
+                        patient_data_summary += f"  * {a}\n"
+                else:
+                    patient_data_summary += "- **Đề xuất**: Các chỉ số sinh hiệu thực tế đang nằm trong ngưỡng an toàn.\n"
+
         if role == "patient":
             if "nhịp tim" in msg_lower:
-                return "Nhịp tim (Heart Rate) là số lần tim đập trong một phút. Nhịp tim bình thường lúc nghỉ ngơi thường từ 60 đến 100 nhịp/phút. Dữ liệu của bạn cho thấy nhịp tim hiện tại đang ở mức ổn định.\\n\\n*CardioGuard AI chỉ hỗ trợ tham khảo và không thay thế bác sĩ chuyên môn.*"
+                return f"Nhịp tim (Heart Rate) là số lần tim đập trong một phút. Nhịp tim bình thường lúc nghỉ ngơi thường từ 60 đến 100 nhịp/phút. {patient_data_summary}\n\n*CardioGuard AI chỉ hỗ trợ tham khảo và không thay thế bác sĩ chuyên môn (Mock Mode).*"
             if "spo2" in msg_lower:
-                return "SpO2 đo lượng oxy trong máu của bạn. Bình thường SpO2 ở mức 95% - 100%. Nếu dưới 90%, đây có thể là dấu hiệu nguy hiểm và bạn cần liên hệ bác sĩ ngay.\\n\\n*CardioGuard AI chỉ hỗ trợ tham khảo và không thay thế bác sĩ chuyên môn.*"
+                return f"SpO2 đo lượng oxy trong máu của bạn. Bình thường SpO2 ở mức 95% - 100%. Nếu dưới 92%, đây là dấu hiệu nguy hiểm và bạn cần liên hệ bác sĩ ngay. {patient_data_summary}\n\n*CardioGuard AI chỉ hỗ trợ tham khảo và không thay thế bác sĩ chuyên môn (Mock Mode).*"
             if "huyết áp" in msg_lower:
-                return "Huyết áp bao gồm số tâm thu và tâm trương. Mức 140/90 mmHg là ngưỡng bắt đầu của tăng huyết áp (cao huyết áp). Bạn nên theo dõi thường xuyên và giảm muối trong khẩu phần ăn.\\n\\n*CardioGuard AI chỉ hỗ trợ tham khảo và không thay thế bác sĩ chuyên môn.*"
+                return f"Huyết áp bao gồm số tâm thu và tâm trương. Mức 140/90 mmHg là ngưỡng bắt đầu của tăng huyết áp (cao huyết áp). {patient_data_summary}\n\n*CardioGuard AI chỉ hỗ trợ tham khảo và không thay thế bác sĩ chuyên môn (Mock Mode).*"
             
-            return f"Chào bạn, tôi là trợ lý AI. Hiện tại hệ thống đang chạy ở chế độ mô phỏng (chưa cấu hình API Key thật). Câu hỏi của bạn là: '{message}'.\\nTôi khuyên bạn nên kiểm tra lại các chỉ số sức khỏe hàng ngày nhé!\\n\\n*CardioGuard AI chỉ hỗ trợ tham khảo và không thay thế bác sĩ chuyên môn.*"
+            return f"Chào bạn, tôi là trợ lý AI. Hiện tại hệ thống đang chạy ở chế độ mô phỏng (chưa cấu hình API Key). {patient_data_summary}\n\n*CardioGuard AI chỉ hỗ trợ tham khảo và không thay thế bác sĩ chuyên môn (Mock Mode).*"
             
         elif role == "doctor":
+            if patient_data_summary:
+                return f"## Tóm tắt lâm sàng bệnh nhân (Chế độ Mock AI)\n{patient_data_summary}\n\n*Lưu ý: Hệ thống hiện chưa cấu hình OpenAI API Key thật trong tệp .env.*"
             if "tóm tắt" in msg_lower:
-                return "## Tóm tắt bệnh nhân\\n- **Nguy cơ**: Trung bình\\n- **SpO2 gần nhất**: 96%\\n- **Nhịp tim**: Đang có xu hướng dao động nhẹ (75 - 88 bpm)\\n\\n**Đề xuất**: Tiếp tục theo dõi qua camera."
-            return "Dữ liệu phân tích cho thấy không có bất thường nghiêm trọng. Tuy nhiên, hệ thống hiện đang chạy ở chế độ mô phỏng (Mock Mode) vì chưa có API Key của AI Model."
+                return "## Tóm tắt bệnh nhân (Mock Mode)\n- **Hệ thống AI**: Chưa cấu hình OPENAI_API_KEY trong tệp `.env`.\n- **Dữ liệu**: Không thể phân tích tự động vì thiếu API Key thật.\n\n*Vui lòng cung cấp khóa API trong tệp cấu hình để kích hoạt AI chẩn đoán.*"
+            return "Hệ thống AI hiện đang chạy ở chế độ mô phỏng (chưa cấu hình API Key thật). Không tự dựng dữ liệu lâm sàng giả."
             
         return "Tôi không hiểu yêu cầu."
 

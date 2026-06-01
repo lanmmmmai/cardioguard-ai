@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 from app.schemas.auth_schema import validate_full_name, validate_password
 
@@ -6,7 +7,7 @@ from app.schemas.auth_schema import validate_full_name, validate_password
 PHONE_PATTERN = re.compile(r"^[0-9+() .-]{7,20}$")
 
 
-def validate_optional_phone(value: str | None) -> str | None:
+def validate_optional_phone(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
     normalized = value.strip()
@@ -18,19 +19,19 @@ def validate_optional_phone(value: str | None) -> str | None:
 
 
 class UserMeUpdate(BaseModel):
-    full_name: str | None = None
-    phone: str | None = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
 
     @field_validator("full_name")
     @classmethod
-    def full_name_format(cls, value: str | None) -> str | None:
+    def full_name_format(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
         return validate_full_name(value)
 
     @field_validator("phone")
     @classmethod
-    def phone_format(cls, value: str | None) -> str | None:
+    def phone_format(cls, value: Optional[str]) -> Optional[str]:
         return validate_optional_phone(value)
 
 
@@ -52,28 +53,28 @@ class PasswordUpdate(BaseModel):
 
 
 class PatientMeUpdate(BaseModel):
-    full_name: str | None = None
-    age: int | None = Field(default=None, ge=0, le=130)
-    gender: str | None = None
-    phone: str | None = None
-    address: str | None = None
-    medical_history: str | None = None
+    full_name: Optional[str] = None
+    age: Optional[int] = Field(default=None, ge=0, le=130)
+    gender: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    medical_history: Optional[str] = None
 
     @field_validator("full_name")
     @classmethod
-    def full_name_format(cls, value: str | None) -> str | None:
+    def full_name_format(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
         return validate_full_name(value)
 
     @field_validator("phone")
     @classmethod
-    def phone_format(cls, value: str | None) -> str | None:
+    def phone_format(cls, value: Optional[str]) -> Optional[str]:
         return validate_optional_phone(value)
 
     @field_validator("gender")
     @classmethod
-    def gender_format(cls, value: str | None) -> str | None:
+    def gender_format(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
         normalized = value.strip()
@@ -85,8 +86,99 @@ class PatientMeUpdate(BaseModel):
 
     @field_validator("address", "medical_history")
     @classmethod
-    def trim_optional_text(cls, value: str | None) -> str | None:
+    def trim_optional_text(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
         normalized = value.strip()
         return normalized or None
+
+
+class UserAdminCreate(BaseModel):
+    full_name: str
+    email: str
+    phone: Optional[str] = None
+    role: str
+    password: str
+    status: Optional[str] = "active"
+
+    @field_validator("full_name")
+    @classmethod
+    def full_name_format(cls, value: str) -> str:
+        return validate_full_name(value)
+
+    @field_validator("phone")
+    @classmethod
+    def phone_format(cls, value: Optional[str]) -> Optional[str]:
+        return validate_optional_phone(value)
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, value: str) -> str:
+        return validate_password(value)
+
+    @field_validator("role")
+    @classmethod
+    def role_format(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"admin", "doctor", "patient"}:
+            raise ValueError("Role must be admin, doctor, or patient")
+        return normalized
+
+    @field_validator("status")
+    @classmethod
+    def status_format(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return "active"
+        normalized = value.strip().lower()
+        if normalized not in {"active", "inactive"}:
+            raise ValueError("Status must be active or inactive")
+        return normalized
+
+
+class UserAdminUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    role: Optional[str] = None
+    status: Optional[str] = None
+    password: Optional[str] = None
+
+    @field_validator("full_name")
+    @classmethod
+    def full_name_format(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        return validate_full_name(value)
+
+    @field_validator("phone")
+    @classmethod
+    def phone_format(cls, value: Optional[str]) -> Optional[str]:
+        return validate_optional_phone(value)
+
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        return validate_password(value)
+
+    @field_validator("role")
+    @classmethod
+    def role_format(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if normalized not in {"admin", "doctor", "patient"}:
+            raise ValueError("Role must be admin, doctor, or patient")
+        return normalized
+
+    @field_validator("status")
+    @classmethod
+    def status_format(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if normalized not in {"active", "inactive"}:
+            raise ValueError("Status must be active or inactive")
+        return normalized
+

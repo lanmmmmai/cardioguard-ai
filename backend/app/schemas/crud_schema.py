@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional, List, Dict
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,28 +20,28 @@ class CrudRead(FlexibleBaseModel):
 
 
 class AppointmentCreate(CrudCreate):
-    patient_id: UUID | None = None
-    doctor_id: UUID | None = None
-    title: str | None = None
-    status: str | None = None
-    channel: str | None = None
+    patient_id: Optional[UUID] = None
+    doctor_id: Optional[UUID] = None
+    title: Optional[str] = None
+    status: Optional[str] = None
+    channel: Optional[str] = None
 
 
 class AppointmentUpdate(CrudUpdate):
-    patient_id: UUID | None = None
-    doctor_id: UUID | None = None
-    title: str | None = None
-    status: str | None = None
-    channel: str | None = None
+    patient_id: Optional[UUID] = None
+    doctor_id: Optional[UUID] = None
+    title: Optional[str] = None
+    status: Optional[str] = None
+    channel: Optional[str] = None
 
 
 class MedicalRecordCreate(CrudCreate):
-    patient_id: UUID | None = None
-    doctor_id: UUID | None = None
-    type: str | None = None
-    diagnosis: str | None = None
-    summary: str | None = None
-    files: list[Any] | None = None
+    patient_id: Optional[UUID] = None
+    doctor_id: Optional[UUID] = None
+    type: Optional[str] = None
+    diagnosis: Optional[str] = None
+    summary: Optional[str] = None
+    files: Optional[List[Any]] = None
 
 
 class MedicalRecordUpdate(MedicalRecordCreate):
@@ -49,13 +49,13 @@ class MedicalRecordUpdate(MedicalRecordCreate):
 
 
 class PrescriptionCreate(CrudCreate):
-    patient_id: UUID | None = None
-    doctor_id: UUID | None = None
-    medication_name: str | None = None
-    dosage: str | None = None
-    frequency: str | None = None
-    instructions: str | None = None
-    status: str | None = None
+    patient_id: Optional[UUID] = None
+    doctor_id: Optional[UUID] = None
+    medication_name: Optional[str] = None
+    dosage: Optional[str] = None
+    frequency: Optional[str] = None
+    instructions: Optional[str] = None
+    status: Optional[str] = None
 
 
 class PrescriptionUpdate(PrescriptionCreate):
@@ -63,11 +63,11 @@ class PrescriptionUpdate(PrescriptionCreate):
 
 
 class DeviceCreate(CrudCreate):
-    patient_id: UUID | None = None
-    name: str | None = None
-    device_type: str | None = None
-    status: str | None = None
-    battery: int | None = Field(default=None, ge=0, le=100)
+    patient_id: Optional[UUID] = None
+    name: Optional[str] = None
+    device_type: Optional[str] = None
+    status: Optional[str] = None
+    battery: Optional[int] = Field(default=None, ge=0, le=100)
 
 
 class DeviceUpdate(DeviceCreate):
@@ -75,12 +75,12 @@ class DeviceUpdate(DeviceCreate):
 
 
 class NotificationCreate(CrudCreate):
-    user_id: UUID | None = None
-    patient_id: UUID | None = None
-    title: str | None = None
-    message: str | None = None
-    type: str | None = None
-    is_read: bool | None = None
+    user_id: Optional[UUID] = None
+    patient_id: Optional[UUID] = None
+    title: Optional[str] = None
+    message: Optional[str] = None
+    type: Optional[str] = None
+    is_read: Optional[bool] = None
 
 
 class NotificationUpdate(NotificationCreate):
@@ -88,12 +88,12 @@ class NotificationUpdate(NotificationCreate):
 
 
 class ChatMessageCreate(CrudCreate):
-    patient_id: UUID | None = None
-    doctor_id: UUID | None = None
-    sender_id: UUID | None = None
-    recipient_id: UUID | None = None
-    message: str | None = None
-    is_read: bool | None = None
+    patient_id: Optional[UUID] = None
+    doctor_id: Optional[UUID] = None
+    sender_id: Optional[UUID] = None
+    recipient_id: Optional[UUID] = None
+    message: Optional[str] = None
+    is_read: Optional[bool] = None
 
 
 class ChatMessageUpdate(ChatMessageCreate):
@@ -101,11 +101,11 @@ class ChatMessageUpdate(ChatMessageCreate):
 
 
 class AuditLogCreate(CrudCreate):
-    user_id: UUID | None = None
-    action: str | None = None
-    entity_type: str | None = None
-    entity_id: UUID | None = None
-    details: dict[str, Any] | None = None
+    user_id: Optional[UUID] = None
+    action: Optional[str] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[UUID] = None
+    details: Optional[Dict[str, Any]] = None
 
 
 class AuditLogUpdate(AuditLogCreate):
@@ -113,11 +113,11 @@ class AuditLogUpdate(AuditLogCreate):
 
 
 class CameraCreate(CrudCreate):
-    patient_id: UUID | None = None
-    name: str | None = None
-    location: str | None = None
-    stream_url: str | None = None
-    status: str | None = None
+    patient_id: Optional[UUID] = None
+    name: Optional[str] = None
+    location: Optional[str] = None
+    stream_url: Optional[str] = None
+    status: Optional[str] = None
 
 
 class CameraUpdate(CameraCreate):
@@ -125,12 +125,12 @@ class CameraUpdate(CameraCreate):
 
 
 class ReportCreate(CrudCreate):
-    patient_id: UUID | None = None
-    doctor_id: UUID | None = None
-    title: str | None = None
-    report_type: str | None = None
-    content: str | None = None
-    data: dict[str, Any] | None = None
+    patient_id: Optional[UUID] = None
+    doctor_id: Optional[UUID] = None
+    title: Optional[str] = None
+    report_type: Optional[str] = None
+    content: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
 
 
 class ReportUpdate(ReportCreate):

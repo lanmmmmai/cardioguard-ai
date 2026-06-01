@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Header, HTTPException, Depends
-from typing import List
+from typing import List, Optional
 from app.core.database import database
 from app.core.security import hash_password
 from app.api.auth_api import get_user_from_token
@@ -7,7 +7,7 @@ from app.schemas.admin_doctor_schema import DoctorCreate, DoctorUpdate, DoctorRe
 
 router = APIRouter(prefix="/admin", tags=["admin_doctors"])
 
-async def require_admin(authorization: str | None = Header(default=None)):
+async def require_admin(authorization: Optional[str] = Header(default=None)):
     user = await get_user_from_token(authorization)
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Chỉ admin mới có quyền thực hiện thao tác này")
@@ -137,6 +137,9 @@ async def delete_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
     if not check_doctor:
         raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
 
-    delete_query = "DELETE FROM users WHERE role = 'doctor' AND id::text = :doctor_id"
-    await database.execute(delete_query, {"doctor_id": doctor_id})
-    return {"message": "Xóa bác sĩ thành công", "id": doctor_id}
+    # Dọn dẹp phân công doctor_patient trước để tránh lỗi FK
+    await database.execute("DELETE FROM doctor_patient WHERE doctor_id::text = :doctor_id", {"doctor_id": doctor_id})
+    
+    # Thực hiện Soft Delete
+    await database.execute("UPDATE users SET status = 'inactive' WHERE role = 'doctor' AND id::text = :doctor_id", {"doctor_id": doctor_id})
+    return {"message": "Vô hiệu hóa bác sĩ thành công (Soft Delete)", "id": doctor_id}

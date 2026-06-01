@@ -1,5 +1,6 @@
 import React from 'react';
 import { Users, Bell, AlertOctagon, TrendingUp, ShieldAlert, Award } from 'lucide-react';
+import { normalizeAlertSeverity } from '../utils/severity';
 
 interface Patient {
   id: string;
@@ -28,11 +29,17 @@ interface StatsDashboardProps {
 }
 
 export const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients, alerts }) => {
-  // 1. Calculate general stats
+  // 1. Calculate general stats using normalized severities for clinical safety
   const totalPatients = patients.length;
   const totalAlerts = alerts.length;
-  const highAlertsCount = alerts.filter(a => a.severity.toLowerCase() === 'high' || a.severity.toLowerCase() === 'critical').length;
-  const mediumAlertsCount = alerts.filter(a => a.severity.toLowerCase() === 'medium' || a.severity.toLowerCase() === 'warning').length;
+  const highAlertsCount = alerts.filter(a => {
+    const norm = normalizeAlertSeverity(a.severity);
+    return norm === 'high' || norm === 'critical';
+  }).length;
+  const mediumAlertsCount = alerts.filter(a => {
+    const norm = normalizeAlertSeverity(a.severity);
+    return norm === 'warning';
+  }).length;
   const lowAlertsCount = totalAlerts - highAlertsCount - mediumAlertsCount;
 
   // 2. Use only real alert data. Empty reports should display zero states, not fake values.
@@ -313,7 +320,7 @@ export const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients, alerts
                 cy="60"
                 r="50"
                 fill="transparent"
-                stroke="var(--color-spo2)"
+                stroke="var(--color-info)"
                 strokeWidth="10"
                 strokeDasharray={`${strokeLow} ${circ}`}
                 strokeDashoffset={-offsetLow}
@@ -333,7 +340,7 @@ export const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients, alerts
             <div className="legend-item" style={{ justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div className="legend-color-dot" style={{ background: 'var(--color-critical)' }}></div>
-                <span>Nguy kịch (High)</span>
+                <span>Nguy kịch / Nghiêm trọng</span>
               </div>
               <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{displayHigh} ({pctHigh}%)</span>
             </div>
@@ -341,15 +348,15 @@ export const StatsDashboard: React.FC<StatsDashboardProps> = ({ patients, alerts
             <div className="legend-item" style={{ justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div className="legend-color-dot" style={{ background: 'var(--color-warning)' }}></div>
-                <span>Cảnh báo (Medium)</span>
+                <span>Cảnh báo</span>
               </div>
               <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{displayMedium} ({pctMedium}%)</span>
             </div>
 
             <div className="legend-item" style={{ justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div className="legend-color-dot" style={{ background: 'var(--color-spo2)' }}></div>
-                <span>Theo dõi (Low)</span>
+                <div className="legend-color-dot" style={{ background: 'var(--color-info)' }}></div>
+                <span>Theo dõi</span>
               </div>
               <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{displayLow} ({pctLow}%)</span>
             </div>

@@ -16,6 +16,7 @@ import { EmailCmsPage } from './components/cms/EmailCmsPage';
 import { PatientChatbot } from './pages/PatientChatbot';
 import { DoctorChatbot } from './pages/DoctorChatbot';
 import { DoctorsManager } from './components/DoctorsManager';
+import { UsersManager } from './components/UsersManager';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { defaultRouteByRole, normalizeRole, type UserRole } from './auth/roles';
@@ -68,15 +69,21 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/admin/patients': { title: 'Quản lý bệnh nhân', subtitle: 'Hồ sơ y tế, lịch sử khám và thông tin người bệnh.' },
   '/patient/chatbot': { title: 'Trợ lý AI', subtitle: 'Giải đáp, phân tích và theo dõi sức khỏe tim mạch.' },
   '/doctor/ai-assistant': { title: 'AI Command Center', subtitle: 'Trợ lý phân tích dữ liệu, tóm tắt bệnh án và phát hiện bất thường.' },
+  '/doctor/chatbot': { title: 'Chatbot AI', subtitle: 'Giải đáp, phân tích và hỗ trợ tư vấn sức khỏe tim mạch.' },
   '/admin/doctors': { title: 'Quản lý bác sĩ', subtitle: 'Danh sách bác sĩ, phân công chuyên khoa và quyền truy cập.' },
+  '/admin/users': { title: 'Quản lý tài khoản', subtitle: 'Phân quyền hệ thống, theo dõi trạng thái hoạt động và quản trị toàn bộ tài khoản người dùng CardioGuard.' },
   '/admin/system-logs': { title: 'Nhật ký hệ thống', subtitle: 'Audit log, lịch sử đăng nhập và thao tác bảo mật.' },
   '/admin/settings': { title: 'Cài đặt hệ thống', subtitle: 'Cấu hình nền tảng, API token và trạng thái kết nối.' },
   '/admin/profile': { title: 'Hồ sơ cá nhân', subtitle: 'Thông tin tài khoản admin và đổi mật khẩu.' },
   '/doctor/prescriptions': { title: 'Đơn thuốc', subtitle: 'Kê đơn, xem lịch sử đơn thuốc và AI hỗ trợ tham khảo.' },
   '/doctor/chat': { title: 'Chat tư vấn', subtitle: 'Tư vấn trực tuyến bảo mật giữa bác sĩ và bệnh nhân.' },
+  '/doctor/messages': { title: 'Nhắn tin tư vấn', subtitle: 'Tư vấn trực tuyến bảo mật giữa bác sĩ và bệnh nhân.' },
   '/doctor/ai-analysis': { title: 'AI phân tích sức khỏe', subtitle: 'Dự đoán nguy cơ tim mạch, phát hiện bất thường và gợi ý chẩn đoán tham khảo.' },
   '/doctor/profile': { title: 'Hồ sơ cá nhân', subtitle: 'Thông tin bác sĩ, chuyên khoa và lịch làm việc.' },
+  '/patient/home': { title: 'Trang chủ bệnh nhân', subtitle: 'Tổng quan chỉ số sức khỏe của bạn.' },
+  '/patient/dashboard': { title: 'Trang chủ bệnh nhân', subtitle: 'Tổng quan chỉ số sức khỏe của bạn.' },
   '/patient/health': { title: 'Chỉ số sức khỏe', subtitle: 'Theo dõi nhịp tim, SpO2, huyết áp và ECG realtime.' },
+  '/patient/metrics': { title: 'Chỉ số sức khỏe', subtitle: 'Theo dõi nhịp tim, SpO2, huyết áp và ECG realtime.' },
   '/patient/history': { title: 'Lịch sử sức khỏe', subtitle: 'Lưu trữ và phân tích chỉ số sức khỏe theo thời gian.' },
   '/patient/prescriptions': { title: 'Đơn thuốc của tôi', subtitle: 'Danh sách đơn thuốc hiện tại và lịch sử kê đơn.' },
   '/patient/sos': { title: 'SOS khẩn cấp', subtitle: 'Kích hoạt cảnh báo khẩn cấp gửi tới bác sĩ và hệ thống.' },
@@ -123,7 +130,13 @@ const AppContent: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [latestTelemetry, setLatestTelemetry] = useState<SensorData | null>(null);
-  const [activeBanner, setActiveBanner] = useState<{ message: string; patientName: string; severity: string } | null>(null);
+  const [activeBanner, setActiveBanner] = useState<{
+    message: string;
+    patientName: string;
+    patientId: string;
+    severity: string;
+    timestamp: string;
+  } | null>(null);
   const [showAddPatientModal, setShowAddPatientModal] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
@@ -136,16 +149,26 @@ const AppContent: React.FC = () => {
   }, [theme]);
 
   useEffect(() => {
-    if (path === '/' && !loading) {
-      navigate(role ? defaultRouteByRole[role] : '/login', true);
-    }
-  }, [loading, path, role]);
+    if (loading) return;
 
-  useEffect(() => {
-    if (!loading && isAuthenticated && role && ['/login', '/register', '/forgot-password'].includes(path)) {
-      navigate(defaultRouteByRole[role], true);
+    if (path === '/' || !routeRole) {
+      if (path === '/' || !['/login', '/register', '/forgot-password', '/change-password'].includes(path)) {
+        if (!pageTitles[normalizedPath]) {
+          navigate(role ? defaultRouteByRole[role] : '/login', true);
+        }
+      }
     }
-  }, [isAuthenticated, loading, path, role]);
+
+    if (path === '/change-password') {
+      if (!isAuthenticated || !role) {
+        navigate('/login', true);
+      }
+    } else if (['/login', '/register', '/forgot-password'].includes(path)) {
+      if (isAuthenticated && role) {
+        navigate(defaultRouteByRole[role], true);
+      }
+    }
+  }, [loading, path, role, isAuthenticated, routeRole]);
 
   const fetchPatients = async () => {
     try {
@@ -197,8 +220,24 @@ const AppContent: React.FC = () => {
     const matchingPatient = patients.find((patient) => patient.id === data.patient_id);
     const patientName = matchingPatient?.full_name || 'Bệnh nhân';
 
-    setActiveBanner({ message: firstAlert.message, patientName, severity: firstAlert.severity });
-    window.setTimeout(() => setActiveBanner(null), 7000);
+    const severity = firstAlert.severity || 'high';
+    const timestamp = new Date().toLocaleTimeString('vi-VN');
+
+    setActiveBanner({
+      message: firstAlert.message,
+      patientName,
+      patientId: data.patient_id,
+      severity,
+      timestamp
+    });
+
+    // Persistent for critical or high alarms (no auto-timeout)
+    const isPersistent = ['critical', 'high'].includes(severity.toLowerCase());
+    if (!isPersistent) {
+      window.setTimeout(() => {
+        setActiveBanner((prev) => prev && prev.patientId === data.patient_id && prev.message === firstAlert.message ? null : prev);
+      }, 7000);
+    }
 
     setAlerts((prev) => [
       ...data.alerts.map((alert) => ({
@@ -234,13 +273,29 @@ const AppContent: React.FC = () => {
       } as Alert;
       const matchingPatient = patients.find((patient) => patient.id === alert.patient_id);
       const patientName = alert.full_name || matchingPatient?.full_name || 'Bệnh nhân';
-      setActiveBanner({ message: alert.message, patientName, severity: alert.severity });
-      window.setTimeout(() => setActiveBanner(null), 7000);
+      const severity = alert.severity || 'high';
+      const timestamp = new Date().toLocaleTimeString('vi-VN');
+
+      setActiveBanner({
+        message: alert.message,
+        patientName,
+        patientId: alert.patient_id,
+        severity,
+        timestamp
+      });
+
+      // Persistent for critical or high alarms (no auto-timeout)
+      const isPersistent = ['critical', 'high'].includes(severity.toLowerCase());
+      if (!isPersistent) {
+        window.setTimeout(() => {
+          setActiveBanner((prev) => prev && prev.patientId === alert.patient_id && prev.message === alert.message ? null : prev);
+        }, 7000);
+      }
       setAlerts((prev) => [{ ...alert, full_name: patientName }, ...prev]);
     }
   }, [handleSensorTelemetry, patients]);
 
-  useWebSocket(WS_URL, accessToken ? handleRealtimeMessage : undefined, accessToken);
+  const { isConnected } = useWebSocket(WS_URL, accessToken ? handleRealtimeMessage : undefined, accessToken);
 
   const handleLoginSuccess = (token: string, userData: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean }) => {
     const userRole = normalizeRole(userData.role);
@@ -294,7 +349,10 @@ const AppContent: React.FC = () => {
         return <EmailCmsPage />;
       case '/admin/doctors':
         return <DoctorsManager />;
+      case '/admin/users':
+        return <UsersManager />;
       case '/doctor/ai-assistant':
+      case '/doctor/chatbot':
         return <DoctorChatbot />;
       case '/admin/patients':
       case '/doctor/patients':
@@ -303,37 +361,39 @@ const AppContent: React.FC = () => {
       case '/doctor/alerts':
         return <Alerts alerts={alerts} />;
       case '/admin/devices':
-        return <FeatureHub type="devices" role="admin" patients={patients} />;
+        return <FeatureHub key={normalizedPath} type="devices" role="admin" patients={patients} />;
       case '/admin/cameras':
-        return <ApiDataPage title="Quản lý camera" subtitle="Danh sách camera thật từ bảng cameras theo quyền hiện tại." endpoint="/cameras" />;
+        return <ApiDataPage key={normalizedPath} title="Quản lý camera" subtitle="Danh sách camera thật từ bảng cameras theo quyền hiện tại." endpoint="/cameras" />;
       case '/admin/reports':
       case '/doctor/reports':
-        return <ApiDataPage title="Báo cáo" subtitle="Danh sách báo cáo thật từ bảng reports theo quyền hiện tại." endpoint="/reports" />;
+        return <ApiDataPage key={normalizedPath} title="Báo cáo" subtitle="Danh sách báo cáo thật từ bảng reports theo quyền hiện tại." endpoint="/reports" />;
       case '/doctor/dashboard':
         return <DoctorDashboard patients={patients} alerts={alerts} />;
       case '/doctor/appointments':
       case '/patient/appointments':
-        return <FeatureHub type="appointments" role={routeRole || 'doctor'} patients={patients} />;
+        return <FeatureHub key={normalizedPath} type="appointments" role={routeRole || 'doctor'} patients={patients} />;
       case '/doctor/medical-records':
-        return <FeatureHub type="records" role="doctor" patients={patients} />;
+        return <FeatureHub key={normalizedPath} type="records" role="doctor" patients={patients} />;
       case '/doctor/prescriptions':
       case '/patient/prescriptions':
-        return <ApiDataPage title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/prescriptions" />;
+        return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/prescriptions" />;
       case '/doctor/chat':
+      case '/doctor/messages':
       case '/patient/chat':
-        return <ApiDataPage title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/chat-messages" />;
+        return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/chat-messages" />;
       case '/patient/notifications':
-        return <ApiDataPage title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/notifications" />;
+        return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/notifications" />;
       case '/admin/system-logs':
-        return <ApiDataPage title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/audit-logs" />;
+        return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/audit-logs" />;
       case '/admin/profile':
       case '/doctor/profile':
       case '/patient/profile':
         return <ProfilePage role={routeRole || 'patient'} />;
       case '/doctor/realtime-monitoring':
-        return <Dashboard patients={patients} latestTelemetry={latestTelemetry} alerts={alerts} onAddPatientClick={() => navigate('/doctor/patients')} />;
+        return <Dashboard patients={patients} latestTelemetry={latestTelemetry} alerts={alerts} onAddPatientClick={() => navigate('/doctor/patients')} isConnected={isConnected} />;
       case '/patient/home':
-        return <PatientHome latestTelemetry={latestTelemetry} alerts={alerts} />;
+      case '/patient/dashboard':
+        return <PatientHome latestTelemetry={latestTelemetry} alerts={alerts} isConnected={isConnected} />;
       default: {
         const meta = pageTitles[normalizedPath];
         return meta ? <PlaceholderPage title={meta.title} subtitle={meta.subtitle} /> : null;
@@ -355,11 +415,10 @@ const AppContent: React.FC = () => {
 
   if (path === '/change-password') {
     if (!isAuthenticated || !role) {
-      navigate('/login', true);
       return null;
     }
     return <ChangePassword onNavigateNext={() => {
-      // Refresh user info (clears must_change_password) then navigate to default route
+      // Once successfully changed, refresh user info and navigate to default route
       refreshUser().then(() => {
         navigate(defaultRouteByRole[role], true);
       }).catch(() => {
@@ -376,12 +435,10 @@ const AppContent: React.FC = () => {
         onNavigateToForgotPassword={() => navigate('/forgot-password')}
       />;
     }
-    navigate(role ? defaultRouteByRole[role] : '/login', true);
     return null;
   }
 
   if (!routeContent) {
-    navigate(role ? defaultRouteByRole[role] : '/login', true);
     return null;
   }
 
@@ -390,6 +447,7 @@ const AppContent: React.FC = () => {
     navigate,
     theme,
     onToggleTheme: () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark')),
+    isConnected,
   };
 
   const layout = routeRole === 'admin'
@@ -398,15 +456,54 @@ const AppContent: React.FC = () => {
       ? <DoctorLayout {...layoutProps}>{routeContent}</DoctorLayout>
       : <PatientLayout {...layoutProps}>{routeContent}</PatientLayout>;
 
+  const handleViewPatientDetail = (patientId: string) => {
+    setSelectedPatientId(patientId);
+    if (role === 'doctor') {
+      navigate('/doctor/patients');
+    } else if (role === 'admin') {
+      navigate('/admin/patients');
+    }
+    setActiveBanner(null);
+  };
+
   return (
     <ProtectedRoute allowedRoles={routeRole ? [routeRole] : []} currentPath={normalizedPath} navigate={navigate}>
       {activeBanner && (
-        <div className="global-notification-bar">
-          <AlertOctagon className="beat-animated" size={18} />
-          <span>
-            <strong>CẢNH BÁO ({activeBanner.severity.toUpperCase()}):</strong> {activeBanner.patientName} - {activeBanner.message}
-          </span>
-          <button type="button" onClick={() => setActiveBanner(null)}>Đóng</button>
+        <div className={`global-notification-bar ${activeBanner.severity.toLowerCase()}`} role="alert" aria-live="assertive">
+          <div className="banner-header">
+            <div className="banner-title-box">
+              <AlertOctagon className="beat-animated" size={18} style={{ color: 'var(--color-critical)' }} />
+              <span>CẢNH BÁO LÂM SÀNG</span>
+            </div>
+            <button className="banner-close-btn" type="button" onClick={() => setActiveBanner(null)} aria-label="Đóng cảnh báo">
+              Đóng
+            </button>
+          </div>
+          <div className="banner-body">
+            <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-primary)' }}>
+              {activeBanner.patientName}
+            </p>
+            <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)' }}>
+              {activeBanner.message}
+            </p>
+            <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Độ nghiêm trọng: <span className={`metric-status-badge ${activeBanner.severity.toLowerCase()}`} style={{ display: 'inline-block', padding: '2px 6px', fontSize: '0.7rem' }}>
+                {activeBanner.severity.toUpperCase()}
+              </span> • {activeBanner.timestamp}
+            </p>
+          </div>
+          {(role === 'doctor' || role === 'admin') && (
+            <div className="banner-footer">
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ padding: '6px 12px', fontSize: '0.8rem', borderRadius: '6px' }}
+                onClick={() => handleViewPatientDetail(activeBanner.patientId)}
+              >
+                Xem chi tiết
+              </button>
+            </div>
+          )}
         </div>
       )}
       {layout}

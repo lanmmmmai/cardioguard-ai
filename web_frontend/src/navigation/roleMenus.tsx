@@ -53,11 +53,11 @@ export const roleMenus: Record<UserRole, RoleMenuItem[]> = {
     { label: 'Lịch hẹn khám', path: '/doctor/appointments', icon: CalendarDays },
     { label: 'Kê đơn thuốc', path: '/doctor/prescriptions', icon: Pill },
     { label: 'Báo cáo y tế', path: '/doctor/reports', icon: FileText },
-    { label: 'Nhắn tin', path: '/doctor/messages', icon: MessageCircle },
+    { label: 'Nhắn tin', path: '/doctor/chat', icon: MessageCircle },
     { label: 'Chatbot AI', path: '/doctor/chatbot', icon: Bot },
   ],
   patient: [
-    { label: 'Dashboard', path: '/patient/dashboard', icon: Home },
+    { label: 'Dashboard', path: '/patient/home', icon: Home },
     { label: 'Trợ lý AI', path: '/patient/chatbot', icon: Bot },
     { label: 'Chỉ số sức khỏe', path: '/patient/metrics', icon: HeartPulse },
     { label: 'Lịch hẹn của tôi', path: '/patient/appointments', icon: CalendarDays },

@@ -1,14 +1,14 @@
 import React, { useRef, useState } from 'react';
 import { Activity, ArrowLeft, CheckCircle2, Lock, Mail, ShieldCheck, User, Loader2 } from 'lucide-react';
 import { API_URL } from '../config';
+import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
 
 interface RegisterProps {
   onRegisterSuccess: () => void;
   onNavigateToLogin: () => void;
 }
 
-const fullNamePattern = /^[A-Za-zÀ-ỹ]+(?:[ '\-][A-Za-zÀ-ỹ]+)+$/;
-const passwordPattern = /^(?=.*[A-Z])(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+const fullNamePattern = /^[A-Za-zÀ-ỹ]+(?:[ '-][A-Za-zÀ-ỹ]+)+$/;
 
 const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ');
 
@@ -46,8 +46,8 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
       return 'Vui lòng dùng địa chỉ Gmail để xác minh OTP';
     }
 
-    if (!passwordPattern.test(password)) {
-      return 'Mật khẩu tối thiểu 8 ký tự, có ít nhất 1 chữ hoa, có chữ, số và ký tự đặc biệt';
+    if (!isStrongPassword(password)) {
+      return passwordPolicyMessage;
     }
 
     if (password !== confirmPassword) {
@@ -88,7 +88,9 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
       setOtp('');
       setSuccess(
         data.dev_otp
-          ? `Môi trường dev chưa cấu hình SMTP. Mã OTP tạm: ${data.dev_otp}`
+          ? `Môi trường dev chưa cấu hình Brevo API. Mã OTP tạm: ${data.dev_otp}`
+          : data.email_sent === false
+            ? 'Môi trường dev chưa cấu hình gửi email. Nếu cần test OTP, xem log backend hoặc bật EXPOSE_DEV_OTP.'
           : `Đã gửi OTP tới ${data.email || email.toLowerCase()}. Vui lòng kiểm tra hộp thư hoặc spam.`
       );
     } catch (err: any) {
