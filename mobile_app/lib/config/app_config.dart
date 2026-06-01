@@ -28,6 +28,7 @@ class AppConfig {
   static const String meEndpoint = '/auth/me';
   static const String patientsEndpoint = '/patients';
   static const String alertsEndpoint = '/alerts';
+  static const String alertsWeeklyStatsEndpoint = '/alerts/stats/last-7-days';
   static const String assignmentsEndpoint = '/admin/assignments';
 
   // Secure Storage Keys

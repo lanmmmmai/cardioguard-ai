@@ -399,7 +399,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       decoration:
                           const InputDecoration(labelText: 'Mật khẩu hiện tại'),
                       obscureText: true,
-                      validator: _validatePasswordPolicy,
+                      validator: (v) => (v == null || v.isEmpty)
+                          ? 'Vui lòng nhập mật khẩu hiện tại'
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(

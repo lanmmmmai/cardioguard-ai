@@ -3,6 +3,7 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../core/api_client.dart';
 import '../core/app_logger.dart';
+import '../config/app_config.dart';
 
 class StatsScreen extends StatefulWidget {
   final bool isDarkTheme;
@@ -48,18 +49,11 @@ class _StatsScreenState extends State<StatsScreen> {
       final responses = await Future.wait([
         client.get('/patients'),
         client.get('/alerts'),
+        client.get(AppConfig.alertsWeeklyStatsEndpoint),
       ]);
       final patients = (responses[0].data as List<dynamic>? ?? const []);
       final alerts = (responses[1].data as List<dynamic>? ?? const []);
-      final now = DateTime.now();
-      final sevenDaysAgo = DateTime(now.year, now.month, now.day)
-          .subtract(const Duration(days: 6));
-      final dayCountMap = <DateTime, int>{};
-      for (int i = 0; i < 7; i++) {
-        final d = DateTime(
-            sevenDaysAgo.year, sevenDaysAgo.month, sevenDaysAgo.day + i);
-        dayCountMap[d] = 0;
-      }
+      final weeklyStats = (responses[2].data as List<dynamic>? ?? const []);
 
       if (!mounted) return;
       setState(() {
@@ -81,33 +75,33 @@ class _StatsScreenState extends State<StatsScreen> {
           } else {
             low++;
           }
-
-          final createdAtRaw = row['created_at'];
-          if (createdAtRaw is String) {
-            final parsed = DateTime.tryParse(createdAtRaw)?.toLocal();
-            if (parsed != null) {
-              final bucket = DateTime(parsed.year, parsed.month, parsed.day);
-              if (dayCountMap.containsKey(bucket)) {
-                dayCountMap[bucket] = (dayCountMap[bucket] ?? 0) + 1;
-              }
-            }
-          }
         }
 
         _highAlertsVal = high.toDouble();
         _medAlertsVal = med.toDouble();
         _lowAlertsVal = low.toDouble();
-        final orderedDays = dayCountMap.keys.toList()..sort();
-        _weeklyAlertSpots = orderedDays
-            .asMap()
-            .entries
-            .map((e) => FlSpot(
-                e.key.toDouble(), (dayCountMap[e.value] ?? 0).toDouble()))
-            .toList();
-        _weeklyLabels = orderedDays
-            .map((d) =>
-                '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}')
-            .toList();
+        if (weeklyStats.isNotEmpty) {
+          _weeklyLabels = weeklyStats
+              .map((e) =>
+                  (e as Map<String, dynamic>)['label']?.toString() ?? '-')
+              .toList();
+          _weeklyAlertSpots = weeklyStats.asMap().entries.map((entry) {
+            final row = entry.value as Map<String, dynamic>;
+            final count = (row['count'] as num?)?.toDouble() ?? 0.0;
+            return FlSpot(entry.key.toDouble(), count);
+          }).toList();
+        } else {
+          _weeklyLabels = const ['-', '-', '-', '-', '-', '-', '-'];
+          _weeklyAlertSpots = const [
+            FlSpot(0, 0),
+            FlSpot(1, 0),
+            FlSpot(2, 0),
+            FlSpot(3, 0),
+            FlSpot(4, 0),
+            FlSpot(5, 0),
+            FlSpot(6, 0),
+          ];
+        }
 
         // Count critical cases
         _criticalCount = high;
