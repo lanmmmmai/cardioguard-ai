@@ -34,7 +34,7 @@ const normalizeUser = (user: any): AuthUser | null => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [accessToken, setAccessToken] = useState<string | null>(() => storage.getItem('token'));
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(() => {
     try {
       const stored = storage.getItem('user');
@@ -48,7 +48,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<string | null>(null);
 
   const logout = () => {
-    storage.removeItem('token');
     storage.removeItem('user');
     setAccessToken(null);
     setUser(null);
@@ -62,7 +61,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Tài khoản chưa được phân quyền');
     }
 
-    storage.setItem('token', token);
     storage.setItem('user', JSON.stringify(normalizedUser));
     setAccessToken(token);
     setUser(normalizedUser);
@@ -71,11 +69,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const refreshUser = async () => {
-    const token = storage.getItem('token');
-    if (!token) return null;
+    if (!accessToken) return null;
 
     const response = await fetch(`${API_URL}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     if (!response.ok) {
@@ -89,15 +86,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     storage.setItem('user', JSON.stringify(normalizedUser));
-    setAccessToken(token);
+    setAccessToken(accessToken);
     setUser(normalizedUser);
     return normalizedUser;
   };
 
   useEffect(() => {
     const restoreSession = async () => {
-      const token = storage.getItem('token');
-      if (!token) {
+      if (!accessToken) {
+        storage.removeItem('user');
         setLoading(false);
         return;
       }
@@ -113,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     restoreSession();
-  }, []);
+  }, [accessToken]);
 
   const value = useMemo<AuthContextValue>(() => ({
     accessToken,

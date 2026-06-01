@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../core/api_client.dart';
 import '../core/app_logger.dart';
@@ -375,4 +375,5 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 }
+
 

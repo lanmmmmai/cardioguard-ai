@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
@@ -260,4 +260,5 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
     );
   }
 }
+
 

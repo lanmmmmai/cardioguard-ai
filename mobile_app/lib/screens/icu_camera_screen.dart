@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 class IcuCameraScreen extends StatefulWidget {
   final bool isDarkTheme;
@@ -380,4 +380,5 @@ class _CrtOverlayPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _CrtOverlayPainter oldDelegate) => true;
 }
+
 

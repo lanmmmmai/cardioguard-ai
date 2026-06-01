@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 
 import '../providers/auth_provider.dart';
 import '../providers/patient_provider.dart';
@@ -712,4 +712,5 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     );
   }
 }
+
 

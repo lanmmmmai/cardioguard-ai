@@ -30,12 +30,14 @@ class WebSocketService {
 
     try {
       final token = await SecureStorage().getToken();
-      final uriStr = token != null ? '$wsUrl?token=$token' : wsUrl;
-      final uri = Uri.parse(uriStr);
+      final uri = Uri.parse(wsUrl);
 
       _channel = IOWebSocketChannel.connect(uri);
       _isConnected = true;
       AppLogger.log('WebSocket authenticated connection opened to $wsUrl');
+      if (token != null && token.isNotEmpty) {
+        _channel!.sink.add(json.encode({"type": "auth", "token": token}));
+      }
 
       _channel!.stream.listen(
         (message) {
@@ -82,4 +84,5 @@ class WebSocketService {
     _channel = null;
   }
 }
+
 

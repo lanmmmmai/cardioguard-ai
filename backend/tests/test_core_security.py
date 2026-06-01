@@ -1,4 +1,8 @@
 import unittest
+import os
+
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test_db")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-with-at-least-32-chars")
 
 from app.core.password_policy import validate_password
 from app.core.security import create_access_token, hash_password, verify_password

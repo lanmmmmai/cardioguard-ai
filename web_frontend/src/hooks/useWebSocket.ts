@@ -51,13 +51,10 @@ export const useWebSocket = (
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       wsUrl = `${protocol}//${window.location.host}${url}`;
     }
-    if (token) {
-      const separator = wsUrl.includes('?') ? '&' : '?';
-      wsUrl = `${wsUrl}${separator}token=${encodeURIComponent(token)}`;
-    }
-
     try {
-      const socket = new WebSocket(wsUrl);
+      const socket = token
+        ? new WebSocket(wsUrl, [`cardioguard.jwt.${token}`])
+        : new WebSocket(wsUrl);
       socketRef.current = socket;
 
       socket.onopen = () => {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import '../providers/auth_provider.dart';
 import '../providers/patient_provider.dart';
 import '../core/api_client.dart';
@@ -375,4 +375,5 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+
 

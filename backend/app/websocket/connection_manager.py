@@ -8,7 +8,6 @@ class ConnectionManager:
         self.active_connections: dict[WebSocket, dict] = {}
 
     async def connect(self, websocket: WebSocket, user_info: dict):
-        await websocket.accept()
         self.active_connections[websocket] = user_info
         print(f"WebSocket connected: User {user_info['email']} ({user_info['role']})")
 
@@ -39,7 +38,7 @@ class ConnectionManager:
         }
         
         disconnected = []
-        for connection, user in self.active_connections.items():
+        for connection, user in list(self.active_connections.items()):
             try:
                 role = user["role"]
                 uid = user["id"]
@@ -61,7 +60,7 @@ class ConnectionManager:
         }
         
         disconnected = []
-        for connection, user in self.active_connections.items():
+        for connection, user in list(self.active_connections.items()):
             try:
                 role = user["role"]
                 uid = user["id"]
@@ -81,7 +80,7 @@ class ConnectionManager:
         }
         
         disconnected = []
-        for connection, user in self.active_connections.items():
+        for connection, user in list(self.active_connections.items()):
             try:
                 uid = user["id"]
                 if uid == sender_id or uid == recipient_id:
@@ -100,7 +99,7 @@ class ConnectionManager:
         }
         
         disconnected = []
-        for connection, user in self.active_connections.items():
+        for connection, user in list(self.active_connections.items()):
             try:
                 uid = user["id"]
                 if uid == patient_id or uid == doctor_id:
@@ -119,7 +118,7 @@ class ConnectionManager:
         }
         
         disconnected = []
-        for connection, user in self.active_connections.items():
+        for connection, user in list(self.active_connections.items()):
             try:
                 uid = user["id"]
                 if uid == user_id:
