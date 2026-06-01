@@ -7,6 +7,8 @@ import '../providers/auth_provider.dart';
 import '../providers/patient_provider.dart';
 import '../providers/chat_provider.dart';
 import '../services/websocket_service.dart';
+import '../widgets/cg_widgets.dart';
+import '../ui/cg_tokens.dart';
 
 class PatientDetailScreen extends StatefulWidget {
   final Map<String, dynamic> patient;
@@ -52,7 +54,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     // Initial API fetches
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final patientId = widget.patient['id'];
-      final patientProvider = Provider.of<PatientProvider>(context, listen: false);
+      final patientProvider =
+          Provider.of<PatientProvider>(context, listen: false);
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
       patientProvider.fetchMedicalRecords(patientId);
@@ -68,7 +71,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     if (type == 'chat') {
       final msg = event['data'];
       Provider.of<ChatProvider>(context, listen: false).addRealtimeMessage(msg);
-    } else if (type == 'health_metrics' && event['patient_id'] == widget.patient['id']) {
+    } else if (type == 'health_metrics' &&
+        event['patient_id'] == widget.patient['id']) {
       final metrics = event['data'] as Map<String, dynamic>;
       setState(() {
         _currentHr = (metrics['heart_rate'] as num).toDouble();
@@ -102,8 +106,10 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: widget.isDarkTheme ? const Color(0xFF11151D) : Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor:
+          widget.isDarkTheme ? const Color(0xFF11151D) : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
         return Padding(
           padding: EdgeInsets.only(
@@ -117,22 +123,37 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Thêm Bệnh Án Mới', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('Thêm Bệnh Án Mới',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
-                TextField(controller: typeController, decoration: const InputDecoration(labelText: 'Loại khám')),
+                TextField(
+                    controller: typeController,
+                    decoration: const InputDecoration(labelText: 'Loại khám')),
                 const SizedBox(height: 12),
-                TextField(controller: diagnosisController, decoration: const InputDecoration(labelText: 'Chẩn đoán')),
+                TextField(
+                    controller: diagnosisController,
+                    decoration: const InputDecoration(labelText: 'Chẩn đoán')),
                 const SizedBox(height: 12),
-                TextField(controller: summaryController, maxLines: 3, decoration: const InputDecoration(labelText: 'Tóm tắt / Kết luận')),
+                TextField(
+                    controller: summaryController,
+                    maxLines: 3,
+                    decoration:
+                        const InputDecoration(labelText: 'Tóm tắt / Kết luận')),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF3366)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF3366)),
                     onPressed: () async {
-                      if (diagnosisController.text.isEmpty || summaryController.text.isEmpty) return;
-                      final patientProvider = Provider.of<PatientProvider>(context, listen: false);
+                      if (diagnosisController.text.isEmpty ||
+                          summaryController.text.isEmpty) {
+                        return;
+                      }
+                      final patientProvider =
+                          Provider.of<PatientProvider>(context, listen: false);
                       final success = await patientProvider.addMedicalRecord(
                         patientId: widget.patient['id'],
                         type: typeController.text.trim(),
@@ -143,7 +164,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                         Navigator.pop(context);
                       }
                     },
-                    child: const Text('Lưu Bệnh Án', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    child: const Text('Lưu Bệnh Án',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -165,8 +188,10 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: widget.isDarkTheme ? const Color(0xFF11151D) : Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      backgroundColor:
+          widget.isDarkTheme ? const Color(0xFF11151D) : Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
         return Padding(
           padding: EdgeInsets.only(
@@ -180,24 +205,42 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Kê Đơn Thuốc Mới', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('Kê Đơn Thuốc Mới',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 16),
-                TextField(controller: medController, decoration: const InputDecoration(labelText: 'Tên thuốc')),
+                TextField(
+                    controller: medController,
+                    decoration: const InputDecoration(labelText: 'Tên thuốc')),
                 const SizedBox(height: 12),
-                TextField(controller: dosageController, decoration: const InputDecoration(labelText: 'Liều lượng (e.g. 500mg)')),
+                TextField(
+                    controller: dosageController,
+                    decoration: const InputDecoration(
+                        labelText: 'Liều lượng (e.g. 500mg)')),
                 const SizedBox(height: 12),
-                TextField(controller: freqController, decoration: const InputDecoration(labelText: 'Tần suất (e.g. 2 lần/ngày)')),
+                TextField(
+                    controller: freqController,
+                    decoration: const InputDecoration(
+                        labelText: 'Tần suất (e.g. 2 lần/ngày)')),
                 const SizedBox(height: 12),
-                TextField(controller: instructController, decoration: const InputDecoration(labelText: 'Hướng dẫn sử dụng')),
+                TextField(
+                    controller: instructController,
+                    decoration:
+                        const InputDecoration(labelText: 'Hướng dẫn sử dụng')),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF3366)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF3366)),
                     onPressed: () async {
-                      if (medController.text.isEmpty || dosageController.text.isEmpty) return;
-                      final patientProvider = Provider.of<PatientProvider>(context, listen: false);
+                      if (medController.text.isEmpty ||
+                          dosageController.text.isEmpty) {
+                        return;
+                      }
+                      final patientProvider =
+                          Provider.of<PatientProvider>(context, listen: false);
                       final success = await patientProvider.addPrescription(
                         patientId: widget.patient['id'],
                         medicationName: medController.text.trim(),
@@ -209,7 +252,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                         Navigator.pop(context);
                       }
                     },
-                    child: const Text('Lưu Đơn Thuốc', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    child: const Text('Lưu Đơn Thuốc',
+                        style: TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -229,9 +274,11 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final currentUserId = authProvider.currentUser!.id;
     final patientId = widget.patient['id'];
-    
+
     // Doctor or Admin
-    final doctorId = authProvider.currentUser!.role == 'doctor' ? currentUserId : widget.patient['doctor_id'] ?? currentUserId;
+    final doctorId = authProvider.currentUser!.role == 'doctor'
+        ? currentUserId
+        : widget.patient['doctor_id'] ?? currentUserId;
     final recipientId = patientId;
 
     chatProvider.sendMessage(
@@ -252,11 +299,15 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     final chatProvider = Provider.of<ChatProvider>(context);
 
     final isDark = widget.isDarkTheme;
-    final primaryBg = isDark ? const Color(0xFF07080A) : const Color(0xFFF5F6F8);
+    final primaryBg =
+        isDark ? const Color(0xFF07080A) : const Color(0xFFF5F6F8);
     final cardBg = isDark ? const Color(0xFF11151D) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1D2939);
-    final textMuted = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08);
+    final textMuted =
+        isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.07)
+        : Colors.black.withValues(alpha: 0.08);
 
     final p = widget.patient;
     final role = authProvider.currentUser?.role ?? 'patient';
@@ -274,7 +325,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           ),
           title: Text(
             p['full_name'],
-            style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 16),
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: textColor, fontSize: 16),
           ),
           bottom: TabBar(
             labelColor: const Color(0xFFFF3366),
@@ -296,43 +348,76 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               child: Column(
                 children: [
                   // Patient Details
-                  Container(
+                  CgCard(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: borderColor),
-                    ),
                     child: Column(
                       children: [
-                        _buildDetailRow('Tuổi', '${p['age']} tuổi', textColor, textMuted),
-                        _buildDetailRow('Giới tính', p['gender'], textColor, textMuted),
-                        _buildDetailRow('Số điện thoại', p['phone'], textColor, textMuted),
-                        _buildDetailRow('Địa chỉ', p['address'] ?? 'Chưa cập nhật', textColor, textMuted),
-                        _buildDetailRow('Tiền sử bệnh lý', p['medical_history'] ?? 'Không có', textColor, textMuted),
+                        _buildDetailRow(
+                            'Tuổi', '${p['age']} tuổi', textColor, textMuted),
+                        _buildDetailRow(
+                            'Giới tính', p['gender'], textColor, textMuted),
+                        _buildDetailRow(
+                            'Số điện thoại', p['phone'], textColor, textMuted),
+                        _buildDetailRow(
+                            'Địa chỉ',
+                            p['address'] ?? 'Chưa cập nhật',
+                            textColor,
+                            textMuted),
+                        _buildDetailRow(
+                            'Tiền sử bệnh lý',
+                            p['medical_history'] ?? 'Không có',
+                            textColor,
+                            textMuted),
                       ],
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Mini Metrics Cards
                   Row(
                     children: [
-                      Expanded(child: _buildMiniMetricCard('NHỊP TIM', '${_currentHr.toInt()}', 'BPM', const Color(0xFFFF3366), cardBg, textMuted)),
+                      Expanded(
+                          child: _buildMiniMetricCard(
+                              'NHỊP TIM',
+                              '${_currentHr.toInt()}',
+                              'BPM',
+                              CgColors.hr,
+                              cardBg,
+                              textMuted)),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildMiniMetricCard('SPO2', '${_currentSpo2.toInt()}', '%', const Color(0xFF00F2FE), cardBg, textMuted)),
+                      Expanded(
+                          child: _buildMiniMetricCard(
+                              'SPO2',
+                              '${_currentSpo2.toInt()}',
+                              '%',
+                              CgColors.spo2,
+                              cardBg,
+                              textMuted)),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildMiniMetricCard('HUYẾT ÁP', '${_currentSysBp.toInt()}/${_currentDiaBp.toInt()}', 'mmHg', const Color(0xFF39FF14), cardBg, textMuted)),
+                      Expanded(
+                          child: _buildMiniMetricCard(
+                              'HUYẾT ÁP',
+                              '${_currentSysBp.toInt()}/${_currentDiaBp.toInt()}',
+                              'mmHg',
+                              CgColors.bp,
+                              cardBg,
+                              textMuted)),
                     ],
                   ),
                   const SizedBox(height: 16),
 
                   // Heart Rate Trend
-                  _buildChartSection('XU HƯỚNG NHỊP TIM (HR)', _hrSpots, const Color(0xFFFF3366), 40, 160, cardBg, textMuted),
+                  RepaintBoundary(
+                    child: _buildChartSection('XU HƯỚNG NHỊP TIM (HR)',
+                        _hrSpots, CgColors.hr, 40, 160, cardBg, textMuted),
+                  ),
                   const SizedBox(height: 16),
 
                   // SpO2 Trend
-                  _buildChartSection('XU HƯỚNG NỒNG ĐỘ OXY (SPO2)', _spo2Spots, const Color(0xFF00F2FE), 80, 100, cardBg, textMuted),
+                  RepaintBoundary(
+                    child: _buildChartSection('XU HƯỚNG NỒNG ĐỘ OXY (SPO2)',
+                        _spo2Spots, CgColors.spo2, 80, 100, cardBg, textMuted),
+                  ),
                 ],
               ),
             ),
@@ -341,7 +426,11 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
             Scaffold(
               backgroundColor: Colors.transparent,
               body: patientProvider.medicalRecords.isEmpty
-                  ? Center(child: Text('Chưa có lịch sử bệnh án.', style: TextStyle(color: textMuted)))
+                  ? const CgInlineState(
+                      type: CgStateType.empty,
+                      title: 'Chưa có bệnh án',
+                      message: 'Hiện chưa có hồ sơ bệnh án nào được ghi nhận.',
+                    )
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: patientProvider.medicalRecords.length,
@@ -359,28 +448,37 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFF3366).withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(record.type, style: const TextStyle(color: Color(0xFFFF3366), fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ),
+                                  CgStatusBadge(
+                                      label: record.type,
+                                      color: CgColors.primary),
                                   Text(
                                     '${record.createdAt.day}/${record.createdAt.month}/${record.createdAt.year}',
-                                    style: TextStyle(color: textMuted, fontSize: 11),
+                                    style: TextStyle(
+                                        color: textMuted, fontSize: 11),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              Text('Chẩn đoán:', style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 13)),
-                              Text(record.diagnosis, style: TextStyle(color: textColor, fontSize: 13)),
+                              Text('Chẩn đoán:',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                      fontSize: 13)),
+                              Text(record.diagnosis,
+                                  style: TextStyle(
+                                      color: textColor, fontSize: 13)),
                               const SizedBox(height: 8),
-                              Text('Tóm tắt & Kết luận:', style: TextStyle(fontWeight: FontWeight.bold, color: textColor, fontSize: 13)),
-                              Text(record.summary, style: TextStyle(color: textMuted, fontSize: 13)),
+                              Text('Tóm tắt & Kết luận:',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                      fontSize: 13)),
+                              Text(record.summary,
+                                  style: TextStyle(
+                                      color: textMuted, fontSize: 13)),
                             ],
                           ),
                         );
@@ -390,7 +488,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                   ? FloatingActionButton(
                       onPressed: _showAddRecordSheet,
                       backgroundColor: const Color(0xFFFF3366),
-                      child: const Icon(LucideIcons.filePlus, color: Colors.white),
+                      child:
+                          const Icon(LucideIcons.filePlus, color: Colors.white),
                     )
                   : null,
             ),
@@ -399,7 +498,12 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
             Scaffold(
               backgroundColor: Colors.transparent,
               body: patientProvider.prescriptions.isEmpty
-                  ? Center(child: Text('Chưa có đơn thuốc nào.', style: TextStyle(color: textMuted)))
+                  ? const CgInlineState(
+                      type: CgStateType.empty,
+                      title: 'Chưa có đơn thuốc',
+                      message:
+                          'Bệnh nhân chưa có đơn thuốc nào trong hệ thống.',
+                    )
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: patientProvider.prescriptions.length,
@@ -417,26 +521,39 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     presc.medicationName,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFF3366), fontSize: 15),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFFFF3366),
+                                        fontSize: 15),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: Colors.green.withValues(alpha: 0.1),
+                                      color:
+                                          Colors.green.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
-                                    child: const Text('ĐANG DÙNG', style: TextStyle(color: Colors.green, fontSize: 9, fontWeight: FontWeight.bold)),
+                                    child: const Text('ĐANG DÙNG',
+                                        style: TextStyle(
+                                            color: Colors.green,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold)),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 10),
-                              _buildPrescDetail('Liều lượng:', presc.dosage, textColor),
-                              _buildPrescDetail('Tần suất:', presc.frequency, textColor),
-                              _buildPrescDetail('Hướng dẫn:', presc.instructions, textColor),
+                              _buildPrescDetail(
+                                  'Liều lượng:', presc.dosage, textColor),
+                              _buildPrescDetail(
+                                  'Tần suất:', presc.frequency, textColor),
+                              _buildPrescDetail(
+                                  'Hướng dẫn:', presc.instructions, textColor),
                             ],
                           ),
                         );
@@ -456,32 +573,51 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               children: [
                 Expanded(
                   child: chatProvider.messages.isEmpty
-                      ? Center(child: Text('Bắt đầu cuộc hội thoại...', style: TextStyle(color: textMuted)))
+                      ? const CgInlineState(
+                          type: CgStateType.empty,
+                          title: 'Chưa có hội thoại',
+                          message:
+                              'Nhập nội dung để bắt đầu trao đổi giữa bác sĩ và bệnh nhân.',
+                        )
                       : ListView.builder(
                           padding: const EdgeInsets.all(16),
                           itemCount: chatProvider.messages.length,
                           itemBuilder: (context, index) {
                             final msg = chatProvider.messages[index];
-                            final isMe = msg.senderId == authProvider.currentUser!.id;
-                            final bubbleColor = isMe 
-                                ? const Color(0xFFFF3366) 
-                                : (isDark ? const Color(0xFF1C222D) : Colors.black.withValues(alpha: 0.04));
+                            final isMe =
+                                msg.senderId == authProvider.currentUser!.id;
+                            final bubbleColor = isMe
+                                ? const Color(0xFFFF3366)
+                                : (isDark
+                                    ? const Color(0xFF1C222D)
+                                    : Colors.black.withValues(alpha: 0.04));
                             final textStyle = TextStyle(
                               color: isMe ? Colors.white : textColor,
                               fontSize: 13,
                             );
 
                             return Align(
-                              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                              alignment: isMe
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
+                                constraints: BoxConstraints(
+                                    maxWidth:
+                                        MediaQuery.of(context).size.width *
+                                            0.7),
                                 decoration: BoxDecoration(
                                   color: bubbleColor,
-                                  borderRadius: BorderRadius.circular(16).copyWith(
-                                    bottomRight: isMe ? const Radius.circular(0) : const Radius.circular(16),
-                                    topLeft: !isMe ? const Radius.circular(0) : const Radius.circular(16),
+                                  borderRadius:
+                                      BorderRadius.circular(16).copyWith(
+                                    bottomRight: isMe
+                                        ? const Radius.circular(0)
+                                        : const Radius.circular(16),
+                                    topLeft: !isMe
+                                        ? const Radius.circular(0)
+                                        : const Radius.circular(16),
                                   ),
                                 ),
                                 child: Text(msg.message, style: textStyle),
@@ -512,7 +648,10 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(LucideIcons.send, color: Color(0xFFFF3366)),
+                        icon: const Icon(LucideIcons.send,
+                            color: Color(0xFFFF3366)),
+                        style: IconButton.styleFrom(
+                            minimumSize: const Size(48, 48)),
                         onPressed: _sendChatMessage,
                       ),
                     ],
@@ -526,20 +665,33 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, Color textColor, Color textMuted) {
+  Widget _buildDetailRow(
+      String label, String value, Color textColor, Color textMuted) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 120, child: Text(label, style: TextStyle(color: textMuted, fontSize: 13, fontWeight: FontWeight.w500))),
-          Expanded(child: Text(value, style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.bold))),
+          SizedBox(
+              width: 120,
+              child: Text(label,
+                  style: TextStyle(
+                      color: textMuted,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500))),
+          Expanded(
+              child: Text(value,
+                  style: TextStyle(
+                      color: textColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold))),
         ],
       ),
     );
   }
 
-  Widget _buildMiniMetricCard(String title, String value, String unit, Color color, Color cardBg, Color textMuted) {
+  Widget _buildMiniMetricCard(String title, String value, String unit,
+      Color color, Color cardBg, Color textMuted) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -549,30 +701,31 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(color: textMuted, fontSize: 8, fontWeight: FontWeight.bold)),
+          Text(title,
+              style: TextStyle(
+                  color: textMuted, fontSize: 8, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Row(
-            textBaseline: TextBaseline.alphabetic,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            children: [
-              Text(value, style: TextStyle(color: color, fontSize: 15, fontWeight: FontWeight.bold)),
-              const SizedBox(width: 2),
-              Text(unit, style: TextStyle(color: textMuted, fontSize: 8)),
-            ],
-          )
+          CgMetricValue(value: value, unit: unit, color: color, valueSize: 16),
         ],
       ),
     );
   }
 
-  Widget _buildChartSection(String title, List<FlSpot> spots, Color lineColor, double minY, double maxY, Color cardBg, Color textMuted) {
+  Widget _buildChartSection(String title, List<FlSpot> spots, Color lineColor,
+      double minY, double maxY, Color cardBg, Color textMuted) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(18)),
+      decoration:
+          BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(18)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: textMuted, letterSpacing: 0.5)),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: textMuted,
+                  letterSpacing: 0.5)),
           const SizedBox(height: 16),
           SizedBox(
             height: 120,
@@ -583,14 +736,21 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  getDrawingHorizontalLine: (val) => FlLine(color: Colors.white.withValues(alpha: 0.04), strokeWidth: 1),
+                  getDrawingHorizontalLine: (val) => FlLine(
+                      color: Colors.white.withValues(alpha: 0.04),
+                      strokeWidth: 1),
                 ),
                 titlesData: const FlTitlesData(
                   show: true,
-                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 28, interval: 30)),
+                  topTitles:
+                      AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles:
+                      AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles:
+                      AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                          showTitles: true, reservedSize: 28, interval: 30)),
                 ),
                 borderData: FlBorderData(show: false),
                 lineBarsData: [
@@ -600,7 +760,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                     color: lineColor,
                     barWidth: 2,
                     dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(show: true, color: lineColor.withValues(alpha: 0.08)),
+                    belowBarData: BarAreaData(
+                        show: true, color: lineColor.withValues(alpha: 0.08)),
                   ),
                 ],
               ),
@@ -617,12 +778,15 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey))),
-          Expanded(child: Text(value, style: TextStyle(fontSize: 12, color: textColor))),
+          SizedBox(
+              width: 80,
+              child: Text(label,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey))),
+          Expanded(
+              child: Text(value,
+                  style: TextStyle(fontSize: 12, color: textColor))),
         ],
       ),
     );
   }
 }
-
-

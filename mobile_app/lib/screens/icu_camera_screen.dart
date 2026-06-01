@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
+import '../widgets/cg_widgets.dart';
 
 class IcuCameraScreen extends StatefulWidget {
   final bool isDarkTheme;
@@ -59,12 +60,9 @@ class _IcuCameraScreenState extends State<IcuCameraScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDarkTheme;
-    final primaryBg =
-        isDark ? const Color(0xFF07080A) : const Color(0xFFF5F6F8);
     final cardBg = isDark
         ? const Color(0xFF11151D).withValues(alpha: 0.7)
         : Colors.white.withValues(alpha: 0.9);
-    final textColor = isDark ? Colors.white : const Color(0xFF1D2939);
     final textMuted =
         isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
     final borderColor = isDark
@@ -73,101 +71,66 @@ class _IcuCameraScreenState extends State<IcuCameraScreen>
 
     final double timestamp = DateTime.now().millisecondsSinceEpoch.toDouble();
 
-    return Scaffold(
-      backgroundColor: primaryBg,
-      body: SafeArea(
-        child: Column(
+    return CgScreenScaffold(
+      title: 'Camera giả lập ICU',
+      subtitle: 'Màn hình mô phỏng camera ICU phục vụ demo giao diện',
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFF39FF14).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border:
+              Border.all(color: const Color(0xFF39FF14).withValues(alpha: 0.3)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Page Header
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Camera giả lập ICU',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Màn hình mô phỏng camera ICU phục vụ demo giao diện',
-                        style: TextStyle(
-                          color: textMuted,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF39FF14).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color:
-                              const Color(0xFF39FF14).withValues(alpha: 0.3)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(LucideIcons.radio,
-                            size: 12, color: Color(0xFF39FF14)),
-                        SizedBox(width: 6),
-                        Text(
-                          'SIMULATED FEED',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Color(0xFF39FF14),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                ],
-              ),
+            Icon(LucideIcons.radio, size: 12, color: Color(0xFF39FF14)),
+            SizedBox(width: 6),
+            Text(
+              'SIMULATED FEED',
+              style: TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF39FF14),
+                  fontWeight: FontWeight.bold),
             ),
-
-            // Camera viewport wrapper
-            Expanded(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF030A03),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: const Color(0xFF39FF14).withValues(alpha: 0.2),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 15,
-                        spreadRadius: 2,
-                      )
-                    ],
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
+          // Camera viewport wrapper
+          Expanded(
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF030A03),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFF39FF14).withValues(alpha: 0.2),
+                    width: 1.5,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 15,
+                      spreadRadius: 2,
+                    )
+                  ],
+                ),
+                child: RepaintBoundary(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(18),
                     child: Stack(
                       children: [
-                        // CRT Scanline Overlay Effect
                         Positioned.fill(
                           child: CustomPaint(
                             painter: _CrtOverlayPainter(timestamp: timestamp),
                           ),
                         ),
-                        // Bed & Silhouette Vector Painter
                         Positioned.fill(
                           child: CustomPaint(
                             painter: _IcuCameraPainter(
@@ -182,37 +145,37 @@ class _IcuCameraScreenState extends State<IcuCameraScreen>
                 ),
               ),
             ),
+          ),
 
-            // Camera details info
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: cardBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderColor),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(LucideIcons.alertCircle,
-                        color: Color(0xFF39FF14), size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Luồng hiển thị đang ở chế độ mô phỏng. Không sử dụng như nguồn camera lâm sàng thực tế.',
-                        style: TextStyle(
-                          color: textMuted,
-                          fontSize: 12,
-                        ),
+          // Camera details info
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor),
+              ),
+              child: Row(
+                children: [
+                  const Icon(LucideIcons.alertCircle,
+                      color: Color(0xFF39FF14), size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Luồng hiển thị đang ở chế độ mô phỏng. Không sử dụng như nguồn camera lâm sàng thực tế.',
+                      style: TextStyle(
+                        color: textMuted,
+                        fontSize: 12,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
