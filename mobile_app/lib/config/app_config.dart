@@ -3,7 +3,7 @@ class AppConfig {
   // flutter run --dart-define=API_BASE_URL=http://192.168.x.x:8000
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://cardioguard-ai-1-27vd.onrender.com',
+    defaultValue: 'https://cardioguard-ai-backend.onrender.com',
   );
 
   static String get wsUrl {
