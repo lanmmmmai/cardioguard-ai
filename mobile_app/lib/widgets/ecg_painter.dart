@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 class EcgPainter extends CustomPainter {
   final List<double> dataPoints;
@@ -105,7 +106,8 @@ class EcgPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant EcgPainter oldDelegate) {
-    return oldDelegate.dataPoints != dataPoints || oldDelegate.isDarkTheme != isDarkTheme;
+    return !listEquals(oldDelegate.dataPoints, dataPoints) ||
+        oldDelegate.heartRate != heartRate ||
+        oldDelegate.isDarkTheme != isDarkTheme;
   }
 }
-

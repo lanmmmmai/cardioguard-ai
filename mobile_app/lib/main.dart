@@ -51,7 +51,7 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
         title: 'Smart Heart Patient Monitoring',
         debugShowCheckedModeBanner: false,
         themeMode: _isDarkTheme ? ThemeMode.dark : ThemeMode.light,
-        
+
         // Light Theme Style
         theme: ThemeData(
           brightness: Brightness.light,
@@ -68,7 +68,8 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
             labelStyle: TextStyle(color: Colors.black.withValues(alpha: 0.6)),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
+              borderSide:
+                  BorderSide(color: Colors.black.withValues(alpha: 0.08)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -93,7 +94,8 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
             labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.07)),
+              borderSide:
+                  BorderSide(color: Colors.white.withValues(alpha: 0.07)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -138,19 +140,34 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDarkTheme;
-    final bottomBarBg = isDark ? const Color(0xFF11151D).withValues(alpha: 0.9) : Colors.white;
+    final bottomBarBg =
+        isDark ? const Color(0xFF11151D).withValues(alpha: 0.9) : Colors.white;
     const activeColor = Color(0xFFFF3366);
-    final inactiveColor = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08);
+    final inactiveColor =
+        isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.07)
+        : Colors.black.withValues(alpha: 0.08);
 
     final authProvider = Provider.of<AuthProvider>(context);
     final role = authProvider.currentUser?.role ?? 'patient';
+    final forcePasswordChange = authProvider.requiresPasswordChange;
 
     // Configure items and screens dynamically based on the active role
     final List<Widget> screens;
     final List<Map<String, dynamic>> tabConfig;
 
-    if (role == 'admin' || role == 'doctor') {
+    if (forcePasswordChange) {
+      screens = [
+        SettingsScreen(
+          isDarkTheme: widget.isDarkTheme,
+          onToggleTheme: widget.onToggleTheme,
+        ),
+      ];
+      tabConfig = [
+        {'icon': LucideIcons.lock, 'label': 'Đổi mật khẩu'},
+      ];
+    } else if (role == 'admin' || role == 'doctor') {
       screens = [
         DashboardScreen(
           isDarkTheme: widget.isDarkTheme,
@@ -213,13 +230,8 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(tabConfig.length, (index) {
                 final config = tabConfig[index];
-                return _buildNavItem(
-                  index, 
-                  config['icon'] as IconData, 
-                  config['label'] as String, 
-                  activeColor, 
-                  inactiveColor
-                );
+                return _buildNavItem(index, config['icon'] as IconData,
+                    config['label'] as String, activeColor, inactiveColor);
               }),
             ),
           ),
@@ -228,7 +240,8 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label, Color activeColor, Color inactiveColor) {
+  Widget _buildNavItem(int index, IconData icon, String label,
+      Color activeColor, Color inactiveColor) {
     final isSelected = _currentIndex == index;
     final color = isSelected ? activeColor : inactiveColor;
 
@@ -260,5 +273,3 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
     );
   }
 }
-
-

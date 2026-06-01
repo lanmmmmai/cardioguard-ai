@@ -53,7 +53,11 @@ def extract_bearer_token(authorization: Optional[str]) -> str:
 _users_columns_cache: Optional[set[str]] = None
 
 
-async def get_user_from_token(authorization: Optional[str]):
+async def get_user_from_token(
+    authorization: Optional[str],
+    *,
+    allow_must_change_password: bool = False,
+):
     token = extract_bearer_token(authorization)
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -98,7 +102,10 @@ async def get_user_from_token(authorization: Optional[str]):
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
-    return {
+    if (user["status"] or "").strip().lower() == "inactive":
+        raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
+
+    result = {
         "id": user["id"],
         "full_name": user["full_name"],
         "email": user["email"],
@@ -108,6 +115,14 @@ async def get_user_from_token(authorization: Optional[str]):
         "status": user["status"],
         "must_change_password": user["must_change_password"]
     }
+
+    if result["must_change_password"] and not allow_must_change_password:
+        raise HTTPException(
+            status_code=403,
+            detail="Bạn phải đổi mật khẩu trước khi tiếp tục sử dụng hệ thống",
+        )
+
+    return result
 
 
 from app.services.email_service import send_system_email
@@ -251,19 +266,49 @@ async def register(data: RegisterRequest, request: Request):
     VALUES (:full_name, :email, :password_hash, :role)
     """
 
-    await database.execute(
-        query=insert_query,
-        values={
-            "full_name": otp_result.metadata.get("full_name") or data.full_name,
-            "email": email,
-            "password_hash": hash_password(data.password),
-            "role": "patient"
-        }
-    )
+    user_id = None
+    async with database.transaction():
+        await database.execute(
+            query=insert_query,
+            values={
+                "full_name": otp_result.metadata.get("full_name") or data.full_name,
+                "email": email,
+                "password_hash": hash_password(data.password),
+                "role": "patient"
+            }
+        )
+
+        # Đồng bộ hồ sơ patient ngay sau đăng ký để tránh /patients/me trả null.
+        created_user = await database.fetch_one(
+            "SELECT id::text as id, full_name FROM users WHERE email = :email",
+            {"email": email},
+        )
+        user_id = created_user["id"] if created_user else None
+        if created_user:
+            patient_columns = await database.fetch_all(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'patients'
+                """
+            )
+            patient_cols = {row["column_name"] for row in patient_columns}
+            patient_values = {
+                "id": user_id,
+                "full_name": created_user["full_name"],
+            }
+            if "user_id" in patient_cols:
+                patient_values["user_id"] = user_id
+            if "phone" in patient_cols:
+                patient_values["phone"] = None
+            insert_columns = ", ".join(patient_values.keys())
+            bind_columns = ", ".join(f":{key}" for key in patient_values.keys())
+            await database.execute(
+                f"INSERT INTO patients ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
+                patient_values,
+            )
 
     # Ghi nhận log đăng ký thành công
-    created_user = await database.fetch_one("SELECT id::text as id FROM users WHERE email = :email", {"email": email})
-    user_id = created_user["id"] if created_user else None
     await log_activity(
         user_id=user_id,
         action="USER_REGISTER_SUCCESS",
@@ -489,7 +534,10 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
 
 @router.post("/auth/change-password")
 async def change_password(data: ChangePasswordRequest, request: Request, authorization: Optional[str] = Header(default=None)):
-    current_user = await get_user_from_token(authorization)
+    current_user = await get_user_from_token(
+        authorization,
+        allow_must_change_password=True,
+    )
     
     user = await database.fetch_one(
         "SELECT password_hash FROM users WHERE id::text = :id",
@@ -523,4 +571,9 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
 
 @router.get("/auth/me")
 async def me(authorization: Optional[str] = Header(default=None)):
-    return {"user": await get_user_from_token(authorization)}
+    return {
+        "user": await get_user_from_token(
+            authorization,
+            allow_must_change_password=True,
+        )
+    }

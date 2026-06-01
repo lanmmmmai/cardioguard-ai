@@ -47,6 +47,53 @@ async def get_alerts(authorization: Optional[str] = Header(default=None)):
     return alerts
 
 
+@router.get("/alerts/stats/last-7-days")
+async def get_alert_stats_last_7_days(
+    authorization: Optional[str] = Header(default=None),
+):
+    current_user = await get_user_from_token(authorization)
+    role = current_user["role"]
+    where_sql = ""
+    values = {}
+
+    if role == "patient":
+        where_sql = "WHERE alerts.patient_id::text = :user_id"
+        values["user_id"] = current_user["id"]
+    elif role == "doctor":
+        where_sql = """
+        WHERE EXISTS (
+            SELECT 1 FROM doctor_patient dp
+            WHERE dp.doctor_id::text = :user_id
+              AND dp.patient_id::text = alerts.patient_id::text
+        )
+        """
+        values["user_id"] = current_user["id"]
+
+    query = f"""
+    WITH days AS (
+      SELECT generate_series(
+        date_trunc('day', now()) - interval '6 day',
+        date_trunc('day', now()),
+        interval '1 day'
+      )::date AS day
+    ),
+    scoped AS (
+      SELECT date_trunc('day', alerts.created_at)::date AS day
+      FROM alerts
+      {where_sql}
+    )
+    SELECT
+      to_char(days.day, 'DD/MM') AS label,
+      COALESCE(COUNT(scoped.day), 0)::int AS count
+    FROM days
+    LEFT JOIN scoped ON scoped.day = days.day
+    GROUP BY days.day
+    ORDER BY days.day ASC
+    """
+    rows = await database.fetch_all(query, values)
+    return [{"label": row["label"], "count": row["count"]} for row in rows]
+
+
 from fastapi import HTTPException
 
 @router.patch("/alerts/{alert_id}/resolve")

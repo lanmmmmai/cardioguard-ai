@@ -3,6 +3,7 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../core/api_client.dart';
 import '../core/app_logger.dart';
+import '../config/app_config.dart';
 
 class StatsScreen extends StatefulWidget {
   final bool isDarkTheme;
@@ -18,10 +19,20 @@ class _StatsScreenState extends State<StatsScreen> {
   int _criticalCount = 0;
   bool _isLoading = false;
 
-  // Pie chart variables
-  double _highAlertsVal = 5.0;
-  double _medAlertsVal = 12.0;
-  double _lowAlertsVal = 24.0;
+  // Pie chart variables (không dùng fallback giả)
+  double _highAlertsVal = 0.0;
+  double _medAlertsVal = 0.0;
+  double _lowAlertsVal = 0.0;
+  List<FlSpot> _weeklyAlertSpots = const [
+    FlSpot(0, 0),
+    FlSpot(1, 0),
+    FlSpot(2, 0),
+    FlSpot(3, 0),
+    FlSpot(4, 0),
+    FlSpot(5, 0),
+    FlSpot(6, 0),
+  ];
+  List<String> _weeklyLabels = const ['-', '-', '-', '-', '-', '-', '-'];
 
   @override
   void initState() {
@@ -38,9 +49,11 @@ class _StatsScreenState extends State<StatsScreen> {
       final responses = await Future.wait([
         client.get('/patients'),
         client.get('/alerts'),
+        client.get(AppConfig.alertsWeeklyStatsEndpoint),
       ]);
       final patients = (responses[0].data as List<dynamic>? ?? const []);
       final alerts = (responses[1].data as List<dynamic>? ?? const []);
+      final weeklyStats = (responses[2].data as List<dynamic>? ?? const []);
 
       if (!mounted) return;
       setState(() {
@@ -64,9 +77,31 @@ class _StatsScreenState extends State<StatsScreen> {
           }
         }
 
-        _highAlertsVal = high > 0 ? high.toDouble() : 5.0;
-        _medAlertsVal = med > 0 ? med.toDouble() : 12.0;
-        _lowAlertsVal = low > 0 ? low.toDouble() : 24.0;
+        _highAlertsVal = high.toDouble();
+        _medAlertsVal = med.toDouble();
+        _lowAlertsVal = low.toDouble();
+        if (weeklyStats.isNotEmpty) {
+          _weeklyLabels = weeklyStats
+              .map((e) =>
+                  (e as Map<String, dynamic>)['label']?.toString() ?? '-')
+              .toList();
+          _weeklyAlertSpots = weeklyStats.asMap().entries.map((entry) {
+            final row = entry.value as Map<String, dynamic>;
+            final count = (row['count'] as num?)?.toDouble() ?? 0.0;
+            return FlSpot(entry.key.toDouble(), count);
+          }).toList();
+        } else {
+          _weeklyLabels = const ['-', '-', '-', '-', '-', '-', '-'];
+          _weeklyAlertSpots = const [
+            FlSpot(0, 0),
+            FlSpot(1, 0),
+            FlSpot(2, 0),
+            FlSpot(3, 0),
+            FlSpot(4, 0),
+            FlSpot(5, 0),
+            FlSpot(6, 0),
+          ];
+        }
 
         // Count critical cases
         _criticalCount = high;
@@ -84,11 +119,17 @@ class _StatsScreenState extends State<StatsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDarkTheme;
-    final primaryBg = isDark ? const Color(0xFF07080A) : const Color(0xFFF5F6F8);
-    final cardBg = isDark ? const Color(0xFF11151D).withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.9);
+    final primaryBg =
+        isDark ? const Color(0xFF07080A) : const Color(0xFFF5F6F8);
+    final cardBg = isDark
+        ? const Color(0xFF11151D).withValues(alpha: 0.7)
+        : Colors.white.withValues(alpha: 0.9);
     final textColor = isDark ? Colors.white : const Color(0xFF1D2939);
-    final textMuted = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
-    final borderColor = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08);
+    final textMuted =
+        isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.07)
+        : Colors.black.withValues(alpha: 0.08);
 
     return Scaffold(
       backgroundColor: primaryBg,
@@ -106,7 +147,8 @@ class _StatsScreenState extends State<StatsScreen> {
                     children: [
                       Text(
                         'Thống Kê Hệ Thống',
-                        style: TextStyle(fontSize: 22,
+                        style: TextStyle(
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: textColor,
                         ),
@@ -114,7 +156,10 @@ class _StatsScreenState extends State<StatsScreen> {
                       const SizedBox(height: 4),
                       Text(
                         'Phân tích sự cố và hiệu suất telemetry',
-                        style: TextStyle(color: textMuted, fontSize: 13,),
+                        style: TextStyle(
+                          color: textMuted,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
@@ -132,7 +177,9 @@ class _StatsScreenState extends State<StatsScreen> {
 
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF3366)))
+                  ? const Center(
+                      child:
+                          CircularProgressIndicator(color: Color(0xFFFF3366)))
                   : SingleChildScrollView(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       child: Column(
@@ -146,9 +193,30 @@ class _StatsScreenState extends State<StatsScreen> {
                             mainAxisSpacing: 10,
                             childAspectRatio: 1.1,
                             children: [
-                              _buildKpiCard('BỆNH NHÂN', '$_totalPatients', LucideIcons.users, const Color(0xFF00F2FE), cardBg, textColor, textMuted),
-                              _buildKpiCard('CẢNH BÁO', '$_totalAlerts', LucideIcons.bell, const Color(0xFFFFB606), cardBg, textColor, textMuted),
-                              _buildKpiCard('NGUY KỊCH', '$_criticalCount', LucideIcons.alertTriangle, const Color(0xFFFF3366), cardBg, textColor, textMuted),
+                              _buildKpiCard(
+                                  'BỆNH NHÂN',
+                                  '$_totalPatients',
+                                  LucideIcons.users,
+                                  const Color(0xFF00F2FE),
+                                  cardBg,
+                                  textColor,
+                                  textMuted),
+                              _buildKpiCard(
+                                  'CẢNH BÁO',
+                                  '$_totalAlerts',
+                                  LucideIcons.bell,
+                                  const Color(0xFFFFB606),
+                                  cardBg,
+                                  textColor,
+                                  textMuted),
+                              _buildKpiCard(
+                                  'NGUY KỊCH',
+                                  '$_criticalCount',
+                                  LucideIcons.alertTriangle,
+                                  const Color(0xFFFF3366),
+                                  cardBg,
+                                  textColor,
+                                  textMuted),
                             ],
                           ),
                           const SizedBox(height: 16),
@@ -169,7 +237,8 @@ class _StatsScreenState extends State<StatsScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF9EA5B4),letterSpacing: 0.5,
+                                    color: Color(0xFF9EA5B4),
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
                                 const SizedBox(height: 20),
@@ -185,21 +254,33 @@ class _StatsScreenState extends State<StatsScreen> {
                                           value: _highAlertsVal,
                                           title: 'Nguy kịch',
                                           radius: 30,
-                                          titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white,),
+                                          titleStyle: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
                                         ),
                                         PieChartSectionData(
                                           color: const Color(0xFFFFB606),
                                           value: _medAlertsVal,
                                           title: 'Cảnh báo',
                                           radius: 30,
-                                          titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white,),
+                                          titleStyle: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
                                         ),
                                         PieChartSectionData(
                                           color: const Color(0xFF39FF14),
                                           value: _lowAlertsVal,
                                           title: 'Ổn định',
                                           radius: 30,
-                                          titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white,),
+                                          titleStyle: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -208,11 +289,15 @@ class _StatsScreenState extends State<StatsScreen> {
                                 const SizedBox(height: 12),
                                 // Legend
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceAround,
                                   children: [
-                                    _buildLegendItem('Cao', const Color(0xFFFF3366), textMuted),
-                                    _buildLegendItem('Trung bình', const Color(0xFFFFB606), textMuted),
-                                    _buildLegendItem('Thấp', const Color(0xFF39FF14), textMuted),
+                                    _buildLegendItem('Cao',
+                                        const Color(0xFFFF3366), textMuted),
+                                    _buildLegendItem('Trung bình',
+                                        const Color(0xFFFFB606), textMuted),
+                                    _buildLegendItem('Thấp',
+                                        const Color(0xFF39FF14), textMuted),
                                   ],
                                 ),
                               ],
@@ -232,11 +317,12 @@ class _StatsScreenState extends State<StatsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'TẦN SUẤT SỰ CỐ (7 NGÀY QUA)',
+                                  'TẦN SUẤT SỰ CỐ (7 NGÀY GẦN NHẤT)',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF9EA5B4),letterSpacing: 0.5,
+                                    color: Color(0xFF9EA5B4),
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
                                 const SizedBox(height: 24),
@@ -247,25 +333,38 @@ class _StatsScreenState extends State<StatsScreen> {
                                       gridData: FlGridData(
                                         show: true,
                                         drawVerticalLine: false,
-                                        getDrawingHorizontalLine: (val) => FlLine(
-                                          color: Colors.white.withValues(alpha: 0.05),
+                                        getDrawingHorizontalLine: (val) =>
+                                            FlLine(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.05),
                                           strokeWidth: 1,
                                         ),
                                       ),
                                       titlesData: FlTitlesData(
                                         show: true,
-                                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                        topTitles: const AxisTitles(
+                                            sideTitles:
+                                                SideTitles(showTitles: false)),
+                                        rightTitles: const AxisTitles(
+                                            sideTitles:
+                                                SideTitles(showTitles: false)),
                                         bottomTitles: AxisTitles(
                                           sideTitles: SideTitles(
                                             showTitles: true,
                                             getTitlesWidget: (val, meta) {
-                                              const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
                                               int idx = val.toInt();
-                                              if (idx >= 0 && idx < days.length) {
+                                              if (idx >= 0 &&
+                                                  idx < _weeklyLabels.length) {
                                                 return Padding(
-                                                  padding: const EdgeInsets.only(top: 6),
-                                                  child: Text(days[idx], style: TextStyle(color: textMuted, fontSize: 10,)),
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          top: 6),
+                                                  child:
+                                                      Text(_weeklyLabels[idx],
+                                                          style: TextStyle(
+                                                            color: textMuted,
+                                                            fontSize: 9,
+                                                          )),
                                                 );
                                               }
                                               return const Text('');
@@ -284,22 +383,15 @@ class _StatsScreenState extends State<StatsScreen> {
                                       borderData: FlBorderData(show: false),
                                       lineBarsData: [
                                         LineChartBarData(
-                                          spots: const [
-                                            FlSpot(0, 3),
-                                            FlSpot(1, 7),
-                                            FlSpot(2, 4),
-                                            FlSpot(3, 10),
-                                            FlSpot(4, 5),
-                                            FlSpot(5, 12),
-                                            FlSpot(6, 6),
-                                          ],
+                                          spots: _weeklyAlertSpots,
                                           isCurved: true,
                                           color: const Color(0xFFFF3366),
                                           barWidth: 3,
                                           dotData: const FlDotData(show: true),
                                           belowBarData: BarAreaData(
                                             show: true,
-                                            color: const Color(0xFFFF3366).withValues(alpha: 0.1),
+                                            color: const Color(0xFFFF3366)
+                                                .withValues(alpha: 0.1),
                                           ),
                                         ),
                                       ],
@@ -320,7 +412,8 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
-  Widget _buildKpiCard(String label, String value, IconData icon, Color color, Color cardBg, Color textColor, Color textMuted) {
+  Widget _buildKpiCard(String label, String value, IconData icon, Color color,
+      Color cardBg, Color textColor, Color textMuted) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -343,12 +436,14 @@ class _StatsScreenState extends State<StatsScreen> {
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: textColor,),
+              color: textColor,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
-            style: TextStyle(color: textMuted, fontSize: 8, fontWeight: FontWeight.bold),
+            style: TextStyle(
+                color: textMuted, fontSize: 8, fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -369,11 +464,12 @@ class _StatsScreenState extends State<StatsScreen> {
         const SizedBox(width: 6),
         Text(
           label,
-          style: TextStyle(color: textMuted, fontSize: 11,),
+          style: TextStyle(
+            color: textMuted,
+            fontSize: 11,
+          ),
         ),
       ],
     );
   }
 }
-
-

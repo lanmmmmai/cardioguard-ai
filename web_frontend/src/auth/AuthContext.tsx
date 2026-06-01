@@ -9,6 +9,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   loading: boolean;
   authError: string | null;
+  requiresPasswordChange: boolean;
   login: (token: string, user: AuthUser) => AuthUser;
   logout: () => void;
   refreshUser: () => Promise<AuthUser | null>;
@@ -119,6 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isAuthenticated: Boolean(accessToken && user),
     loading,
     authError,
+    requiresPasswordChange: user?.must_change_password === true,
     login,
     logout,
     refreshUser,

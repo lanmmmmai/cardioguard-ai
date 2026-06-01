@@ -118,7 +118,10 @@ async def update_user_me(payload: UserMeUpdate, request: Request, authorization:
 
 @router.put("/users/me/password")
 async def update_user_password(payload: PasswordUpdate, request: Request, authorization: Optional[str] = Header(default=None)):
-    current_user = await get_user_from_token(authorization)
+    current_user = await get_user_from_token(
+        authorization,
+        allow_must_change_password=True,
+    )
     row = await database.fetch_one(
         "SELECT password_hash FROM users WHERE id::text = :user_id",
         {"user_id": current_user["id"]},
@@ -129,7 +132,7 @@ async def update_user_password(payload: PasswordUpdate, request: Request, author
         raise HTTPException(status_code=403, detail="Current password is incorrect")
 
     await database.execute(
-        "UPDATE users SET password_hash = :password_hash WHERE id::text = :user_id",
+        "UPDATE users SET password_hash = :password_hash, must_change_password = FALSE WHERE id::text = :user_id",
         {"password_hash": hash_password(payload.new_password), "user_id": current_user["id"]},
     )
 
@@ -582,13 +585,15 @@ async def delete_user(
     if not check_user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
         
-    # 1. Dọn dẹp phân công doctor_patient trước để tránh lỗi FK
-    await database.execute("DELETE FROM doctor_patient WHERE patient_id::text = :user_id OR doctor_id::text = :user_id", {"user_id": user_id})
-    
-    # 2. Cố gắng Hard Delete trước để dọn sạch DB nếu là tài khoản test/chưa có dữ liệu liên kết phức tạp
-    # Dùng cơ chế transaction để đảm bảo toàn vẹn dữ liệu khi rollback
+    # Cố gắng Hard Delete trước trong transaction để rollback toàn phần nếu fail.
     transaction = await database.transaction()
     try:
+        # 1) Dọn dẹp phân công doctor_patient bên trong transaction.
+        await database.execute(
+            "DELETE FROM doctor_patient WHERE patient_id::text = :user_id OR doctor_id::text = :user_id",
+            {"user_id": user_id},
+        )
+
         # Nếu là bệnh nhân, cố gắng dọn dẹp dòng liên kết trong bảng patients trước
         if check_user["role"] == "patient":
             await database.execute("DELETE FROM patients WHERE user_id::text = :user_id", {"user_id": user_id})
