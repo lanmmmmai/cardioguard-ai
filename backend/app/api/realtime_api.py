@@ -15,6 +15,8 @@ async def websocket_endpoint(websocket: WebSocket):
     token = None
     selected_subprotocol = None
     protocols_header = websocket.headers.get("sec-websocket-protocol", "")
+    print(f"[WS Debug] New WebSocket handshake initiated. Subprotocols: {protocols_header}")
+    
     for proto in [p.strip() for p in protocols_header.split(",") if p.strip()]:
         if proto.startswith("cardioguard.jwt."):
             token = proto[len("cardioguard.jwt.") :]
@@ -37,6 +39,7 @@ async def websocket_endpoint(websocket: WebSocket):
             token = None
 
     if not token:
+        print("[WS Debug] Connection closed: Missing authentication token.")
         await websocket.close(code=1008, reason="Missing authentication token")
         return
 
@@ -46,6 +49,7 @@ async def websocket_endpoint(websocket: WebSocket):
         user_id = payload.get("sub")
         
         if not user_id:
+            print("[WS Debug] Connection closed: Invalid token payload (missing sub).")
             await websocket.close(code=1008, reason="Invalid token payload")
             return
 
@@ -58,15 +62,18 @@ async def websocket_endpoint(websocket: WebSocket):
             {"user_id": user_id},
         )
         if not user_row:
+            print(f"[WS Debug] Connection closed: User with ID {user_id} not found in database.")
             await websocket.close(code=1008, reason="User not found")
             return
         if (user_row["status"] or "").strip().lower() == "inactive":
+            print(f"[WS Debug] Connection closed: Account for User {user_row['email']} is inactive.")
             await websocket.close(code=1008, reason="Account inactive")
             return
 
         email = user_row["email"]
         role = (user_row["role"] or "").strip().lower()
         if role not in {"admin", "doctor", "patient"}:
+            print(f"[WS Debug] Connection closed: User {email} has invalid role: {role}.")
             await websocket.close(code=1008, reason="Invalid user role")
             return
 
@@ -75,10 +82,12 @@ async def websocket_endpoint(websocket: WebSocket):
             "email": email,
             "role": role
         }
-    except JWTError:
+    except JWTError as je:
+        print(f"[WS Debug] Connection closed: Expired or invalid JWT token. Error: {je}")
         await websocket.close(code=1008, reason="Expired or invalid token")
         return
 
+    print(f"[WS Debug] WebSocket successfully authenticated & opened: User {email} (Role: {role})")
     await manager.connect(websocket, user_info)
     
     await websocket.send_json({
@@ -91,12 +100,14 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             message = await websocket.receive_text()
             if message == "ping":
+                print(f"[WS Debug] Received ping from {email}")
                 await websocket.send_json({
                     "type": "pong",
                     "timestamp": datetime.now(timezone.utc).isoformat()
                 })
     except WebSocketDisconnect:
+        print(f"[WS Debug] WebSocket disconnected gracefully for User {email}")
         manager.disconnect(websocket)
     except Exception as e:
-        print(f"WebSocket connection error for {email}: {e}")
+        print(f"[WS Debug] WebSocket connection error for {email}: {e}")
         manager.disconnect(websocket)

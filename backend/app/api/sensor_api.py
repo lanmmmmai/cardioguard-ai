@@ -190,6 +190,7 @@ def detect_abnormal_iot(readings: Any) -> list[dict[str, str]]:
 async def create_sensor_data(data: SensorDataCreate, request: Request, authorization: Optional[str] = Header(default=None)):
     current_user = await get_user_from_token(authorization)
     await ensure_patient_access(current_user, data.patient_id)
+    print(f"[Sensor Debug] Received manual sensor data submit request from User {current_user['email']} for Patient {data.patient_id}. Readings: HR={data.heart_rate}, SpO2={data.spo2}, BP={data.systolic_bp}/{data.diastolic_bp}, ECG={data.ecg_value}")
 
     insert_sensor_query = """
     INSERT INTO sensor_data(
@@ -281,6 +282,7 @@ async def create_sensor_data(data: SensorDataCreate, request: Request, authoriza
             "created_at": datetime.now(timezone.utc).isoformat()
         })
 
+    print(f"[Sensor Debug] Manually submitted data saved. Alerts: {alerts}")
     return {
         "message": "Sensor data saved successfully",
         "is_abnormal": len(alerts) > 0,
@@ -314,6 +316,8 @@ async def create_iot_telemetry(
     patient_id = device_row["patient_id"]
     if not patient_id:
         raise HTTPException(status_code=404, detail="Device does not have assigned patient")
+
+    print(f"[Sensor Debug] Received IoT Telemetry from MAC: {x_device_mac}, UID: {x_device_uid} for Patient {patient_id}. Readings: HR={data.readings.heart_rate}, SpO2={data.readings.spo2}, BP={data.readings.systolic_bp}/{data.readings.diastolic_bp}, ECG={data.readings.ecg_value}")
 
     await database.execute(
         """
@@ -412,6 +416,7 @@ async def create_iot_telemetry(
             },
         )
 
+    print(f"[Sensor Debug] IoT Telemetry saved and broadcasted. Alerts generated: {alerts}")
     return {
         "message": "Telemetry accepted",
         "patient_id": patient_id,
