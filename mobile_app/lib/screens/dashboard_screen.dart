@@ -29,7 +29,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
   // Local ECG point buffer
-  final List<double> _ecgPoints = List.filled(240, 0.0);
+  final List<double> _ecgPoints = List.filled(240, 0.0, growable: true);
 
   // Animation controller for 3D Heart
   late AnimationController _tickerController;
