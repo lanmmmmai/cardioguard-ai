@@ -217,7 +217,7 @@ Tạo `web_frontend/.env` dựa trên [web_frontend/.env.example](/Users/doanlan
 
 ```env
 VITE_API_URL=http://localhost:8000
-VITE_WS_URL=ws://localhost:8000
+VITE_WS_URL=ws://localhost:8000/ws/realtime
 ```
 
 ## Mobile App

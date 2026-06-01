@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
+import '../config/app_config.dart';
 
 class ApiService {
-  // Use production Render URL instead of local URL
-  static String baseUrl = 'https://cardioguard-ai-1-27vd.onrender.com'; 
+  static String baseUrl = AppConfig.baseUrl;
   static String? token;
   static Map<String, dynamic>? currentUser;
 
