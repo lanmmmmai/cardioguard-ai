@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, User, Heart, Activity, AlertTriangle, Phone, MapPin, Calendar, Clipboard } from 'lucide-react';
+import { ChevronLeft, User, Heart, Activity, AlertTriangle, MapPin, Calendar, Clipboard, Mail } from 'lucide-react';
 import { getSeverityMeta } from '../utils/severity';
 
 interface Patient {
@@ -274,9 +274,9 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Phone size={16} style={{ color: 'var(--text-muted)' }} />
+              <Mail size={16} style={{ color: 'var(--text-muted)' }} />
               <div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Số điện thoại</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>Địa chỉ Email</span>
                 <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{patient.phone || 'Chưa cung cấp'}</span>
               </div>
             </div>
