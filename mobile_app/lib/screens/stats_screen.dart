@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../services/api_service.dart';
+import '../core/api_client.dart';
+import '../core/app_logger.dart';
 
 class StatsScreen extends StatefulWidget {
   final bool isDarkTheme;
@@ -32,38 +33,52 @@ class _StatsScreenState extends State<StatsScreen> {
     setState(() {
       _isLoading = true;
     });
+    try {
+      final client = ApiClient();
+      final responses = await Future.wait([
+        client.get('/patients'),
+        client.get('/alerts'),
+      ]);
+      final patients = (responses[0].data as List<dynamic>? ?? const []);
+      final alerts = (responses[1].data as List<dynamic>? ?? const []);
 
-    final patients = await ApiService.getPatients();
-    final alerts = await ApiService.getAlerts();
+      if (!mounted) return;
+      setState(() {
+        _totalPatients = patients.length;
+        _totalAlerts = alerts.length;
 
-    setState(() {
-      _totalPatients = patients.length;
-      _totalAlerts = alerts.length;
+        // Group alerts by severity
+        int high = 0;
+        int med = 0;
+        int low = 0;
 
-      // Group alerts by severity
-      int high = 0;
-      int med = 0;
-      int low = 0;
-
-      for (var a in alerts) {
-        final severity = (a['severity'] as String? ?? '').toLowerCase();
-        if (severity == 'high' || severity == 'critical') {
-          high++;
-        } else if (severity == 'medium' || severity == 'warning') {
-          med++;
-        } else {
-          low++;
+        for (final a in alerts) {
+          final row = a as Map<String, dynamic>? ?? const {};
+          final severity = (row['severity'] as String? ?? '').toLowerCase();
+          if (severity == 'high' || severity == 'critical') {
+            high++;
+          } else if (severity == 'medium' || severity == 'warning') {
+            med++;
+          } else {
+            low++;
+          }
         }
-      }
 
-      _highAlertsVal = high > 0 ? high.toDouble() : 5.0;
-      _medAlertsVal = med > 0 ? med.toDouble() : 12.0;
-      _lowAlertsVal = low > 0 ? low.toDouble() : 24.0;
+        _highAlertsVal = high > 0 ? high.toDouble() : 5.0;
+        _medAlertsVal = med > 0 ? med.toDouble() : 12.0;
+        _lowAlertsVal = low > 0 ? low.toDouble() : 24.0;
 
-      // Count critical cases
-      _criticalCount = high;
-      _isLoading = false;
-    });
+        // Count critical cases
+        _criticalCount = high;
+        _isLoading = false;
+      });
+    } catch (e) {
+      AppLogger.log('Stats load error: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
