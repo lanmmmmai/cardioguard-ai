@@ -146,7 +146,7 @@ class _StatsScreenState extends State<StatsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Thống Kê Hệ Thống',
+                        'Thống kê hệ thống',
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -155,7 +155,7 @@ class _StatsScreenState extends State<StatsScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Phân tích sự cố và hiệu suất telemetry',
+                        'Phân tích cảnh báo và hiệu suất telemetry',
                         style: TextStyle(
                           color: textMuted,
                           fontSize: 13,

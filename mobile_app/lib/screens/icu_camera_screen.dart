@@ -88,7 +88,7 @@ class _IcuCameraScreenState extends State<IcuCameraScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Camera Giả Lập ICU',
+                        'Camera giả lập ICU',
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,

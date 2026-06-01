@@ -11,6 +11,8 @@ import '../providers/alert_provider.dart';
 import '../services/websocket_service.dart';
 import '../widgets/ecg_painter.dart';
 import '../widgets/heart_3d_painter.dart';
+import '../widgets/cg_widgets.dart';
+import '../ui/cg_tokens.dart';
 
 class DashboardScreen extends StatefulWidget {
   final VoidCallback onToggleTheme;
@@ -138,13 +140,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _triggerBannerFlash() {
     _bannerTimer?.cancel();
     _isBannerFlash = true;
-    _bannerTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      if (mounted) {
-        setState(() {
-          _isBannerFlash = !_isBannerFlash;
-        });
-      }
-    });
 
     // Auto dismiss banner after 8 seconds
     Future.delayed(const Duration(seconds: 8), () {
@@ -299,8 +294,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             if (_activeBannerMessage != null)
               Container(
                 color: _isBannerFlash
-                    ? const Color(0xFFFF0055)
-                    : const Color(0xFF9E002E),
+                    ? CgColors.critical
+                    : const Color(0xFF7A271A),
                 padding:
                     const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                 width: double.infinity,
@@ -455,7 +450,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             '$hrVal',
                             'BPM',
                             LucideIcons.heart,
-                            const Color(0xFFFF3366),
+                            CgColors.hr,
                             isAbnormal && hrVal > 100,
                             cardBg,
                             textColor,
@@ -466,7 +461,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             '$spo2Val',
                             '%',
                             LucideIcons.droplet,
-                            const Color(0xFF00F2FE),
+                            CgColors.spo2,
                             isAbnormal && spo2Val < 94,
                             cardBg,
                             textColor,
@@ -477,7 +472,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             '$sysBp/$diaBp',
                             'mmHg',
                             LucideIcons.activity,
-                            const Color(0xFF39FF14),
+                            CgColors.bp,
                             isAbnormal && (sysBp > 135 || sysBp < 95),
                             cardBg,
                             textColor,
@@ -841,19 +836,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                             letterSpacing: 0.5)),
                     const SizedBox(height: 4),
                     Row(
-                      textBaseline: TextBaseline.alphabetic,
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
                       children: [
-                        Text(value,
-                            style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
-                                color: textColor)),
-                        const SizedBox(width: 4),
-                        Text(unit,
-                            style: TextStyle(fontSize: 10, color: textMuted)),
+                        CgMetricValue(
+                            value: value,
+                            unit: unit,
+                            color: textColor,
+                            valueSize: 24),
                       ],
-                    )
+                    ),
                   ],
                 ),
                 Container(

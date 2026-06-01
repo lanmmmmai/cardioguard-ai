@@ -254,7 +254,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // Profile Edit Form (only for Patient role)
             if (currentUser.role == 'patient') ...[
-              const Text('HỒ SƠ CÁ NHÂN',
+              const Text('Hồ sơ cá nhân',
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -346,7 +346,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
 
             // Theme Options
-            const Text('HỆ THỐNG',
+            const Text('Hệ thống',
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -373,7 +373,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 24),
 
             // Change Password Form
-            const Text('ĐỔI MẬT KHẨU',
+            const Text('Đổi mật khẩu',
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,

@@ -16,6 +16,8 @@ import 'providers/patient_provider.dart';
 import 'providers/alert_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/appointment_provider.dart';
+import 'ui/cg_theme.dart';
+import 'ui/cg_tokens.dart';
 
 void main() {
   runApp(const HeartMonitorApp());
@@ -51,58 +53,8 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
         title: 'Smart Heart Patient Monitoring',
         debugShowCheckedModeBanner: false,
         themeMode: _isDarkTheme ? ThemeMode.dark : ThemeMode.light,
-
-        // Light Theme Style
-        theme: ThemeData(
-          brightness: Brightness.light,
-          primaryColor: const Color(0xFFFF3366),
-          scaffoldBackgroundColor: const Color(0xFFF5F6F8),
-          colorScheme: const ColorScheme.light(
-            primary: Color(0xFFFF3366),
-            secondary: Color(0xFF00F2FE),
-            surface: Colors.white,
-          ),
-          inputDecorationTheme: InputDecorationTheme(
-            filled: true,
-            fillColor: Colors.black.withValues(alpha: 0.03),
-            labelStyle: TextStyle(color: Colors.black.withValues(alpha: 0.6)),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  BorderSide(color: Colors.black.withValues(alpha: 0.08)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFFF3366)),
-            ),
-          ),
-        ),
-
-        // Dark Theme Style
-        darkTheme: ThemeData(
-          brightness: Brightness.dark,
-          primaryColor: const Color(0xFFFF3366),
-          scaffoldBackgroundColor: const Color(0xFF07080A),
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFFFF3366),
-            secondary: Color(0xFF00F2FE),
-            surface: Color(0xFF11151D),
-          ),
-          inputDecorationTheme: InputDecorationTheme(
-            filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.03),
-            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  BorderSide(color: Colors.white.withValues(alpha: 0.07)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFFF3366)),
-            ),
-          ),
-        ),
+        theme: buildCgTheme(Brightness.light),
+        darkTheme: buildCgTheme(Brightness.dark),
 
         // Initial route is splash for session verification
         initialRoute: '/splash',
@@ -142,7 +94,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
     final isDark = widget.isDarkTheme;
     final bottomBarBg =
         isDark ? const Color(0xFF11151D).withValues(alpha: 0.9) : Colors.white;
-    const activeColor = Color(0xFFFF3366);
+    const activeColor = CgColors.primary;
     final inactiveColor =
         isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
     final borderColor = isDark
