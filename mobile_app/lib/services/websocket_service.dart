@@ -32,14 +32,16 @@ class WebSocketService {
 
     try {
       final token = await SecureStorage().getToken();
+      if (token == null || token.isEmpty) {
+        AppLogger.log('Skip WebSocket connect: missing auth token');
+        return;
+      }
       final uri = Uri.parse(wsUrl);
 
       _channel = IOWebSocketChannel.connect(uri);
       _isConnected = true;
-      AppLogger.log('WebSocket authenticated connection opened to $wsUrl');
-      if (token != null && token.isNotEmpty) {
-        _channel!.sink.add(json.encode({"type": "auth", "token": token}));
-      }
+      AppLogger.log('WebSocket transport connected to $wsUrl');
+      _channel!.sink.add(json.encode({"type": "auth", "token": token}));
 
       _channel!.stream.listen(
         (message) {
@@ -57,7 +59,12 @@ class WebSocketService {
           _handleDisconnect();
         },
         onDone: () {
-          AppLogger.log('WebSocket connection closed.');
+          final closeCode = _channel?.closeCode;
+          final closeReason = _channel?.closeReason;
+          AppLogger.log('WebSocket connection closed. code=$closeCode reason=$closeReason');
+          if (closeCode == 1008) {
+            _isIntentionalDisconnect = true;
+          }
           _handleDisconnect();
         },
       );

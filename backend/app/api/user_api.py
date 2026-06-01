@@ -118,7 +118,10 @@ async def update_user_me(payload: UserMeUpdate, request: Request, authorization:
 
 @router.put("/users/me/password")
 async def update_user_password(payload: PasswordUpdate, request: Request, authorization: Optional[str] = Header(default=None)):
-    current_user = await get_user_from_token(authorization)
+    current_user = await get_user_from_token(
+        authorization,
+        allow_must_change_password=True,
+    )
     row = await database.fetch_one(
         "SELECT password_hash FROM users WHERE id::text = :user_id",
         {"user_id": current_user["id"]},

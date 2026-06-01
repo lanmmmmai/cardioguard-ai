@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Bell, CalendarDays, Camera, Cpu, FileText, HeartPulse, Pill, UserCog, Users } from 'lucide-react';
+import { Activity, AlertTriangle, Bell, CalendarDays, Camera, Cpu, FileText, HeartPulse, Pill, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface CmsModuleConfig {
@@ -10,7 +10,6 @@ export interface CmsModuleConfig {
 }
 
 export const cmsModules: CmsModuleConfig[] = [
-  { key: 'users', label: 'Users', icon: UserCog, templateColumns: ['email', 'full_name', 'phone', 'role', 'password'], preferredColumns: ['full_name', 'email', 'phone', 'role', 'created_at'] },
   { key: 'patients', label: 'Patients', icon: Users, templateColumns: ['full_name', 'age', 'gender', 'phone', 'address', 'medical_history'], preferredColumns: ['full_name', 'age', 'gender', 'phone', 'address'] },
   { key: 'devices', label: 'Devices', icon: Cpu, templateColumns: ['device_name', 'serial_number', 'status', 'battery_level'], preferredColumns: ['device_name', 'serial_number', 'status', 'battery_level'] },
   { key: 'cameras', label: 'Cameras', icon: Camera, templateColumns: ['camera_name', 'location', 'stream_url', 'status', 'assigned_patient_id'], preferredColumns: ['camera_name', 'location', 'stream_url', 'status', 'assigned_patient_id'] },

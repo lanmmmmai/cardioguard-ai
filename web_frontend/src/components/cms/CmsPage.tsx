@@ -130,12 +130,7 @@ export const CmsPage: React.FC = () => {
     downloadText(`${activeModule}-template.csv`, `${config.templateColumns.join(',')}\n`);
   };
 
-  const formColumns = useMemo(() => {
-    if (activeModule === 'users' && editing === 'new') {
-      return [...columns, { name: 'password', type: 'text', nullable: false, readonly: false }];
-    }
-    return columns;
-  }, [activeModule, columns, editing]);
+  const formColumns = useMemo(() => columns, [columns]);
 
   if (role !== 'admin') {
     return <div className="panel cms-empty-state">Bạn không có quyền truy cập CMS.</div>;

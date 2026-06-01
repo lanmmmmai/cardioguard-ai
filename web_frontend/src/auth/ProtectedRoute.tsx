@@ -10,7 +10,7 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, currentPath, navigate, children }) => {
-  const { isAuthenticated, loading, role, logout } = useAuth();
+  const { isAuthenticated, loading, role, logout, requiresPasswordChange } = useAuth();
 
   React.useEffect(() => {
     if (loading) return;
@@ -20,10 +20,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, cu
       return;
     }
 
+    if (requiresPasswordChange && currentPath !== '/change-password') {
+      navigate('/change-password', true);
+      return;
+    }
+
     if (!allowedRoles.includes(role)) {
       navigate(defaultRouteByRole[role], true);
     }
-  }, [allowedRoles, currentPath, isAuthenticated, loading, navigate, role]);
+  }, [allowedRoles, currentPath, isAuthenticated, loading, navigate, role, requiresPasswordChange]);
 
   if (loading) {
     return <div className="route-loading">Đang kiểm tra phiên đăng nhập...</div>;

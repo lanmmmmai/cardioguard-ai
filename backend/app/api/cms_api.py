@@ -79,11 +79,20 @@ def module_config(module: str) -> dict[str, Any]:
 
 
 def ensure_module_write_allowed(module: str) -> None:
-    # users phải đi qua user_api để giữ đồng bộ patients + soft-delete policy
-    if module == "users":
+    # Các module này phải đi qua domain API để giữ nghiệp vụ và toàn vẹn dữ liệu.
+    restricted_modules = {
+        "users",
+        "patients",
+        "alerts",
+        "sensor_data",
+        "prescriptions",
+        "medical_records",
+        "reports",
+    }
+    if module in restricted_modules:
         raise HTTPException(
             status_code=403,
-            detail="Module users chỉ cho phép ghi qua /admin/users để đảm bảo nghiệp vụ an toàn.",
+            detail=f"Module {module} chỉ cho phép ghi qua domain API để đảm bảo nghiệp vụ an toàn.",
         )
 
 

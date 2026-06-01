@@ -60,7 +60,7 @@ interface SensorData {
 }
 
 const AppContent: React.FC = () => {
-  const { accessToken, isAuthenticated, loading, role, login, refreshUser } = useAuth();
+  const { accessToken, isAuthenticated, loading, role, login, refreshUser, requiresPasswordChange } = useAuth();
   const { path, navigate } = useBrowserPath();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -99,6 +99,11 @@ const AppContent: React.FC = () => {
       }
     }
 
+    if (requiresPasswordChange && path !== '/change-password') {
+      navigate('/change-password', true);
+      return;
+    }
+
     if (path === '/change-password') {
       if (!isAuthenticated || !role) {
         navigate('/login', true);
@@ -108,7 +113,7 @@ const AppContent: React.FC = () => {
         navigate(defaultRouteByRole[role], true);
       }
     }
-  }, [loading, path, role, isAuthenticated, routeRole]);
+  }, [loading, path, role, isAuthenticated, routeRole, requiresPasswordChange]);
 
   const fetchPatients = async () => {
     try {
@@ -244,7 +249,7 @@ const AppContent: React.FC = () => {
     }
 
     const normalizedUser = login(token, { ...userData, role: userRole });
-    if (userData.must_change_password) {
+    if (normalizedUser.must_change_password) {
       navigate('/change-password', true);
     } else {
       navigate(defaultRouteByRole[normalizedUser.role], true);

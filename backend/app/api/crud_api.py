@@ -50,6 +50,27 @@ ALIASES = {
 
 WRITE_PROTECTED_COLUMNS = {"created_at", "updated_at"}
 _column_cache: dict[str, set[str]] = {}
+PATIENT_CREATE_BLOCKED_TABLES = {"devices", "medical_records", "prescriptions", "reports"}
+PATIENT_UPDATE_BLOCKED_TABLES = {"devices", "medical_records", "prescriptions", "reports"}
+PATIENT_DELETE_BLOCKED_TABLES = {"appointments", "cameras", "devices", "medical_records", "prescriptions", "reports"}
+DOCTOR_DELETE_BLOCKED_TABLES = {"devices", "medical_records", "prescriptions", "reports"}
+
+
+def enforce_operation_permission(table: str, role: str, operation: str) -> None:
+    if role == "admin":
+        return
+    if role == "patient":
+        if operation == "create" and table in PATIENT_CREATE_BLOCKED_TABLES:
+            raise HTTPException(status_code=403, detail=f"Patient cannot create records in {table}")
+        if operation == "update" and table in PATIENT_UPDATE_BLOCKED_TABLES:
+            raise HTTPException(status_code=403, detail=f"Patient cannot update records in {table}")
+        if operation == "delete" and table in PATIENT_DELETE_BLOCKED_TABLES:
+            raise HTTPException(status_code=403, detail=f"Patient cannot delete records in {table}")
+        return
+    if role == "doctor":
+        if operation == "delete" and table in DOCTOR_DELETE_BLOCKED_TABLES:
+            raise HTTPException(status_code=403, detail=f"Doctor cannot delete records in {table}")
+        return
 
 
 def quote_identifier(value: str) -> str:
@@ -284,6 +305,7 @@ async def trigger_websocket_broadcast(table: str, record: dict[str, Any]):
 
 async def create_record(table: str, payload: dict[str, Any], authorization: Optional[str], request: Optional[Request] = None):
     user = await get_user_from_token(authorization)
+    enforce_operation_permission(table, user["role"], "create")
     columns = await table_columns(table)
     values = normalize_payload(payload)
     allowed_columns = columns - WRITE_PROTECTED_COLUMNS
@@ -320,6 +342,7 @@ async def create_record(table: str, payload: dict[str, Any], authorization: Opti
 
 async def update_record(table: str, record_id: str, payload: dict[str, Any], authorization: Optional[str], request: Optional[Request] = None):
     user = await get_user_from_token(authorization)
+    enforce_operation_permission(table, user["role"], "update")
     columns = await table_columns(table)
     current = await fetch_authorized_row(table, record_id, columns, user)
     values = normalize_payload(payload)
@@ -356,6 +379,7 @@ async def update_record(table: str, record_id: str, payload: dict[str, Any], aut
 
 async def delete_record(table: str, record_id: str, authorization: Optional[str], request: Optional[Request] = None):
     user = await get_user_from_token(authorization)
+    enforce_operation_permission(table, user["role"], "delete")
     columns = await table_columns(table)
     current = await fetch_authorized_row(table, record_id, columns, user)
     await enforce_write_scope(table, columns, user, {}, current)
