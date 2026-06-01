@@ -70,10 +70,10 @@ class _StatsScreenState extends State<StatsScreen> {
   Widget build(BuildContext context) {
     final isDark = widget.isDarkTheme;
     final primaryBg = isDark ? const Color(0xFF07080A) : const Color(0xFFF5F6F8);
-    final cardBg = isDark ? const Color(0xFF11151D).withOpacity(0.7) : Colors.white.withOpacity(0.9);
+    final cardBg = isDark ? const Color(0xFF11151D).withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.9);
     final textColor = isDark ? Colors.white : const Color(0xFF1D2939);
     final textMuted = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
-    final borderColor = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08);
 
     return Scaffold(
       backgroundColor: primaryBg,
@@ -233,7 +233,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                         show: true,
                                         drawVerticalLine: false,
                                         getDrawingHorizontalLine: (val) => FlLine(
-                                          color: Colors.white.withOpacity(0.05),
+                                          color: Colors.white.withValues(alpha: 0.05),
                                           strokeWidth: 1,
                                         ),
                                       ),
@@ -284,7 +284,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                           dotData: const FlDotData(show: true),
                                           belowBarData: BarAreaData(
                                             show: true,
-                                            color: const Color(0xFFFF3366).withOpacity(0.1),
+                                            color: const Color(0xFFFF3366).withValues(alpha: 0.1),
                                           ),
                                         ),
                                       ],
@@ -360,3 +360,4 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 }
+

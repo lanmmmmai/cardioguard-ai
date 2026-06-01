@@ -96,10 +96,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    final cardBg = isDark ? const Color(0xFF11151D).withOpacity(0.7) : Colors.white.withOpacity(0.85);
+    final cardBg = isDark ? const Color(0xFF11151D).withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.85);
     final textColor = isDark ? Colors.white : Colors.black;
-    final textMutedColor = isDark ? Colors.white.withOpacity(0.6) : Colors.black.withOpacity(0.6);
-    final borderColor = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08);
+    final textMutedColor = isDark ? Colors.white.withValues(alpha: 0.6) : Colors.black.withValues(alpha: 0.6);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08);
 
     final String? activeError = _localError ?? authProvider.errorMessage;
 
@@ -119,7 +119,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 height: 250,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFFF3366).withOpacity(0.06),
+                  color: const Color(0xFFFF3366).withValues(alpha: 0.06),
                 ),
               ),
             ),
@@ -131,7 +131,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 height: 250,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF00F2FE).withOpacity(0.06),
+                  color: const Color(0xFF00F2FE).withValues(alpha: 0.06),
                 ),
               ),
             ),
@@ -179,9 +179,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFF0055).withOpacity(0.1),
+                                color: const Color(0xFFFF0055).withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFFF0055).withOpacity(0.3)),
+                                border: Border.all(color: const Color(0xFFFF0055).withValues(alpha: 0.3)),
                               ),
                               child: Row(
                                 children: [
@@ -204,9 +204,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF39FF14).withOpacity(0.1),
+                                color: const Color(0xFF39FF14).withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFF39FF14).withOpacity(0.3)),
+                                border: Border.all(color: const Color(0xFF39FF14).withValues(alpha: 0.3)),
                               ),
                               child: Row(
                                 children: [
@@ -237,7 +237,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   decoration: InputDecoration(
                                     labelText: 'Họ và tên',
                                     labelStyle: TextStyle(color: textMutedColor),
-                                    prefixIcon: Icon(LucideIcons.user, color: textMutedColor.withOpacity(0.8), size: 18),
+                                    prefixIcon: Icon(LucideIcons.user, color: textMutedColor.withValues(alpha: 0.8), size: 18),
                                   ),
                                   validator: (v) => (v == null || v.isEmpty) ? 'Vui lòng nhập họ tên' : null,
                                 ),
@@ -250,7 +250,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   decoration: InputDecoration(
                                     labelText: 'Email liên hệ',
                                     labelStyle: TextStyle(color: textMutedColor),
-                                    prefixIcon: Icon(LucideIcons.mail, color: textMutedColor.withOpacity(0.8), size: 18),
+                                    prefixIcon: Icon(LucideIcons.mail, color: textMutedColor.withValues(alpha: 0.8), size: 18),
                                   ),
                                   validator: (v) {
                                     if (v == null || v.isEmpty) return 'Vui lòng nhập email';
@@ -267,7 +267,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   decoration: InputDecoration(
                                     labelText: 'Mật khẩu',
                                     labelStyle: TextStyle(color: textMutedColor),
-                                    prefixIcon: Icon(LucideIcons.lock, color: textMutedColor.withOpacity(0.8), size: 18),
+                                    prefixIcon: Icon(LucideIcons.lock, color: textMutedColor.withValues(alpha: 0.8), size: 18),
                                   ),
                                   validator: (v) => (v == null || v.length < 6) ? 'Mật khẩu phải từ 6 ký tự' : null,
                                 ),
@@ -282,7 +282,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     decoration: InputDecoration(
                                       labelText: 'Nhập mã OTP (6 số)',
                                       labelStyle: TextStyle(color: textMutedColor),
-                                      prefixIcon: Icon(LucideIcons.key, color: textMutedColor.withOpacity(0.8), size: 18),
+                                      prefixIcon: Icon(LucideIcons.key, color: textMutedColor.withValues(alpha: 0.8), size: 18),
                                     ),
                                   ),
                                 ],
@@ -350,3 +350,4 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
+

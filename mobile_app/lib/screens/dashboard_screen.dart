@@ -39,7 +39,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   // Selected Patient for Doctor/Admin
   String? _selectedPatientId;
-  String _selectedPatientName = 'Chưa chọn';
 
   // SOS state
   bool _isSosCounting = false;
@@ -74,14 +73,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       
       if (authProvider.currentUser?.role == 'patient') {
         _selectedPatientId = authProvider.currentUser?.id;
-        _selectedPatientName = authProvider.currentUser?.fullName ?? 'Bản thân';
         patientProvider.fetchMyProfile();
       } else {
         patientProvider.fetchPatients().then((_) {
           if (patientProvider.patients.isNotEmpty) {
             setState(() {
               _selectedPatientId = patientProvider.patients.first.id;
-              _selectedPatientName = patientProvider.patients.first.fullName;
             });
           }
         });
@@ -270,7 +267,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     final cardBg = isDark ? const Color(0xFF11151D) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1D2939);
     final textMuted = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
-    final borderColor = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08);
 
     final role = authProvider.currentUser?.role ?? 'patient';
     final liveMetrics = patientProvider.liveMetrics;
@@ -337,10 +334,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                               }).toList(),
                               onChanged: (id) {
                                 if (id != null) {
-                                  final p = patientProvider.patients.firstWhere((element) => element.id == id);
                                   setState(() {
                                     _selectedPatientId = id;
-                                    _selectedPatientName = p.fullName;
                                     _ecgPoints.fillRange(0, _ecgPoints.length, 0.0);
                                   });
                                 }
@@ -427,7 +422,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF00F2FE).withOpacity(0.1),
+                                  color: const Color(0xFF00F2FE).withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Text('LIVE MONITOR', style: TextStyle(fontSize: 9, color: Color(0xFF00F2FE), fontWeight: FontWeight.bold)),
@@ -439,7 +434,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                             borderRadius: BorderRadius.circular(12),
                             child: Container(
                               height: 140,
-                              color: isDark ? Colors.black.withOpacity(0.2) : Colors.black.withOpacity(0.02),
+                              color: isDark ? Colors.black.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.02),
                               width: double.infinity,
                               child: CustomPaint(
                                 painter: EcgPainter(
@@ -535,11 +530,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                                   height: 100,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: const Color(0xFFFF0055).withOpacity(0.1),
+                                    color: const Color(0xFFFF0055).withValues(alpha: 0.1),
                                     border: Border.all(color: const Color(0xFFFF0055), width: 3),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFFFF0055).withOpacity(0.2),
+                                        color: const Color(0xFFFF0055).withValues(alpha: 0.2),
                                         blurRadius: 16,
                                         spreadRadius: 2,
                                       )
@@ -630,7 +625,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: color.withOpacity(0.1),
+            backgroundColor: color.withValues(alpha: 0.1),
             child: Icon(icon, color: color, size: 18),
           ),
           const SizedBox(width: 10),
@@ -662,7 +657,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     Color textMuted,
     Color borderColor,
   ) {
-    final glowColor = accentColor.withOpacity(0.1);
+    final glowColor = accentColor.withValues(alpha: 0.1);
     return Container(
       margin: const EdgeInsets.only(bottom: 2),
       decoration: BoxDecoration(
@@ -717,3 +712,4 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     );
   }
 }
+

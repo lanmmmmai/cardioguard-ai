@@ -59,10 +59,10 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
   Widget build(BuildContext context) {
     final isDark = widget.isDarkTheme;
     final primaryBg = isDark ? const Color(0xFF07080A) : const Color(0xFFF5F6F8);
-    final cardBg = isDark ? const Color(0xFF11151D).withOpacity(0.7) : Colors.white.withOpacity(0.9);
+    final cardBg = isDark ? const Color(0xFF11151D).withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.9);
     final textColor = isDark ? Colors.white : const Color(0xFF1D2939);
     final textMuted = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
-    final borderColor = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08);
 
     final double timestamp = DateTime.now().millisecondsSinceEpoch.toDouble();
 
@@ -97,12 +97,12 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF39FF14).withOpacity(0.1),
+                      color: const Color(0xFF39FF14).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF39FF14).withOpacity(0.3)),
+                      border: Border.all(color: const Color(0xFF39FF14).withValues(alpha: 0.3)),
                     ),
-                    child: Row(
-                      children: const [
+                    child: const Row(
+                      children: [
                         Icon(LucideIcons.radio, size: 12, color: Color(0xFF39FF14)),
                         SizedBox(width: 6),
                         Text(
@@ -129,12 +129,12 @@ class _IcuCameraScreenState extends State<IcuCameraScreen> with SingleTickerProv
                     color: const Color(0xFF030A03),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: const Color(0xFF39FF14).withOpacity(0.2),
+                      color: const Color(0xFF39FF14).withValues(alpha: 0.2),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
+                        color: Colors.black.withValues(alpha: 0.5),
                         blurRadius: 15,
                         spreadRadius: 2,
                       )
@@ -213,7 +213,7 @@ class _IcuCameraPainter extends CustomPainter {
 
     // 1. Draw green thermal grid
     final gridPaint = Paint()
-      ..color = const Color(0xFF39FF14).withOpacity(0.04)
+      ..color = const Color(0xFF39FF14).withValues(alpha: 0.04)
       ..strokeWidth = 1.0;
 
     for (double x = 0; x < width; x += 40) {
@@ -225,7 +225,7 @@ class _IcuCameraPainter extends CustomPainter {
 
     // 2. Draw viewfinder corners
     final bracketPaint = Paint()
-      ..color = const Color(0xFF39FF14).withOpacity(0.6)
+      ..color = const Color(0xFF39FF14).withValues(alpha: 0.6)
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
@@ -247,7 +247,7 @@ class _IcuCameraPainter extends CustomPainter {
 
     // 4. Draw Bed & Silhouette
     final bedPaint = Paint()
-      ..color = const Color(0xFF39FF14).withOpacity(0.25)
+      ..color = const Color(0xFF39FF14).withValues(alpha: 0.25)
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
@@ -266,7 +266,7 @@ class _IcuCameraPainter extends CustomPainter {
     final chestExpansion = 5.0 * math.sin(breathTime * 2 * math.pi);
 
     final patientPaint = Paint()
-      ..color = const Color(0xFF39FF14).withOpacity(0.55)
+      ..color = const Color(0xFF39FF14).withValues(alpha: 0.55)
       ..strokeWidth = 2.0
       ..style = PaintingStyle.stroke;
 
@@ -369,14 +369,15 @@ class _CrtOverlayPainter extends CustomPainter {
 
     // Moving scanline
     final scanlinePaint = Paint()
-      ..color = const Color(0xFF39FF14).withOpacity(0.08)
+      ..color = const Color(0xFF39FF14).withValues(alpha: 0.08)
       ..strokeWidth = 2.0;
 
     final double speed = (timestamp / 12) % height;
     canvas.drawLine(Offset(0, speed), Offset(width, speed), scanlinePaint);
-    canvas.drawLine(Offset(0, (speed + 8) % height), Offset(width, (speed + 8) % height), scanlinePaint..color = const Color(0xFF39FF14).withOpacity(0.04));
+    canvas.drawLine(Offset(0, (speed + 8) % height), Offset(width, (speed + 8) % height), scanlinePaint..color = const Color(0xFF39FF14).withValues(alpha: 0.04));
   }
 
   @override
   bool shouldRepaint(covariant _CrtOverlayPainter oldDelegate) => true;
 }
+

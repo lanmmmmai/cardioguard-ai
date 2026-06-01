@@ -55,7 +55,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
     final cardBg = isDark ? const Color(0xFF11151D) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1D2939);
     final textMuted = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
-    final borderColor = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08);
 
     final role = authProvider.currentUser?.role ?? 'patient';
 
@@ -133,7 +133,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                         hintStyle: TextStyle(color: textMuted, fontSize: 13),
                         prefixIcon: Icon(LucideIcons.search, color: textMuted, size: 16),
                         filled: true,
-                        fillColor: isDark ? Colors.white.withOpacity(0.01) : Colors.black.withOpacity(0.02),
+                        fillColor: isDark ? Colors.white.withValues(alpha: 0.01) : Colors.black.withValues(alpha: 0.02),
                         contentPadding: const EdgeInsets.symmetric(vertical: 8),
                       ),
                     ),
@@ -196,7 +196,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                             physics: const AlwaysScrollableScrollPhysics(),
                             children: [
                               SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-                              Icon(LucideIcons.shieldCheck, color: const Color(0xFF39FF14).withOpacity(0.8), size: 48),
+                              Icon(LucideIcons.shieldCheck, color: const Color(0xFF39FF14).withValues(alpha: 0.8), size: 48),
                               const SizedBox(height: 14),
                               Center(child: Text('Không có cảnh báo nào', style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 15))),
                               const SizedBox(height: 4),
@@ -220,11 +220,11 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
                               if (severity == 'high' || severity == 'critical' || severity == 'sos') {
                                 leftBorderColor = const Color(0xFFFF3366);
-                                alertStripBg = const Color(0xFFFF3366).withOpacity(0.04);
+                                alertStripBg = const Color(0xFFFF3366).withValues(alpha: 0.04);
                                 iconColor = const Color(0xFFFF3366);
                               } else if (severity == 'medium' || severity == 'warning') {
                                 leftBorderColor = const Color(0xFFFFB606);
-                                alertStripBg = const Color(0xFFFFB606).withOpacity(0.03);
+                                alertStripBg = const Color(0xFFFFB606).withValues(alpha: 0.03);
                                 iconColor = const Color(0xFFFFB606);
                               } else {
                                 leftBorderColor = const Color(0xFF39FF14);
@@ -234,7 +234,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
                               if (alert.isResolved) {
                                 leftBorderColor = Colors.grey;
-                                alertStripBg = cardBg.withOpacity(0.5);
+                                alertStripBg = cardBg.withValues(alpha: 0.5);
                                 iconColor = Colors.grey;
                               }
 
@@ -279,7 +279,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                                                       Container(
                                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                         decoration: BoxDecoration(
-                                                          color: leftBorderColor.withOpacity(0.12),
+                                                          color: leftBorderColor.withValues(alpha: 0.12),
                                                           borderRadius: BorderRadius.circular(8),
                                                         ),
                                                         child: Text(
@@ -315,7 +315,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                                                   label: const Text('Xác nhận xử lý', style: TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
                                                   style: TextButton.styleFrom(
                                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                                    backgroundColor: Colors.green.withOpacity(0.1),
+                                                    backgroundColor: Colors.green.withValues(alpha: 0.1),
                                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                                   ),
                                                 ),
@@ -338,3 +338,4 @@ class _AlertsScreenState extends State<AlertsScreen> {
     );
   }
 }
+

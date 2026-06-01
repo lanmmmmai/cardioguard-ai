@@ -60,16 +60,15 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
           colorScheme: const ColorScheme.light(
             primary: Color(0xFFFF3366),
             secondary: Color(0xFF00F2FE),
-            background: Color(0xFFF5F6F8),
             surface: Colors.white,
           ),
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
-            fillColor: Colors.black.withOpacity(0.03),
-            labelStyle: TextStyle(color: Colors.black.withOpacity(0.6)),
+            fillColor: Colors.black.withValues(alpha: 0.03),
+            labelStyle: TextStyle(color: Colors.black.withValues(alpha: 0.6)),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.black.withOpacity(0.08)),
+              borderSide: BorderSide(color: Colors.black.withValues(alpha: 0.08)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -86,16 +85,15 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
           colorScheme: const ColorScheme.dark(
             primary: Color(0xFFFF3366),
             secondary: Color(0xFF00F2FE),
-            background: Color(0xFF07080A),
             surface: Color(0xFF11151D),
           ),
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
-            fillColor: Colors.white.withOpacity(0.03),
-            labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+            fillColor: Colors.white.withValues(alpha: 0.03),
+            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.white.withOpacity(0.07)),
+              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.07)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -140,10 +138,10 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDarkTheme;
-    final bottomBarBg = isDark ? const Color(0xFF11151D).withOpacity(0.9) : Colors.white;
-    final activeColor = const Color(0xFFFF3366);
+    final bottomBarBg = isDark ? const Color(0xFF11151D).withValues(alpha: 0.9) : Colors.white;
+    const activeColor = Color(0xFFFF3366);
     final inactiveColor = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
-    final borderColor = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08);
 
     final authProvider = Provider.of<AuthProvider>(context);
     final role = authProvider.currentUser?.role ?? 'patient';
@@ -262,3 +260,4 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
     );
   }
 }
+

@@ -141,7 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     final cardBg = isDark ? const Color(0xFF11151D) : Colors.white;
-    final textMuted = isDark ? Colors.white.withOpacity(0.5) : Colors.black.withOpacity(0.5);
+    final textMuted = isDark ? Colors.white.withValues(alpha: 0.5) : Colors.black.withValues(alpha: 0.5);
 
     return Scaffold(
       appBar: AppBar(
@@ -161,14 +161,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: cardBg,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08),
+                  color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08),
                 ),
               ),
               child: Row(
                 children: [
                   CircleAvatar(
                     radius: 30,
-                    backgroundColor: const Color(0xFFFF3366).withOpacity(0.1),
+                    backgroundColor: const Color(0xFFFF3366).withValues(alpha: 0.1),
                     child: const Icon(LucideIcons.user, color: Color(0xFFFF3366), size: 30),
                   ),
                   const SizedBox(width: 16),
@@ -189,7 +189,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF3366).withOpacity(0.1),
+                            color: const Color(0xFFFF3366).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -219,7 +219,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: cardBg,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08),
+                    color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08),
                   ),
                 ),
                 child: Form(
@@ -287,7 +287,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: cardBg,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08),
+                  color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08),
                 ),
               ),
               child: SwitchListTile(
@@ -308,7 +308,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: cardBg,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08),
+                  color: isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08),
                 ),
               ),
               child: Form(
@@ -375,3 +375,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+

@@ -256,7 +256,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     final cardBg = isDark ? const Color(0xFF11151D) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1D2939);
     final textMuted = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
-    final borderColor = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08);
 
     final p = widget.patient;
     final role = authProvider.currentUser?.role ?? 'patient';
@@ -364,7 +364,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFFF3366).withOpacity(0.1),
+                                      color: const Color(0xFFFF3366).withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(record.type, style: const TextStyle(color: Color(0xFFFF3366), fontSize: 10, fontWeight: FontWeight.bold)),
@@ -426,7 +426,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: Colors.green.withOpacity(0.1),
+                                      color: Colors.green.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: const Text('ĐANG DÙNG', style: TextStyle(color: Colors.green, fontSize: 9, fontWeight: FontWeight.bold)),
@@ -465,7 +465,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                             final isMe = msg.senderId == authProvider.currentUser!.id;
                             final bubbleColor = isMe 
                                 ? const Color(0xFFFF3366) 
-                                : (isDark ? const Color(0xFF1C222D) : Colors.black.withOpacity(0.04));
+                                : (isDark ? const Color(0xFF1C222D) : Colors.black.withValues(alpha: 0.04));
                             final textStyle = TextStyle(
                               color: isMe ? Colors.white : textColor,
                               fontSize: 13,
@@ -582,7 +582,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  getDrawingHorizontalLine: (val) => FlLine(color: Colors.white.withOpacity(0.04), strokeWidth: 1),
+                  getDrawingHorizontalLine: (val) => FlLine(color: Colors.white.withValues(alpha: 0.04), strokeWidth: 1),
                 ),
                 titlesData: const FlTitlesData(
                   show: true,
@@ -599,7 +599,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                     color: lineColor,
                     barWidth: 2,
                     dotData: const FlDotData(show: false),
-                    belowBarData: BarAreaData(show: true, color: lineColor.withOpacity(0.08)),
+                    belowBarData: BarAreaData(show: true, color: lineColor.withValues(alpha: 0.08)),
                   ),
                 ],
               ),
@@ -623,3 +623,4 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     );
   }
 }
+

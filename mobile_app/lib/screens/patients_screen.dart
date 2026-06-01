@@ -73,7 +73,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
             }
 
             final patientProvider = Provider.of<PatientProvider>(context);
-            final itemBg = widget.isDarkTheme ? const Color(0xFF1C222D) : Colors.black.withOpacity(0.02);
+            final itemBg = widget.isDarkTheme ? const Color(0xFF1C222D) : Colors.black.withValues(alpha: 0.02);
 
             return Padding(
               padding: EdgeInsets.only(
@@ -157,6 +157,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                 patientProvider.fetchPatients(); // refresh main patients list
                               }
                             } catch (e) {
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Lỗi phân công (Có thể đã phân công trước đó)')),
                               );
@@ -239,7 +240,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
     final cardBg = isDark ? const Color(0xFF11151D) : Colors.white;
     final textColor = isDark ? Colors.white : const Color(0xFF1D2939);
     final textMuted = isDark ? const Color(0xFF9EA5B4) : const Color(0xFF475467);
-    final borderColor = isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.08);
+    final borderColor = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.08);
 
     final role = authProvider.currentUser?.role ?? 'patient';
 
@@ -376,3 +377,4 @@ class _PatientsScreenState extends State<PatientsScreen> {
     );
   }
 }
+
