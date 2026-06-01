@@ -22,6 +22,16 @@ class _StatsScreenState extends State<StatsScreen> {
   double _highAlertsVal = 0.0;
   double _medAlertsVal = 0.0;
   double _lowAlertsVal = 0.0;
+  List<FlSpot> _weeklyAlertSpots = const [
+    FlSpot(0, 0),
+    FlSpot(1, 0),
+    FlSpot(2, 0),
+    FlSpot(3, 0),
+    FlSpot(4, 0),
+    FlSpot(5, 0),
+    FlSpot(6, 0),
+  ];
+  List<String> _weeklyLabels = const ['-', '-', '-', '-', '-', '-', '-'];
 
   @override
   void initState() {
@@ -41,6 +51,15 @@ class _StatsScreenState extends State<StatsScreen> {
       ]);
       final patients = (responses[0].data as List<dynamic>? ?? const []);
       final alerts = (responses[1].data as List<dynamic>? ?? const []);
+      final now = DateTime.now();
+      final sevenDaysAgo = DateTime(now.year, now.month, now.day)
+          .subtract(const Duration(days: 6));
+      final dayCountMap = <DateTime, int>{};
+      for (int i = 0; i < 7; i++) {
+        final d = DateTime(
+            sevenDaysAgo.year, sevenDaysAgo.month, sevenDaysAgo.day + i);
+        dayCountMap[d] = 0;
+      }
 
       if (!mounted) return;
       setState(() {
@@ -62,11 +81,33 @@ class _StatsScreenState extends State<StatsScreen> {
           } else {
             low++;
           }
+
+          final createdAtRaw = row['created_at'];
+          if (createdAtRaw is String) {
+            final parsed = DateTime.tryParse(createdAtRaw)?.toLocal();
+            if (parsed != null) {
+              final bucket = DateTime(parsed.year, parsed.month, parsed.day);
+              if (dayCountMap.containsKey(bucket)) {
+                dayCountMap[bucket] = (dayCountMap[bucket] ?? 0) + 1;
+              }
+            }
+          }
         }
 
         _highAlertsVal = high.toDouble();
         _medAlertsVal = med.toDouble();
         _lowAlertsVal = low.toDouble();
+        final orderedDays = dayCountMap.keys.toList()..sort();
+        _weeklyAlertSpots = orderedDays
+            .asMap()
+            .entries
+            .map((e) => FlSpot(
+                e.key.toDouble(), (dayCountMap[e.value] ?? 0).toDouble()))
+            .toList();
+        _weeklyLabels = orderedDays
+            .map((d) =>
+                '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}')
+            .toList();
 
         // Count critical cases
         _criticalCount = high;
@@ -282,7 +323,7 @@ class _StatsScreenState extends State<StatsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'TẦN SUẤT SỰ CỐ (DỮ LIỆU MẪU)',
+                                  'TẦN SUẤT SỰ CỐ (7 NGÀY GẦN NHẤT)',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
@@ -317,27 +358,19 @@ class _StatsScreenState extends State<StatsScreen> {
                                           sideTitles: SideTitles(
                                             showTitles: true,
                                             getTitlesWidget: (val, meta) {
-                                              const days = [
-                                                'T2',
-                                                'T3',
-                                                'T4',
-                                                'T5',
-                                                'T6',
-                                                'T7',
-                                                'CN'
-                                              ];
                                               int idx = val.toInt();
                                               if (idx >= 0 &&
-                                                  idx < days.length) {
+                                                  idx < _weeklyLabels.length) {
                                                 return Padding(
                                                   padding:
                                                       const EdgeInsets.only(
                                                           top: 6),
-                                                  child: Text(days[idx],
-                                                      style: TextStyle(
-                                                        color: textMuted,
-                                                        fontSize: 10,
-                                                      )),
+                                                  child:
+                                                      Text(_weeklyLabels[idx],
+                                                          style: TextStyle(
+                                                            color: textMuted,
+                                                            fontSize: 9,
+                                                          )),
                                                 );
                                               }
                                               return const Text('');
@@ -356,15 +389,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                       borderData: FlBorderData(show: false),
                                       lineBarsData: [
                                         LineChartBarData(
-                                          spots: const [
-                                            FlSpot(0, 3),
-                                            FlSpot(1, 7),
-                                            FlSpot(2, 4),
-                                            FlSpot(3, 10),
-                                            FlSpot(4, 5),
-                                            FlSpot(5, 12),
-                                            FlSpot(6, 6),
-                                          ],
+                                          spots: _weeklyAlertSpots,
                                           isCurved: true,
                                           color: const Color(0xFFFF3366),
                                           barWidth: 3,
