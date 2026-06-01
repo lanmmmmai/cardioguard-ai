@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/app_logger.dart';
 import '../core/api_client.dart';
 import '../models/models.dart';
 import '../config/app_config.dart';
@@ -48,7 +49,7 @@ class PatientProvider extends ChangeNotifier {
         _patients = list.map((item) => Patient.fromJson(item)).toList();
       }
     } catch (e) {
-      print('Fetch patients error: $e');
+      AppLogger.log('Fetch patients error: $e');
     } finally {
       _setLoading(false);
     }
@@ -63,7 +64,7 @@ class PatientProvider extends ChangeNotifier {
         _currentPatientProfile = Patient.fromJson(response.data['patient']);
       }
     } catch (e) {
-      print('Fetch patient profile error: $e');
+      AppLogger.log('Fetch patient profile error: $e');
     } finally {
       _setLoading(false);
     }
@@ -97,7 +98,7 @@ class PatientProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     } catch (e) {
-      print('Update patient profile error: $e');
+      AppLogger.log('Update patient profile error: $e');
       _setLoading(false);
       return false;
     }
@@ -113,7 +114,7 @@ class PatientProvider extends ChangeNotifier {
         _medicalRecords = list.map((item) => MedicalRecord.fromJson(item)).toList();
       }
     } catch (e) {
-      print('Fetch medical records error: $e');
+      AppLogger.log('Fetch medical records error: $e');
     } finally {
       _setLoading(false);
     }
@@ -146,7 +147,7 @@ class PatientProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     } catch (e) {
-      print('Add medical record error: $e');
+      AppLogger.log('Add medical record error: $e');
       _setLoading(false);
       return false;
     }
@@ -162,7 +163,7 @@ class PatientProvider extends ChangeNotifier {
         _prescriptions = list.map((item) => Prescription.fromJson(item)).toList();
       }
     } catch (e) {
-      print('Fetch prescriptions error: $e');
+      AppLogger.log('Fetch prescriptions error: $e');
     } finally {
       _setLoading(false);
     }
@@ -198,7 +199,7 @@ class PatientProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     } catch (e) {
-      print('Add prescription error: $e');
+      AppLogger.log('Add prescription error: $e');
       _setLoading(false);
       return false;
     }
@@ -234,8 +235,9 @@ class PatientProvider extends ChangeNotifier {
       );
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      print('Trigger simulation error: $e');
+      AppLogger.log('Trigger simulation error: $e');
       return false;
     }
   }
 }
+

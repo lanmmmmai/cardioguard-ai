@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../core/app_logger.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import '../core/secure_storage.dart';
@@ -34,7 +35,7 @@ class WebSocketService {
 
       _channel = IOWebSocketChannel.connect(uri);
       _isConnected = true;
-      print('WebSocket authenticated connection opened to $wsUrl');
+      AppLogger.log('WebSocket authenticated connection opened to $wsUrl');
 
       _channel!.stream.listen(
         (message) {
@@ -44,20 +45,20 @@ class WebSocketService {
               listener(data);
             }
           } catch (e) {
-            print('Error parsing WebSocket message: $e');
+            AppLogger.log('Error parsing WebSocket message: $e');
           }
         },
         onError: (err) {
-          print('WebSocket error: $err');
+          AppLogger.log('WebSocket error: $err');
           _handleDisconnect();
         },
         onDone: () {
-          print('WebSocket connection closed.');
+          AppLogger.log('WebSocket connection closed.');
           _handleDisconnect();
         },
       );
     } catch (e) {
-      print('WebSocket connection failed: $e');
+      AppLogger.log('WebSocket connection failed: $e');
       _handleDisconnect();
     }
   }
@@ -69,7 +70,7 @@ class WebSocketService {
     // Auto-reconnect after 3 seconds
     Future.delayed(const Duration(seconds: 3), () async {
       if (!_isConnected) {
-        print('Attempting to reconnect WebSocket...');
+        AppLogger.log('Attempting to reconnect WebSocket...');
         await connect();
       }
     });
@@ -81,3 +82,4 @@ class WebSocketService {
     _channel = null;
   }
 }
+

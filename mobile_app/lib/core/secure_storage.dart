@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'app_logger.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../config/app_config.dart';
 
@@ -41,7 +42,7 @@ class SecureStorage {
       try {
         return json.decode(userJson) as Map<String, dynamic>;
       } catch (e) {
-        print('Error decoding stored user: $e');
+        AppLogger.log('Error decoding stored user: $e');
         return null;
       }
     }
@@ -59,3 +60,4 @@ class SecureStorage {
     await deleteUser();
   }
 }
+

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/app_logger.dart';
 import '../core/api_client.dart';
 import '../core/secure_storage.dart';
 import '../models/models.dart';
@@ -55,7 +56,7 @@ class AuthProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = response.data;
         if (data != null && data['dev_otp'] != null) {
-          print('[DEV MODE] OTP generated: ${data['dev_otp']}');
+          AppLogger.log('[DEV MODE] OTP generated: ${data['dev_otp']}');
         }
         return true;
       }
@@ -155,7 +156,7 @@ class AuthProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print('Auto login error: $e');
+      AppLogger.log('Auto login error: $e');
       // If network fails but token exists, we can still load from cache user
       final cachedUser = await _secureStorage.getUser();
       if (cachedUser != null) {
@@ -177,7 +178,7 @@ class AuthProvider extends ChangeNotifier {
       _isAuthenticated = false;
       _setError(null);
     } catch (e) {
-      print('Logout error: $e');
+      AppLogger.log('Logout error: $e');
     } finally {
       _setLoading(false);
     }
@@ -191,3 +192,4 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
+

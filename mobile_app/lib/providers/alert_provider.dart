@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/app_logger.dart';
 import '../core/api_client.dart';
 import '../models/models.dart';
 import '../config/app_config.dart';
@@ -30,7 +31,7 @@ class AlertProvider extends ChangeNotifier {
         _alerts = list.map((item) => Alert.fromJson(item)).toList();
       }
     } catch (e) {
-      print('Fetch alerts error: $e');
+      AppLogger.log('Fetch alerts error: $e');
     } finally {
       _setLoading(false);
     }
@@ -61,7 +62,7 @@ class AlertProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print('Resolve alert error: $e');
+      AppLogger.log('Resolve alert error: $e');
       return false;
     }
   }
@@ -81,7 +82,7 @@ class AlertProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print('Trigger SOS error: $e');
+      AppLogger.log('Trigger SOS error: $e');
       return false;
     }
   }
@@ -98,7 +99,8 @@ class AlertProvider extends ChangeNotifier {
       }
       notifyListeners();
     } catch (e) {
-      print('Error handling realtime alert: $e');
+      AppLogger.log('Error handling realtime alert: $e');
     }
   }
 }
+

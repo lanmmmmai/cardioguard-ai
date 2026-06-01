@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../core/app_logger.dart';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
@@ -42,7 +43,7 @@ class ApiService {
       }
       return false;
     } catch (e) {
-      print('Login error: $e');
+      AppLogger.log('Login error: $e');
       return false;
     }
   }
@@ -62,7 +63,7 @@ class ApiService {
       );
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      print('Register error: $e');
+      AppLogger.log('Register error: $e');
       return false;
     }
   }
@@ -79,7 +80,7 @@ class ApiService {
       }
       return [];
     } catch (e) {
-      print('Fetch patients error: $e');
+      AppLogger.log('Fetch patients error: $e');
       return [];
     }
   }
@@ -108,7 +109,7 @@ class ApiService {
       );
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      print('Add patient error: $e');
+      AppLogger.log('Add patient error: $e');
       return false;
     }
   }
@@ -125,7 +126,7 @@ class ApiService {
       }
       return [];
     } catch (e) {
-      print('Fetch alerts error: $e');
+      AppLogger.log('Fetch alerts error: $e');
       return [];
     }
   }
@@ -166,8 +167,9 @@ class ApiService {
       );
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      print('Trigger simulation error: $e');
+      AppLogger.log('Trigger simulation error: $e');
       return false;
     }
   }
 }
+

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/app_logger.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../providers/patient_provider.dart';
@@ -67,7 +68,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                   modalLoading = false;
                 });
               }).catchError((e) {
-                print('Error fetching modal data: $e');
+                AppLogger.log('Error fetching modal data: $e');
                 setModalState(() => modalLoading = false);
               });
             }
@@ -210,7 +211,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                                 setModalState(() {});
                                                 patientProvider.fetchPatients(); // refresh main patients list
                                               } catch (e) {
-                                                print('Error deleting assignment: $e');
+                                                AppLogger.log('Error deleting assignment: $e');
                                               }
                                             },
                                           ),
@@ -377,4 +378,5 @@ class _PatientsScreenState extends State<PatientsScreen> {
     );
   }
 }
+
 
