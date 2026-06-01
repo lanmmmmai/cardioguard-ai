@@ -82,6 +82,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
 
       if (response.statusCode == 200) {
+        if (!mounted) return;
         _currentPasswordController.clear();
         _newPasswordController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -89,11 +90,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Mật khẩu hiện tại không đúng.'), backgroundColor: Colors.red),
       );
     } finally {
-      setState(() => _isChangingPassword = false);
+      if (mounted) {
+        setState(() => _isChangingPassword = false);
+      }
     }
   }
 
@@ -112,6 +116,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       medicalHistory: _historyController.text.trim(),
     );
 
+    if (!mounted) return;
     setState(() => _isSavingProfile = false);
 
     if (success) {
@@ -288,7 +293,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: SwitchListTile(
                 title: const Text('Chế độ tối (Dark Mode)', style: TextStyle(fontWeight: FontWeight.w600)),
                 value: widget.isDarkTheme,
-                activeColor: const Color(0xFFFF3366),
+                activeThumbColor: const Color(0xFFFF3366),
                 onChanged: (_) => widget.onToggleTheme(),
               ),
             ),

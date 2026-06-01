@@ -148,7 +148,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                           child: SizedBox(
                             height: 34,
                             child: DropdownButtonFormField<String>(
-                              value: _severityFilter,
+                              initialValue: _severityFilter,
                               dropdownColor: cardBg,
                               style: TextStyle(color: textColor, fontSize: 12),
                               decoration: InputDecoration(

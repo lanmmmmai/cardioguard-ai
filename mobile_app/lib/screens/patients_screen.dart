@@ -112,7 +112,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             hint: const Text('Bác sĩ', style: TextStyle(fontSize: 12)),
-                            value: selectedDoctorId,
+                            initialValue: selectedDoctorId,
                             dropdownColor: widget.isDarkTheme ? const Color(0xFF11151D) : Colors.white,
                             items: doctors.map((doc) {
                               return DropdownMenuItem<String>(
@@ -128,7 +128,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             hint: const Text('Bệnh nhân', style: TextStyle(fontSize: 12)),
-                            value: selectedPatientId,
+                            initialValue: selectedPatientId,
                             dropdownColor: widget.isDarkTheme ? const Color(0xFF11151D) : Colors.white,
                             items: patientProvider.patients.map((p) {
                               return DropdownMenuItem<String>(
