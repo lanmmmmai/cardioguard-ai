@@ -77,10 +77,12 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
       if (_severityFilter == 'all') return true;
       final sev = a.severity.toLowerCase();
-      if (_severityFilter == 'high')
+      if (_severityFilter == 'high') {
         return (sev == 'high' || sev == 'critical' || sev == 'sos');
-      if (_severityFilter == 'medium')
+      }
+      if (_severityFilter == 'medium') {
         return (sev == 'medium' || sev == 'warning');
+      }
       if (_severityFilter == 'low') return (sev == 'low' || sev == 'info');
       return true;
     }).toList();
@@ -342,6 +344,9 @@ class _AlertsScreenState extends State<AlertsScreen> {
                                                         setState(() =>
                                                             _resolvingIds
                                                                 .add(alert.id));
+                                                        final messenger =
+                                                            ScaffoldMessenger
+                                                                .of(context);
                                                         final ok =
                                                             await alertProvider
                                                                 .resolveAlert(
@@ -351,8 +356,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                                                               _resolvingIds
                                                                   .remove(alert
                                                                       .id));
-                                                          ScaffoldMessenger.of(
-                                                                  context)
+                                                          messenger
                                                               .showSnackBar(
                                                             SnackBar(
                                                               content: Text(ok

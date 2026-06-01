@@ -37,8 +37,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!RegExp(r'[A-Z]').hasMatch(v)) return 'Mật khẩu cần ít nhất 1 chữ hoa';
     if (!RegExp(r'[a-zA-Z]').hasMatch(v)) return 'Mật khẩu cần chứa chữ cái';
     if (!RegExp(r'\d').hasMatch(v)) return 'Mật khẩu cần ít nhất 1 chữ số';
-    if (!RegExp(r'[^A-Za-z\d]').hasMatch(v))
+    if (!RegExp(r'[^A-Za-z\d]').hasMatch(v)) {
       return 'Mật khẩu cần ít nhất 1 ký tự đặc biệt';
+    }
     return null;
   }
 
@@ -169,8 +170,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         decoration:
                             const InputDecoration(labelText: 'Email liên hệ'),
                         validator: (v) {
-                          if (v == null || v.isEmpty)
+                          if (v == null || v.isEmpty) {
                             return 'Vui lòng nhập email';
+                          }
                           if (!v.contains('@')) return 'Email không hợp lệ';
                           return null;
                         },
