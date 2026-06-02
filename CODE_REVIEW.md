@@ -117,11 +117,7 @@
 
 ---
 
-### 🟡 [MEDIUM] BE-15: Alert API không có pagination
-
-- **File:** `backend/app/api/alert_api.py:9-47`
-- **Mô tả:** Query alerts không có `LIMIT` clause. Patient với hàng nghìn alerts sẽ nhận tất cả trong một response.
-- **Fix:** Thêm pagination với default limit và max limit.
+### 🟢 [RESOLVED] BE-15: Alert API không có pagination
 
 ---
 
@@ -225,17 +221,7 @@
 
 ---
 
-### 🔴 [CRITICAL] FE-03: Dev OTP exposed in UI
-
-- **File:** `web_frontend/src/components/Register.tsx:89-91`
-- **Mô tả:** Dev OTP render trực tiếp trong UI. Nếu code này ship lên production, bất kỳ ai cũng thấy OTP mà không cần email.
-- **Code:**
-  ```tsx
-  data.dev_otp
-    ? `Môi trường dev chưa cấu hình Brevo API. Mã OTP tạm: ${data.dev_otp}`
-    : null
-  ```
-- **Fix:** Kiểm tra `process.env.NODE_ENV === 'development'` trước khi render, hoặc chỉ dùng backend flag `EXPOSE_DEV_OTP`.
+### 🟢 [RESOLVED] FE-03: Dev OTP exposed in UI
 
 ---
 
@@ -401,18 +387,7 @@
 
 ---
 
-### 🟠 [HIGH] MO-05: Production URL hardcoded trong source
-
-- **File:** `mobile_app/lib/config/app_config.dart:4-7`
-- **Mô tả:** `defaultValue: 'https://cardioguard-ai-backend.onrender.com'` — nếu repo public, backend endpoint bị lộ.
-- **Code:**
-  ```dart
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'https://cardioguard-ai-backend.onrender.com',
-  );
-  ```
-- **Fix:** Load từ non-committed config hoặc `.env` file.
+### 🟢 [RESOLVED] MO-05: Production URL hardcoded trong source
 
 ---
 

@@ -7,7 +7,11 @@ router = APIRouter()
 
 
 @router.get("/alerts")
-async def get_alerts(authorization: Optional[str] = Header(default=None)):
+async def get_alerts(
+    limit: int = 100,
+    offset: int = 0,
+    authorization: Optional[str] = Header(default=None)
+):
     current_user = await get_user_from_token(authorization)
     role = current_user["role"]
     where_sql = ""
@@ -26,6 +30,9 @@ async def get_alerts(authorization: Optional[str] = Header(default=None)):
         """
         values["user_id"] = current_user["id"]
 
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+
     query = f"""
     SELECT 
         alerts.id,
@@ -40,7 +47,11 @@ async def get_alerts(authorization: Optional[str] = Header(default=None)):
     JOIN users ON alerts.patient_id::text = users.id::text AND lower(users.role) = 'patient'
     {where_sql}
     ORDER BY alerts.created_at DESC
+    LIMIT :limit OFFSET :offset
     """
+
+    values["limit"] = limit
+    values["offset"] = offset
 
     alerts = await database.fetch_all(query, values)
 
