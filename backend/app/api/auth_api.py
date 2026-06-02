@@ -1,3 +1,4 @@
+import asyncio
 import secrets
 import requests
 import logging
@@ -48,6 +49,23 @@ def extract_bearer_token(authorization: Optional[str]) -> str:
 
 
 _users_columns_cache: Optional[set[str]] = None
+_users_columns_lock = asyncio.Lock()
+
+async def get_users_columns() -> set[str]:
+    global _users_columns_cache
+    if _users_columns_cache is None:
+        async with _users_columns_lock:
+            if _users_columns_cache is None:
+                columns = await database.fetch_all(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'users'
+                    """
+                )
+                _users_columns_cache = {column["column_name"] for column in columns}
+    return _users_columns_cache
+
 
 
 async def get_user_from_token(
@@ -65,17 +83,7 @@ async def get_user_from_token(
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
-    global _users_columns_cache
-    if _users_columns_cache is None:
-        columns = await database.fetch_all(
-            """
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_schema = 'public' AND table_name = 'users'
-            """
-        )
-        _users_columns_cache = {column["column_name"] for column in columns}
-    user_columns = _users_columns_cache
+    user_columns = await get_users_columns()
     select_columns = [
         "id::text as id",
         "full_name",
@@ -329,17 +337,7 @@ async def login(data: LoginRequest, request: Request):
     email = data.email.lower()
     check_rate_limit(ip, email, "/auth/login", max_requests=5, window_seconds=60)
 
-    global _users_columns_cache
-    if _users_columns_cache is None:
-        columns = await database.fetch_all(
-            """
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_schema = 'public' AND table_name = 'users'
-            """
-        )
-        _users_columns_cache = {column["column_name"] for column in columns}
-    user_columns = _users_columns_cache
+    user_columns = await get_users_columns()
     select_cols = "id::text as id, full_name, email, password_hash, role"
     if "must_change_password" in user_columns:
         select_cols += ", must_change_password"

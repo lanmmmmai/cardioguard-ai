@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     EMAIL_FROM_NAME: str = "CardioGuard AI"
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
-    SMTP_USER: str = ""
     SMTP_USERNAME: str = ""
     SMTP_PASSWORD: str = ""
     SMTP_FROM_NAME: str = ""

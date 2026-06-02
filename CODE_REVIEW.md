@@ -21,43 +21,7 @@
 
 ## 1. Backend Issues
 
-### 🔴 [CRITICAL] BE-01: Rate limiting vô hiệu trong multi-worker
 
-- **File:** `backend/app/core/rate_limit.py:5`
-- **Mô tả:** Rate limiting lưu trong dict in-memory (`_rate_limits = {}`). Mỗi worker uvicorn có dict riêng, nên attacker có thể bypass rate limit bằng cách gửi request tới các worker khác nhau. Ví dụ: nếu limit là 10 req/window và có 4 workers, attacker thực sự có thể gửi 40 req/window.
-- **Code:**
-  ```python
-  _rate_limits = {}  # Mỗi worker có dict riêng
-  ```
-- **Fix:** Dùng Redis hoặc shared storage cho rate limiting, hoặc dùng `uvicorn --workers 1` trong production.
-
----
-
-
-
-### 🔴 [CRITICAL] BE-04: Hardcoded default secret key
-
-- **File:** `backend/app/core/config.py:7`
-- **Mô tả:** `DEFAULT_SECRET_KEY = "heart_monitor_secret_key"` hardcoded trong source. Mặc dù validator ở line 31-36 từ chối giá trị này, nhưng nếu ai đó bypass validator (subclassing), secret key yếu sẽ bị dùng.
-- **Code:**
-  ```python
-  DEFAULT_SECRET_KEY = "heart_monitor_secret_key"
-  ```
-- **Fix:** Xóa default value, yêu cầu bắt buộc set `SECRET_KEY` trong env.
-
----
-
-### 🔴 [CRITICAL] BE-05: Health endpoint leak exception details
-
-- **File:** `backend/app/main.py:90`
-- **Mô tả:** Health endpoint trả về raw exception text cho unauthenticated caller, bao gồm internal hostnames, connection strings.
-- **Code:**
-  ```python
-  "database": f"error: {str(e)}",  # Leaks internal info
-  ```
-- **Fix:** Chỉ trả về `"error": "unavailable"` thay vì `str(e)`.
-
----
 
 
 ### 🟠 [HIGH] BE-07: JWT không có token revocation
@@ -82,83 +46,7 @@
 
 
 
-
-### 🟠 [HIGH] BE-14: Hard-delete user không audit clinical data
-
-- **File:** `backend/app/api/user_api.py:589-635`
-- **Mô tả:** Fallback sang soft-delete tốt, nhưng initial hard-delete attempt có thể thành công cho users chỉ có clinical data trong các table không listed (chat_sessions, chatbot_messages, email_logs).
-- **Fix:** Extended list các clinical tables hoặc luôn soft-delete.
-
----
-
-
-
-
-
-
-### 🟡 [MEDIUM] BE-20: `datetime.utcnow()` deprecated
-
-- **File:** `backend/app/api/auth_api.py`, `backend/app/services/audit_service.py:52`, `backend/app/api/chat_api.py:138`
-- **Mô tả:** `datetime.utcnow()` deprecated trong Python 3.12+.
-- **Fix:** Dùng `datetime.now(timezone.utc)`.
-
----
-
-### 🟡 [MEDIUM] BE-21: Audit log limit không có upper bound
-
-- **File:** `backend/app/api/user_api.py:639-640`
-- **Mô tả:** Admin có thể pass `limit=999999` và dump toàn bộ audit log.
-- **Code:**
-  ```python
-  limit: int = 100,  # Không có max validation
-  offset: int = 0,
-  ```
-- **Fix:** Thêm `min(limit, 1000)` hoặc tương tự.
-
----
-
-### 🟢 [LOW] BE-22: `clinical_models.py` là dead code
-
-- **File:** `backend/app/models/clinical_models.py`
-- **Mô tả:** File define SQLAlchemy Table objects nhưng codebase dùng raw SQL queries. Models bị drift out of sync với actual schema.
-- **Fix:** Xóa file hoặc migrate sang ORM queries.
-
----
-
-### 🟢 [LOW] BE-23: `verify_password` silently return False on exception
-
-- **File:** `backend/app/core/security.py:23-24`
-- **Mô tả:** Nếu `bcrypt.checkpw` throw (malformed hash), caller treat như "wrong password" thay vì log real error.
-- **Fix:** Log exception trước khi return False.
-
----
-
-### 🟢 [LOW] BE-24: `_users_columns_cache` không thread-safe
-
-- **File:** `backend/app/api/auth_api.py:55, 73-82, 331-340`
-- **Mô tả:** Global cache `_users_columns_cache` có thể bị race condition giữa concurrent requests. CPython GIL make it mostly safe nhưng không guaranteed.
-- **Fix:** Dùng `threading.Lock` hoặc缓存 invalidation strategy.
-
----
-
-### 🟢 [LOW] BE-25: `SMTP_USERNAME` và `SMTP_USER` duplication
-
-- **File:** `backend/app/core/config.py:20-21`
-- **Mô tả:** Hai fields cho cùng concept, `email_service.py:63` fallback giữa chúng.
-- **Fix:** Merge thành một field.
-
----
-
 ## 2. Web Frontend Issues
-
-
-
-
-
-
-
-
-
 
 ### 🟡 [MEDIUM] FE-10: No error handling cho `response.json()`
 
@@ -282,16 +170,6 @@
 
 ## 3. Mobile App Issues
 
-
-
-
-
-
-
-
-
-
-
 ### 🟡 [MEDIUM] MO-11: Providers never disposed, init never called
 
 - **File:** `mobile_app/lib/main.dart:47-51`
@@ -414,7 +292,6 @@
 
 ## 4. AI Model Issues
 
-
 ### 🟡 [MEDIUM] AI-02: CORS wildcard methods/headers
 
 - **File:** `ai_model/app.py:49-50`
@@ -444,8 +321,6 @@
 - **Fix:** Dùng `run_in_executor` hoặc sync endpoint.
 
 ---
-
-
 
 ### 🟢 [LOW] AI-07: No model validation beyond accuracy
 
@@ -486,9 +361,6 @@
 - **Fix:** Dùng encrypted NVS partition hoặc provisioning flow. Không commit credentials.
 
 ---
-
-
-
 
 ### 🟠 [HIGH] HW-05: JSON injection qua unescaped string concatenation
 
@@ -690,6 +562,36 @@
 
 ## 8. Lỗi Đã Khắc Phục (Resolved)
 
+### 🟢 [RESOLVED] BE-01: Rate limiting vô hiệu trong multi-worker
+
+---
+### 🟢 [RESOLVED] BE-04: Hardcoded default secret key
+
+---
+### 🟢 [RESOLVED] BE-05: Health endpoint leak exception details
+
+---
+### 🟢 [RESOLVED] BE-14: Hard-delete user không audit clinical data
+
+---
+### 🟢 [RESOLVED] BE-22: `clinical_models.py` là dead code
+
+---
+### 🟢 [RESOLVED] BE-23: `verify_password` silently return False on exception
+
+---
+### 🟢 [RESOLVED] BE-24: `_users_columns_cache` không thread-safe
+
+---
+### 🟢 [RESOLVED] BE-25: `SMTP_USERNAME` và `SMTP_USER` duplication
+
+---
+### 🟢 [RESOLVED] BE-20: `datetime.utcnow()` deprecated
+
+---
+### 🟢 [RESOLVED] BE-21: Audit log limit không có upper bound
+
+---
 ### 🟢 [RESOLVED] BE-02: Race condition TOCTOU trong registration
 
 ---
