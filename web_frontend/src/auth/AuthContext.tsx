@@ -97,6 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.info('Auth login: email=%s role=%s', normalizedUser.email, normalizedUser.role);
     storage.setItem(USER_KEY, encryptData(normalizedUser));
     storage.setItem(TOKEN_KEY, token);
+    storage.setItem('last_role', normalizedUser.role);
     setAccessToken(token);
     setUser(normalizedUser);
     setAuthError(null);
@@ -136,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     storage.setItem(USER_KEY, encryptData(normalizedUser));
+    storage.setItem('last_role', normalizedUser.role);
     setUser(normalizedUser);
     return normalizedUser;
   }, [accessToken]);

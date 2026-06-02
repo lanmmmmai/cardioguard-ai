@@ -71,7 +71,14 @@ const AppContent: React.FC = () => {
   const [showAddPatientModal, setShowAddPatientModal] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
-  const normalizedPath = path === '/' ? (role ? defaultRouteByRole[role] : '/login') : path;
+  const getLastLoginRoute = (): string => {
+    const lastRole = sessionStorage.getItem('last_role');
+    if (lastRole === 'admin') return '/login-admin';
+    if (lastRole === 'doctor') return '/login-doctor';
+    return '/login';
+  };
+
+  const normalizedPath = path === '/' ? (role ? defaultRouteByRole[role] : getLastLoginRoute()) : path;
   const routeRole = privateRouteRole(normalizedPath);
 
   useEffect(() => {
@@ -90,7 +97,7 @@ const AppContent: React.FC = () => {
     if (path === '/' || !routeRole) {
       if (path === '/' || (!authPaths.includes(path) && path !== '/change-password')) {
         if (!pageTitles[normalizedPath]) {
-          navigate(role ? defaultRouteByRole[role] : '/login', true);
+          navigate(role ? defaultRouteByRole[role] : getLastLoginRoute(), true);
         }
       }
     }
@@ -102,7 +109,7 @@ const AppContent: React.FC = () => {
 
     if (path === '/change-password') {
       if (!isAuthenticated || !role) {
-        navigate('/login', true);
+        navigate(getLastLoginRoute(), true);
       }
     } else if (authPaths.includes(path)) {
       if (isAuthenticated && role) {
@@ -427,7 +434,7 @@ const AppContent: React.FC = () => {
     }
     return <ChangePassword onNavigateNext={(nextRole) => {
       const targetRole = nextRole || role;
-      navigate(targetRole ? defaultRouteByRole[targetRole] : '/login', true);
+      navigate(targetRole ? defaultRouteByRole[targetRole] : getLastLoginRoute(), true);
     }} />;
   }
 

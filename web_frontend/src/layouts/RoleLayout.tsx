@@ -3,6 +3,7 @@ import { Activity, LogOut, Menu, Moon, Sun, MoreHorizontal, X } from 'lucide-rea
 import { useAuth } from '../auth/AuthContext';
 import { roleLabel, type UserRole } from '../auth/roles';
 import { roleMenus } from '../navigation/roleMenus';
+import { API_URL } from '../config';
 
 interface RoleLayoutProps {
   role: UserRole;
@@ -29,9 +30,15 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
   children,
   isConnected = false,
 }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, accessToken } = useAuth();
   const menuItems = roleMenus[role];
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const getMediaUrl = (path?: string | null) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    return `${API_URL}${path}?token=${accessToken}`;
+  };
 
   // Close mobile drawer when pressing Escape key for accessibility
   useEffect(() => {
@@ -119,7 +126,16 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
             </button>
 
             <div className="role-user-card">
-              <div className="avatar">{(user?.full_name || user?.email || '?').charAt(0).toUpperCase()}</div>
+              {user?.avatar_url ? (
+                <img 
+                  src={getMediaUrl(user.avatar_url)} 
+                  alt={user.full_name || 'Avatar'} 
+                  className="avatar" 
+                  style={{ objectFit: 'cover', width: '32px', height: '32px', borderRadius: '50%' }}
+                />
+              ) : (
+                <div className="avatar">{(user?.full_name || user?.email || '?').charAt(0).toUpperCase()}</div>
+              )}
               <div className="user-info">
                 <div className="user-name">{user?.full_name || 'Người dùng'}</div>
                 <div className="user-role">{roleLabel[role]}</div>

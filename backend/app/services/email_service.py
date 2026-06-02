@@ -63,6 +63,51 @@ def get_role_email_context(role: Optional[str]) -> dict[str, str]:
     )
 
 
+def get_login_info(role: Optional[str]) -> dict[str, str]:
+    """Lấy link đăng nhập và text tương ứng theo vai trò."""
+    role_key = (role or "").strip().lower()
+    
+    # Chuẩn hóa vai trò
+    if role_key in {"benh_nhan", "patient"}:
+        target_role = "patient"
+    elif role_key in {"bac_si", "doctor"}:
+        target_role = "doctor"
+    elif role_key in {"quan_tri_vien", "admin"}:
+        target_role = "admin"
+    else:
+        target_role = "patient"
+
+    # Lấy base URL từ FRONTEND_ORIGINS hoặc mặc định
+    base_url = "https://giatky.site"
+    if settings.FRONTEND_ORIGINS:
+        origins = [o.strip() for o in settings.FRONTEND_ORIGINS.split(",") if o.strip()]
+        if origins:
+            base_url = origins[0]
+
+    # Loại bỏ slash cuối cùng nếu có
+    if base_url.endswith("/"):
+        base_url = base_url[:-1]
+
+    login_map = {
+        "patient": {
+            "url": f"{base_url}/login",
+            "button_text": "Đăng nhập Cổng Bệnh nhân",
+        },
+        "doctor": {
+            "url": f"{base_url}/login-doctor",
+            "button_text": "Đăng nhập Cổng Bác sĩ",
+        },
+        "admin": {
+            "url": f"{base_url}/login-admin",
+            "button_text": "Đăng nhập Cổng Quản trị",
+        },
+    }
+    return login_map.get(target_role, {
+        "url": f"{base_url}/login",
+        "button_text": "Đăng nhập hệ thống",
+    })
+
+
 def render_template(html: str, variables: dict[str, str]) -> str:
     """Thay thế các biến động dạng {{variable_name}} trong template HTML."""
     # Làm giàu biến để tương thích chéo giữa otp, otp_code và new_password
@@ -91,6 +136,13 @@ def render_template(html: str, variables: dict[str, str]) -> str:
 
     if not enriched.get("role_description"):
         enriched["role_description"] = role_context["role_description"]
+
+    # Làm giàu biến link đăng nhập động
+    login_info = get_login_info(role_value)
+    if not enriched.get("login_url"):
+        enriched["login_url"] = login_info["url"]
+    if not enriched.get("login_button_text"):
+        enriched["login_button_text"] = login_info["button_text"]
 
     defaults = {
         "hospital_name": settings.EMAIL_FROM_NAME or "CardioGuard AI",
@@ -321,7 +373,8 @@ async def send_doctor_status_email(email: str, full_name: str, status: str, note
     variables = {
         "full_name": full_name,
         "verification_note": note or "",
-        "hospital_name": hospital_name
+        "hospital_name": hospital_name,
+        "role": "doctor"
     }
     
     if status == "pending_verification":
@@ -352,6 +405,16 @@ async def send_doctor_status_email(email: str, full_name: str, status: str, note
           <p style="color:#374151">Xin chào Bác sĩ <strong>{full_name}</strong>,</p>
           <p style="color:#374151">Tài khoản bác sĩ của bạn đã được xác thực và có thể sử dụng hệ thống CardioGuard AI.</p>
           <p style="color:#374151">Bây giờ bạn có thể đăng nhập vào cổng bác sĩ để làm việc.</p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 28px;">
+            <tr>
+              <td align="center">
+                <a href="{{{{login_url}}}}" 
+                   style="display:inline-block;background:#1183C6;color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:14px 34px;border-radius:999px;">
+                  {{{{login_button_text}}}}
+                </a>
+              </td>
+            </tr>
+          </table>
           <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
           <p style="color:#9ca3af;font-size:12px">CardioGuard AI — {hospital_name}</p>
         </div>
@@ -397,6 +460,16 @@ async def send_doctor_status_email(email: str, full_name: str, status: str, note
             <strong>Nội dung cần bổ sung:</strong> {note or "Vui lòng xem lại hồ sơ."}
           </p>
           <p style="color:#374151">Vui lòng đăng nhập lại vào cổng bác sĩ để thực hiện chỉnh sửa và tải lại giấy tờ cần thiết.</p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 28px;">
+            <tr>
+              <td align="center">
+                <a href="{{{{login_url}}}}" 
+                   style="display:inline-block;background:#1183C6;color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:14px 34px;border-radius:999px;">
+                  {{{{login_button_text}}}}
+                </a>
+              </td>
+            </tr>
+          </table>
           <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
           <p style="color:#9ca3af;font-size:12px">CardioGuard AI — {hospital_name}</p>
         </div>

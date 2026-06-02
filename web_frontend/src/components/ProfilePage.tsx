@@ -244,13 +244,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       
       // Update local state based on what was uploaded
       if (fileType === 'avatar') {
-        if (role === 'patient') {
-          setPatientForm(prev => ({ ...prev, avatar_url: resData.url }));
-        } else if (role === 'doctor') {
-          setDoctorForm(prev => ({ ...prev, avatar_url: resData.url }));
-        } else if (role === 'admin') {
-          setAccountForm(prev => ({ ...prev, avatar_url: resData.url }));
-        }
+        setPatientForm(prev => ({ ...prev, avatar_url: resData.url }));
+        setDoctorForm(prev => ({ ...prev, avatar_url: resData.url }));
+        setAccountForm(prev => ({ ...prev, avatar_url: resData.url }));
         setSuccess('Tải ảnh đại diện mới thành công! Nhấp lưu để hoàn tất thay đổi.');
       } else if (fileType === 'doctor_license') {
         setDoctorForm(prev => ({ ...prev, license_certificate_url: resData.url }));

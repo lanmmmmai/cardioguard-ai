@@ -63,6 +63,7 @@ async def fetch_current_user(user_id: str) -> dict[str, Any]:
         "role",
         "created_at" if "created_at" in columns else "NULL::timestamptz as created_at",
         "status" if "status" in columns else "NULL::text as status",
+        "avatar_url" if "avatar_url" in columns else "NULL::text as avatar_url",
     ]
     row = await database.fetch_one(
         f"""
@@ -386,7 +387,7 @@ async def list_users(
     query = """
     SELECT id::text as id, full_name, email, phone, role, status, created_at
     FROM users
-    WHERE 1=1
+    WHERE 1=1 AND (status IS NULL OR status != 'deleted')
     """
     params = {}
     
@@ -630,7 +631,7 @@ async def delete_user(
         
     # Luôn sử dụng Soft Delete để bảo toàn dữ liệu y tế lâm sàng nhạy cảm và lịch sử audit.
     columns = await table_columns("users")
-    update_fields = ["status = 'inactive'"]
+    update_fields = ["status = 'deleted'"]
     if "updated_at" in columns:
         update_fields.append("updated_at = NOW()")
 
@@ -645,7 +646,7 @@ async def delete_user(
             doctor_profile_columns = await table_columns("doctor_profiles")
             doctor_update_fields = []
             if "status" in doctor_profile_columns:
-                doctor_update_fields.append("status = 'inactive'")
+                doctor_update_fields.append("status = 'deleted'")
             if "updated_at" in doctor_profile_columns:
                 doctor_update_fields.append("updated_at = NOW()")
             if doctor_update_fields:
@@ -678,7 +679,7 @@ async def delete_user(
     return {
         "message": "Tài khoản đã được vô hiệu hóa an toàn (Soft Delete) để bảo toàn dữ liệu lâm sàng", 
         "id": user_id, 
-        "status": "inactive",
+        "status": "deleted",
         "deactivated_at": datetime.now(timezone.utc).isoformat()
     }
 

@@ -17,12 +17,17 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, cu
 
     if (!isAuthenticated || !role || !user) {
       let targetLogin = '/login';
+      const lastRole = sessionStorage.getItem('last_role');
       if (currentPath.startsWith('/admin')) {
         targetLogin = '/login-admin';
       } else if (currentPath.startsWith('/doctor')) {
         targetLogin = '/login-doctor';
       } else if (currentPath.startsWith('/patient')) {
         targetLogin = '/login';
+      } else if (lastRole === 'admin') {
+        targetLogin = '/login-admin';
+      } else if (lastRole === 'doctor') {
+        targetLogin = '/login-doctor';
       }
       navigate(targetLogin, true);
       return;
@@ -110,9 +115,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, cu
   if (!defaultRouteByRole[role]) {
     logout();
     let targetLogin = '/login';
+    const lastRole = sessionStorage.getItem('last_role') || role;
     if (currentPath.startsWith('/admin')) {
       targetLogin = '/login-admin';
     } else if (currentPath.startsWith('/doctor')) {
+      targetLogin = '/login-doctor';
+    } else if (lastRole === 'admin') {
+      targetLogin = '/login-admin';
+    } else if (lastRole === 'doctor') {
       targetLogin = '/login-doctor';
     }
     navigate(targetLogin, true);

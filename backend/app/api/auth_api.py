@@ -120,7 +120,7 @@ async def get_user_from_token(
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
-    if (user["status"] or "").strip().lower() in {"inactive", "disabled"}:
+    if (user["status"] or "").strip().lower() in {"inactive", "disabled", "deleted"}:
         raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
 
     result = {
@@ -200,6 +200,16 @@ async def send_random_password_email(email: str, full_name: str, new_password: s
         {new_password}
       </div>
       <p style="color:#6b7280;font-size:13px">Vui lòng đăng nhập với mật khẩu này. Bạn sẽ được yêu cầu đổi mật khẩu ngay sau khi đăng nhập thành công.</p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 28px;">
+        <tr>
+          <td align="center">
+            <a href="{{{{login_url}}}}" 
+               style="display:inline-block;background:#1183C6;color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:14px 34px;border-radius:999px;">
+              {{{{login_button_text}}}}
+            </a>
+          </td>
+        </tr>
+      </table>
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
       <p style="color:#9ca3af;font-size:12px">CardioGuard AI</p>
     </div>
@@ -448,14 +458,14 @@ async def login(data: LoginRequest, request: Request):
         )
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    if (user["status"] or "").strip().lower() in {"inactive", "disabled"}:
+    if (user["status"] or "").strip().lower() in {"inactive", "disabled", "deleted"}:
         await log_activity(
             user_id=user["id"],
             action="USER_LOGIN_FAILED",
             entity_type="users",
             entity_id=user["id"],
             ip_address=ip_addr,
-            details={"email": data.email.lower(), "reason": "Account inactive or disabled"}
+            details={"email": data.email.lower(), "reason": "Account inactive, disabled or deleted"}
         )
         raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
 

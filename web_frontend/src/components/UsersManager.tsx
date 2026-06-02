@@ -27,7 +27,11 @@ const accountCreatedAtFormatter = new Intl.DateTimeFormat('vi-VN', {
 
 const parseAccountDate = (dateStr: string | null) => {
   if (!dateStr) return null;
-  const date = new Date(dateStr);
+  let normalizedStr = dateStr;
+  if (!dateStr.includes('Z') && !/\+\d{2}:?\d{2}$/.test(dateStr) && !/-\d{2}:?\d{2}$/.test(dateStr)) {
+    normalizedStr = dateStr + 'Z';
+  }
+  const date = new Date(normalizedStr);
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
@@ -119,7 +123,7 @@ export const UsersManager: React.FC = () => {
   }, [fetchUsers]);
 
   useEffect(() => {
-    const clockInterval = window.setInterval(() => setNow(new Date()), 1000);
+    const clockInterval = window.setInterval(() => setNow(new Date()), 30000);
     return () => window.clearInterval(clockInterval);
   }, []);
 
@@ -347,9 +351,7 @@ export const UsersManager: React.FC = () => {
         throw new Error(data.detail || 'Lỗi khi xóa tài khoản');
       }
 
-      setUsers((prev) => prev.map((item) => (
-        item.id === selectedUser.id ? { ...item, status: data.status || 'inactive' } : item
-      )));
+      setUsers((prev) => prev.filter((item) => item.id !== selectedUser.id));
       setShowDeleteConfirm(false);
       setSelectedUser(null);
       fetchUsers(false);
