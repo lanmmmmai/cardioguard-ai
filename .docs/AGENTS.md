@@ -9,6 +9,8 @@ This repository is CardioGuard AI, a multi-platform healthcare monitoring app:
 
 For any task, read and apply the relevant skills in `.codex/skills/`:
 
+- `.codex/skills/cardioguard-code-standards/SKILL.md` (code style, docstrings, naming conventions for all languages — apply on every coding task)
+- `.codex/skills/cardioguard-testing-standards/SKILL.md` (testing frameworks, commands, and patterns per module — apply when writing tests)
 - `.codex/skills/cardioguard-healthcare-ui/SKILL.md` (for web and mobile UI/UX changes)
 - `.codex/skills/cardioguard-backend-integration/SKILL.md` (for backend database, APIs, authentication, and integration routers)
 - `.codex/skills/cardioguard-security-privacy/SKILL.md` (for patient data privacy, RBAC, and secure session credentials)
@@ -30,7 +32,7 @@ Before adding a dependency, check the relevant package file first. Keep existing
   * **TypeScript/React (Frontend)**: Use JSDoc/TSDoc format for functions and components to show descriptions on hover.
   * **Dart/Flutter (Mobile)**: Use triple-slash (`///`) document comments above classes and methods to enable DartDoc rendering.
   * **File Header structure**: Every file must start with a header block containing: (1) File purpose, (2) Overall workflow/logic, (3) System component relationships.
-- **Bug Fix & Task Execution Workflow**: Always follow the step-by-step issue-fix and verification workflow defined in [WORKFLOW.md](file:///e:/AIoT/cardioguard-ai/WORKFLOW.md).
+- **Bug Fix & Task Execution Workflow**: Always follow the step-by-step issue-fix and verification workflow defined in [WORKFLOW.md](.docs/WORKFLOW.md).
 - **Codex Skill Compliance**: Before starting any task, check the `.codex/skills/` directory, identify which skills apply to your current task scope, and strictly follow the design principles, rules, and constraints defined in those skills.
 
 

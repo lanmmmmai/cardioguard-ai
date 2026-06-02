@@ -1,12 +1,12 @@
 # Agent AI Developer Workflow — CardioGuard AI Issue Resolution
 
-This workflow is specifically designed for the AI Agent (and other developers) to systematically address the issues identified in the [CODE_REVIEW.md](file:///e:/AIoT/cardioguard-ai/CODE_REVIEW.md) report, in compliance with the repository rules defined in [AGENTS.md](file:///e:/AIoT/cardioguard-ai/AGENTS.md).
+This workflow is specifically designed for the AI Agent (and other developers) to systematically address the issues identified in the [CODE_REVIEW.md](.docs/CODE_REVIEW.md) report, in compliance with the repository rules defined in [AGENTS.md](.docs/AGENTS.md).
 
 ---
 
 ## 🔄 Standard Issue-Fix Cycle
 
-Every time an issue or a group of related issues from [CODE_REVIEW.md](file:///e:/AIoT/cardioguard-ai/CODE_REVIEW.md) is addressed, the developer must strictly follow this 5-step lifecycle:
+Every time an issue or a group of related issues from [CODE_REVIEW.md](.docs/CODE_REVIEW.md) is addressed, the developer must strictly follow this 5-step lifecycle:
 
 ```mermaid
 graph TD
