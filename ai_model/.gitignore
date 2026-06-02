@@ -1,0 +1,12 @@
+# Model training artifacts
+*.pkl
+runs/
+checkpoints/
+outputs/
+mlruns/
+.ipynb_checkpoints/
+
+# Training data (raw source is CSV in repo)
+*.h5
+*.pt
+*.pth

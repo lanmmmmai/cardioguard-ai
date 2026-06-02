@@ -121,6 +121,11 @@ mobile_app/android/app/release/
 mobile_app/macos/Flutter/ephemeral/
 mobile_app/windows/flutter/ephemeral/
 
+# Mobile app platform directories (regenerate with `flutter create --platforms=... .`)
+mobile_app/windows/
+mobile_app/macos/
+mobile_app/web/
+
 # Mobile app assets added at build time
 mobile_app/assets/fonts/Futura.ttf
 
