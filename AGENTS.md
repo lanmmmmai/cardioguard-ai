@@ -26,5 +26,7 @@ Before adding a dependency, check the relevant package file first. Keep existing
   * **TypeScript/React (Frontend)**: Use JSDoc/TSDoc format for functions and components to show descriptions on hover.
   * **Dart/Flutter (Mobile)**: Use triple-slash (`///`) document comments above classes and methods to enable DartDoc rendering.
   * **File Header structure**: Every file must start with a header block containing: (1) File purpose, (2) Overall workflow/logic, (3) System component relationships.
+- **Bug Fix & Task Execution Workflow**: Always follow the step-by-step issue-fix and verification workflow defined in [WORKFLOW.md](file:///e:/AIoT/cardioguard-ai/WORKFLOW.md) (Luôn tuân thủ quy trình sửa lỗi và xác minh từng bước được định nghĩa trong WORKFLOW.md).
+
 
 
