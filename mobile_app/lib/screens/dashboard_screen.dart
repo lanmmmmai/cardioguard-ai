@@ -11,6 +11,8 @@ import '../providers/alert_provider.dart';
 import '../services/websocket_service.dart';
 import '../widgets/ecg_painter.dart';
 import '../widgets/heart_3d_painter.dart';
+import '../widgets/cg_widgets.dart';
+import '../ui/cg_tokens.dart';
 
 class DashboardScreen extends StatefulWidget {
   final VoidCallback onToggleTheme;
@@ -138,13 +140,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _triggerBannerFlash() {
     _bannerTimer?.cancel();
     _isBannerFlash = true;
-    _bannerTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
-      if (mounted) {
-        setState(() {
-          _isBannerFlash = !_isBannerFlash;
-        });
-      }
-    });
 
     // Auto dismiss banner after 8 seconds
     Future.delayed(const Duration(seconds: 8), () {
@@ -293,98 +288,105 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Scaffold(
       backgroundColor: primaryBg,
       body: SafeArea(
-        child: Column(
-          children: [
-            // Warning Banner
-            if (_activeBannerMessage != null)
-              Container(
-                color: _isBannerFlash
-                    ? const Color(0xFFFF0055)
-                    : const Color(0xFF9E002E),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                width: double.infinity,
-                child: Row(
-                  children: [
-                    const Icon(LucideIcons.alertTriangle,
-                        color: Colors.white, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'CẢNH BÁO: $_activeBannerMessage',
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.x,
-                          color: Colors.white, size: 16),
-                      onPressed: () =>
-                          setState(() => _activeBannerMessage = null),
-                    ),
-                  ],
-                ),
-              ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isTablet = constraints.maxWidth >= 600;
 
-            // Top Bar
-            Padding(
+            // Common Warning Banner Widget
+            final bannerWidget = _activeBannerMessage != null
+                ? Container(
+                    color: _isBannerFlash
+                        ? CgColors.critical
+                        : const Color(0xFF7A271A),
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    width: double.infinity,
+                    child: Row(
+                      children: [
+                        const Icon(LucideIcons.alertTriangle,
+                            color: Colors.white, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'CẢNH BÁO: $_activeBannerMessage',
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(LucideIcons.x,
+                              color: Colors.white, size: 16),
+                          onPressed: () =>
+                              setState(() => _activeBannerMessage = null),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink();
+
+            // Common Top Bar Widget
+            final topBarWidget = Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        role == 'patient'
-                            ? 'Chỉ số sức khỏe'
-                            : 'Giám Sát Trung Tâm',
-                        style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: textColor),
-                      ),
-                      const SizedBox(height: 4),
-                      if (role != 'patient' &&
-                          patientProvider.patients.isNotEmpty)
-                        Row(
-                          children: [
-                            Text('Bệnh nhân: ',
-                                style:
-                                    TextStyle(color: textMuted, fontSize: 13)),
-                            DropdownButton<String>(
-                              value: _selectedPatientId,
-                              dropdownColor: cardBg,
-                              style: const TextStyle(
-                                  color: Color(0xFFFF3366),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14),
-                              underline: const SizedBox(),
-                              items: patientProvider.patients.map((p) {
-                                return DropdownMenuItem(
-                                    value: p.id, child: Text(p.fullName));
-                              }).toList(),
-                              onChanged: (id) {
-                                if (id != null) {
-                                  setState(() {
-                                    _selectedPatientId = id;
-                                    _ecgPoints.fillRange(
-                                        0, _ecgPoints.length, 0.0);
-                                  });
-                                }
-                              },
-                            ),
-                          ],
-                        )
-                      else if (role == 'patient')
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          'Theo dõi sinh học trực tiếp của bạn',
-                          style: TextStyle(color: textMuted, fontSize: 13),
+                          role == 'patient'
+                              ? 'Chỉ số sức khỏe'
+                              : 'Giám Sát Trung Tâm',
+                          style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: textColor),
                         ),
-                    ],
+                        const SizedBox(height: 4),
+                        if (role != 'patient' &&
+                            patientProvider.patients.isNotEmpty)
+                          Row(
+                            children: [
+                              Text('Bệnh nhân: ',
+                                  style:
+                                      TextStyle(color: textMuted, fontSize: 13)),
+                              DropdownButton<String>(
+                                value: _selectedPatientId,
+                                dropdownColor: cardBg,
+                                style: const TextStyle(
+                                    color: Color(0xFFFF3366),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14),
+                                underline: const SizedBox(),
+                                items: patientProvider.patients.map((p) {
+                                  return DropdownMenuItem(
+                                      value: p.id, child: Text(p.fullName));
+                                }).toList(),
+                                onChanged: (id) {
+                                  if (id != null) {
+                                    setState(() {
+                                      _selectedPatientId = id;
+                                      _ecgPoints.fillRange(
+                                          0, _ecgPoints.length, 0.0);
+                                    });
+                                  }
+                                },
+                              ),
+                            ],
+                          )
+                        else if (role == 'patient')
+                          Text(
+                            'Theo dõi sinh học trực tiếp của bạn',
+                            style: TextStyle(color: textMuted, fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   IconButton(
                     onPressed: widget.onToggleTheme,
                     icon: Icon(
@@ -401,345 +403,410 @@ class _DashboardScreenState extends State<DashboardScreen>
                   )
                 ],
               ),
-            ),
+            );
 
-            // Main Content Area
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
+            // Left column widgets (KPI, Vitals, SOS/Controls)
+            final leftWidgetsList = [
+              // System Dashboard Cards (Admin Only)
+              if (role == 'admin') ...[
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 2.8,
                   children: [
-                    // System Dashboard Cards (Admin Only)
-                    if (role == 'admin') ...[
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 2.8,
-                        children: [
-                          _buildSummaryCard(
-                              'Bệnh nhân',
-                              '${patientProvider.patients.length}',
-                              LucideIcons.users,
-                              Colors.blue,
-                              cardBg,
-                              textColor,
-                              textMuted,
-                              borderColor),
-                          _buildSummaryCard(
-                              'Cảnh báo hoạt động',
-                              '${alertProvider.activeAlertCount}',
-                              LucideIcons.bell,
-                              Colors.red,
-                              cardBg,
-                              textColor,
-                              textMuted,
-                              borderColor),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                    ],
+                    _buildSummaryCard(
+                        'Bệnh nhân',
+                        '${patientProvider.patients.length}',
+                        LucideIcons.users,
+                        Colors.blue,
+                        cardBg,
+                        textColor,
+                        textMuted,
+                        borderColor),
+                    _buildSummaryCard(
+                        'Cảnh báo hoạt động',
+                        '${alertProvider.activeAlertCount}',
+                        LucideIcons.bell,
+                        Colors.red,
+                        cardBg,
+                        textColor,
+                        textMuted,
+                        borderColor),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
 
-                    // Vitals Grid
-                    GridView.count(
-                      crossAxisCount: 1,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 3.5,
-                      children: [
-                        _buildMetricCard(
-                            'NHỊP TIM',
-                            '$hrVal',
-                            'BPM',
-                            LucideIcons.heart,
-                            const Color(0xFFFF3366),
-                            isAbnormal && hrVal > 100,
-                            cardBg,
-                            textColor,
-                            textMuted,
-                            borderColor),
-                        _buildMetricCard(
-                            'NỒNG ĐỘ OXY (SPO2)',
-                            '$spo2Val',
-                            '%',
-                            LucideIcons.droplet,
-                            const Color(0xFF00F2FE),
-                            isAbnormal && spo2Val < 94,
-                            cardBg,
-                            textColor,
-                            textMuted,
-                            borderColor),
-                        _buildMetricCard(
-                            'HUYẾT ÁP (BP)',
-                            '$sysBp/$diaBp',
-                            'mmHg',
-                            LucideIcons.activity,
-                            const Color(0xFF39FF14),
-                            isAbnormal && (sysBp > 135 || sysBp < 95),
-                            cardBg,
-                            textColor,
-                            textMuted,
-                            borderColor),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
+              // Vitals Grid
+              GridView.count(
+                crossAxisCount: 1,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 12,
+                childAspectRatio: isTablet ? 3.0 : 2.8,
+                children: [
+                  _buildMetricCard(
+                      'NHỊP TIM',
+                      '$hrVal',
+                      'BPM',
+                      LucideIcons.heart,
+                      CgColors.hr,
+                      isAbnormal && hrVal > 100,
+                      cardBg,
+                      textColor,
+                      textMuted,
+                      borderColor),
+                  _buildMetricCard(
+                      'NỒNG ĐỘ OXY (SPO2)',
+                      '$spo2Val',
+                      '%',
+                      LucideIcons.droplet,
+                      CgColors.spo2,
+                      isAbnormal && spo2Val < 94,
+                      cardBg,
+                      textColor,
+                      textMuted,
+                      borderColor),
+                  _buildMetricCard(
+                      'HUYẾT ÁP (BP)',
+                      '$sysBp/$diaBp',
+                      'mmHg',
+                      LucideIcons.activity,
+                      CgColors.bp,
+                      isAbnormal && (sysBp > 135 || sysBp < 95),
+                      cardBg,
+                      textColor,
+                      textMuted,
+                      borderColor),
+                ],
+              ),
+              const SizedBox(height: 16),
 
-                    // ECG Panel
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: cardBg,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: borderColor),
+              // SOS / Simulation Controls Panel
+              if (role == 'patient') ...[
+                // Patient SOS Button
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'GỬI CỨU HỘ KHẨN CẤP',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 14),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('ĐIỆN TÂM ĐỒ (ECG)',
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: textMuted)),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF00F2FE)
-                                      .withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text('LIVE MONITOR',
-                                    style: TextStyle(
-                                        fontSize: 9,
-                                        color: Color(0xFF00F2FE),
-                                        fontWeight: FontWeight.bold)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              height: 140,
-                              color: isDark
-                                  ? Colors.black.withValues(alpha: 0.2)
-                                  : Colors.black.withValues(alpha: 0.02),
-                              width: double.infinity,
-                              child: CustomPaint(
-                                painter: EcgPainter(
-                                  dataPoints: List<double>.from(_ecgPoints),
-                                  heartRate: hrVal.toDouble(),
-                                  isDarkTheme: isDark,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 6),
+                      Text(
+                        'Nhấn giữ nút SOS bên dưới trong trường hợp bạn cần sự giúp đỡ lập tiếp từ bác sĩ điều trị.',
+                        style: TextStyle(color: textMuted, fontSize: 12),
+                        textAlign: TextAlign.center,
                       ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // 3D Rotating Heart beat
-                    Container(
-                      height: 240,
-                      decoration: BoxDecoration(
-                        color: cardBg,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          CustomPaint(
-                            size: const Size(200, 200),
-                            painter: Heart3dPainter(
-                              points: _heartPoints,
-                              angleY: _angleY,
-                              angleX: _angleX,
-                              pulse: _pulse,
-                              isDarkTheme: isDark,
-                            ),
-                          ),
-                          Positioned(
-                            bottom: 12,
-                            child: Text(
-                              'TRỰC QUAN TIM PHỔI (${hrVal.toInt()} BPM)',
-                              style: const TextStyle(
-                                  color: Color(0xFFFF3366),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // SOS / Simulation Controls Panel
-                    if (role == 'patient') ...[
-                      // Patient SOS Button
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: cardBg,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Column(
+                      const SizedBox(height: 20),
+                      if (_isSosCounting) ...[
+                        Column(
                           children: [
-                            const Text(
-                              'GỬI CỨU HỘ KHẨN CẤP',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                            const SizedBox(height: 6),
                             Text(
-                              'Nhấn giữ nút SOS bên dưới trong trường hợp bạn cần sự giúp đỡ lập tức từ bác sĩ điều trị.',
-                              style: TextStyle(color: textMuted, fontSize: 12),
-                              textAlign: TextAlign.center,
+                              'ĐANG KÍCH HOẠT TRONG $_sosCountdown S',
+                              style: const TextStyle(
+                                  color: Color(0xFFFF0055),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
                             ),
-                            const SizedBox(height: 20),
-                            if (_isSosCounting) ...[
-                              Column(
-                                children: [
-                                  Text(
-                                    'ĐANG KÍCH HOẠT TRONG $_sosCountdown S',
-                                    style: const TextStyle(
-                                        color: Color(0xFFFF0055),
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  ElevatedButton(
-                                    onPressed: _cancelSos,
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.grey),
-                                    child: const Text('Hủy bỏ yêu cầu',
-                                        style: TextStyle(color: Colors.white)),
-                                  ),
-                                ],
-                              ),
-                            ] else ...[
-                              GestureDetector(
-                                onLongPress: _triggerSos,
-                                child: Container(
-                                  width: 100,
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: const Color(0xFFFF0055)
-                                        .withValues(alpha: 0.1),
-                                    border: Border.all(
-                                        color: const Color(0xFFFF0055),
-                                        width: 3),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFFFF0055)
-                                            .withValues(alpha: 0.2),
-                                        blurRadius: 16,
-                                        spreadRadius: 2,
-                                      )
-                                    ],
-                                  ),
-                                  child: const Center(
-                                    child: Text(
-                                      'SOS',
-                                      style: TextStyle(
-                                        color: Color(0xFFFF0055),
-                                        fontSize: 26,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text('Nhấn giữ nút để gửi',
-                                  style: TextStyle(
-                                      color: textMuted, fontSize: 11)),
-                            ],
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: _cancelSos,
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.grey),
+                              child: const Text('Hủy bỏ yêu cầu',
+                                  style: TextStyle(color: Colors.white)),
+                            ),
                           ],
                         ),
-                      ),
-                    ] else ...[
-                      // Doctor/Admin Simulator Controls
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: cardBg,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('THIẾT BỊ MÔ PHỎNG LÂM SÀNG',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 14)),
-                            const SizedBox(height: 6),
-                            Text(
-                                'Mô phỏng trạng thái sinh học bất thường để kiểm tra hệ thống báo động.',
-                                style:
-                                    TextStyle(color: textMuted, fontSize: 12)),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: _selectedPatientId == null
-                                        ? null
-                                        : () =>
-                                            patientProvider.triggerSimulation(
-                                                _selectedPatientId!, false),
-                                    style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(
-                                          color: Color(0xFF39FF14)),
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12)),
-                                    ),
-                                    child: const Text('Bình thường',
-                                        style: TextStyle(
-                                            color: Color(0xFF39FF14))),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: _selectedPatientId == null
-                                        ? null
-                                        : () =>
-                                            patientProvider.triggerSimulation(
-                                                _selectedPatientId!, true),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFFF3366),
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12)),
-                                    ),
-                                    child: const Text('Bất thường',
-                                        style: TextStyle(color: Colors.white)),
-                                  ),
-                                ),
+                      ] else ...[
+                        GestureDetector(
+                          onLongPress: _triggerSos,
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFFFF0055)
+                                  .withValues(alpha: 0.1),
+                              border: Border.all(
+                                  color: const Color(0xFFFF0055),
+                                  width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFFF0055)
+                                      .withValues(alpha: 0.2),
+                                  blurRadius: 16,
+                                  spreadRadius: 2,
+                                )
                               ],
                             ),
-                          ],
+                            child: const Center(
+                              child: Text(
+                                'SOS',
+                                style: TextStyle(
+                                  color: Color(0xFFFF0055),
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
+                        const SizedBox(height: 10),
+                        Text('Nhấn giữ nút để gửi',
+                            style: TextStyle(
+                                color: textMuted, fontSize: 11)),
+                      ],
+                    ],
+                  ),
+                ),
+              ] else ...[
+                // Doctor/Admin Simulator Controls
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('THIẾT BỊ MÔ PHỎNG LÂM SÀNG',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 14)),
+                      const SizedBox(height: 6),
+                      Text(
+                          'Mô phỏng trạng thái sinh học bất thường để kiểm tra hệ thống báo động.',
+                          style:
+                              TextStyle(color: textMuted, fontSize: 12)),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _selectedPatientId == null
+                                  ? null
+                                  : () =>
+                                      patientProvider.triggerSimulation(
+                                          _selectedPatientId!, false),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                    color: Color(0xFF39FF14)),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                              ),
+                              child: const Text('Bình thường',
+                                  style: TextStyle(
+                                      color: Color(0xFF39FF14))),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _selectedPatientId == null
+                                  ? null
+                                  : () =>
+                                      patientProvider.triggerSimulation(
+                                          _selectedPatientId!, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFF3366),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                              ),
+                              child: const Text('Bất thường',
+                                  style: TextStyle(color: Colors.white)),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                    const SizedBox(height: 30),
+                  ),
+                ),
+              ],
+            ];
+
+            // Right column widgets (ECG Panel, 3D Rotating Heart)
+            final rightWidgetsList = [
+              // ECG Panel
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text('ĐIỆN TÂM ĐỒ (ECG)',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: textMuted),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00F2FE)
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text('LIVE MONITOR',
+                              style: TextStyle(
+                                  fontSize: 9,
+                                  color: Color(0xFF00F2FE),
+                                  fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 140,
+                        color: isDark
+                            ? Colors.black.withValues(alpha: 0.2)
+                            : Colors.black.withValues(alpha: 0.02),
+                        width: double.infinity,
+                        child: CustomPaint(
+                          painter: EcgPainter(
+                            dataPoints: List<double>.from(_ecgPoints),
+                            heartRate: hrVal.toDouble(),
+                            isDarkTheme: isDark,
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+
+              // 3D Rotating Heart beat
+              Container(
+                height: 240,
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CustomPaint(
+                      size: const Size(200, 200),
+                      painter: Heart3dPainter(
+                        points: _heartPoints,
+                        angleY: _angleY,
+                        angleX: _angleX,
+                        pulse: _pulse,
+                        isDarkTheme: isDark,
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 12,
+                      child: Text(
+                        'TRỰC QUAN TIM PHỔI (${hrVal.toInt()} BPM)',
+                        style: const TextStyle(
+                            color: Color(0xFFFF3366),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ];
+
+            if (isTablet) {
+              // Adaptive 2-Column Split-View for Tablet
+              return Column(
+                children: [
+                  bannerWidget,
+                  topBarWidget,
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Left Column (Vitals & Controls)
+                          Expanded(
+                            flex: 4,
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  ...leftWidgetsList,
+                                  const SizedBox(height: 30),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const VerticalDivider(width: 24, thickness: 0.5, color: Colors.transparent),
+                          // Right Column (Charts & 3D Heart)
+                          Expanded(
+                            flex: 6,
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  ...rightWidgetsList,
+                                  const SizedBox(height: 30),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            } else {
+              // Standard Vertical Layout for Phone
+              return Column(
+                children: [
+                  bannerWidget,
+                  topBarWidget,
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Column(
+                        children: [
+                          ...leftWidgetsList,
+                          const SizedBox(height: 16),
+                          ...rightWidgetsList,
+                          const SizedBox(height: 30),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+          },
         ),
       ),
     );
@@ -841,19 +908,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                             letterSpacing: 0.5)),
                     const SizedBox(height: 4),
                     Row(
-                      textBaseline: TextBaseline.alphabetic,
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
                       children: [
-                        Text(value,
-                            style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
-                                color: textColor)),
-                        const SizedBox(width: 4),
-                        Text(unit,
-                            style: TextStyle(fontSize: 10, color: textMuted)),
+                        CgMetricValue(
+                            value: value,
+                            unit: unit,
+                            color: textColor,
+                            valueSize: 24),
                       ],
-                    )
+                    ),
                   ],
                 ),
                 Container(

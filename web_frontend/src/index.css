@@ -320,6 +320,11 @@ body {
   border: 1px solid transparent;
 }
 
+.btn:active {
+  transform: scale(0.98);
+  transition: transform 0.1s ease;
+}
+
 .btn-primary {
   background: linear-gradient(135deg, var(--color-primary), #e62050);
   color: white;
@@ -365,7 +370,7 @@ body {
   border: 1px solid var(--glass-border);
   border-radius: var(--border-radius);
   padding: 1.5rem;
-  box-shadow: var(--box-shadow-glow);
+  box-shadow: var(--box-shadow-glow), inset 0 1px 1px rgba(255, 255, 255, 0.05);
   transition: var(--transition-smooth);
 }
 
@@ -4121,6 +4126,25 @@ body {
 
 .theme-toggle-btn:active {
   transform: translateY(0) scale(0.95);
+}
+
+/* Tabular Numbers & Monospace for Clinical Figures */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Premium Shimmer Skeleton Loading Indicators */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.02) 25%, rgba(255, 255, 255, 0.07) 50%, rgba(255, 255, 255, 0.02) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
 }
 
 

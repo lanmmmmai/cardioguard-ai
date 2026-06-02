@@ -136,6 +136,33 @@ export const PatientHome: React.FC<{
   const [isStale, setIsStale] = useState(true);
   const [isSendingSos, setIsSendingSos] = useState(false);
   const [showSosConfirm, setShowSosConfirm] = useState(false);
+
+  // SOS Long Press States
+  const [countdown, setCountdown] = useState(3);
+  const [isHolding, setIsHolding] = useState(false);
+
+  useEffect(() => {
+    let interval: any = null;
+    if (isHolding) {
+      setCountdown(3);
+      interval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setIsHolding(false);
+            handleTriggerSos();
+            return 3;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      setCountdown(3);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isHolding]);
   const [currentMetrics, setCurrentMetrics] = useState<{
     heartRate: number | null;
     spo2: number | null;
@@ -213,7 +240,75 @@ export const PatientHome: React.FC<{
           <h1 className="page-title">Trang chủ bệnh nhân</h1>
           <p className="page-subtitle">Chỉ số sức khỏe thời gian thực, lịch hẹn và cảnh báo y tế.</p>
         </div>
-        <button className="sos-button" onClick={() => setShowSosConfirm(true)}>SOS khẩn cấp</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {isHolding ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(239, 68, 68, 0.04)', padding: '8px 16px', borderRadius: '14px', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+              <div 
+                className="sos-button-hold counting"
+                onMouseUp={() => setIsHolding(false)}
+                onMouseLeave={() => setIsHolding(false)}
+                onTouchEnd={() => setIsHolding(false)}
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '2px solid var(--color-critical)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  animation: 'pulse-halo 1s infinite',
+                }}
+              >
+                <span style={{ color: 'var(--color-critical)', fontWeight: 800, fontSize: '1.1rem' }}>
+                  {countdown}
+                </span>
+              </div>
+              <span className="beat-animated" style={{ color: 'var(--color-critical)', fontSize: '0.85rem', fontWeight: 700 }}>
+                ĐANG KÍCH HOẠT SOS TRONG {countdown} S
+              </span>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                style={{ padding: '4px 10px', fontSize: '0.72rem', borderRadius: '6px', marginLeft: '8px' }} 
+                onClick={() => setIsHolding(false)}
+              >
+                Hủy
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div 
+                className="sos-button-hold"
+                onMouseDown={() => setIsHolding(true)}
+                onTouchStart={() => setIsHolding(true)}
+                style={{
+                  width: '46px',
+                  height: '46px',
+                  borderRadius: '50%',
+                  background: 'rgba(239, 68, 68, 0.05)',
+                  border: '2px solid var(--color-critical)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  boxShadow: '0 4px 15px rgba(239, 68, 68, 0.15)',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span style={{ color: 'var(--color-critical)', fontWeight: 900, fontSize: '0.9rem' }}>
+                  SOS
+                </span>
+              </div>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500 }}>
+                Nhấn giữ nút để cứu hộ
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* WebSocket Connection / Vitals Stale Status Banner */}

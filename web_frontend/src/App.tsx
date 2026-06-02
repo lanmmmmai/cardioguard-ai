@@ -9,6 +9,7 @@ import { Patients } from './components/Patients';
 import { Alerts } from './components/Alerts';
 import { PatientDetail } from './components/PatientDetail';
 import { FeatureHub } from './components/FeatureHub';
+import { Appointments } from './components/Appointments';
 import { ApiDataPage } from './components/ApiDataPage';
 import { ProfilePage } from './components/ProfilePage';
 import { CmsPage } from './components/cms/CmsPage';
@@ -317,7 +318,7 @@ const AppContent: React.FC = () => {
         return <DoctorDashboard patients={patients} alerts={alerts} />;
       case '/doctor/appointments':
       case '/patient/appointments':
-        return <FeatureHub key={normalizedPath} type="appointments" role={routeRole || 'doctor'} patients={patients} />;
+        return <Appointments patients={patients} role={routeRole || 'patient'} />;
       case '/doctor/medical-records':
         return <FeatureHub key={normalizedPath} type="records" role="doctor" patients={patients} />;
       case '/doctor/prescriptions':

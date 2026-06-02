@@ -4,6 +4,7 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 import '../providers/auth_provider.dart';
 import '../providers/patient_provider.dart';
 import '../core/api_client.dart';
+import '../ui/cg_tokens.dart';
 
 class SettingsScreen extends StatefulWidget {
   final bool isDarkTheme;
@@ -34,6 +35,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _isChangingPassword = false;
   bool _isSavingProfile = false;
+  String? _profileError;
+  String? _passwordError;
 
   String? _validatePasswordPolicy(String? value) {
     final v = value ?? '';
@@ -92,7 +95,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _changePassword() async {
     if (!_passwordFormKey.currentState!.validate()) return;
-    setState(() => _isChangingPassword = true);
+    setState(() {
+      _isChangingPassword = true;
+      _passwordError = null;
+    });
 
     try {
       final client = ApiClient();
@@ -110,6 +116,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _currentPasswordController.clear();
         _newPasswordController.clear();
         _confirmPasswordController.clear();
+        setState(() => _passwordError = null);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Đổi mật khẩu thành công!'),
@@ -118,11 +125,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Mật khẩu hiện tại không đúng.'),
-            backgroundColor: Colors.red),
-      );
+      setState(() => _passwordError =
+          'Mật khẩu hiện tại không đúng hoặc yêu cầu không hợp lệ.');
     } finally {
       if (mounted) {
         setState(() => _isChangingPassword = false);
@@ -132,7 +136,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _savePatientProfile() async {
     if (!_profileFormKey.currentState!.validate()) return;
-    setState(() => _isSavingProfile = true);
+    setState(() {
+      _isSavingProfile = true;
+      _profileError = null;
+    });
 
     final patientProvider =
         Provider.of<PatientProvider>(context, listen: false);
@@ -150,16 +157,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _isSavingProfile = false);
 
     if (success) {
+      setState(() => _profileError = null);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text('Cập nhật hồ sơ thành công!'),
             backgroundColor: Colors.green),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Lỗi cập nhật hồ sơ.'), backgroundColor: Colors.red),
-      );
+      setState(() => _profileError =
+          'Không thể cập nhật hồ sơ. Vui lòng kiểm tra lại thông tin.');
     }
   }
 
@@ -254,7 +260,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // Profile Edit Form (only for Patient role)
             if (currentUser.role == 'patient') ...[
-              const Text('HỒ SƠ CÁ NHÂN',
+              const Text('Hồ sơ cá nhân',
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -275,6 +281,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   key: _profileFormKey,
                   child: Column(
                     children: [
+                      if (_profileError != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: CgColors.critical.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            _profileError!,
+                            style: const TextStyle(
+                                color: CgColors.critical, fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       TextFormField(
                         controller: _ageController,
                         decoration: const InputDecoration(labelText: 'Tuổi'),
@@ -325,7 +347,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed:
                               _isSavingProfile ? null : _savePatientProfile,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF3366),
+                            backgroundColor: CgColors.primary,
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12)),
                           ),
@@ -346,7 +368,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
 
             // Theme Options
-            const Text('HỆ THỐNG',
+            const Text('Hệ thống',
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -373,7 +395,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 24),
 
             // Change Password Form
-            const Text('ĐỔI MẬT KHẨU',
+            const Text('Đổi mật khẩu',
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -394,6 +416,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 key: _passwordFormKey,
                 child: Column(
                   children: [
+                    if (_passwordError != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: CgColors.critical.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          _passwordError!,
+                          style: const TextStyle(
+                              color: CgColors.critical, fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     TextFormField(
                       controller: _currentPasswordController,
                       decoration:
@@ -434,7 +472,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: ElevatedButton(
                         onPressed: _isChangingPassword ? null : _changePassword,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF3366),
+                          backgroundColor: CgColors.primary,
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                         ),

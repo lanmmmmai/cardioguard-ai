@@ -5,6 +5,7 @@ This folder stores project-local agent skills for CardioGuard AI.
 Installed external skill:
 
 - `redesign-existing-projects`: copied from `Leonxlnx/taste-skill` at `skills/redesign-skill`. Use it for focused UI audit and redesign work on existing screens.
+- `full-output-enforcement`: copied from `Leonxlnx/taste-skill` at `skills/output-skill`. Use it when tasks require full, non-truncated implementation output.
 
 Project-local skill:
 
@@ -15,5 +16,6 @@ Selection notes:
 
 - Do not use `gpt-taste` by default. It pushes heavy GSAP and marketing-page motion that does not fit this healthcare monitoring app.
 - Do not use `image-to-code` by default. It is useful for visual landing pages, but too heavy for routine dashboard and product UI work.
+- Do not use `imagegen-frontend-mobile` by default for this repository. It is image-generation-only and does not produce Flutter code for production app screens.
 - Do not use the default `design-taste-frontend` as a blanket rule. It explicitly targets landing pages, portfolios, and redesigns, not dense realtime dashboards or data tables.
 

@@ -642,23 +642,35 @@ async def get_audit_logs(
     authorization: Optional[str] = Header(default=None)
 ):
     await require_admin(authorization)
-    rows = await database.fetch_all(
-        """
-        SELECT 
-            id::text as id,
-            user_id::text as user_id,
-            action,
-            entity_type,
-            entity_id,
-            details,
-            ip_address,
-            created_at
+    columns = await table_columns("audit_logs")
+    
+    select_columns = []
+    if "id" in columns:
+        select_columns.append("id::text as id")
+    if "user_id" in columns:
+        select_columns.append("user_id::text as user_id")
+    if "action" in columns:
+        select_columns.append("action")
+    if "entity_type" in columns:
+        select_columns.append("entity_type")
+    if "entity_id" in columns:
+        select_columns.append("entity_id")
+    if "details" in columns:
+        select_columns.append("details")
+    else:
+        select_columns.append("NULL::text as details")
+    if "ip_address" in columns:
+        select_columns.append("ip_address")
+    if "created_at" in columns:
+        select_columns.append("created_at")
+        
+    query = f"""
+        SELECT {", ".join(select_columns)}
         FROM audit_logs
         ORDER BY created_at DESC
         LIMIT :limit OFFSET :offset
-        """,
-        {"limit": limit, "offset": offset}
-    )
+    """
+    rows = await database.fetch_all(query, {"limit": limit, "offset": offset})
     
     # helper convert rows to json-friendly list of dicts
     result = []
