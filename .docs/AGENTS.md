@@ -16,7 +16,6 @@ For any task, read and apply the relevant skills in `.codex/skills/`:
 - `.codex/skills/cardioguard-security-privacy/SKILL.md` (for patient data privacy, RBAC, and secure session credentials)
 - `.codex/skills/cardioguard-ai-guardrails/SKILL.md` (for LLM/chatbot medical disclaimers and API error boundaries)
 - `.codex/skills/cardioguard-telemetry-optimization/SKILL.md` (for high-frequency WebSocket and real-time buffer optimizations)
-- `.codex/skills/redesign-existing-projects/SKILL.md` (for general UI audit & polish checklists)
 - `.codex/skills/full-output-enforcement/SKILL.md` (when implementation requires complete, non-truncated output)
 
 The CardioGuard skill overrides generic taste-skill advice when there is a conflict. This app is a clinical dashboard/product interface, not a landing page.

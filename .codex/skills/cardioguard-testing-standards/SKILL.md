@@ -44,19 +44,8 @@ python -m unittest tests.test_core_security.TestPasswordPolicy.test_validate_pas
 - Method: `test_{describes_behavior}` (snake_case)
 
 ### Required Patterns
-
-#### ENV Setup (top of test file):
 ```python
-import os
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test_db")
-os.environ.setdefault("SECRET_KEY", "test-secret-key-with-at-least-32-chars")
-```
-
-#### Standard test structure:
-```python
-import unittest
-import os
-
+import unittest, os
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test_db")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-with-at-least-32-chars")
 
@@ -67,12 +56,10 @@ class TestModuleName(unittest.TestCase):
     """Tests for module_name functionality."""
 
     def test_describes_expected_behavior(self):
-        """Short description of what this test verifies."""
         result = function_under_test("valid_input")
         self.assertEqual(result, expected_value)
 
     def test_handles_edge_case(self):
-        """Description of edge case being tested."""
         with self.assertRaises(ValueError):
             function_under_test("invalid_input")
 ```
@@ -172,30 +159,25 @@ void main() {
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-
 import 'package:heart_monitor_app/providers/auth_provider.dart';
 
 Widget createTestableWidget({required Widget child, required AuthProvider authProvider}) {
   return MediaQuery(
     data: const MediaQueryData(size: Size(400, 800)),
     child: MultiProvider(
-      providers: [
-        ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
-      ],
+      providers: [ChangeNotifierProvider<AuthProvider>.value(value: authProvider)],
       child: MaterialApp(home: child),
     ),
   );
 }
 
 void main() {
-  group('MyWidget', () {
-    testWidgets('renders correctly', (tester) async {
-      await tester.pumpWidget(createTestableWidget(
-        child: const MyWidget(),
-        authProvider: AuthProvider(),
-      ));
-      expect(find.text('Expected Text'), findsOneWidget);
-    });
+  testWidgets('renders correctly', (tester) async {
+    await tester.pumpWidget(createTestableWidget(
+      child: const MyWidget(),
+      authProvider: AuthProvider(),
+    ));
+    expect(find.text('Expected Text'), findsOneWidget);
   });
 }
 ```

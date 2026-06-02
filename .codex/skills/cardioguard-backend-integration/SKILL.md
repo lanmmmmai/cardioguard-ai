@@ -40,10 +40,4 @@ Use this skill for backend development, database schema migrations, authorizatio
 - **Intentional Closures**: Use flags (like `intentionalCloseRef`) to distinguish between expected cleanups and sudden disconnects. This prevents red WebSocket disconnect warnings from flooding the browser developer tools.
 - **State Cleanups**: Ensure that all WebSocket subscriptions and listener events are properly unmounted on component destruction.
 
-### 6. Code Commenting & Documentation (Mandatory)
-- **File Header Comment**: Every new or modified backend/integration file must include a descriptive header comment detailing its purpose, system scope, and relationship with other components.
-- **Detailed Inline Comments**: Write clear, comprehensive comments for all functions, endpoints, classes, and logic blocks.
-  - **Python (FastAPI/SQLAlchemy)**: Must use *Google Style Python Docstrings*. Specify the `Args`, `Returns`, and `Raises` (exceptions) for all functions, routers, and repositories.
-  - **TypeScript/React (web_frontend integrations)**: Must use *JSDoc/TSDoc* format to provide helpful tooltip hints on hover in IDE.
-
 

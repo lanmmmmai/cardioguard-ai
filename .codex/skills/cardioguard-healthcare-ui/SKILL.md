@@ -1,6 +1,6 @@
 ---
 name: cardioguard-healthcare-ui
-description: Project-local UI guidance for CardioGuard AI. Use when changing web_frontend or mobile_app UI/UX, especially with redesign-existing-projects, while preserving clinical clarity and existing architecture.
+description: Project-local UI guidance for CardioGuard AI. Use when changing web_frontend or mobile_app UI/UX, while preserving clinical clarity and existing architecture.
 ---
 
 # CardioGuard Healthcare UI Skill
@@ -34,17 +34,6 @@ Avoid:
 - Replacing existing icon libraries just to satisfy a style preference.
 - New dependencies unless the package file has been checked and the benefit is concrete.
 
-## Applying `redesign-existing-projects`
-
-Use `.codex/skills/redesign-existing-projects/SKILL.md` as an audit checklist, but these CardioGuard overrides win:
-
-- Dense dashboard layouts are allowed when they improve clinical scanability.
-- A left sidebar is acceptable because this app has role-based operational navigation.
-- `lucide-react` and `lucide_icons` are already part of the project and should remain the default icon families.
-- Do not replace functional ECG, 3D heart, WebSocket telemetry, alert, auth, or role-routing behavior for visual reasons.
-- Do not add decorative patient data, fake medical claims, or invented diagnostic conclusions.
-- Keep alert colors semantically stable: critical, warning, normal, oxygen, blood pressure, and heart rate must stay easy to distinguish.
-
 ## Design Rules
 
 - Use tabular numbers or monospace treatment for vitals and timestamps where alignment matters.
@@ -55,11 +44,6 @@ Use `.codex/skills/redesign-existing-projects/SKILL.md` as an audit checklist, b
 - Respect `prefers-reduced-motion` for nonessential animation.
 - Buttons and form controls must have visible hover, active, disabled, and focus states.
 - On mobile, avoid fixed widths that clip Vietnamese labels or patient names.
-- **Code Commenting & Documentation (Mandatory)**: Every new or modified frontend/UI file must have a detailed header comment summarizing the component's purpose, design context, and state structure. Additionally, write comprehensive inline comments explaining the purpose, execution flow, and logic for state hooks, events, helper functions, and custom canvas/painters.
-  - **React/TS (web_frontend)**: Use *JSDoc/TSDoc* format above functions and components.
-  - **Flutter (mobile_app)**: Use *triple-slash (`///`)* document comments above classes and methods to enable DartDoc rendering.
-
-
 
 ## Workflow
 
