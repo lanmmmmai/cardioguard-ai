@@ -42,5 +42,8 @@ Use this skill for backend development, database schema migrations, authorizatio
 
 ### 6. Code Commenting & Documentation (Mandatory)
 - **File Header Comment**: Every new or modified backend/integration file must include a descriptive header comment detailing its purpose, system scope, and relationship with other components.
-- **Detailed Inline Comments**: Write clear, comprehensive comments for all functions, endpoints, classes, and logic blocks (explaining what it does, the workflow/execution path, and its purpose).
+- **Detailed Inline Comments**: Write clear, comprehensive comments for all functions, endpoints, classes, and logic blocks.
+  - **Python (FastAPI/SQLAlchemy)**: Must use *Google Style Python Docstrings*. Specify the `Args`, `Returns`, and `Raises` (exceptions) for all functions, routers, and repositories.
+  - **TypeScript/React (web_frontend integrations)**: Must use *JSDoc/TSDoc* format to provide helpful tooltip hints on hover in IDE.
+
 

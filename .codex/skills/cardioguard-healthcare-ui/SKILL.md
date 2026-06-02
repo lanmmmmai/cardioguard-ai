@@ -55,7 +55,10 @@ Use `.codex/skills/redesign-existing-projects/SKILL.md` as an audit checklist, b
 - Respect `prefers-reduced-motion` for nonessential animation.
 - Buttons and form controls must have visible hover, active, disabled, and focus states.
 - On mobile, avoid fixed widths that clip Vietnamese labels or patient names.
-- **Code Commenting & Documentation (Mandatory)**: Every new or modified frontend/UI file must have a detailed header comment summarizing the component's purpose, design context, and state structure. Additionally, write comprehensive inline comments explaining the purpose, execution flow, and logic for state hooks, events, helper functions, and custom canvas/painters (e.g. ECG rendering, 3D heart).
+- **Code Commenting & Documentation (Mandatory)**: Every new or modified frontend/UI file must have a detailed header comment summarizing the component's purpose, design context, and state structure. Additionally, write comprehensive inline comments explaining the purpose, execution flow, and logic for state hooks, events, helper functions, and custom canvas/painters.
+  - **React/TS (web_frontend)**: Use *JSDoc/TSDoc* format above functions and components.
+  - **Flutter (mobile_app)**: Use *triple-slash (`///`)* document comments above classes and methods to enable DartDoc rendering.
+
 
 
 ## Workflow

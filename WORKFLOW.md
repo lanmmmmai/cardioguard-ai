@@ -30,7 +30,13 @@ graph TD
 * **Hành động**: Tiến hành áp dụng thay đổi vào mã nguồn sử dụng công cụ thay thế nội dung file.
 * **Quy tắc**:
   * Tuân thủ quy tắc xuất mã nguồn đầy đủ, không viết code tắt hoặc để lại các đoạn mã giả (placeholder) không hoạt động.
-  * **Chính sách chú thích mã nguồn (Code Commenting Policy)**: Mỗi tệp tin được tạo mới hoặc sửa đổi phải có phần chú thích chi tiết ở đầu file giải thích tác dụng của file đó và vai trò của nó. Đồng thời, các hàm, lớp, khối logic phức tạp phải có comment giải thích chi tiết tác dụng, luồng hoạt động (workflow) và mục đích để làm gì.
+  * **Chính sách chú thích mã nguồn (Code Commenting Policy)**: Mỗi tệp tin được tạo mới hoặc sửa đổi phải có phần chú thích chi tiết ở đầu file (File Header) giải thích tác dụng của file đó và vai trò của nó. Đồng thời, các hàm, lớp, khối logic phức tạp phải có comment giải thích chi tiết tác dụng, luồng hoạt động (workflow) và mục đích để làm gì.
+  * **Quy chuẩn định dạng bắt buộc**:
+    * **Python (Backend)**: Sử dụng *Google Style Python Docstrings* (ghi rõ các tham số `Args`, giá trị trả về `Returns`, và các ngoại lệ có thể xảy ra `Raises`).
+    * **TypeScript/React (Frontend)**: Sử dụng định dạng *JSDoc/TSDoc* để hiển thị ghi chú trực quan khi rê chuột.
+    * **Dart/Flutter (Mobile)**: Sử dụng chú thích tài liệu ba dấu xuyệt (`///`) để phục vụ render tài liệu qua DartDoc.
+    * **Cấu trúc File Header**: Bắt đầu tệp bằng phần ghi chú gồm: (1) Mục đích tệp tin, (2) Luồng xử lý tổng thể, (3) Mối liên hệ với các thành phần khác.
+
 
 
 #### 🧪 Bước 4: Biên Dịch & Xác Minh (Verification)
