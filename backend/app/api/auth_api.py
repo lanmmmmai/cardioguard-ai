@@ -499,10 +499,12 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
         must_change_password = False
     else:
         import string
+        from app.core.password_policy import PASSWORD_PATTERN
         chars = string.ascii_letters + string.digits + "@!#?$"
-        new_password = "".join(secrets.choice(chars) for _ in range(12))
-        # ensure strong requirements
-        new_password += "A1!a"
+        while True:
+            new_password = "".join(secrets.choice(chars) for _ in range(16))
+            if PASSWORD_PATTERN.fullmatch(new_password):
+                break
         must_change_password = True
     
     hashed_password = hash_password(new_password)

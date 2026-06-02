@@ -4,7 +4,7 @@ from typing import Optional, Any, Dict
 from app.core.database import database
 from app.api.auth_api import get_user_from_token
 from app.services.ai_service import ai_service
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 router = APIRouter()
@@ -135,7 +135,7 @@ async def send_chat_message(
             "id": str(ai_msg_id),
             "sender": "ai",
             "message": ai_response_text,
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
     }
 

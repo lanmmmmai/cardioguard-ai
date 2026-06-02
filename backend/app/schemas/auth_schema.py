@@ -1,6 +1,6 @@
 import re
 from typing import Optional
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from app.core.password_policy import validate_password
 
 
@@ -85,3 +85,9 @@ class ChangePasswordRequest(BaseModel):
     @classmethod
     def password_strength(cls, value: str) -> str:
         return validate_password(value)
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> 'ChangePasswordRequest':
+        if self.new_password == self.old_password:
+            raise ValueError("New password must be different from old password")
+        return self

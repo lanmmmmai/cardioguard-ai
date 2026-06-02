@@ -619,6 +619,7 @@ async def get_audit_logs(
     authorization: Optional[str] = Header(default=None)
 ):
     await require_admin(authorization)
+    limit = min(limit, 1000)
     columns = await table_columns("audit_logs")
     
     select_columns = []

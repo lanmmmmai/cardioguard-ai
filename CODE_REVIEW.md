@@ -129,24 +129,11 @@
 
 ---
 
-### 🟡 [MEDIUM] BE-18: ChangePassword không enforce old != new
-
-- **File:** `backend/app/schemas/auth_schema.py:80-87`
-- **Mô tả:** User có thể "đổi" password thành chính password cũ.
-- **Fix:** Thêm validation `new_password != old_password`.
+### 🟢 [RESOLVED] BE-18: ChangePassword không enforce old != new
 
 ---
 
-### 🟡 [MEDIUM] BE-19: Generated random password predictable
-
-- **File:** `backend/app/api/auth_api.py:500-504`
-- **Mô tả:** Suffix `"A1!a"` luôn được append, giảm entropy. Password cũng gửi plaintext qua email.
-- **Code:**
-  ```python
-  new_password = "".join(secrets.choice(chars) for _ in range(12))
-  new_password += "A1!a"  # Luôn luôn suffix này
-  ```
-- **Fix:** Bỏ suffix, hoặc random suffix.
+### 🟢 [RESOLVED] BE-19: Generated random password predictable
 
 ---
 
