@@ -2,14 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Activity, Lock, Loader2, CheckCircle2 } from 'lucide-react';
 import { API_URL } from '../config';
 import { useAuth } from '../auth/AuthContext';
+import type { UserRole } from '../auth/roles';
 import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
 
 interface ChangePasswordProps {
-  onNavigateNext: () => void;
+  onNavigateNext: (nextRole?: UserRole) => void;
 }
 
 export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }) => {
-  const { accessToken } = useAuth();
+  const { accessToken, login, refreshUser, role } = useAuth();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -80,10 +81,19 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }
         throw new Error(data.detail || 'Thay đổi mật khẩu thất bại');
       }
 
+      let nextRole = role || undefined;
+      if (data.access_token && data.user) {
+        const updatedUser = login(data.access_token, data.user);
+        nextRole = updatedUser.role;
+      } else {
+        const refreshedUser = await refreshUser();
+        nextRole = refreshedUser?.role || nextRole;
+      }
+
       setSuccess(true);
       timerRef.current = setTimeout(() => {
-        onNavigateNext();
-      }, 2000);
+        onNavigateNext(nextRole);
+      }, 900);
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
     } finally {

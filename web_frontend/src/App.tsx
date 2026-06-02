@@ -35,7 +35,7 @@ import { API_URL, WS_URL } from './config';
 import { Patient, Alert, SensorData } from './types';
 
 const AppContent: React.FC = () => {
-  const { accessToken, isAuthenticated, loading, role, login, refreshUser, requiresPasswordChange } = useAuth();
+  const { accessToken, isAuthenticated, loading, role, login, requiresPasswordChange } = useAuth();
   const { path, navigate } = useBrowserPath();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -425,13 +425,9 @@ const AppContent: React.FC = () => {
     if (!isAuthenticated || !role) {
       return null;
     }
-    return <ChangePassword onNavigateNext={() => {
-      // Once successfully changed, refresh user info and navigate to default route
-      refreshUser().then(() => {
-        navigate(defaultRouteByRole[role], true);
-      }).catch(() => {
-        navigate(defaultRouteByRole[role], true);
-      });
+    return <ChangePassword onNavigateNext={(nextRole) => {
+      const targetRole = nextRole || role;
+      navigate(targetRole ? defaultRouteByRole[targetRole] : '/login', true);
     }} />;
   }
 

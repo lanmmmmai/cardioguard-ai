@@ -702,7 +702,22 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
     except Exception:
         pass
 
-    return {"message": "Password changed successfully"}
+    new_token = create_access_token({
+        "sub": current_user["id"],
+        "email": current_user["email"],
+        "role": current_user["role"],
+    })
+    updated_user = {
+        **current_user,
+        "must_change_password": False,
+    }
+
+    return {
+        "message": "Password changed successfully",
+        "access_token": new_token,
+        "token_type": "bearer",
+        "user": updated_user,
+    }
 
 
 
