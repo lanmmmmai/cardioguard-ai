@@ -160,3 +160,7 @@ desktop.ini
 *.sln
 *.sw?
 .eslintcache
+
+# Codex & Docs local specifications
+.codex/
+.docs/
