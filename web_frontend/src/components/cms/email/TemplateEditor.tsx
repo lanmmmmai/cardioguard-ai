@@ -36,13 +36,15 @@ interface TemplateEditorProps {
 export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClose, onSaved }) => {
   const { accessToken } = useAuth();
   const [form, setForm] = useState<Template>({
+    id: template?.id,
     name: template?.name ?? '',
     subject: template?.subject ?? '',
-    html_content: template?.html_content ?? DEFAULT_HTML,
+    html_content: template?.id ? '' : DEFAULT_HTML,
     text_content: template?.text_content ?? '',
     type: template?.type ?? 'custom',
     is_active: template?.is_active ?? true,
   });
+  const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showVariables, setShowVariables] = useState(false);
@@ -50,6 +52,63 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
   const [previewHtml, setPreviewHtml] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const loadTemplateDetail = async () => {
+      // Tạo mới template
+      if (!template?.id) {
+        const newForm: Template = {
+          name: '',
+          subject: '',
+          html_content: DEFAULT_HTML,
+          text_content: '',
+          type: 'custom',
+          is_active: true,
+        };
+
+        setForm(newForm);
+        setPreviewHtml(DEFAULT_HTML);
+        return;
+      }
+
+      // Chỉnh sửa template cũ
+      setIsLoadingTemplate(true);
+      setError(null);
+
+      try {
+        const res = await fetch(`${API_URL}/email/templates/${template.id}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.detail || 'Không thể tải chi tiết template');
+        }
+
+        const nextForm: Template = {
+          id: data.id,
+          name: data.name || '',
+          subject: data.subject || '',
+          html_content: data.html_content || '',
+          text_content: data.text_content || '',
+          type: data.type || 'custom',
+          is_active: data.is_active ?? true,
+        };
+
+        setForm(nextForm);
+        setPreviewHtml(nextForm.html_content);
+      } catch (err: any) {
+        setError(err.message || 'Không thể tải template');
+      } finally {
+        setIsLoadingTemplate(false);
+      }
+    };
+
+    loadTemplateDetail();
+  }, [template?.id, accessToken]);
 
   // Live preview: debounce 400ms
   useEffect(() => {
@@ -217,8 +276,9 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
                 className="form-control email-editor-html-textarea"
                 value={form.html_content}
                 onChange={(e) => set('html_content', e.target.value)}
-                placeholder="Nhập HTML hoặc dùng biến động {{full_name}}, {{otp}}..."
+                placeholder={isLoadingTemplate ? 'Đang tải template...' : 'Nhập HTML hoặc dùng biến động {{full_name}}, {{otp}}...'}
                 spellCheck={false}
+                disabled={isLoadingTemplate}
               />
             </div>
 
