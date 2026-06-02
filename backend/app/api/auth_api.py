@@ -73,6 +73,8 @@ async def get_user_from_token(
     authorization: Optional[str],
     *,
     allow_must_change_password: bool = False,
+    allow_uncompleted: bool = False,
+    allow_unverified: bool = False,
 ):
     token = extract_bearer_token(authorization)
     try:
@@ -101,6 +103,9 @@ async def get_user_from_token(
         "created_at" if "created_at" in user_columns else "NULL::timestamptz as created_at",
         "status" if "status" in user_columns else "NULL::text as status",
         "must_change_password" if "must_change_password" in user_columns else "FALSE as must_change_password",
+        "profile_completed" if "profile_completed" in user_columns else "FALSE as profile_completed",
+        "is_verified" if "is_verified" in user_columns else "FALSE as is_verified",
+        "avatar_url" if "avatar_url" in user_columns else "NULL::text as avatar_url",
     ]
 
     user = await database.fetch_one(
@@ -115,7 +120,7 @@ async def get_user_from_token(
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
-    if (user["status"] or "").strip().lower() == "inactive":
+    if (user["status"] or "").strip().lower() in {"inactive", "disabled"}:
         raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
 
     result = {
@@ -126,13 +131,31 @@ async def get_user_from_token(
         "role": normalize_role(user["role"]),
         "created_at": user["created_at"],
         "status": user["status"],
-        "must_change_password": user["must_change_password"]
+        "must_change_password": user["must_change_password"],
+        "profile_completed": bool(user["profile_completed"]),
+        "is_verified": bool(user["is_verified"]),
+        "avatar_url": user["avatar_url"],
     }
 
     if result["must_change_password"] and not allow_must_change_password:
         raise HTTPException(
             status_code=403,
             detail="Bạn phải đổi mật khẩu trước khi tiếp tục sử dụng hệ thống",
+        )
+
+    # Check profile completion
+    if not result["profile_completed"] and not allow_uncompleted:
+        if result["role"] in {"patient", "doctor"}:
+            raise HTTPException(
+                status_code=403,
+                detail="Tài khoản chưa hoàn thiện hồ sơ. Vui lòng hoàn thiện hồ sơ trước khi tiếp tục."
+            )
+
+    # Check doctor verification
+    if result["role"] == "doctor" and not result["is_verified"] and not allow_unverified:
+        raise HTTPException(
+            status_code=403,
+            detail="Tài khoản bác sĩ chưa được ban quản trị phê duyệt xác thực."
         )
 
     return result
@@ -276,8 +299,8 @@ async def register(data: RegisterRequest, request: Request):
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
     insert_query = """
-    INSERT INTO users(full_name, email, password_hash, role, phone, specialty, department, status)
-    VALUES (:full_name, :email, :password_hash, :role, :phone, :specialty, :department, 'active')
+    INSERT INTO users(full_name, email, password_hash, role, phone, specialty, department, status, profile_completed, is_verified)
+    VALUES (:full_name, :email, :password_hash, :role, :phone, :specialty, :department, 'pending_profile', FALSE, FALSE)
     """
 
     user_id = None
@@ -379,6 +402,18 @@ async def login(data: LoginRequest, request: Request):
         select_cols += ", status"
     else:
         select_cols += ", NULL::text as status"
+    if "profile_completed" in user_columns:
+        select_cols += ", profile_completed"
+    else:
+        select_cols += ", FALSE as profile_completed"
+    if "is_verified" in user_columns:
+        select_cols += ", is_verified"
+    else:
+        select_cols += ", FALSE as is_verified"
+    if "avatar_url" in user_columns:
+        select_cols += ", avatar_url"
+    else:
+        select_cols += ", NULL::text as avatar_url"
 
     query = f"""
     SELECT {select_cols}
@@ -413,14 +448,14 @@ async def login(data: LoginRequest, request: Request):
         )
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    if (user["status"] or "").strip().lower() == "inactive":
+    if (user["status"] or "").strip().lower() in {"inactive", "disabled"}:
         await log_activity(
             user_id=user["id"],
             action="USER_LOGIN_FAILED",
             entity_type="users",
             entity_id=user["id"],
             ip_address=ip_addr,
-            details={"email": data.email.lower(), "reason": "Account inactive"}
+            details={"email": data.email.lower(), "reason": "Account inactive or disabled"}
         )
         raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
 
@@ -477,7 +512,10 @@ async def login(data: LoginRequest, request: Request):
             "email": user["email"],
             "role": normalize_role(user["role"]),
             "status": user["status"],
-            "must_change_password": user["must_change_password"]
+            "must_change_password": user["must_change_password"],
+            "profile_completed": bool(user["profile_completed"]),
+            "is_verified": bool(user["is_verified"]),
+            "avatar_url": user["avatar_url"]
         }
     }
 
@@ -620,6 +658,8 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
     current_user = await get_user_from_token(
         authorization,
         allow_must_change_password=True,
+        allow_uncompleted=True,
+        allow_unverified=True,
     )
     
     user = await database.fetch_one(
@@ -672,5 +712,7 @@ async def me(authorization: Optional[str] = Header(default=None)):
         "user": await get_user_from_token(
             authorization,
             allow_must_change_password=True,
+            allow_uncompleted=True,
+            allow_unverified=True,
         )
     }

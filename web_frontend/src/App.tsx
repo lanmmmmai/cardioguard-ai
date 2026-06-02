@@ -19,6 +19,10 @@ import { DoctorChatbot } from './pages/DoctorChatbot';
 import { DoctorsManager } from './components/DoctorsManager';
 import { UsersManager } from './components/UsersManager';
 import { SystemSettings } from './components/SystemSettings';
+import { PatientCompleteProfile } from './pages/PatientCompleteProfile';
+import { DoctorCompleteProfile } from './pages/DoctorCompleteProfile';
+import { DoctorPendingVerification, DoctorVerificationRejected } from './pages/DoctorStatusPages';
+import { AdminDoctorVerification } from './components/AdminDoctorVerification';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { defaultRouteByRole, normalizeRole, UserRole } from './auth/roles';
@@ -316,6 +320,16 @@ const AppContent: React.FC = () => {
 
   const routeContent = useMemo(() => {
     switch (normalizedPath) {
+      case '/patient/complete-profile':
+        return <PatientCompleteProfile />;
+      case '/doctor/complete-profile':
+        return <DoctorCompleteProfile />;
+      case '/doctor/pending-verification':
+        return <DoctorPendingVerification />;
+      case '/doctor/verification-rejected':
+        return <DoctorVerificationRejected />;
+      case '/admin/doctor-verification':
+        return <AdminDoctorVerification />;
       case '/patient/chatbot':
         return <PatientChatbot />;
       case '/admin/dashboard':
@@ -452,11 +466,20 @@ const AppContent: React.FC = () => {
     isConnected,
   };
 
-  const layout = routeRole === 'admin'
-    ? <AdminLayout {...layoutProps}>{routeContent}</AdminLayout>
-    : routeRole === 'doctor'
-      ? <DoctorLayout {...layoutProps}>{routeContent}</DoctorLayout>
-      : <PatientLayout {...layoutProps}>{routeContent}</PatientLayout>;
+  const isOnboardingOrStatusRoute = [
+    '/patient/complete-profile',
+    '/doctor/complete-profile',
+    '/doctor/pending-verification',
+    '/doctor/verification-rejected'
+  ].includes(normalizedPath);
+
+  const layout = isOnboardingOrStatusRoute
+    ? <div className="fullscreen-onboarding-wrapper" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '24px' }}>{routeContent}</div>
+    : routeRole === 'admin'
+      ? <AdminLayout {...layoutProps}>{routeContent}</AdminLayout>
+      : routeRole === 'doctor'
+        ? <DoctorLayout {...layoutProps}>{routeContent}</DoctorLayout>
+        : <PatientLayout {...layoutProps}>{routeContent}</PatientLayout>;
 
   const handleViewPatientDetail = (patientId: string) => {
     setSelectedPatientId(patientId);

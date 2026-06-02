@@ -313,3 +313,101 @@ async def send_system_email(
         logger.exception("Failed to write email log for type=%s", email_type)
 
     return status == "sent"
+
+
+async def send_doctor_status_email(email: str, full_name: str, status: str, note: Optional[str] = None) -> bool:
+    """Gửi email thông báo trạng thái xác thực của bác sĩ."""
+    hospital_name = settings.EMAIL_FROM_NAME or "CardioGuard AI"
+    variables = {
+        "full_name": full_name,
+        "verification_note": note or "",
+        "hospital_name": hospital_name
+    }
+    
+    if status == "pending_verification":
+        subject = "CardioGuard AI - Hồ sơ bác sĩ của bạn đang chờ phê duyệt"
+        html = f"""
+        <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+          <h2 style="color:#0f766e;margin-bottom:8px">CardioGuard AI</h2>
+          <p style="color:#374151">Xin chào Bác sĩ <strong>{full_name}</strong>,</p>
+          <p style="color:#374151">Hồ sơ bác sĩ của bạn đã được ghi nhận và đang chờ quản trị viên xác thực.</p>
+          <p style="color:#374151">Chúng tôi sẽ thông báo cho bạn ngay sau khi tài khoản được phê duyệt.</p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
+          <p style="color:#9ca3af;font-size:12px">CardioGuard AI — {hospital_name}</p>
+        </div>
+        """
+        return await send_system_email(
+            email_type="doctor_pending_verification",
+            to_email=email,
+            to_name=full_name,
+            variables=variables,
+            fallback_subject=subject,
+            fallback_html=html
+        )
+    elif status == "active":
+        subject = "CardioGuard AI - Tài khoản bác sĩ của bạn đã được xác thực"
+        html = f"""
+        <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+          <h2 style="color:#0f766e;margin-bottom:8px">CardioGuard AI</h2>
+          <p style="color:#374151">Xin chào Bác sĩ <strong>{full_name}</strong>,</p>
+          <p style="color:#374151">Tài khoản bác sĩ của bạn đã được xác thực và có thể sử dụng hệ thống CardioGuard AI.</p>
+          <p style="color:#374151">Bây giờ bạn có thể đăng nhập vào cổng bác sĩ để làm việc.</p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
+          <p style="color:#9ca3af;font-size:12px">CardioGuard AI — {hospital_name}</p>
+        </div>
+        """
+        return await send_system_email(
+            email_type="doctor_verified",
+            to_email=email,
+            to_name=full_name,
+            variables=variables,
+            fallback_subject=subject,
+            fallback_html=html
+        )
+    elif status == "rejected":
+        subject = "CardioGuard AI - Hồ sơ bác sĩ của bạn chưa được phê duyệt"
+        html = f"""
+        <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+          <h2 style="color:#e11d48;margin-bottom:8px">CardioGuard AI</h2>
+          <p style="color:#374151">Xin chào Bác sĩ <strong>{full_name}</strong>,</p>
+          <p style="color:#374151">Hồ sơ bác sĩ của bạn chưa được phê duyệt.</p>
+          <p style="color:#374151;padding:12px;background-color:#fef2f2;border-left:4px solid #ef4444;margin:16px 0">
+            <strong>Lý do:</strong> {note or "Không có lý do chi tiết."}
+          </p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
+          <p style="color:#9ca3af;font-size:12px">CardioGuard AI — {hospital_name}</p>
+        </div>
+        """
+        return await send_system_email(
+            email_type="doctor_rejected",
+            to_email=email,
+            to_name=full_name,
+            variables=variables,
+            fallback_subject=subject,
+            fallback_html=html
+        )
+    elif status == "need_update":
+        subject = "CardioGuard AI - Yêu cầu bổ sung thông tin hồ sơ bác sĩ"
+        html = f"""
+        <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+          <h2 style="color:#d97706;margin-bottom:8px">CardioGuard AI</h2>
+          <p style="color:#374151">Xin chào Bác sĩ <strong>{full_name}</strong>,</p>
+          <p style="color:#374151">Hồ sơ bác sĩ cần bổ sung thông tin.</p>
+          <p style="color:#374151;padding:12px;background-color:#fffbeb;border-left:4px solid #f59e0b;margin:16px 0">
+            <strong>Nội dung cần bổ sung:</strong> {note or "Vui lòng xem lại hồ sơ."}
+          </p>
+          <p style="color:#374151">Vui lòng đăng nhập lại vào cổng bác sĩ để thực hiện chỉnh sửa và tải lại giấy tờ cần thiết.</p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
+          <p style="color:#9ca3af;font-size:12px">CardioGuard AI — {hospital_name}</p>
+        </div>
+        """
+        return await send_system_email(
+            email_type="doctor_need_update",
+            to_email=email,
+            to_name=full_name,
+            variables=variables,
+            fallback_subject=subject,
+            fallback_html=html
+        )
+    return False
+

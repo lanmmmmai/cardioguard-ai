@@ -65,6 +65,8 @@ class DoctorUpdate(BaseModel):
         return self
 
 
+from datetime import date
+
 class DoctorResponse(BaseModel):
     id: str
     full_name: str
@@ -74,3 +76,16 @@ class DoctorResponse(BaseModel):
     department: Optional[str] = None
     status: str
     created_at: Optional[datetime] = None
+    gender: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    address: Optional[str] = None
+    position: Optional[str] = None
+    experience_years: Optional[int] = None
+    license_number: Optional[str] = None
+    license_issued_date: Optional[date] = None
+    license_issued_by: Optional[str] = None
+    license_certificate_url: Optional[str] = None
+    cccd_front_url: Optional[str] = None
+    cccd_back_url: Optional[str] = None
+    is_verified: Optional[bool] = None
+    verification_note: Optional[str] = None

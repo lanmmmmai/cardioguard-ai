@@ -34,4 +34,9 @@ export const pageTitles: Record<string, { title: string; subtitle: string }> = {
   "/patient/notifications": { title: "Thông báo", subtitle: "Lịch hẹn, cảnh báo sức khỏe và cập nhật hệ thống." },
   "/patient/profile": { title: "Hồ sơ cá nhân", subtitle: "Xem/cập nhật thông tin cá nhân và ảnh đại diện." },
   "/patient/settings": { title: "Cài đặt", subtitle: "Tùy chỉnh thông báo, bảo mật và giao diện." },
+  "/patient/complete-profile": { title: "Hoàn thiện hồ sơ bệnh nhân", subtitle: "Vui lòng cập nhật đầy đủ thông tin để kích hoạt tài khoản." },
+  "/doctor/complete-profile": { title: "Hoàn thiện hồ sơ bác sĩ", subtitle: "Tải lên chứng chỉ y khoa và thông tin chuyên môn." },
+  "/doctor/pending-verification": { title: "Chờ xác thực tài khoản", subtitle: "Hồ sơ của bạn đang được ban quản trị kiểm tra và xét duyệt." },
+  "/doctor/verification-rejected": { title: "Hồ sơ bị từ chối xác thực", subtitle: "Hồ sơ của bạn không đủ điều kiện phê duyệt." },
+  "/admin/doctor-verification": { title: "Xác thực bác sĩ", subtitle: "Xét duyệt và phê duyệt hồ sơ bác sĩ đăng ký." },
 };

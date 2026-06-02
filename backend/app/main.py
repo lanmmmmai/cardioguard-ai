@@ -15,6 +15,7 @@ from app.api.crud_api import router as crud_router
 from app.api.user_api import router as user_router
 from app.api.cms_api import router as cms_router
 from app.api.admin_doctor_api import router as admin_doctor_router
+from app.api.profile_api import router as profile_router
 from app.api.email_api import router as email_router
 from app.api.chat_api import router as chat_router
 from app.services.otp_service import ensure_otp_table
@@ -83,6 +84,7 @@ app.include_router(admin_doctor_router)
 app.include_router(email_router)
 app.include_router(feature_router)
 app.include_router(chat_router, prefix="/api/chat", tags=["Chatbot"])
+app.include_router(profile_router)
 
 
 @app.get("/health", tags=["System"])

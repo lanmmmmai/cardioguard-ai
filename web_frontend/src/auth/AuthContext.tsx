@@ -45,6 +45,9 @@ const normalizeUser = (user: any): AuthUser | null => {
     created_at: user.created_at || null,
     status: user.status || null,
     must_change_password: user.must_change_password || false,
+    profile_completed: Boolean(user.profile_completed),
+    is_verified: Boolean(user.is_verified),
+    avatar_url: user.avatar_url || null,
   };
 };
 

@@ -9,6 +9,9 @@ export interface AuthUser {
   created_at?: string | null;
   status?: string | null;
   must_change_password?: boolean;
+  profile_completed?: boolean;
+  is_verified?: boolean;
+  avatar_url?: string | null;
 }
 
 export const VALID_ROLES: UserRole[] = ['admin', 'doctor', 'patient'];
