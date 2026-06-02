@@ -18,6 +18,9 @@
 
 import os
 import joblib
+import logging
+
+logger = logging.getLogger(__name__)
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -93,7 +96,7 @@ class HeartRiskInput(BaseModel):
     oldpeak: float = Field(..., ge=0.0, le=10.0, description="ST depression so với lúc nghỉ (ví dụ: 1.5)")
     slope: float = Field(..., ge=1, le=3, description="Độ dốc đoạn ST: 1=Đi lên, 2=Phẳng, 3=Đi xuống")
     ca: float = Field(..., ge=0, le=3, description="Số mạch máu lớn (0-3) phát hiện qua fluoroscopy")
-    thal: float = Field(..., description="Kết quả thalassemia: 3=Bình thường, 6=Khiếm khuyết cố định, 7=Có thể hồi phục")
+    thal: float = Field(..., ge=3, le=7, description="Kết quả thalassemia: 3=Bình thường, 6=Khiếm khuyết cố định, 7=Có thể hồi phục")
 
     class Config:
         # Ví dụ mẫu hiển thị trong /docs
@@ -199,9 +202,10 @@ async def predict_heart_risk(data: HeartRiskInput):
 
     except Exception as exc:
         # Trả về lỗi 500 nếu có sự cố trong quá trình dự đoán
+        logger.exception("Error during model prediction")
         raise HTTPException(
             status_code=500,
-            detail=f"Lỗi khi thực hiện dự đoán: {str(exc)}"
+            detail="Lỗi khi thực hiện dự đoán. Vui lòng kiểm tra lại dữ liệu đầu vào."
         ) from exc
 
 
@@ -226,6 +230,6 @@ async def health_check():
     return {
         "status": "healthy",
         "model_loaded": model is not None,
-        "model_path": MODEL_PATH,
+        "model_name": os.path.basename(MODEL_PATH),
         "features": FEATURE_COLUMNS
     }
