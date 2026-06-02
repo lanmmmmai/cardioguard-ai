@@ -77,10 +77,10 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         event['patient_id'] == widget.patient['id']) {
       final metrics = event['data'] as Map<String, dynamic>;
       setState(() {
-        _currentHr = (metrics['heart_rate'] as num).toDouble();
-        _currentSpo2 = (metrics['spo2'] as num).toDouble();
-        _currentSysBp = (metrics['systolic_bp'] as num).toDouble();
-        _currentDiaBp = (metrics['diastolic_bp'] as num).toDouble();
+        _currentHr = (metrics['heart_rate'] as num?)?.toDouble() ?? 75.0;
+        _currentSpo2 = (metrics['spo2'] as num?)?.toDouble() ?? 98.0;
+        _currentSysBp = (metrics['systolic_bp'] as num?)?.toDouble() ?? 120.0;
+        _currentDiaBp = (metrics['diastolic_bp'] as num?)?.toDouble() ?? 80.0;
 
         _tickCount++;
         _hrSpots.removeAt(0);

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { API_URL } from '../config';
 import { AuthUser, UserRole, normalizeRole } from './roles';
 
@@ -19,6 +19,18 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const storage = window.sessionStorage;
 const TOKEN_KEY = 'access_token';
 const USER_KEY = 'user';
+
+const encryptData = (data: any): string => {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+};
+
+const decryptData = (ciphertext: string): any => {
+  try {
+    return JSON.parse(decodeURIComponent(escape(atob(ciphertext))));
+  } catch {
+    return null;
+  }
+};
 
 const normalizeUser = (user: any): AuthUser | null => {
   const role = normalizeRole(user?.role);
@@ -48,7 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AuthUser | null>(() => {
     try {
       const stored = storage.getItem(USER_KEY);
-      return stored ? normalizeUser(JSON.parse(stored)) : null;
+      return stored ? normalizeUser(decryptData(stored)) : null;
     } catch {
       storage.removeItem(USER_KEY);
       return null;
@@ -72,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Tài khoản chưa được phân quyền');
     }
 
-    storage.setItem(USER_KEY, JSON.stringify(normalizedUser));
+    storage.setItem(USER_KEY, encryptData(normalizedUser));
     storage.setItem(TOKEN_KEY, token);
     setAccessToken(token);
     setUser(normalizedUser);
@@ -80,7 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return normalizedUser;
   };
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     if (!accessToken) return null;
 
     const response = await fetch(`${API_URL}/auth/me`, {
@@ -97,12 +109,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Tài khoản chưa được phân quyền');
     }
 
-    storage.setItem(USER_KEY, JSON.stringify(normalizedUser));
-    storage.setItem(TOKEN_KEY, accessToken);
-    setAccessToken(accessToken);
+    storage.setItem(USER_KEY, encryptData(normalizedUser));
     setUser(normalizedUser);
     return normalizedUser;
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -124,7 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     restoreSession();
-  }, [accessToken]);
+  }, [accessToken, refreshUser]);
 
   const value = useMemo<AuthContextValue>(() => ({
     accessToken,

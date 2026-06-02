@@ -557,7 +557,7 @@ async def get_sensor_data(
     return [row_to_dict(row) for row in data]
 
 
-@router.get("/api/sensors/history")
+@router.get("/sensors/history")
 async def get_sensor_history(
     authorization: Optional[str] = Header(default=None),
     patient_id: Optional[str] = Query(default=None),

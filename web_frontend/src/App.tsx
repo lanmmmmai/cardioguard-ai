@@ -69,6 +69,10 @@ const AppContent: React.FC = () => {
     return savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : 'dark';
   });
   const [patients, setPatients] = useState<Patient[]>([]);
+  const patientsRef = React.useRef(patients);
+  React.useEffect(() => {
+    patientsRef.current = patients;
+  }, [patients]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [latestTelemetry, setLatestTelemetry] = useState<SensorData | null>(null);
@@ -164,7 +168,7 @@ const AppContent: React.FC = () => {
     if (!data.is_abnormal || data.alerts.length === 0) return;
 
     const firstAlert = data.alerts[0];
-    const matchingPatient = patients.find((patient) => patient.id === data.patient_id);
+    const matchingPatient = patientsRef.current.find((patient) => patient.id === data.patient_id);
     const patientName = matchingPatient?.full_name || 'Bệnh nhân';
 
     const severity = firstAlert.severity || 'high';
@@ -197,7 +201,7 @@ const AppContent: React.FC = () => {
       })),
       ...prev,
     ]);
-  }, [patients]);
+  }, []);
 
   const handleRealtimeMessage = useCallback((message: any) => {
     if (!message?.type) {
@@ -218,7 +222,7 @@ const AppContent: React.FC = () => {
         ...message.data,
         patient_id: message.patient_id || message.data.patient_id,
       } as Alert;
-      const matchingPatient = patients.find((patient) => patient.id === alert.patient_id);
+      const matchingPatient = patientsRef.current.find((patient) => patient.id === alert.patient_id);
       const patientName = alert.full_name || matchingPatient?.full_name || 'Bệnh nhân';
       const severity = alert.severity || 'high';
       const timestamp = new Date().toLocaleTimeString('vi-VN');
@@ -240,7 +244,7 @@ const AppContent: React.FC = () => {
       }
       setAlerts((prev) => [{ ...alert, full_name: patientName }, ...prev]);
     }
-  }, [handleSensorTelemetry, patients]);
+  }, [handleSensorTelemetry]);
 
   const { isConnected } = useWebSocket(WS_URL, accessToken ? handleRealtimeMessage : undefined, accessToken);
 

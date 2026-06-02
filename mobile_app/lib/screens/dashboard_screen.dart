@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,7 +32,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
   // Local ECG point buffer
-  final List<double> _ecgPoints = List.filled(240, 0.0, growable: true);
+  final ListQueue<double> _ecgPoints = ListQueue<double>.from(List.filled(240, 0.0));
 
   // Animation controller for 3D Heart
   late AnimationController _tickerController;
@@ -106,7 +107,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     final patientId = event['patient_id'];
 
     if (type == 'health_metrics' && patientId == _selectedPatientId) {
-      final metrics = event['data'] as Map<String, dynamic>;
+      final metrics = event['data'] as Map<String, dynamic>?;
+      if (metrics == null) return;
+
       final patientProvider =
           Provider.of<PatientProvider>(context, listen: false);
 
@@ -114,13 +117,15 @@ class _DashboardScreenState extends State<DashboardScreen>
       patientProvider.updateLiveMetrics(metrics);
 
       // Add ECG point
-      final double ecgVal = (metrics['ecg_value'] as num).toDouble();
+      final double ecgVal = (metrics['ecg_value'] as num?)?.toDouble() ?? 0.0;
       setState(() {
-        _ecgPoints.removeAt(0);
+        _ecgPoints.removeFirst();
         _ecgPoints.add(ecgVal);
       });
     } else if (type == 'emergency_alerts') {
-      final alertData = event['data'] as Map<String, dynamic>;
+      final alertData = event['data'] as Map<String, dynamic>?;
+      if (alertData == null) return;
+      
       final alertProvider = Provider.of<AlertProvider>(context, listen: false);
 
       // Update alert list
@@ -198,7 +203,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           simEcg = (math.Random().nextDouble() - 0.5) * 0.02;
         }
 
-        _ecgPoints.removeAt(0);
+        _ecgPoints.removeFirst();
         _ecgPoints.add(simEcg);
       }
     });
@@ -368,8 +373,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   if (id != null) {
                                     setState(() {
                                       _selectedPatientId = id;
-                                      _ecgPoints.fillRange(
-                                          0, _ecgPoints.length, 0.0);
+                                      _ecgPoints.clear();
+                                      _ecgPoints.addAll(List.filled(240, 0.0));
                                     });
                                   }
                                 },
@@ -692,7 +697,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         width: double.infinity,
                         child: CustomPaint(
                           painter: EcgPainter(
-                            dataPoints: List<double>.from(_ecgPoints),
+                            dataPoints: _ecgPoints.toList(),
                             heartRate: hrVal.toDouble(),
                             isDarkTheme: isDark,
                           ),
