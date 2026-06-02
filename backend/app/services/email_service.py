@@ -5,6 +5,7 @@
 # =============================================================================
 
 import asyncio
+import json
 import re
 import logging
 import smtplib
@@ -16,12 +17,12 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any, Optional
 
+from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 from app.core.config import settings
 from app.core.database import database
 
 logger = logging.getLogger(__name__)
-
 
 ROLE_EMAIL_MAP = {
     "patient": {
@@ -48,6 +49,56 @@ ROLE_EMAIL_MAP = {
         "role_label": "Quản trị viên",
         "role_description": "Quản lý hệ thống, tài khoản người dùng, thiết bị IoT, mẫu email, báo cáo và nhật ký hoạt động.",
     },
+}
+
+EMAIL_TEMPLATE_CATALOG = {
+    "otp_register": {"cms_email_id": "EMAIL_OTP_REGISTER", "label": "OTP Đăng ký"},
+    "otp_login": {"cms_email_id": "EMAIL_OTP_LOGIN", "label": "OTP Đăng nhập"},
+    "welcome": {"cms_email_id": "EMAIL_WELCOME", "label": "Welcome Email"},
+    "reset_password": {"cms_email_id": "EMAIL_RESET_PASSWORD", "label": "Đặt lại mật khẩu"},
+    "emergency_alert": {"cms_email_id": "EMAIL_EMERGENCY_ALERT", "label": "Cảnh báo khẩn cấp"},
+    "appointment_reminder": {"cms_email_id": "EMAIL_APPOINTMENT_REMINDER", "label": "Nhắc lịch hẹn"},
+    "doctor_assignment": {"cms_email_id": "EMAIL_DOCTOR_ASSIGNMENT", "label": "Phân công bác sĩ"},
+    "health_alert": {"cms_email_id": "EMAIL_HEALTH_ALERT", "label": "Cảnh báo sức khỏe"},
+    "monthly_report": {"cms_email_id": "EMAIL_MONTHLY_REPORT", "label": "Báo cáo tháng"},
+    "doctor_pending_verification": {"cms_email_id": "EMAIL_DOCTOR_PENDING_VERIFICATION", "label": "Bác sĩ chờ duyệt"},
+    "doctor_verified": {"cms_email_id": "EMAIL_DOCTOR_VERIFIED", "label": "Bác sĩ đã xác thực"},
+    "doctor_rejected": {"cms_email_id": "EMAIL_DOCTOR_REJECTED", "label": "Bác sĩ bị từ chối"},
+    "doctor_need_update": {"cms_email_id": "EMAIL_DOCTOR_NEED_UPDATE", "label": "Bác sĩ cần bổ sung"},
+}
+
+EMAIL_TYPE_ALIASES = {
+    "password_reset": "reset_password",
+    "alert_critical": "emergency_alert",
+    "doctor_assigned": "doctor_assignment",
+    "health_warning": "health_alert",
+}
+
+DEFAULT_TEMPLATE_VARIABLES = [
+    "full_name",
+    "otp",
+    "doctor_name",
+    "heart_rate",
+    "spo2",
+    "alert_message",
+    "hospital_name",
+    "current_date",
+    "email",
+    "appointment_date",
+    "medication_name",
+    "patient_name",
+    "login_url",
+    "login_button_text",
+    "role_label",
+    "role_description",
+    "verification_note",
+]
+
+DOCTOR_STATUS_TEMPLATE_MAP = {
+    "pending_verification": "doctor_pending_verification",
+    "active": "doctor_verified",
+    "rejected": "doctor_rejected",
+    "need_update": "doctor_need_update",
 }
 
 
@@ -108,6 +159,100 @@ def get_login_info(role: Optional[str]) -> dict[str, str]:
     })
 
 
+def normalize_email_type(email_type: Optional[str]) -> str:
+    normalized = (email_type or "").strip().lower()
+    if normalized in EMAIL_TYPE_ALIASES:
+        normalized = EMAIL_TYPE_ALIASES[normalized]
+    return normalized
+
+
+def normalize_cms_email_id(cms_email_id: Optional[str], email_type: Optional[str] = None) -> str:
+    normalized = (cms_email_id or "").strip().upper()
+    if normalized:
+        return normalized
+
+    canonical_type = normalize_email_type(email_type)
+    catalog = EMAIL_TEMPLATE_CATALOG.get(canonical_type)
+    if catalog:
+        return catalog["cms_email_id"]
+
+    fallback = canonical_type or "CUSTOM"
+    return "EMAIL_" + re.sub(r"[^A-Z0-9]+", "_", fallback.upper()).strip("_")
+
+
+def parse_variables(raw_variables: Any) -> list[str]:
+    if raw_variables is None:
+        return []
+    if isinstance(raw_variables, list):
+        return [str(item).strip() for item in raw_variables if str(item).strip()]
+    if isinstance(raw_variables, str):
+        text = raw_variables.strip()
+        if not text:
+            return []
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return [str(item).strip() for item in parsed if str(item).strip()]
+        except Exception:
+            pass
+        return [part.strip() for part in re.split(r"[\n,;]+", text) if part.strip()]
+    return [str(raw_variables).strip()]
+
+
+def format_variables(variables: Any) -> list[str]:
+    return parse_variables(variables)
+
+
+def extract_plain_text(html: str) -> str:
+    text = re.sub(r"<\s*br\s*/?>", "\n", html, flags=re.IGNORECASE)
+    text = re.sub(r"</p\s*>", "\n\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+def resolve_template_identifier(email_type: Optional[str] = None, cms_email_id: Optional[str] = None) -> tuple[str, str]:
+    canonical_type = normalize_email_type(email_type)
+    canonical_cms_id = normalize_cms_email_id(cms_email_id, canonical_type)
+    return canonical_type, canonical_cms_id
+
+
+async def find_email_template(
+    email_type: Optional[str] = None,
+    cms_email_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    canonical_type, canonical_cms_id = resolve_template_identifier(email_type, cms_email_id)
+    query = """
+        SELECT id::text as id, cms_email_id, email_type, name, subject, html_content, text_content,
+               variables, is_active, created_at, updated_at
+        FROM email_templates
+        WHERE is_active = TRUE
+          AND (
+            lower(cms_email_id) = lower(:cms_email_id)
+            OR lower(email_type) = lower(:email_type)
+            OR lower(type) = lower(:email_type)
+          )
+        ORDER BY updated_at DESC
+        LIMIT 1
+    """
+    try:
+        row = await database.fetch_one(
+            query,
+            {"cms_email_id": canonical_cms_id, "email_type": canonical_type},
+        )
+        if not row:
+            return None
+        result = dict(row)
+        result["variables"] = format_variables(result.get("variables"))
+        return result
+    except Exception:
+        logger.exception(
+            "Failed to resolve email template",
+            extra={"email_type": canonical_type, "cms_email_id": canonical_cms_id},
+        )
+        raise
+
+
 def render_template(html: str, variables: dict[str, str]) -> str:
     """Thay thế các biến động dạng {{variable_name}} trong template HTML."""
     # Làm giàu biến để tương thích chéo giữa otp, otp_code và new_password
@@ -163,6 +308,7 @@ def send_smtp_email_sync(
     to_name: str,
     subject: str,
     html_body: str,
+    text_body: Optional[str] = None,
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
 ) -> bool:
@@ -194,6 +340,8 @@ def send_smtp_email_sync(
         bcc_list = [addr.strip() for addr in bcc.split(",") if addr.strip()]
         recipients.extend(bcc_list)
 
+    plain_text = text_body or extract_plain_text(html_body)
+    msg.attach(MIMEText(plain_text, "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     try:
@@ -223,12 +371,13 @@ async def send_smtp_email(
     to_name: str,
     subject: str,
     html_body: str,
+    text_body: Optional[str] = None,
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
 ) -> bool:
     """Gửi email bất đồng bộ qua SMTP bằng cách chạy trong threadpool."""
     return await run_in_threadpool(
-        send_smtp_email_sync, to_email, to_name, subject, html_body, cc, bcc
+        send_smtp_email_sync, to_email, to_name, subject, html_body, text_body, cc, bcc
     )
 
 
@@ -237,6 +386,7 @@ def send_brevo_email_sync(
     to_name: str,
     subject: str,
     html_body: str,
+    text_body: Optional[str] = None,
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
 ) -> bool:
@@ -253,6 +403,8 @@ def send_brevo_email_sync(
         "subject": subject,
         "htmlContent": html_body,
     }
+    if text_body:
+        payload["textContent"] = text_body
     if cc:
         payload["cc"] = [{"email": addr.strip()} for addr in cc.split(",") if addr.strip()]
     if bcc:
@@ -272,67 +424,55 @@ def send_brevo_email_sync(
     return True
 
 
-async def send_system_email(
+async def render_and_deliver_email(
+    *,
+    template_id: Optional[str],
     email_type: str,
     to_email: str,
     to_name: str,
     variables: dict[str, str],
-    fallback_subject: str,
-    fallback_html: str,
-) -> bool:
-    """
-    Gửi email hệ thống (Đăng ký, Quên mật khẩu, v.v.):
-    1. Tìm template thích hợp đang được kích hoạt từ cơ sở dữ liệu.
-    2. Nếu có, sử dụng nó; nếu không, fallback về template mặc định.
-    3. Gửi qua Brevo (nếu có API Key) hoặc SMTP (nếu được cấu hình trong .env).
-    4. Tự động lưu lịch sử gửi vào bảng `email_logs`.
-    """
-    # 1. Tìm template đang active trong DB
-    query = """
-        SELECT id, name, subject, html_content, is_active
-        FROM email_templates
-        WHERE type = :type AND is_active = TRUE
-        ORDER BY updated_at DESC
-        LIMIT 1
-    """
-    template = None
-    try:
-        template = await database.fetch_one(query=query, values={"type": email_type})
-    except Exception as e:
-        logger.warning("Failed to fetch email template for type=%s", email_type)
-
-    # 2. Xác định subject và html_content
-    if template:
-        subject = template["subject"]
-        html_content = template["html_content"]
-        template_id = template["id"]
-    else:
-        subject = fallback_subject
-        html_content = fallback_html
-        template_id = None
-
-    # 3. Render các biến động
+    subject: str,
+    html_content: str,
+    text_content: Optional[str] = None,
+    cc: Optional[str] = None,
+    bcc: Optional[str] = None,
+    created_by: str = "system",
+) -> tuple[str, Optional[str], Optional[datetime], bool]:
     rendered_subject = render_template(subject, variables)
     rendered_html = render_template(html_content, variables)
+    rendered_text = render_template(text_content, variables) if text_content else None
 
     status = "pending"
     error_message = None
     sent_at = None
 
-    # 4. Thực hiện gửi email
     try:
         if settings.BREVO_API_KEY:
             email_sent = await run_in_threadpool(
-                send_brevo_email_sync, to_email, to_name, rendered_subject, rendered_html
+                send_brevo_email_sync,
+                to_email,
+                to_name,
+                rendered_subject,
+                rendered_html,
+                rendered_text,
+                cc,
+                bcc,
             )
             status = "sent" if email_sent else "failed"
             sent_at = datetime.now(timezone.utc)
         elif settings.SMTP_HOST:
-            email_sent = await send_smtp_email(to_email, to_name, rendered_subject, rendered_html)
+            email_sent = await send_smtp_email(
+                to_email,
+                to_name,
+                rendered_subject,
+                rendered_html,
+                rendered_text,
+                cc,
+                bcc,
+            )
             status = "sent" if email_sent else "failed"
             sent_at = datetime.now(timezone.utc)
         else:
-            # Dev Mode / Fallback không gửi
             logger.info("Email delivery skipped in dev mode: type=%s", email_type)
             status = "sent"
             sent_at = datetime.now(timezone.utc)
@@ -341,16 +481,14 @@ async def send_system_email(
         error_message = str(exc)
         logger.exception("Email send crashed for type=%s", email_type)
 
-    # 5. Ghi log lịch sử gửi vào DB
     log_id = str(uuid.uuid4())
     try:
-        insert_query = """
+        await database.execute(
+            """
             INSERT INTO email_logs (id, template_id, receiver_email, subject, status, error_message, sent_at, created_by)
             VALUES (:id, :template_id, :receiver_email, :subject, :status, :error_message, :sent_at, :created_by)
-        """
-        await database.execute(
-            query=insert_query,
-            values={
+            """,
+            {
                 "id": log_id,
                 "template_id": template_id,
                 "receiver_email": to_email,
@@ -358,17 +496,56 @@ async def send_system_email(
                 "status": status,
                 "error_message": error_message,
                 "sent_at": sent_at,
-                "created_by": "system",
-            }
+                "created_by": created_by,
+            },
         )
-    except Exception as exc:
+    except Exception:
         logger.exception("Failed to write email log for type=%s", email_type)
 
-    return status == "sent"
+    return status, error_message, sent_at, status == "sent", log_id
+
+
+async def send_system_email(
+    email_type: str,
+    to_email: str,
+    to_name: str,
+    variables: dict[str, str],
+    fallback_subject: Optional[str] = None,
+    fallback_html: Optional[str] = None,
+) -> bool:
+    """
+    Gửi email hệ thống bằng template CMS.
+    fallback_* được giữ lại để tương thích ngược, nhưng template CMS phải tồn tại.
+    """
+    template = await find_email_template(email_type=email_type)
+    if not template:
+        raise HTTPException(status_code=404, detail="Không tìm thấy mẫu email CMS cho chức năng này")
+
+    subject = template["subject"]
+    html_content = template["html_content"]
+    text_content = template.get("text_content")
+    template_id = template["id"]
+
+    _, _, _, success, _ = await render_and_deliver_email(
+        template_id=template_id,
+        email_type=email_type,
+        to_email=to_email,
+        to_name=to_name,
+        variables=variables,
+        subject=subject,
+        html_content=html_content,
+        text_content=text_content,
+        created_by="system",
+    )
+    return success
 
 
 async def send_doctor_status_email(email: str, full_name: str, status: str, note: Optional[str] = None) -> bool:
     """Gửi email thông báo trạng thái xác thực của bác sĩ."""
+    email_type = DOCTOR_STATUS_TEMPLATE_MAP.get(status)
+    if not email_type:
+        raise HTTPException(status_code=404, detail="Không tìm thấy mẫu email CMS cho chức năng này")
+
     hospital_name = settings.EMAIL_FROM_NAME or "CardioGuard AI"
     variables = {
         "full_name": full_name,
@@ -376,111 +553,9 @@ async def send_doctor_status_email(email: str, full_name: str, status: str, note
         "hospital_name": hospital_name,
         "role": "doctor"
     }
-    
-    if status == "pending_verification":
-        subject = "CardioGuard AI - Hồ sơ bác sĩ của bạn đang chờ phê duyệt"
-        html = f"""
-        <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
-          <h2 style="color:#0f766e;margin-bottom:8px">CardioGuard AI</h2>
-          <p style="color:#374151">Xin chào Bác sĩ <strong>{full_name}</strong>,</p>
-          <p style="color:#374151">Hồ sơ bác sĩ của bạn đã được ghi nhận và đang chờ quản trị viên xác thực.</p>
-          <p style="color:#374151">Chúng tôi sẽ thông báo cho bạn ngay sau khi tài khoản được phê duyệt.</p>
-          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
-          <p style="color:#9ca3af;font-size:12px">CardioGuard AI — {hospital_name}</p>
-        </div>
-        """
-        return await send_system_email(
-            email_type="doctor_pending_verification",
-            to_email=email,
-            to_name=full_name,
-            variables=variables,
-            fallback_subject=subject,
-            fallback_html=html
-        )
-    elif status == "active":
-        subject = "CardioGuard AI - Tài khoản bác sĩ của bạn đã được xác thực"
-        html = f"""
-        <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
-          <h2 style="color:#0f766e;margin-bottom:8px">CardioGuard AI</h2>
-          <p style="color:#374151">Xin chào Bác sĩ <strong>{full_name}</strong>,</p>
-          <p style="color:#374151">Tài khoản bác sĩ của bạn đã được xác thực và có thể sử dụng hệ thống CardioGuard AI.</p>
-          <p style="color:#374151">Bây giờ bạn có thể đăng nhập vào cổng bác sĩ để làm việc.</p>
-          <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 28px;">
-            <tr>
-              <td align="center">
-                <a href="{{{{login_url}}}}" 
-                   style="display:inline-block;background:#1183C6;color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:14px 34px;border-radius:999px;">
-                  {{{{login_button_text}}}}
-                </a>
-              </td>
-            </tr>
-          </table>
-          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
-          <p style="color:#9ca3af;font-size:12px">CardioGuard AI — {hospital_name}</p>
-        </div>
-        """
-        return await send_system_email(
-            email_type="doctor_verified",
-            to_email=email,
-            to_name=full_name,
-            variables=variables,
-            fallback_subject=subject,
-            fallback_html=html
-        )
-    elif status == "rejected":
-        subject = "CardioGuard AI - Hồ sơ bác sĩ của bạn chưa được phê duyệt"
-        html = f"""
-        <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
-          <h2 style="color:#e11d48;margin-bottom:8px">CardioGuard AI</h2>
-          <p style="color:#374151">Xin chào Bác sĩ <strong>{full_name}</strong>,</p>
-          <p style="color:#374151">Hồ sơ bác sĩ của bạn chưa được phê duyệt.</p>
-          <p style="color:#374151;padding:12px;background-color:#fef2f2;border-left:4px solid #ef4444;margin:16px 0">
-            <strong>Lý do:</strong> {note or "Không có lý do chi tiết."}
-          </p>
-          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
-          <p style="color:#9ca3af;font-size:12px">CardioGuard AI — {hospital_name}</p>
-        </div>
-        """
-        return await send_system_email(
-            email_type="doctor_rejected",
-            to_email=email,
-            to_name=full_name,
-            variables=variables,
-            fallback_subject=subject,
-            fallback_html=html
-        )
-    elif status == "need_update":
-        subject = "CardioGuard AI - Yêu cầu bổ sung thông tin hồ sơ bác sĩ"
-        html = f"""
-        <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
-          <h2 style="color:#d97706;margin-bottom:8px">CardioGuard AI</h2>
-          <p style="color:#374151">Xin chào Bác sĩ <strong>{full_name}</strong>,</p>
-          <p style="color:#374151">Hồ sơ bác sĩ cần bổ sung thông tin.</p>
-          <p style="color:#374151;padding:12px;background-color:#fffbeb;border-left:4px solid #f59e0b;margin:16px 0">
-            <strong>Nội dung cần bổ sung:</strong> {note or "Vui lòng xem lại hồ sơ."}
-          </p>
-          <p style="color:#374151">Vui lòng đăng nhập lại vào cổng bác sĩ để thực hiện chỉnh sửa và tải lại giấy tờ cần thiết.</p>
-          <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 28px;">
-            <tr>
-              <td align="center">
-                <a href="{{{{login_url}}}}" 
-                   style="display:inline-block;background:#1183C6;color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:14px 34px;border-radius:999px;">
-                  {{{{login_button_text}}}}
-                </a>
-              </td>
-            </tr>
-          </table>
-          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
-          <p style="color:#9ca3af;font-size:12px">CardioGuard AI — {hospital_name}</p>
-        </div>
-        """
-        return await send_system_email(
-            email_type="doctor_need_update",
-            to_email=email,
-            to_name=full_name,
-            variables=variables,
-            fallback_subject=subject,
-            fallback_html=html
-        )
-    return False
-
+    return await send_system_email(
+        email_type=email_type,
+        to_email=email,
+        to_name=full_name,
+        variables=variables,
+    )

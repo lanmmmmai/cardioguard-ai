@@ -3,27 +3,22 @@ import { Eye, EyeOff, Loader2, Monitor, Save, Smartphone, X } from 'lucide-react
 import { API_URL } from '../../../config';
 import { useAuth } from '../../../auth/AuthContext';
 import { EmailVariables } from './EmailVariables';
-
-const TEMPLATE_TYPES = [
-  { value: 'otp_register',        label: 'OTP Đăng ký' },
-  { value: 'otp_login',           label: 'OTP Đăng nhập' },
-  { value: 'welcome',             label: 'Welcome Email' },
-  { value: 'password_reset',      label: 'Đặt lại mật khẩu' },
-  { value: 'alert_critical',      label: 'Cảnh báo khẩn cấp' },
-  { value: 'appointment_reminder',label: 'Nhắc lịch hẹn' },
-  { value: 'doctor_assigned',     label: 'Phân công bác sĩ' },
-  { value: 'health_warning',      label: 'Cảnh báo sức khỏe' },
-  { value: 'monthly_report',      label: 'Báo cáo tháng' },
-  { value: 'custom',              label: 'Tùy chỉnh' },
-];
+import {
+  EMAIL_TEMPLATE_OPTIONS,
+  normalizeCmsEmailId,
+  parseVariablesList,
+  suggestCmsEmailId,
+} from './emailTemplateCatalog';
 
 interface Template {
   id?: string;
+  cms_email_id?: string;
+  email_type: string;
   name: string;
   subject: string;
   html_content: string;
   text_content: string;
-  type: string;
+  variables: string[];
   is_active: boolean;
 }
 
@@ -31,17 +26,20 @@ interface TemplateEditorProps {
   template: Template | null;  // null = tạo mới
   onClose: () => void;
   onSaved: () => void;
+  readOnly?: boolean;
 }
 
-export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClose, onSaved }) => {
+export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClose, onSaved, readOnly = false }) => {
   const { accessToken } = useAuth();
   const [form, setForm] = useState<Template>({
     id: template?.id,
+    cms_email_id: template?.cms_email_id ?? '',
+    email_type: template?.email_type ?? EMAIL_TEMPLATE_OPTIONS[0].value,
     name: template?.name ?? '',
     subject: template?.subject ?? '',
     html_content: template?.id ? '' : DEFAULT_HTML,
     text_content: template?.text_content ?? '',
-    type: template?.type ?? 'custom',
+    variables: template?.variables ?? ['full_name', 'otp'],
     is_active: template?.is_active ?? true,
   });
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
@@ -58,11 +56,13 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
       // Tạo mới template
       if (!template?.id) {
         const newForm: Template = {
+          cms_email_id: suggestCmsEmailId(EMAIL_TEMPLATE_OPTIONS[0].value),
+          email_type: EMAIL_TEMPLATE_OPTIONS[0].value,
           name: '',
           subject: '',
           html_content: DEFAULT_HTML,
           text_content: '',
-          type: 'custom',
+          variables: ['full_name', 'otp'],
           is_active: true,
         };
 
@@ -76,7 +76,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
       setError(null);
 
       try {
-        const res = await fetch(`${API_URL}/email/templates/${template.id}`, {
+        const res = await fetch(`${API_URL}/cms/email-templates/${template.id}`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
@@ -90,11 +90,13 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
 
         const nextForm: Template = {
           id: data.id,
+          cms_email_id: data.cms_email_id || '',
+          email_type: data.email_type || data.type || EMAIL_TEMPLATE_OPTIONS[0].value,
           name: data.name || '',
           subject: data.subject || '',
           html_content: data.html_content || '',
           text_content: data.text_content || '',
-          type: data.type || 'custom',
+          variables: Array.isArray(data.variables) ? data.variables : parseVariablesList(data.variables || ''),
           is_active: data.is_active ?? true,
         };
 
@@ -124,7 +126,21 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
   const set = (field: keyof Template, value: any) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
+  const handleEmailTypeChange = (emailType: string) => {
+    setForm((prev) => {
+      const nextCmsEmailId = prev.cms_email_id && prev.cms_email_id !== suggestCmsEmailId(prev.email_type)
+        ? prev.cms_email_id
+        : suggestCmsEmailId(emailType);
+      return {
+        ...prev,
+        email_type: emailType,
+        cms_email_id: normalizeCmsEmailId(nextCmsEmailId || suggestCmsEmailId(emailType)),
+      };
+    });
+  };
+
   const handleInsertVariable = (syntax: string) => {
+    if (readOnly) return;
     const ta = textareaRef.current;
     if (!ta) return;
     const start = ta.selectionStart;
@@ -139,21 +155,29 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
   };
 
   const handleSave = async () => {
+    if (readOnly) return;
+    if (!form.cms_email_id?.trim()) { setError('Mã ID Email CMS không được trống'); return; }
+    if (!form.email_type) { setError('Chức năng gửi mail không được trống'); return; }
     if (!form.name.trim()) { setError('Tên template không được trống'); return; }
     if (!form.subject.trim()) { setError('Subject không được trống'); return; }
+    if (!form.html_content.trim()) { setError('Nội dung HTML không được trống'); return; }
 
     setError(null);
     setIsSaving(true);
     try {
       const url = template?.id
-        ? `${API_URL}/email/templates/${template.id}`
-        : `${API_URL}/email/templates`;
+        ? `${API_URL}/cms/email-templates/${template.id}`
+        : `${API_URL}/cms/email-templates`;
       const method = template?.id ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          cms_email_id: normalizeCmsEmailId(form.cms_email_id || ''),
+          variables: form.variables,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Lưu thất bại');
@@ -172,7 +196,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
         <div className="email-editor-header">
           <div>
             <h2 className="email-editor-title">
-              {template?.id ? 'Chỉnh sửa template' : 'Tạo template mới'}
+              {template?.id ? (readOnly ? 'Xem template' : 'Chỉnh sửa template') : 'Tạo template mới'}
             </h2>
             <p className="email-editor-subtitle">Chỉnh sửa nội dung và xem preview real-time</p>
           </div>
@@ -181,21 +205,28 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
               type="button"
               className={`btn btn-secondary ${showVariables ? 'active' : ''}`}
               onClick={() => setShowVariables((v) => !v)}
+              disabled={readOnly}
             >
               {showVariables ? <EyeOff size={15} /> : <Eye size={15} />}
               {showVariables ? 'Ẩn biến' : 'Biến động'}
             </button>
+            {!readOnly && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving
+                  ? <><Loader2 size={15} className="beat-animated" /> Đang lưu...</>
+                  : <><Save size={15} /> Lưu template</>}
+              </button>
+            )}
             <button
               type="button"
-              className="btn btn-primary"
-              onClick={handleSave}
-              disabled={isSaving}
+              className="btn btn-secondary"
+              onClick={onClose}
             >
-              {isSaving
-                ? <><Loader2 size={15} className="beat-animated" /> Đang lưu...</>
-                : <><Save size={15} /> Lưu template</>}
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={onClose}>
               <X size={15} />
             </button>
           </div>
@@ -220,6 +251,17 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
               </div>
             )}
 
+              <div className="form-group">
+              <label>Mã ID Email CMS <span style={{ color: 'var(--color-critical)' }}>*</span></label>
+              <input
+                className="form-control"
+                value={form.cms_email_id || ''}
+                onChange={(e) => set('cms_email_id', normalizeCmsEmailId(e.target.value))}
+                placeholder="EMAIL_OTP_REGISTER"
+                disabled={isLoadingTemplate || readOnly}
+              />
+            </div>
+
             <div className="form-group">
               <label>Tên template <span style={{ color: 'var(--color-critical)' }}>*</span></label>
               <input
@@ -227,6 +269,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
                 value={form.name}
                 onChange={(e) => set('name', e.target.value)}
                 placeholder="VD: OTP Đăng Ký Tài Khoản"
+                disabled={readOnly}
               />
             </div>
 
@@ -237,18 +280,20 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
                 value={form.subject}
                 onChange={(e) => set('subject', e.target.value)}
                 placeholder="VD: CardioGuard AI - Mã OTP của bạn"
+                disabled={readOnly}
               />
             </div>
 
             <div className="email-editor-row">
               <div className="form-group" style={{ flex: 1 }}>
-                <label>Loại template</label>
+                <label>Chức năng gửi mail <span style={{ color: 'var(--color-critical)' }}>*</span></label>
                 <select
                   className="form-control"
-                  value={form.type}
-                  onChange={(e) => set('type', e.target.value)}
+                  value={form.email_type}
+                  onChange={(e) => handleEmailTypeChange(e.target.value)}
+                  disabled={readOnly}
                 >
-                  {TEMPLATE_TYPES.map((t) => (
+                  {EMAIL_TEMPLATE_OPTIONS.map((t) => (
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
                 </select>
@@ -259,11 +304,24 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
                     type="checkbox"
                     checked={form.is_active}
                     onChange={(e) => set('is_active', e.target.checked)}
+                    disabled={readOnly}
                     style={{ width: 16, height: 16, accentColor: 'var(--color-safe)' }}
                   />
                   Kích hoạt
                 </label>
               </div>
+            </div>
+
+            <div className="form-group">
+              <label>Biến hỗ trợ</label>
+              <textarea
+                className="form-control"
+                rows={3}
+                value={form.variables.join('\n')}
+                onChange={(e) => set('variables', parseVariablesList(e.target.value))}
+                placeholder="{{full_name}}\n{{otp}}\n{{current_date}}"
+                disabled={readOnly}
+              />
             </div>
 
             <div className="form-group" style={{ flex: 1 }}>
@@ -278,7 +336,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
                 onChange={(e) => set('html_content', e.target.value)}
                 placeholder={isLoadingTemplate ? 'Đang tải template...' : 'Nhập HTML hoặc dùng biến động {{full_name}}, {{otp}}...'}
                 spellCheck={false}
-                disabled={isLoadingTemplate}
+                disabled={isLoadingTemplate || readOnly}
               />
             </div>
 
@@ -290,6 +348,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
                 value={form.text_content}
                 onChange={(e) => set('text_content', e.target.value)}
                 placeholder="Phiên bản text để hiển thị khi email client không hỗ trợ HTML..."
+                disabled={readOnly}
               />
             </div>
           </div>

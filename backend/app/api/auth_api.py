@@ -165,87 +165,29 @@ from app.services.email_service import send_system_email
 
 
 async def send_forgot_password_otp_email(email: str, full_name: str, otp: str, role: Optional[str] = None) -> bool:
-    fallback_subject = "CardioGuard AI - Mã OTP đặt lại mật khẩu"
-    fallback_html = f"""
-    <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
-      <h2 style="color:#e11d48;margin-bottom:8px">CardioGuard AI</h2>
-      <p style="color:#374151">Xin chào <strong>{full_name}</strong>,</p>
-      <p style="color:#374151">Bạn vừa yêu cầu đặt lại mật khẩu. Mã OTP của bạn là:</p>
-      <div style="font-size:36px;font-weight:700;letter-spacing:10px;text-align:center;padding:24px 0;color:#e11d48">
-        {otp}
-      </div>
-      <p style="color:#6b7280;font-size:13px">Mã có hiệu lực trong <strong>10 phút</strong>. Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
-      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
-      <p style="color:#9ca3af;font-size:12px">CardioGuard AI</p>
-    </div>
-    """
     return await send_system_email(
         email_type="password_reset",
         to_email=email,
         to_name=full_name,
         variables={"full_name": full_name, "otp": otp, "role": role},
-        fallback_subject=fallback_subject,
-        fallback_html=fallback_html,
     )
 
 
 async def send_random_password_email(email: str, full_name: str, new_password: str, role: Optional[str] = None) -> bool:
-    fallback_subject = "CardioGuard AI - Mật khẩu mới của bạn"
-    fallback_html = f"""
-    <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
-      <h2 style="color:#e11d48;margin-bottom:8px">CardioGuard AI</h2>
-      <p style="color:#374151">Xin chào <strong>{full_name}</strong>,</p>
-      <p style="color:#374151">Mật khẩu của bạn đã được đặt lại thành công. Mật khẩu tạm thời của bạn là:</p>
-      <div style="font-size:24px;font-weight:700;text-align:center;padding:24px 0;color:#e11d48">
-        {new_password}
-      </div>
-      <p style="color:#6b7280;font-size:13px">Vui lòng đăng nhập với mật khẩu này. Bạn sẽ được yêu cầu đổi mật khẩu ngay sau khi đăng nhập thành công.</p>
-      <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 28px;">
-        <tr>
-          <td align="center">
-            <a href="{{{{login_url}}}}" 
-               style="display:inline-block;background:#1183C6;color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:14px 34px;border-radius:999px;">
-              {{{{login_button_text}}}}
-            </a>
-          </td>
-        </tr>
-      </table>
-      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
-      <p style="color:#9ca3af;font-size:12px">CardioGuard AI</p>
-    </div>
-    """
     return await send_system_email(
         email_type="password_reset",
         to_email=email,
         to_name=full_name,
         variables={"full_name": full_name, "new_password": new_password, "otp": new_password, "role": role},
-        fallback_subject=fallback_subject,
-        fallback_html=fallback_html,
     )
 
 
 async def send_register_otp_email(email: str, full_name: str, otp: str, role: Optional[str] = "patient") -> bool:
-    fallback_subject = "CardioGuard AI - Mã OTP đăng ký"
-    fallback_html = f"""
-    <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
-      <h2 style="color:#e11d48;margin-bottom:8px">CardioGuard AI</h2>
-      <p style="color:#374151">Xin chào <strong>{full_name}</strong>,</p>
-      <p style="color:#374151">Mã OTP đăng ký tài khoản của bạn là:</p>
-      <div style="font-size:36px;font-weight:700;letter-spacing:10px;text-align:center;padding:24px 0;color:#e11d48">
-        {otp}
-      </div>
-      <p style="color:#6b7280;font-size:13px">Mã có hiệu lực trong <strong>10 phút</strong>. Không chia sẻ mã này với bất kỳ ai.</p>
-      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
-      <p style="color:#9ca3af;font-size:12px">CardioGuard AI — Hệ thống giám sát tim mạch thông minh</p>
-    </div>
-    """
     return await send_system_email(
         email_type="otp_register",
         to_email=email,
         to_name=full_name,
         variables={"full_name": full_name, "otp": otp, "role": role},
-        fallback_subject=fallback_subject,
-        fallback_html=fallback_html,
     )
 
 

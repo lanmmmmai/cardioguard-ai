@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from app.core.database import database
 
@@ -201,6 +202,313 @@ async def ensure_profile_schema() -> None:
         logger.info("Role profile schema synchronized")
     except Exception:
         logger.exception("Failed to synchronize role profile schema")
+        raise
+
+
+async def ensure_email_cms_schema() -> None:
+    """Ensure the email CMS schema supports cms_email_id/email_type lookups."""
+    logger.info("Synchronizing email CMS schema")
+    try:
+        await database.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+    except Exception:
+        logger.warning("Could not ensure pgcrypto extension for email CMS schema", exc_info=True)
+
+    statements = [
+        "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS cms_email_id TEXT",
+        "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS email_type TEXT",
+        "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS text_content TEXT DEFAULT ''",
+        "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS variables JSONB DEFAULT '[]'::jsonb",
+        "UPDATE email_templates SET email_type = COALESCE(NULLIF(email_type, ''), NULLIF(type, '')) WHERE email_type IS NULL OR email_type = ''",
+        """
+        UPDATE email_templates
+        SET cms_email_id = CASE
+            WHEN cms_email_id IS NOT NULL AND cms_email_id <> '' THEN cms_email_id
+            ELSE 'EMAIL_' || upper(regexp_replace(COALESCE(NULLIF(email_type, ''), NULLIF(type, ''), 'CUSTOM'), '[^A-Za-z0-9]+', '_', 'g'))
+        END
+        WHERE cms_email_id IS NULL OR cms_email_id = ''
+        """,
+        "ALTER TABLE email_templates ALTER COLUMN html_content SET DEFAULT ''",
+        "ALTER TABLE email_templates ALTER COLUMN text_content SET DEFAULT ''",
+        "ALTER TABLE email_templates ALTER COLUMN variables SET DEFAULT '[]'::jsonb",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_email_templates_cms_email_id ON email_templates(cms_email_id)",
+        "CREATE INDEX IF NOT EXISTS idx_email_templates_email_type_active ON email_templates(email_type, is_active DESC, updated_at DESC)",
+        """
+        CREATE OR REPLACE FUNCTION update_email_templates_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+        """,
+        "DROP TRIGGER IF EXISTS trg_email_templates_updated_at ON email_templates",
+        """
+        CREATE TRIGGER trg_email_templates_updated_at
+        BEFORE UPDATE ON email_templates
+        FOR EACH ROW
+        EXECUTE FUNCTION update_email_templates_updated_at()
+        """,
+    ]
+
+    try:
+        for statement in statements:
+            await database.execute(statement)
+    except Exception:
+        logger.exception("Failed to synchronize email CMS schema")
+        raise
+
+    default_templates = [
+        {
+            "cms_email_id": "EMAIL_OTP_REGISTER",
+            "email_type": "otp_register",
+            "name": "OTP Đăng ký",
+            "subject": "CardioGuard AI - Mã OTP đăng ký của bạn",
+            "text_content": "Xin chào {{full_name}},\nMã OTP đăng ký tài khoản của bạn là {{otp}}.",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+                  <h2 style="color:#e11d48;margin-bottom:8px">CardioGuard AI</h2>
+                  <p style="color:#374151">Xin chào <strong>{{full_name}}</strong>,</p>
+                  <p style="color:#374151">Mã OTP đăng ký tài khoản của bạn là:</p>
+                  <div style="font-size:36px;font-weight:700;letter-spacing:10px;text-align:center;padding:24px 0;color:#e11d48">{{otp}}</div>
+                  <p style="color:#6b7280;font-size:13px">Mã có hiệu lực trong <strong>10 phút</strong>. Không chia sẻ mã này với bất kỳ ai.</p>
+                  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
+                  <p style="color:#9ca3af;font-size:12px">CardioGuard AI — {{hospital_name}}</p>
+                </div>
+            """,
+            "variables": ["full_name", "otp", "hospital_name", "current_date"],
+        },
+        {
+            "cms_email_id": "EMAIL_OTP_LOGIN",
+            "email_type": "otp_login",
+            "name": "OTP Đăng nhập",
+            "subject": "CardioGuard AI - Mã OTP đăng nhập của bạn",
+            "text_content": "Xin chào {{full_name}},\nMã OTP đăng nhập của bạn là {{otp}}.",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+                  <h2 style="color:#0f766e;margin-bottom:8px">CardioGuard AI</h2>
+                  <p style="color:#374151">Xin chào <strong>{{full_name}}</strong>,</p>
+                  <p style="color:#374151">Mã OTP đăng nhập của bạn là:</p>
+                  <div style="font-size:36px;font-weight:700;letter-spacing:10px;text-align:center;padding:24px 0;color:#0f766e">{{otp}}</div>
+                  <p style="color:#6b7280;font-size:13px">Mã có hiệu lực trong <strong>10 phút</strong>.</p>
+                </div>
+            """,
+            "variables": ["full_name", "otp", "hospital_name", "current_date"],
+        },
+        {
+            "cms_email_id": "EMAIL_WELCOME",
+            "email_type": "welcome",
+            "name": "Welcome Email",
+            "subject": "Chào mừng {{full_name}} đến với CardioGuard AI",
+            "text_content": "Xin chào {{full_name}}, chào mừng bạn đến với CardioGuard AI.",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+                  <h2 style="color:#0f766e;margin-bottom:8px">CardioGuard AI</h2>
+                  <p style="color:#374151">Xin chào <strong>{{full_name}}</strong>,</p>
+                  <p style="color:#374151">Tài khoản của bạn đã được kích hoạt thành công. Bạn có thể đăng nhập và bắt đầu sử dụng hệ thống.</p>
+                  <p style="color:#374151">Vai trò của bạn: <strong>{{role_label}}</strong></p>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 28px;">
+                    <tr>
+                      <td align="center">
+                        <a href="{{login_url}}" style="display:inline-block;background:#1183C6;color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:14px 34px;border-radius:999px;">{{login_button_text}}</a>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+            """,
+            "variables": ["full_name", "role_label", "login_url", "login_button_text"],
+        },
+        {
+            "cms_email_id": "EMAIL_RESET_PASSWORD",
+            "email_type": "reset_password",
+            "name": "Đặt lại mật khẩu",
+            "subject": "CardioGuard AI - Mật khẩu mới của bạn",
+            "text_content": "Xin chào {{full_name}}, mật khẩu mới của bạn là {{otp}}.",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+                  <h2 style="color:#e11d48;margin-bottom:8px">CardioGuard AI</h2>
+                  <p style="color:#374151">Xin chào <strong>{{full_name}}</strong>,</p>
+                  <p style="color:#374151">Mật khẩu tạm thời của bạn là:</p>
+                  <div style="font-size:24px;font-weight:700;text-align:center;padding:24px 0;color:#e11d48;letter-spacing:4px">{{otp}}</div>
+                  <p style="color:#6b7280;font-size:13px">Vui lòng đăng nhập và đổi mật khẩu ngay sau khi đăng nhập thành công.</p>
+                </div>
+            """,
+            "variables": ["full_name", "otp"],
+        },
+        {
+            "cms_email_id": "EMAIL_EMERGENCY_ALERT",
+            "email_type": "emergency_alert",
+            "name": "Cảnh báo khẩn cấp",
+            "subject": "CardioGuard AI - CẢNH BÁO: Chỉ số bất thường",
+            "text_content": "Bệnh nhân {{full_name}} có cảnh báo sức khỏe: {{alert_message}}.",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px;border:2px solid #e11d48;border-radius:12px">
+                  <h2 style="color:#e11d48;margin-bottom:8px">⚠️ CẢNH BÁO SỨC KHỎE</h2>
+                  <p style="color:#374151">Bệnh nhân <strong>{{full_name}}</strong> có chỉ số bất thường:</p>
+                  <p style="color:#374151;padding:12px;background:#fef2f2;border-radius:8px;font-size:14px"><strong>Thông báo:</strong> {{alert_message}}</p>
+                </div>
+            """,
+            "variables": ["full_name", "alert_message", "heart_rate", "spo2"],
+        },
+        {
+            "cms_email_id": "EMAIL_APPOINTMENT_REMINDER",
+            "email_type": "appointment_reminder",
+            "name": "Nhắc lịch hẹn",
+            "subject": "CardioGuard AI - Nhắc lịch hẹn khám",
+            "text_content": "Xin chào {{full_name}}, bạn có lịch hẹn vào {{appointment_date}}.",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+                  <h2 style="color:#0f766e;margin-bottom:8px">CardioGuard AI</h2>
+                  <p style="color:#374151">Xin chào <strong>{{full_name}}</strong>,</p>
+                  <p style="color:#374151">Bạn có lịch hẹn khám vào <strong>{{appointment_date}}</strong>.</p>
+                </div>
+            """,
+            "variables": ["full_name", "appointment_date", "doctor_name"],
+        },
+        {
+            "cms_email_id": "EMAIL_DOCTOR_ASSIGNMENT",
+            "email_type": "doctor_assignment",
+            "name": "Phân công bác sĩ",
+            "subject": "CardioGuard AI - Bạn đã được phân công bác sĩ",
+            "text_content": "Xin chào {{full_name}}, bác sĩ phụ trách của bạn là {{doctor_name}}.",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+                  <h2 style="color:#0f766e;margin-bottom:8px">CardioGuard AI</h2>
+                  <p style="color:#374151">Xin chào <strong>{{full_name}}</strong>,</p>
+                  <p style="color:#374151">Bác sĩ phụ trách của bạn là <strong>{{doctor_name}}</strong>.</p>
+                </div>
+            """,
+            "variables": ["full_name", "doctor_name"],
+        },
+        {
+            "cms_email_id": "EMAIL_HEALTH_ALERT",
+            "email_type": "health_alert",
+            "name": "Cảnh báo sức khỏe",
+            "subject": "CardioGuard AI - Cảnh báo sức khỏe",
+            "text_content": "Xin chào {{full_name}}, {{alert_message}}",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+                  <h2 style="color:#d97706;margin-bottom:8px">CardioGuard AI</h2>
+                  <p style="color:#374151">Xin chào <strong>{{full_name}}</strong>,</p>
+                  <p style="color:#374151">{{alert_message}}</p>
+                </div>
+            """,
+            "variables": ["full_name", "alert_message"],
+        },
+        {
+            "cms_email_id": "EMAIL_MONTHLY_REPORT",
+            "email_type": "monthly_report",
+            "name": "Báo cáo tháng",
+            "subject": "CardioGuard AI - Báo cáo sức khỏe tháng",
+            "text_content": "Xin chào {{full_name}}, đây là báo cáo tháng của bạn.",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+                  <h2 style="color:#0f766e;margin-bottom:8px">CardioGuard AI</h2>
+                  <p style="color:#374151">Xin chào <strong>{{full_name}}</strong>,</p>
+                  <p style="color:#374151">Đây là báo cáo sức khỏe tháng của bạn.</p>
+                </div>
+            """,
+            "variables": ["full_name", "current_date"],
+        },
+        {
+            "cms_email_id": "EMAIL_DOCTOR_PENDING_VERIFICATION",
+            "email_type": "doctor_pending_verification",
+            "name": "Bác sĩ chờ duyệt",
+            "subject": "CardioGuard AI - Hồ sơ bác sĩ đang chờ phê duyệt",
+            "text_content": "Xin chào {{full_name}}, hồ sơ của bạn đang chờ phê duyệt.",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+                  <h2 style="color:#0f766e;margin-bottom:8px">CardioGuard AI</h2>
+                  <p style="color:#374151">Xin chào Bác sĩ <strong>{{full_name}}</strong>,</p>
+                  <p style="color:#374151">Hồ sơ bác sĩ của bạn đã được ghi nhận và đang chờ quản trị viên xác thực.</p>
+                </div>
+            """,
+            "variables": ["full_name", "hospital_name"],
+        },
+        {
+            "cms_email_id": "EMAIL_DOCTOR_VERIFIED",
+            "email_type": "doctor_verified",
+            "name": "Bác sĩ đã xác thực",
+            "subject": "CardioGuard AI - Tài khoản bác sĩ đã được xác thực",
+            "text_content": "Xin chào {{full_name}}, tài khoản của bạn đã được xác thực.",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+                  <h2 style="color:#0f766e;margin-bottom:8px">CardioGuard AI</h2>
+                  <p style="color:#374151">Xin chào Bác sĩ <strong>{{full_name}}</strong>,</p>
+                  <p style="color:#374151">Tài khoản bác sĩ của bạn đã được xác thực và có thể sử dụng hệ thống CardioGuard AI.</p>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0 28px;">
+                    <tr>
+                      <td align="center">
+                        <a href="{{login_url}}" style="display:inline-block;background:#1183C6;color:#ffffff;text-decoration:none;font-size:16px;font-weight:800;padding:14px 34px;border-radius:999px;">{{login_button_text}}</a>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+            """,
+            "variables": ["full_name", "login_url", "login_button_text"],
+        },
+        {
+            "cms_email_id": "EMAIL_DOCTOR_REJECTED",
+            "email_type": "doctor_rejected",
+            "name": "Bác sĩ bị từ chối",
+            "subject": "CardioGuard AI - Hồ sơ bác sĩ chưa được phê duyệt",
+            "text_content": "Xin chào {{full_name}}, hồ sơ của bạn chưa được phê duyệt: {{verification_note}}.",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+                  <h2 style="color:#e11d48;margin-bottom:8px">CardioGuard AI</h2>
+                  <p style="color:#374151">Xin chào Bác sĩ <strong>{{full_name}}</strong>,</p>
+                  <p style="color:#374151">Hồ sơ bác sĩ của bạn chưa được phê duyệt.</p>
+                  <p style="color:#374151;padding:12px;background-color:#fef2f2;border-left:4px solid #ef4444;margin:16px 0">
+                    <strong>Lý do:</strong> {{verification_note}}
+                  </p>
+                </div>
+            """,
+            "variables": ["full_name", "verification_note"],
+        },
+        {
+            "cms_email_id": "EMAIL_DOCTOR_NEED_UPDATE",
+            "email_type": "doctor_need_update",
+            "name": "Bác sĩ cần bổ sung",
+            "subject": "CardioGuard AI - Yêu cầu bổ sung hồ sơ bác sĩ",
+            "text_content": "Xin chào {{full_name}}, vui lòng cập nhật hồ sơ: {{verification_note}}.",
+            "html_content": """
+                <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
+                  <h2 style="color:#d97706;margin-bottom:8px">CardioGuard AI</h2>
+                  <p style="color:#374151">Xin chào Bác sĩ <strong>{{full_name}}</strong>,</p>
+                  <p style="color:#374151">Hồ sơ bác sĩ cần bổ sung thông tin.</p>
+                  <p style="color:#374151;padding:12px;background-color:#fffbeb;border-left:4px solid #f59e0b;margin:16px 0">
+                    <strong>Nội dung cần bổ sung:</strong> {{verification_note}}
+                  </p>
+                </div>
+            """,
+            "variables": ["full_name", "verification_note", "login_url", "login_button_text"],
+        },
+    ]
+
+    try:
+        for template in default_templates:
+            await database.execute(
+                """
+                INSERT INTO email_templates (
+                    cms_email_id, email_type, name, subject, html_content, text_content, variables, type, is_active
+                )
+                VALUES (
+                    :cms_email_id, :email_type, :name, :subject, :html_content, :text_content, :variables::jsonb, :type, TRUE
+                )
+                ON CONFLICT (cms_email_id) DO NOTHING
+                """,
+                {
+                    "cms_email_id": template["cms_email_id"],
+                    "email_type": template["email_type"],
+                    "name": template["name"],
+                    "subject": template["subject"],
+                    "html_content": template["html_content"].strip(),
+                    "text_content": template["text_content"].strip(),
+                    "variables": json.dumps(template["variables"]),
+                    "type": template["email_type"],
+                },
+            )
+    except Exception:
+        logger.exception("Failed to seed default email CMS templates")
         raise
 
 

@@ -8,18 +8,21 @@
 -- -------------------------------------------------------
 CREATE TABLE IF NOT EXISTS email_templates (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    cms_email_id TEXT       NOT NULL,
+    email_type  TEXT        NOT NULL,
     name        TEXT        NOT NULL,
     subject     TEXT        NOT NULL,
     html_content TEXT       NOT NULL DEFAULT '',
     text_content TEXT       DEFAULT '',
-    type        TEXT        NOT NULL DEFAULT 'custom',
-    -- Loại template: otp_register | otp_login | welcome | password_reset |
-    --                alert_critical | appointment_reminder | doctor_assigned |
-    --                health_warning | monthly_report | custom
+    variables   JSONB       NOT NULL DEFAULT '[]'::jsonb,
+    type        TEXT        NOT NULL DEFAULT 'otp_register',
     is_active   BOOLEAN     NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_email_templates_cms_email_id ON email_templates(cms_email_id);
+CREATE INDEX IF NOT EXISTS idx_email_templates_email_type_active ON email_templates(email_type, is_active DESC, updated_at DESC);
 
 -- Trigger tự động cập nhật updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -59,8 +62,10 @@ CREATE INDEX IF NOT EXISTS idx_email_logs_template_id  ON email_logs(template_id
 -- -------------------------------------------------------
 -- Seed: 3 mẫu template mặc định để test
 -- -------------------------------------------------------
-INSERT INTO email_templates (name, subject, html_content, type, is_active) VALUES
+INSERT INTO email_templates (cms_email_id, email_type, name, subject, html_content, text_content, variables, type, is_active) VALUES
 (
+    'EMAIL_OTP_REGISTER',
+    'otp_register',
     'OTP Đăng Ký',
     'CardioGuard AI - Mã OTP đăng ký của bạn',
     '<div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
@@ -72,10 +77,14 @@ INSERT INTO email_templates (name, subject, html_content, type, is_active) VALUE
   <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
   <p style="color:#9ca3af;font-size:12px">CardioGuard AI — {{hospital_name}}</p>
 </div>',
+    'Xin chào {{full_name}}, mã OTP đăng ký của bạn là {{otp}}.',
+    '["full_name","otp","hospital_name","current_date"]'::jsonb,
     'otp_register',
     TRUE
 ),
 (
+    'EMAIL_RESET_PASSWORD',
+    'reset_password',
     'Đặt Lại Mật Khẩu',
     'CardioGuard AI - Mật khẩu mới của bạn',
     '<div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
@@ -87,10 +96,14 @@ INSERT INTO email_templates (name, subject, html_content, type, is_active) VALUE
   <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0"/>
   <p style="color:#9ca3af;font-size:12px">{{current_date}} — CardioGuard AI</p>
 </div>',
-    'password_reset',
+    'Xin chào {{full_name}}, mật khẩu mới của bạn là {{otp}}.',
+    '["full_name","otp","current_date"]'::jsonb,
+    'reset_password',
     TRUE
 ),
 (
+    'EMAIL_EMERGENCY_ALERT',
+    'emergency_alert',
     'Cảnh Báo Sức Khỏe Khẩn Cấp',
     'CardioGuard AI - CẢNH BÁO: Chỉ số bất thường',
     '<div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:2px solid #e11d48;border-radius:12px">
@@ -103,7 +116,9 @@ INSERT INTO email_templates (name, subject, html_content, type, is_active) VALUE
   <p style="color:#374151;padding:12px;background:#fef2f2;border-radius:8px;font-size:14px"><strong>Thông báo:</strong> {{alert_message}}</p>
   <p style="color:#9ca3af;font-size:12px;margin-top:16px">Bác sĩ: {{doctor_name}} — {{current_date}}</p>
 </div>',
-    'alert_critical',
+    'Bệnh nhân {{full_name}} có cảnh báo sức khỏe: {{alert_message}}',
+    '["full_name","heart_rate","spo2","alert_message","doctor_name","current_date"]'::jsonb,
+    'emergency_alert',
     TRUE
 )
 ON CONFLICT DO NOTHING;

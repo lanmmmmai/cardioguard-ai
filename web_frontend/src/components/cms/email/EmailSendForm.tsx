@@ -5,9 +5,10 @@ import { useAuth } from '../../../auth/AuthContext';
 
 interface Template {
   id: string;
+  cms_email_id: string;
+  email_type: string;
   name: string;
   subject: string;
-  type: string;
   is_active: boolean;
 }
 
@@ -35,7 +36,7 @@ export const EmailSendForm: React.FC<EmailSendFormProps> = ({ onSent }) => {
   // Load danh sách template
   useEffect(() => {
     if (!accessToken) return;
-    fetch(`${API_URL}/email/templates?limit=100`, {
+    fetch(`${API_URL}/cms/email-templates?limit=100&is_active=true`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
       .then((r) => r.json())
@@ -70,7 +71,7 @@ export const EmailSendForm: React.FC<EmailSendFormProps> = ({ onSent }) => {
     setError(null);
     try {
       // Lấy html_content của template
-      const tplRes = await fetch(`${API_URL}/email/templates/${templateId}`, {
+      const tplRes = await fetch(`${API_URL}/cms/email-templates/${templateId}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const tpl = await tplRes.json();
@@ -159,7 +160,7 @@ export const EmailSendForm: React.FC<EmailSendFormProps> = ({ onSent }) => {
           >
             <option value="">-- Không dùng template --</option>
             {templates.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+              <option key={t.id} value={t.id}>{`${t.name} (${t.cms_email_id})`}</option>
             ))}
           </select>
         </div>
