@@ -23,6 +23,46 @@ from app.core.database import database
 logger = logging.getLogger(__name__)
 
 
+ROLE_EMAIL_MAP = {
+    "patient": {
+        "role_label": "Bệnh nhân",
+        "role_description": "Theo dõi sức khỏe cá nhân, nhận cảnh báo thông minh, quản lý hồ sơ sức khỏe và lịch sử chăm sóc.",
+    },
+    "benh_nhan": {
+        "role_label": "Bệnh nhân",
+        "role_description": "Theo dõi sức khỏe cá nhân, nhận cảnh báo thông minh, quản lý hồ sơ sức khỏe và lịch sử chăm sóc.",
+    },
+    "doctor": {
+        "role_label": "Bác sĩ",
+        "role_description": "Theo dõi danh sách bệnh nhân, xem dữ liệu sức khỏe, quản lý lịch hẹn và hỗ trợ tư vấn điều trị.",
+    },
+    "bac_si": {
+        "role_label": "Bác sĩ",
+        "role_description": "Theo dõi danh sách bệnh nhân, xem dữ liệu sức khỏe, quản lý lịch hẹn và hỗ trợ tư vấn điều trị.",
+    },
+    "admin": {
+        "role_label": "Quản trị viên",
+        "role_description": "Quản lý hệ thống, tài khoản người dùng, thiết bị IoT, mẫu email, báo cáo và nhật ký hoạt động.",
+    },
+    "quan_tri_vien": {
+        "role_label": "Quản trị viên",
+        "role_description": "Quản lý hệ thống, tài khoản người dùng, thiết bị IoT, mẫu email, báo cáo và nhật ký hoạt động.",
+    },
+}
+
+
+def get_role_email_context(role: Optional[str]) -> dict[str, str]:
+    role_key = (role or "").strip().lower()
+
+    return ROLE_EMAIL_MAP.get(
+        role_key,
+        {
+            "role_label": "Người dùng",
+            "role_description": "Sử dụng các chức năng phù hợp với tài khoản trong hệ thống CardioGuard AI.",
+        },
+    )
+
+
 def render_template(html: str, variables: dict[str, str]) -> str:
     """Thay thế các biến động dạng {{variable_name}} trong template HTML."""
     # Làm giàu biến để tương thích chéo giữa otp, otp_code và new_password
@@ -36,9 +76,26 @@ def render_template(html: str, variables: dict[str, str]) -> str:
         enriched["otp"] = enriched["new_password"]
         enriched["otp_code"] = enriched["new_password"]
 
+    # Làm giàu biến role
+    role_value = (
+        enriched.get("role")
+        or enriched.get("user_role")
+        or enriched.get("account_role")
+        or ""
+    )
+
+    role_context = get_role_email_context(role_value)
+
+    if not enriched.get("role_label"):
+        enriched["role_label"] = role_context["role_label"]
+
+    if not enriched.get("role_description"):
+        enriched["role_description"] = role_context["role_description"]
+
     defaults = {
         "hospital_name": settings.EMAIL_FROM_NAME or "CardioGuard AI",
         "current_date": datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M"),
+        "full_name": enriched.get("full_name") or "Người dùng",
     }
     merged = {**defaults, **enriched}
 
