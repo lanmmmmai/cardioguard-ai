@@ -1,4 +1,5 @@
 import json
+import logging
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -84,10 +85,11 @@ async def health():
             }
         }
     except Exception as e:
+        logging.getLogger(__name__).exception("Database health check failed")
         return Response(
             content=json.dumps({
                 "status": "unhealthy",
-                "database": f"error: {str(e)}",
+                "database": "error: unavailable",
                 "services": {
                     "web_server": "running"
                 }

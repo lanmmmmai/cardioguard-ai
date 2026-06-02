@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 BASE_DIR = Path(__file__).resolve().parents[3]
-DEFAULT_SECRET_KEY = "heart_monitor_secret_key"
+
 
 
 class Settings(BaseSettings):
@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     @field_validator("SECRET_KEY")
     @classmethod
     def validate_secret_key(cls, value: str) -> str:
-        if value == DEFAULT_SECRET_KEY:
-            raise ValueError("SECRET_KEY must not use the default development value")
+        if "heart_monitor" in value.lower() or value == "secret_key":
+            raise ValueError("SECRET_KEY must be a strong and non-default value")
         return value
 
     model_config = SettingsConfigDict(

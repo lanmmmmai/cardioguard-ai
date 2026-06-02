@@ -590,54 +590,26 @@ async def delete_user(
     if not check_user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
         
-    # Cố gắng Hard Delete trước trong transaction để rollback toàn phần nếu fail.
-    transaction = await database.transaction()
-    try:
-        # 1) Dọn dẹp phân công doctor_patient bên trong transaction.
-        await database.execute(
-            "DELETE FROM doctor_patient WHERE patient_id::text = :user_id OR doctor_id::text = :user_id",
-            {"user_id": user_id},
-        )
+    if user_id == user["id"]:
+        raise HTTPException(status_code=400, detail="Không thể tự xóa hoặc vô hiệu hóa tài khoản của chính mình")
+        
+    # Luôn sử dụng Soft Delete để bảo toàn dữ liệu y tế lâm sàng nhạy cảm và lịch sử audit
+    await database.execute("UPDATE users SET status = 'inactive' WHERE id::text = :user_id", {"user_id": user_id})
 
-        # Nếu là bệnh nhân, cố gắng dọn dẹp dòng liên kết trong bảng patients trước
-        if check_user["role"] == "patient":
-            await database.execute("DELETE FROM patients WHERE user_id::text = :user_id", {"user_id": user_id})
-            
-        # Thử xóa vĩnh viễn user khỏi bảng users
-        await database.execute("DELETE FROM users WHERE id::text = :user_id", {"user_id": user_id})
-        await transaction.commit()
-        
-        # Ghi nhận log Admin xóa vĩnh viễn user
-        await log_activity(
-            user_id=user["id"],
-            action="ADMIN_HARD_DELETE_USER",
-            entity_type="users",
-            entity_id=user_id,
-            ip_address=request.client.host if request.client else "-"
-        )
-        return {"message": "Xóa vĩnh viễn tài khoản thành công", "id": user_id, "status": "deleted"}
-        
-    except Exception as e:
-        # Nếu vi phạm bất kỳ khóa ngoại nào từ các bảng dữ liệu lâm sàng khác (bệnh án, chỉ số đo, lịch hẹn...), rollback ngay
-        await transaction.rollback()
-        
-        # Tự động chuyển hướng sang Soft Delete: chuyển trạng thái thành 'inactive' để bảo toàn dữ liệu y tế nhạy cảm
-        await database.execute("UPDATE users SET status = 'inactive' WHERE id::text = :user_id", {"user_id": user_id})
-
-        # Ghi nhận log Admin xóa user dạng vô hiệu hóa an toàn (Soft Delete)
-        await log_activity(
-            user_id=user["id"],
-            action="ADMIN_DELETE_USER",
-            entity_type="users",
-            entity_id=user_id,
-            ip_address=request.client.host if request.client else "-"
-        )
-        
-        return {
-            "message": "Tài khoản đã có dữ liệu lâm sàng y tế liên kết nên đã được vô hiệu hóa an toàn (Soft Delete)", 
-            "id": user_id, 
-            "status": "inactive"
-        }
+    # Ghi nhận log Admin xóa user dạng vô hiệu hóa an toàn (Soft Delete)
+    await log_activity(
+        user_id=user["id"],
+        action="ADMIN_DELETE_USER",
+        entity_type="users",
+        entity_id=user_id,
+        ip_address=request.client.host if request.client else "-"
+    )
+    
+    return {
+        "message": "Tài khoản đã được vô hiệu hóa an toàn (Soft Delete) để bảo toàn dữ liệu lâm sàng", 
+        "id": user_id, 
+        "status": "inactive"
+    }
 
 
 @router.get("/audit-logs", tags=["admin"])

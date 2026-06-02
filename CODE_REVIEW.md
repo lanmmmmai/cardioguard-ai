@@ -32,7 +32,7 @@
 
 ---
 
-### 🔴 [CRITICAL] BE-02: Race condition TOCTOU trong registration
+### 🟢 [RESOLVED] BE-02: Race condition TOCTOU trong registration
 
 - **File:** `backend/app/api/auth_api.py:257-311`
 - **Mô tả:** Kiểm tra email tồn tại (line 257-264) và INSERT (line 266-311) không nằm trong cùng một transaction. Hai request concurrent với cùng email đều pass check và đều insert, gây duplicate user hoặc constraint violation.
@@ -49,7 +49,7 @@
 
 ---
 
-### 🔴 [CRITICAL] BE-03: Duplicate route path conflict
+### 🟢 [RESOLVED] BE-03: Duplicate route path conflict
 
 - **File:** `backend/app/api/sensor_api.py:508, 554`
 - **Mô tả:** Cả hai route `/sensor-data` (GET) và `/api/sensors/history` (GET) đều tồn tại. Route `/api/sensors/history` có prefix `/api/` có thể conflict với router prefix setup, tạo endpoint không thể truy cập được.
@@ -119,7 +119,7 @@
 
 ---
 
-### 🟠 [HIGH] BE-08: Internal error messages leak cho client
+### 🟢 [RESOLVED] BE-08: Internal error messages leak cho client
 
 - **File:** `backend/app/api/auth_api.py:235, 444`
 - **Mô tả:** Raw exception text (có thể chứa DB connection strings, internal IPs) được trả về cho user qua API.
@@ -132,7 +132,7 @@
 
 ---
 
-### 🟠 [HIGH] BE-09: Admin có thể đổi role của bất kỳ user nào
+### 🟢 [RESOLVED] BE-09: Admin có thể đổi role của bất kỳ user nào
 
 - **File:** `backend/app/api/user_api.py:484-486`
 - **Mô tả:** Endpoint `update_user` cho phép admin设置 `payload.role` thành bất kỳ giá trị nào. Admin có thể đổi role của admin khác thành patient/doctor, hoặc đổi role của chính mình.
@@ -146,7 +146,7 @@
 
 ---
 
-### 🟠 [HIGH] BE-10: Race condition trong OTP creation
+### 🟢 [RESOLVED] BE-10: Race condition trong OTP creation
 
 - **File:** `backend/app/services/otp_service.py:90-119`
 - **Mô tả:** UPDATE (invalidate old tokens) và INSERT (create new token) không nằm trong transaction. Hai concurrent OTP request cho cùng email có thể invalidate token của nhau và cả hai đều thành công, tạo duplicate valid OTPs.
@@ -161,7 +161,7 @@
 
 ---
 
-### 🟠 [HIGH] BE-11: Không có rate limiting trên IoT telemetry
+### 🟢 [RESOLVED] BE-11: Không có rate limiting trên IoT telemetry
 
 - **File:** `backend/app/api/sensor_api.py:300-441`
 - **Mô tả:** Endpoint `/iot/telemetry` chấp nhận unlimited requests từ authenticated devices. Device bị compromised hoặc buggy có thể flood database.
@@ -169,7 +169,7 @@
 
 ---
 
-### 🟠 [HIGH] BE-12: AI error message leak exception internals
+### 🟢 [RESOLVED] BE-12: AI error message leak exception internals
 
 - **File:** `backend/app/services/ai_service.py:82`
 - **Mô tả:** Khi AI service gặp lỗi, exception string (có thể chứa API keys, hostnames, stack traces) được trả về trong chat response visible cho patients/doctors.
@@ -181,7 +181,7 @@
 
 ---
 
-### 🟠 [HIGH] BE-13: SMTP TLS không verify
+### 🟢 [RESOLVED] BE-13: SMTP TLS không verify
 
 - **File:** `backend/app/services/email_service.py:92-97`
 - **Mô tả:** `smtplib.SMTP` và `smtplib.SMTP_SSL` dùng mà không set certificate verification context. SMTP connections dễ bị MITM attack.
@@ -297,7 +297,7 @@
 
 ## 2. Web Frontend Issues
 
-### 🔴 [CRITICAL] FE-01: POST request tạo patient thiếu Authorization header
+### 🟢 [RESOLVED] FE-01: POST request tạo patient thiếu Authorization header
 
 - **File:** `web_frontend/src/components/Patients.tsx:60-64`
 - **Mô tả:** POST request tạo patient KHÔNG có `Authorization` header. Compare với `App.tsx:122-124` có header. Call sẽ fail cho non-admin users hoặc backend sẽ reject.
@@ -316,7 +316,7 @@
 
 ---
 
-### 🔴 [CRITICAL] FE-02: Canvas CSS variables không render được
+### 🟢 [RESOLVED] FE-02: Canvas CSS variables không render được
 
 - **File:** `web_frontend/src/components/ECGChart.tsx:134-135`
 - **Mô tả:** Canvas 2D context không hiểu CSS custom properties (`var(--color-spo2)`). Giá trị sẽ là invalid/empty string → ECG line invisible hoặc black.
@@ -343,7 +343,7 @@
 
 ---
 
-### 🟠 [HIGH] FE-04: Stale closure gây WebSocket reconnect liên tục
+### 🟢 [RESOLVED] FE-04: Stale closure gây WebSocket reconnect liên tục
 
 - **File:** `web_frontend/src/components/App.tsx:162-200`
 - **Mô tả:** `handleSensorTelemetry` phụ thuộc vào `patients` state. Khi patients list thay đổi, callback mới tạo → `handleRealtimeMessage` mới → WebSocket reconnect. Gây frequent reconnections.
@@ -358,7 +358,7 @@
 
 ---
 
-### 🟠 [HIGH] FE-05: JWT token gửi qua WebSocket plaintext
+### 🟢 [RESOLVED] FE-05: JWT token gửi qua WebSocket plaintext
 
 - **File:** `web_frontend/src/hooks/useWebSocket.ts:74-76`
 - **Mô tả:** Token gửi qua WebSocket auth message. Nếu `WS_URL` dùng `ws://` (default), token travel in cleartext. Config default là `ws://localhost:8000/ws/realtime`.
@@ -370,7 +370,7 @@
 
 ---
 
-### 🟠 [HIGH] FE-06: User data plaintext trong sessionStorage
+### 🟢 [RESOLVED] FE-06: User data plaintext trong sessionStorage
 
 - **File:** `web_frontend/src/auth/AuthContext.tsx:19, 65`
 - **Mô tả:** User object (role, id, email) lưu plaintext trong `sessionStorage`. Accessible bởi bất kỳ script nào trên cùng origin (XSS vector).
@@ -382,7 +382,7 @@
 
 ---
 
-### 🟠 [HIGH] FE-07: `useEffect` infinite loop risk
+### 🟢 [RESOLVED] FE-07: `useEffect` infinite loop risk
 
 - **File:** `web_frontend/src/auth/AuthContext.tsx:95-114`
 - **Mô tả:** `refreshUser` không trong dependency array nhưng đọc `accessToken` từ closure. `refreshUser` gọi `setAccessToken(accessToken)` (no-op nhưng trigger re-render) → effect re-fire. `refreshUser` không wrapped trong `useCallback` nên recreated mỗi render.
@@ -400,7 +400,7 @@
 
 ---
 
-### 🟠 [HIGH] FE-08: `routeContent` useMemo missing dependencies
+### 🟢 [RESOLVED] FE-08: `routeContent` useMemo missing dependencies
 
 - **File:** `web_frontend/src/components/App.tsx:287-351`
 - **Mô tả:** `renderPatientList()` gọi trong useMemo nhưng定义 outside. Nó close over nhiều state variables nhưng dependency array không đầy đủ.
@@ -408,7 +408,7 @@
 
 ---
 
-### 🟠 [HIGH] FE-09: `setTimeout` leaks không clear on unmount
+### 🟢 [RESOLVED] FE-09: `setTimeout` leaks không clear on unmount
 
 - **File:** `web_frontend/src/components/ChangePassword.tsx:59-61`, `Register.tsx:163`
 - **Mô tả:** `setTimeout` không được clear khi component unmount. Gây "setState on unmounted component" warning và potential memory leak.
@@ -542,7 +542,7 @@
 
 ## 3. Mobile App Issues
 
-### 🔴 [CRITICAL] MO-01: `DropdownButtonFormField` dùng `initialValue` (không tồn tại)
+### 🟢 [RESOLVED] MO-01: `DropdownButtonFormField` dùng `initialValue` (không tồn tại)
 
 - **File:** `mobile_app/lib/screens/alerts_screen.dart:145`
 - **Mô tả:** `DropdownButtonFormField` không có parameter `initialValue`. Parameter đúng là `value`. Đây là **compile-time error** hoặc dropdown sẽ luôn reset về item đầu tiên.
@@ -555,7 +555,7 @@
 
 ---
 
-### 🔴 [CRITICAL] MO-02: `_currentIndex` reset trong `build()` gây infinite rebuild
+### 🟢 [RESOLVED] MO-02: `_currentIndex` reset trong `build()` gây infinite rebuild
 
 - **File:** `mobile_app/lib/main.dart:169-171`
 - **Mô tả:** Mutating state inside `build()` vi phạm Flutter contract. Khi `role` thay đổi, screen list shrink, `_currentIndex` out of bounds → setState-like mutation → rebuild loop.
@@ -571,7 +571,7 @@
 
 ---
 
-### 🔴 [CRITICAL] MO-03: Unsafe cast `event['data']` không null check
+### 🟢 [RESOLVED] MO-03: Unsafe cast `event['data']` không null check
 
 - **File:** `mobile_app/lib/screens/dashboard_screen.dart:109, 123`
 - **Mô tả:** Nếu WebSocket event malformed hoặc `data` null, cast throw TypeError.
@@ -583,7 +583,7 @@
 
 ---
 
-### 🔴 [CRITICAL] MO-04: Unsafe `.toDouble()` trên null/incorrect-type value
+### 🟢 [RESOLVED] MO-04: Unsafe `.toDouble()` trên null/incorrect-type value
 
 - **File:** `mobile_app/lib/screens/dashboard_screen.dart:117`, `patient_detail_screen.dart:80-83, 159`
 - **Mô tả:** Nếu `ecg_value` null hoặc không phải `num`, crash.
@@ -610,7 +610,7 @@
 
 ---
 
-### 🟠 [HIGH] MO-06: `authProvider.init()` chưa bao giờ được gọi
+### 🟢 [RESOLVED] MO-06: `authProvider.init()` chưa bao giờ được gọi
 
 - **File:** `mobile_app/lib/providers/auth_provider.dart:28-31`, `mobile_app/lib/main.dart`
 - **Mô tả:** `init()` register 401 callback nhưng **không có code nào gọi init()**. Silent logout on 401 là dead code hoàn toàn.
@@ -625,7 +625,7 @@
 
 ---
 
-### 🟠 [HIGH] MO-07: Read error gây `deleteAll()` — xóa sạch credentials
+### 🟢 [RESOLVED] MO-07: Read error gây `deleteAll()` — xóa sạch credentials
 
 - **File:** `mobile_app/lib/core/secure_storage.dart:22-27`
 - **Mô tả:** Transient read error trên một key gây `deleteAll()`, phá hủy toàn bộ stored credentials. Strategy quá aggressive.
@@ -654,7 +654,7 @@
 
 ---
 
-### 🟠 [HIGH] MO-09: Banner flash timer không hoạt động đúng
+### 🟢 [RESOLVED] MO-09: Banner flash timer không hoạt động đúng
 
 - **File:** `mobile_app/lib/screens/dashboard_screen.dart:140-152`
 - **Mô tả:** `_bannerTimer` never assigned Timer object. `Future.delayed` không tạo `Timer.periodic`. `_bannerTimer?.cancel()` là no-op. `_isBannerFlash` set true nhưng **không bao giờ set false** trong callback.
@@ -673,7 +673,7 @@
 
 ---
 
-### 🟠 [HIGH] MO-10: ECG buffer dùng `removeAt(0)` O(n)
+### 🟢 [RESOLVED] MO-10: ECG buffer dùng `removeAt(0)` O(n)
 
 - **File:** `mobile_app/lib/screens/dashboard_screen.dart:34`
 - **Mô tả:** `List.filled(240, 0.0, growable: true)` dùng `removeAt(0)` + `add()`. `removeAt(0)` trên List là O(n) — shift all elements. 240 elements × 60fps = 14,400 shifts/giây.
@@ -809,7 +809,7 @@
 
 ## 4. AI Model Issues
 
-### 🟠 [HIGH] AI-01: Exception detail leak cho API client
+### 🟢 [RESOLVED] AI-01: Exception detail leak cho API client
 
 - **File:** `ai_model/app.py:204`
 - **Mô tả:** `str(exc)` returned to client — có thể expose stack traces, file paths, library versions.
@@ -851,7 +851,7 @@
 
 ---
 
-### 🟡 [MEDIUM] AI-05: `thal` field không có bounds
+### 🟢 [RESOLVED] AI-05: `thal` field không có bounds
 
 - **File:** `ai_model/app.py:96`
 - **Mô tả:** All other numeric fields have `ge`/`le` constraints nhưng `thal` không có. Description nói valid values 3, 6, 7.
@@ -859,7 +859,7 @@
 
 ---
 
-### 🟡 [MEDIUM] AI-06: Health endpoint leak model path
+### 🟢 [RESOLVED] AI-06: Health endpoint leak model path
 
 - **File:** `ai_model/app.py:229`
 - **Mô tả:** `"model_path": MODEL_PATH` — reveal internal filesystem path.
@@ -907,7 +907,7 @@
 
 ---
 
-### 🔴 [CRITICAL] HW-02: HTTP endpoint — tất cả data gửi plaintext
+### 🟢 [RESOLVED] HW-02: HTTP endpoint — tất cả data gửi plaintext
 
 - **File:** `hardware/esp32_s3_supermini/firmware/include/config.h:9`
 - **Mô tả:** `http://192.168.1.10:8000/api/iot/telemetry` — bao gồm `X-Device-Token` header, gửi qua plaintext HTTP. Network observer có thể đọc/sửa data.
@@ -919,7 +919,7 @@
 
 ---
 
-### 🔴 [CRITICAL] HW-03: State machine logic bị overwrite
+### 🟢 [RESOLVED] HW-03: State machine logic bị overwrite
 
 - **File:** `hardware/esp32_s3_supermini/firmware/src/main.cpp:155`
 - **Mô tả:** State set ở lines 137-145 (ví dụ: `wifi_disconnected`, `backend_unavailable`, `offline_buffering`) ngay lập tức bị overwrite ở line 155 về `measuring`. Tất cả state ngoài `auth_failed` đều là no-op.
@@ -936,7 +936,7 @@
 
 ---
 
-### 🔴 [CRITICAL] HW-04: Buffered frame bị drop khi server trả 400/404
+### 🟢 [RESOLVED] HW-04: Buffered frame bị drop khi server trả 400/404
 
 - **File:** `hardware/esp32_s3_supermini/firmware/src/telemetry_sender.cpp:148-154`
 - **Mô tả:** Khi buffer full, oldest frame bị silently overwrite. Khi server trả 400/404, current `payload` bị push back (không phải `send_payload` bị fail). Dữ liệu y tế bị mất.
