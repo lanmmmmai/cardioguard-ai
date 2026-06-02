@@ -46,7 +46,7 @@ const Card: React.FC<{ icon: React.ReactNode; label: string; value: string | num
   </div>
 );
 
-export const AdminDashboard: React.FC<{ patients: Patient[]; alerts: Alert[]; doctors?: any[] }> = ({ patients, alerts, doctors = [] }) => {
+export const AdminDashboard: React.FC<{ patients: Patient[]; alerts: Alert[]; doctors?: unknown[] }> = ({ patients, alerts, doctors = [] }) => {
   const highAlerts = alerts.filter((alert) => alert.severity === 'high').length;
   const chartValues = [patients.length, alerts.length, highAlerts, doctors.length, 0, 0, 0];
   const maxChartValue = Math.max(...chartValues, 1);

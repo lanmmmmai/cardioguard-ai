@@ -6,7 +6,7 @@ import { MessageBubble, ChatMessage } from './MessageBubble';
 
 interface ChatWindowProps {
   role: 'patient' | 'doctor';
-  contextData?: any;
+  contextData?: unknown;
   placeholder?: string;
 }
 

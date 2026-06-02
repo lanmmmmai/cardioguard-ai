@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { AlertOctagon } from 'lucide-react';
 import { Login } from './components/Login';
 import { Register } from './components/Register';
@@ -28,38 +28,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { useBrowserPath } from './hooks/useBrowserPath';
 import { pageTitles, privateRouteRole } from './navigation/routeMeta';
 import { API_URL, WS_URL } from './config';
-
-interface Patient {
-  id: string;
-  full_name: string;
-  age: number;
-  gender: string;
-  phone: string;
-  address: string;
-  medical_history: string;
-}
-
-interface Alert {
-  id?: string;
-  patient_id: string;
-  full_name?: string;
-  alert_type: string;
-  message: string;
-  severity: string;
-  is_resolved?: boolean;
-  created_at?: string;
-}
-
-interface SensorData {
-  patient_id: string;
-  heart_rate: number;
-  spo2: number;
-  systolic_bp: number;
-  diastolic_bp: number;
-  ecg_value: number;
-  is_abnormal: boolean;
-  alerts: Array<{ alert_type: string; message: string; severity: string }>;
-}
+import { Patient, Alert, SensorData } from './types';
 
 const AppContent: React.FC = () => {
   const { accessToken, isAuthenticated, loading, role, login, refreshUser, requiresPasswordChange } = useAuth();
@@ -74,6 +43,18 @@ const AppContent: React.FC = () => {
     patientsRef.current = patients;
   }, [patients]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+
+  // Ref to hold banner timeout ID
+  const bannerTimeoutRef = useRef<number | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (bannerTimeoutRef.current !== null) {
+        window.clearTimeout(bannerTimeoutRef.current);
+      }
+    };
+  }, []);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [latestTelemetry, setLatestTelemetry] = useState<SensorData | null>(null);
   const [activeBanner, setActiveBanner] = useState<{
@@ -203,10 +184,12 @@ const AppContent: React.FC = () => {
       timestamp
     });
 
-    // Persistent for critical or high alarms (no auto-timeout)
     const isPersistent = ['critical', 'high'].includes(severity.toLowerCase());
+    if (bannerTimeoutRef.current !== null) {
+      window.clearTimeout(bannerTimeoutRef.current);
+    }
     if (!isPersistent) {
-      window.setTimeout(() => {
+      bannerTimeoutRef.current = window.setTimeout(() => {
         setActiveBanner((prev) => prev && prev.patientId === data.patient_id && prev.message === firstAlert.message ? null : prev);
       }, 7000);
     }
@@ -256,10 +239,12 @@ const AppContent: React.FC = () => {
         timestamp
       });
 
-      // Persistent for critical or high alarms (no auto-timeout)
       const isPersistent = ['critical', 'high'].includes(severity.toLowerCase());
+      if (bannerTimeoutRef.current !== null) {
+        window.clearTimeout(bannerTimeoutRef.current);
+      }
       if (!isPersistent) {
-        window.setTimeout(() => {
+        bannerTimeoutRef.current = window.setTimeout(() => {
           setActiveBanner((prev) => prev && prev.patientId === alert.patient_id && prev.message === alert.message ? null : prev);
         }, 7000);
       }

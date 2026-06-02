@@ -294,7 +294,8 @@ export const DoctorsManager: React.FC = () => {
       setShowDeleteConfirm(false);
       fetchDoctors();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
+      setError(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
+      setTimeout(() => setError(null), 5000);
     } finally {
       setIsSubmitting(false);
     }
@@ -313,7 +314,15 @@ export const DoctorsManager: React.FC = () => {
 
   return (
     <div>
-      <div className="page-header">
+      
+      {error && (
+        <div className="alert-strip high" style={{ marginBottom: '1rem' }}>
+          <div className="alert-strip-body">
+            <div className="alert-strip-desc">{error}</div>
+          </div>
+        </div>
+      )}
+<div className="page-header">
         <div>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Stethoscope size={28} /> Quản lý bác sĩ

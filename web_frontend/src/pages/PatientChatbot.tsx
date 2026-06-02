@@ -6,7 +6,7 @@ import { API_URL } from '../config';
 
 export const PatientChatbot: React.FC = () => {
   const { accessToken } = useAuth();
-  const [contextData, setContextData] = useState<any>(null);
+  const [contextData, setContextData] = useState<unknown>(null);
 
   // Fetch recent sensor data to use as context
   useEffect(() => {

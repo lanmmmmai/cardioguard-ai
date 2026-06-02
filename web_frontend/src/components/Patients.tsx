@@ -1,16 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Search, X, Loader2 } from 'lucide-react';
 import { API_URL } from '../config';
-
-interface Patient {
-  id: string;
-  full_name: string;
-  age: number;
-  gender: string;
-  phone: string;
-  address: string;
-  medical_history: string;
-}
+import { Patient } from '../types';
 
 interface PatientsProps {
   patients: Patient[];
@@ -43,10 +34,13 @@ export const Patients: React.FC<PatientsProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Filter patients by search query
-  const filteredPatients = patients.filter(p => 
-    p.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.phone.includes(searchQuery)
-  );
+  const filteredPatients = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return patients.filter(p => 
+      p.full_name.toLowerCase().includes(q) ||
+      p.phone.includes(searchQuery)
+    );
+  }, [patients, searchQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,18 +71,13 @@ export const Patients: React.FC<PatientsProps> = ({
 
       let data;
 
-
       try {
-
 
         data = await response.json();
 
-
       } catch (e) {
 
-
         throw new Error("Lỗi định dạng phản hồi từ server");
-
 
       }
 

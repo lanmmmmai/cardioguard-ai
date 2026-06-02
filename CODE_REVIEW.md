@@ -22,76 +22,6 @@
 ## 1. Backend Issues
 
 
-## 2. Web Frontend Issues
-
-
-
-
-
-
-### 🟡 [MEDIUM] FE-15: `filteredPatients` recomputed mỗi render
-
-- **File:** `web_frontend/src/components/Patients.tsx:44-47`
-- **Mô tả:** Không có `useMemo` wrapping. `searchQuery.toLowerCase()` compute lại cho mỗi patient.
-- **Fix:** Wrap trong `useMemo` với dependency `[patients, searchQuery]`.
-
----
-
-### 🟢 [LOW] FE-16: Interface definitions duplicate ở 5 files
-
-- **Files:** `App.tsx:32-62`, `Dashboard.tsx:9-43`, `PatientDetail.tsx:5-39`, `Alerts.tsx:7-16`, `StatsDashboard.tsx:5-24`
-- **Mô tả:** `Patient`, `Alert`, `SensorData` interfaces define riêng ở mỗi file.
-- **Fix:** Extract shared interfaces sang `types.ts`.
-
----
-
-### 🟢 [LOW] FE-17: `any` types ở nhiều nơi
-
-- **Files:** `App.tsx:73`, `DoctorsManager.tsx:184`, `UsersManager.tsx:183`, `ChatWindow.tsx:9`
-- **Mô tả:** `useState<any[]>([])` — không có type safety.
-- **Fix:** Define proper interfaces.
-
----
-
-### 🟢 [LOW] FE-18: Native `alert()` blocks UI thread
-
-- **Files:** `Alerts.tsx:48,51`, `DoctorsManager.tsx:242`, `UsersManager.tsx:239`
-- **Mô tả:** `alert()` blocks UI, inconsistent với toast/strip pattern.
-- **Fix:** Dùng toast notification component.
-
----
-
-### 🟢 [LOW] FE-19: `SystemSettings` chỉ lưu localStorage
-
-- **File:** `web_frontend/src/components/SystemSettings.tsx:70-95`
-- **Mô tả:** Settings lưu localStorage, không sync backend. Đổi `apiUrl` trong UI không thay đổi API URL thực tế (build time).
-- **Fix:** Lưu settings qua API hoặc document rõ limitations.
-
----
-
-### 🟢 [LOW] FE-20: Missing `key` prop dùng array index
-
-- **Files:** `Dashboard.tsx:541`, `PatientDetail.tsx:230`
-- **Mô tả:** `key={index}` khi list có thể reorder.
-- **Fix:** Dùng `alert.id` nếu available.
-
----
-
-### 🟢 [LOW] FE-21: `ICUCamera` empty dependency array
-
-- **File:** `web_frontend/src/components/ICUCamera.tsx:234`
-- **Mô tả:** Animation effect capture dimensions từ mount, không update khi resize.
-- **Fix:** Thêm ResizeObserver.
-
----
-
-### 🟢 [LOW] FE-22: `window.setTimeout` không lưu return value
-
-- **File:** `web_frontend/src/components/App.tsx:184, 237`
-- **Mô tả:** Timeout không thể clear on unmount.
-- **Fix:** Lưu ID và clear trong cleanup.
-
----
 ## 3. Mobile App Issues
 
 ### 🟡 [MEDIUM] MO-11: Providers never disposed, init never called
@@ -646,3 +576,22 @@
 ### 🟢 [RESOLVED] HW-04: Buffered frame bị drop khi server trả 400/404
 
 ---
+
+## 6. Archive (Đã Sửa)
+
+### 🟢 [RESOLVED] FE-15: `filteredPatients` recomputed mỗi render
+
+### 🟢 [RESOLVED] FE-16: Interface definitions duplicate ở 5 files
+
+### 🟢 [RESOLVED] FE-17: `any` types ở nhiều nơi
+
+### 🟢 [RESOLVED] FE-18: Native `alert()` blocks UI thread
+
+### 🟢 [RESOLVED] FE-19: `SystemSettings` chỉ lưu localStorage
+
+### 🟢 [RESOLVED] FE-20: Missing `key` prop dùng array index
+
+### 🟢 [RESOLVED] FE-21: `ICUCamera` empty dependency array
+
+### 🟢 [RESOLVED] FE-22: `window.setTimeout` không lưu return value
+

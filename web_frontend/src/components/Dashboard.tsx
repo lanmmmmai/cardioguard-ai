@@ -5,42 +5,7 @@ import { BeatingHeart3D } from './BeatingHeart3D';
 import { API_URL } from '../config';
 import { useAuth } from '../auth/AuthContext';
 import { getSeverityMeta } from '../utils/severity';
-
-interface Patient {
-  id: string;
-  full_name: string;
-  age: number;
-  gender: string;
-  phone: string;
-  address: string;
-  medical_history: string;
-}
-
-interface Alert {
-  id?: string;
-  patient_id: string;
-  full_name?: string;
-  alert_type: string;
-  message: string;
-  severity: string;
-  is_resolved?: boolean;
-  created_at?: string;
-}
-
-interface SensorData {
-  patient_id: string;
-  heart_rate: number;
-  spo2: number;
-  systolic_bp: number;
-  diastolic_bp: number;
-  ecg_value: number;
-  is_abnormal: boolean;
-  alerts: Array<{
-    alert_type: string;
-    message: string;
-    severity: string;
-  }>;
-}
+import { Patient, Alert, SensorData } from '../types';
 
 interface DashboardProps {
   patients: Patient[];
@@ -94,7 +59,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     diastolicBp: number | null;
     ecgValue: number | null;
     isAbnormal: boolean;
-    alerts: any[];
+    alerts: Array<{
+      alert_type: string;
+      message: string;
+      severity: string;
+    }>;
     updatedAt: string | null;
   }>({
     heartRate: null,
@@ -550,7 +519,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               const severityLabel = getAlertSeverityLabel(alert.severity);
               
               return (
-                <div key={index} className={`alert-strip ${severityClass}`}>
+                <div key={alert.id || index} className={`alert-strip ${severityClass}`}>
                   <AlertIcon className="alert-strip-icon" size={16} />
                   <div className="alert-strip-body">
                     <div className="alert-strip-title">

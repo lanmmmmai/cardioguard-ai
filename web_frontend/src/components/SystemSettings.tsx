@@ -242,6 +242,15 @@ export const SystemSettings: React.FC = () => {
                 />
               </div>
 
+              <div className="alert-strip low" style={{ marginTop: '0.5rem' }}>
+                <div className="alert-strip-body">
+                  <div className="alert-strip-desc" style={{ fontSize: '0.75rem' }}>
+                    <AlertTriangle size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                    <strong>Lưu ý kỹ thuật:</strong> Cấu hình API/WS tại đây hiện chỉ lưu trữ cục bộ để phục vụ UI Debugging. Ứng dụng thực tế sẽ sử dụng biến môi trường (VITE_API_URL) được nhúng từ lúc Build. Để thay đổi nguồn gốc server thực sự, vui lòng cập nhật file .env và Build lại dự án.
+                  </div>
+                </div>
+              </div>
+
             </div>
           </section>
 

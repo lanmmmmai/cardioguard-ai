@@ -3,17 +3,7 @@ import { Search, Filter, ShieldCheck, Calendar, CheckCircle, Loader2 } from 'luc
 import { getSeverityMeta } from '../utils/severity';
 import { useAuth } from '../auth/AuthContext';
 import { API_URL } from '../config';
-
-interface Alert {
-  id?: string;
-  patient_id: string;
-  full_name?: string;
-  alert_type: string;
-  message: string;
-  severity: string;
-  is_resolved?: boolean;
-  created_at?: string;
-}
+import { Alert } from '../types';
 
 interface AlertsProps {
   alerts: Alert[];
@@ -26,6 +16,7 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
   const [severityFilter, setSeverityFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('unresolved'); // mặc định xem chưa xử lý
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalAlerts(alerts);
@@ -55,10 +46,12 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
           throw new Error("Lỗi định dạng phản hồi từ server");
 
         }
-        alert(data.detail || 'Không thể xác nhận xử lý cảnh báo');
+        setError(data.detail || 'Không thể xác nhận xử lý cảnh báo');
+      setTimeout(() => setError(null), 5000);
       }
     } catch (err) {
-      alert('Lỗi kết nối máy chủ khi xử lý cảnh báo');
+      setError('Lỗi kết nối máy chủ khi xử lý cảnh báo');
+      setTimeout(() => setError(null), 5000);
     } finally {
       setResolvingId(null);
     }
@@ -83,7 +76,15 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
 
   return (
     <div>
-      <div className="page-header">
+      
+      {error && (
+        <div className="alert-strip high" style={{ marginBottom: '1rem' }}>
+          <div className="alert-strip-body">
+            <div className="alert-strip-desc">{error}</div>
+          </div>
+        </div>
+      )}
+<div className="page-header">
         <div>
           <h1 className="page-title">Nhật Ký Cảnh Báo</h1>
           <p className="page-subtitle">Xem toàn bộ lịch sử cảnh báo bất thường trong hệ thống ({localAlerts.length})</p>

@@ -1,42 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, User, Heart, Activity, AlertTriangle, MapPin, Calendar, Clipboard, Mail } from 'lucide-react';
 import { getSeverityMeta } from '../utils/severity';
-
-interface Patient {
-  id: string;
-  full_name: string;
-  age: number;
-  gender: string;
-  phone: string;
-  address: string;
-  medical_history: string;
-}
-
-interface Alert {
-  id?: string;
-  patient_id: string;
-  full_name?: string;
-  alert_type: string;
-  message: string;
-  severity: string;
-  is_resolved?: boolean;
-  created_at?: string;
-}
-
-interface SensorData {
-  patient_id: string;
-  heart_rate: number;
-  spo2: number;
-  systolic_bp: number;
-  diastolic_bp: number;
-  ecg_value: number;
-  is_abnormal: boolean;
-  alerts: Array<{
-    alert_type: string;
-    message: string;
-    severity: string;
-  }>;
-}
+import { Patient, Alert, SensorData } from '../types';
 
 interface PatientDetailProps {
   patient: Patient;
@@ -231,7 +196,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
                   const severityMeta = getSeverityMeta(alert.severity);
                   const AlertIcon = severityMeta.icon;
                   return (
-                    <div key={index} className={`alert-strip ${severityMeta.key}`} style={{ borderLeft: `3px solid ${severityMeta.colorVar}`, background: severityMeta.bgVar }}>
+                    <div key={alert.id || index} className={`alert-strip ${severityMeta.key}`} style={{ borderLeft: `3px solid ${severityMeta.colorVar}`, background: severityMeta.bgVar }}>
                       <AlertIcon className="alert-strip-icon" size={16} style={{ color: severityMeta.colorVar }} />
                       <div className="alert-strip-body">
                         <div className="alert-strip-title" style={{ color: severityMeta.colorVar, fontWeight: severityMeta.weight }}>

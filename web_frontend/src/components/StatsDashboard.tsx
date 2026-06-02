@@ -1,27 +1,7 @@
 import React from 'react';
 import { Users, Bell, AlertOctagon, TrendingUp, ShieldAlert, Award } from 'lucide-react';
 import { normalizeAlertSeverity } from '../utils/severity';
-
-interface Patient {
-  id: string;
-  full_name: string;
-  age: number;
-  gender: string;
-  phone: string;
-  address: string;
-  medical_history: string;
-}
-
-interface Alert {
-  id?: string;
-  patient_id: string;
-  full_name?: string;
-  alert_type: string;
-  message: string;
-  severity: string;
-  is_resolved?: boolean;
-  created_at?: string;
-}
+import { Patient, Alert } from '../types';
 
 interface StatsDashboardProps {
   patients: Patient[];

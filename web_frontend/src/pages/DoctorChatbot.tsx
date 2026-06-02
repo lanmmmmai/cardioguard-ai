@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Patient } from '../types';
 import { Bot, Users, Activity, FileText } from 'lucide-react';
 import { ChatWindow } from '../components/chat/ChatWindow';
 import { useAuth } from '../auth/AuthContext';
@@ -6,7 +7,7 @@ import { API_URL } from '../config';
 
 export const DoctorChatbot: React.FC = () => {
   const { accessToken } = useAuth();
-  const [patients, setPatients] = useState<any[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export const DoctorChatbot: React.FC = () => {
                   <div className="avatar-mini">{p.full_name.charAt(0)}</div>
                   <div className="p-info">
                     <div className="p-name">{p.full_name}</div>
-                    <div className="p-meta">{p.patient_code}</div>
+                    <div className="p-meta">{p.id.substring(0,8)}</div>
                   </div>
                 </div>
               ))}
