@@ -24,7 +24,6 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 VALID_ROLES = {"admin", "doctor", "patient"}
-PRODUCTION_ENVIRONMENTS = {"prod", "production"}
 
 
 def normalize_role(role: Optional[str]) -> str:
@@ -32,10 +31,6 @@ def normalize_role(role: Optional[str]) -> str:
     if normalized not in VALID_ROLES:
         raise HTTPException(status_code=403, detail="Tài khoản chưa được phân quyền")
     return normalized
-
-
-def should_expose_dev_auth_values() -> bool:
-    return settings.EXPOSE_DEV_OTP and settings.ENVIRONMENT.lower() not in PRODUCTION_ENVIRONMENTS
 
 
 def generic_forgot_password_response(email: str) -> dict[str, object]:
@@ -235,8 +230,6 @@ async def request_register_otp(data: RegisterOtpRequest, request: Request):
         raise HTTPException(status_code=502, detail=str(exc) or "Unable to send OTP email") from exc
 
     response = {"message": "OTP sent to email", "email": email, "email_sent": email_sent}
-    if not email_sent and should_expose_dev_auth_values():
-        response["dev_otp"] = otp
     return response
 
 
@@ -528,10 +521,10 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
         return {"message": "Password has been reset successfully."}
 
     email_sent = await send_random_password_email(email, user["full_name"], new_password)
-    response = {"message": "Password has been reset. Please check your email for the new password.", "email_sent": email_sent}
-    if not email_sent and should_expose_dev_auth_values():
-        response["dev_new_password"] = new_password
-    return response
+    return {
+        "message": "Password has been reset. Please check your email for the new password.",
+        "email_sent": email_sent,
+    }
 
 
 @router.post("/auth/change-password")

@@ -17,6 +17,8 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const storage = window.sessionStorage;
+const TOKEN_KEY = 'access_token';
+const USER_KEY = 'user';
 
 const normalizeUser = (user: any): AuthUser | null => {
   const role = normalizeRole(user?.role);
@@ -35,13 +37,20 @@ const normalizeUser = (user: any): AuthUser | null => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(() => {
+    try {
+      return storage.getItem(TOKEN_KEY);
+    } catch {
+      storage.removeItem(TOKEN_KEY);
+      return null;
+    }
+  });
   const [user, setUser] = useState<AuthUser | null>(() => {
     try {
-      const stored = storage.getItem('user');
+      const stored = storage.getItem(USER_KEY);
       return stored ? normalizeUser(JSON.parse(stored)) : null;
     } catch {
-      storage.removeItem('user');
+      storage.removeItem(USER_KEY);
       return null;
     }
   });
@@ -49,7 +58,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<string | null>(null);
 
   const logout = () => {
-    storage.removeItem('user');
+    storage.removeItem(USER_KEY);
+    storage.removeItem(TOKEN_KEY);
     setAccessToken(null);
     setUser(null);
     setAuthError(null);
@@ -62,7 +72,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Tài khoản chưa được phân quyền');
     }
 
-    storage.setItem('user', JSON.stringify(normalizedUser));
+    storage.setItem(USER_KEY, JSON.stringify(normalizedUser));
+    storage.setItem(TOKEN_KEY, token);
     setAccessToken(token);
     setUser(normalizedUser);
     setAuthError(null);
@@ -86,7 +97,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Tài khoản chưa được phân quyền');
     }
 
-    storage.setItem('user', JSON.stringify(normalizedUser));
+    storage.setItem(USER_KEY, JSON.stringify(normalizedUser));
+    storage.setItem(TOKEN_KEY, accessToken);
     setAccessToken(accessToken);
     setUser(normalizedUser);
     return normalizedUser;
@@ -95,7 +107,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const restoreSession = async () => {
       if (!accessToken) {
-        storage.removeItem('user');
+        storage.removeItem(USER_KEY);
+        storage.removeItem(TOKEN_KEY);
         setLoading(false);
         return;
       }

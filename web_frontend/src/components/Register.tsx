@@ -87,10 +87,8 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
       setStep('otp');
       setOtp('');
       setSuccess(
-        data.dev_otp
-          ? `Môi trường dev chưa cấu hình Brevo API. Mã OTP tạm: ${data.dev_otp}`
-          : data.email_sent === false
-            ? 'Môi trường dev chưa cấu hình gửi email. Nếu cần test OTP, xem log backend hoặc bật EXPOSE_DEV_OTP.'
+        data.email_sent === false
+          ? 'Môi trường dev chưa cấu hình gửi email. Vui lòng kiểm tra hộp thư hoặc cấu hình SMTP/Brevo.'
           : `Đã gửi OTP tới ${data.email || email.toLowerCase()}. Vui lòng kiểm tra hộp thư hoặc spam.`
       );
     } catch (err: any) {
