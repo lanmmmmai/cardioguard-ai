@@ -114,7 +114,10 @@ def send_brevo_email(
         return False
 
     payload: dict[str, Any] = {
-        "sender": {"name": settings.EMAIL_FROM_NAME, "email": settings.EMAIL_FROM_EMAIL},
+        "sender": {
+            "name": settings.SMTP_FROM_NAME or settings.EMAIL_FROM_NAME or "CardioGuard AI",
+            "email": settings.SMTP_FROM_EMAIL or settings.EMAIL_FROM_EMAIL or "noreply@giatky.site",
+        },
         "to": [{"email": to_email, "name": to_name}],
         "subject": subject,
         "htmlContent": html_body,
