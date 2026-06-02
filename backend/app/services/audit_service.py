@@ -49,7 +49,7 @@ async def log_activity(
         if "ip_address" in columns:
             payload["ip_address"] = ip_address or "-"
         if "created_at" in columns:
-            payload["created_at"] = datetime.now(timezone.utc)
+            payload["created_at"] = datetime.utcnow()
             
         # Tương thích ngược nếu sau này database bổ sung cột details
         if "details" in columns and details is not None:
