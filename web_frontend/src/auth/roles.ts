@@ -21,7 +21,7 @@ export const normalizeRole = (role?: string | null): UserRole | null => {
 export const defaultRouteByRole: Record<UserRole, string> = {
   admin: '/admin/dashboard',
   doctor: '/doctor/dashboard',
-  patient: '/patient/home',
+  patient: '/patient/dashboard',
 };
 
 export const roleLabel: Record<UserRole, string> = {

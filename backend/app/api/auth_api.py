@@ -223,6 +223,12 @@ async def request_register_otp(data: RegisterOtpRequest, request: Request):
     email = data.email.lower()
     check_rate_limit(ip, email, "/auth/register/request-otp", max_requests=5, window_seconds=60)
 
+    reg_role = (data.role or "patient").strip().lower()
+    if reg_role == "admin":
+        raise HTTPException(status_code=400, detail="Đăng ký tài khoản Admin không được phép công khai.")
+    if reg_role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail="Vai trò đăng ký không hợp lệ.")
+
     check_query = "SELECT id FROM users WHERE email = :email"
     existing_user = await database.fetch_one(
         query=check_query,
@@ -235,11 +241,17 @@ async def request_register_otp(data: RegisterOtpRequest, request: Request):
     otp = await create_otp_token(
         purpose=OTP_PURPOSE_REGISTER,
         email=email,
-        metadata={"full_name": data.full_name},
+        metadata={
+            "full_name": data.full_name,
+            "role": reg_role,
+            "phone": data.phone,
+            "specialty": data.specialty,
+            "department": data.department
+        },
     )
 
     try:
-        email_sent = await send_register_otp_email(email, data.full_name, otp)
+        email_sent = await send_register_otp_email(email, data.full_name, otp, role=reg_role)
     except Exception as exc:
         await invalidate_otp_tokens(purpose=OTP_PURPOSE_REGISTER, email=email)
         logger.exception("Unable to send registration OTP email")
@@ -264,8 +276,8 @@ async def register(data: RegisterRequest, request: Request):
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
     insert_query = """
-    INSERT INTO users(full_name, email, password_hash, role)
-    VALUES (:full_name, :email, :password_hash, :role)
+    INSERT INTO users(full_name, email, password_hash, role, phone, specialty, department, status)
+    VALUES (:full_name, :email, :password_hash, :role, :phone, :specialty, :department, 'active')
     """
 
     user_id = None
@@ -280,13 +292,25 @@ async def register(data: RegisterRequest, request: Request):
             if existing_user:
                 raise HTTPException(status_code=400, detail="Email already exists")
 
+            role = otp_result.metadata.get("role") or data.role or "patient"
+            role = role.strip().lower()
+            if role == "admin":
+                raise HTTPException(status_code=400, detail="Đăng ký tài khoản Admin không được phép công khai.")
+
+            phone = otp_result.metadata.get("phone") or data.phone
+            specialty = otp_result.metadata.get("specialty") or data.specialty
+            department = otp_result.metadata.get("department") or data.department
+
             await database.execute(
                 query=insert_query,
                 values={
                     "full_name": otp_result.metadata.get("full_name") or data.full_name,
                     "email": email,
                     "password_hash": hash_password(data.password),
-                    "role": "patient"
+                    "role": role,
+                    "phone": phone,
+                    "specialty": specialty,
+                    "department": department
                 }
             )
 
@@ -296,7 +320,7 @@ async def register(data: RegisterRequest, request: Request):
                 {"email": email},
             )
             user_id = created_user["id"] if created_user else None
-            if created_user:
+            if created_user and role == "patient":
                 patient_columns = await database.fetch_all(
                     """
                     SELECT column_name
@@ -312,7 +336,7 @@ async def register(data: RegisterRequest, request: Request):
                 if "user_id" in patient_cols:
                     patient_values["user_id"] = user_id
                 if "phone" in patient_cols:
-                    patient_values["phone"] = None
+                    patient_values["phone"] = phone
                 insert_columns = ", ".join(patient_values.keys())
                 bind_columns = ", ".join(f":{key}" for key in patient_values.keys())
                 await database.execute(
@@ -400,10 +424,39 @@ async def login(data: LoginRequest, request: Request):
         )
         raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
 
+    db_role = normalize_role(user["role"])
+
+    # Xác thực expected_role
+    if data.expected_role:
+        expected = data.expected_role.strip().lower()
+        if db_role != expected:
+            await log_activity(
+                user_id=user["id"],
+                action="USER_LOGIN_FAILED",
+                entity_type="users",
+                entity_id=user["id"],
+                ip_address=ip_addr,
+                details={"email": data.email.lower(), "reason": f"Expected role {expected} but got {db_role}"}
+            )
+            
+            if expected == "admin":
+                detail_msg = "Tài khoản này không có quyền truy cập trang quản trị."
+            elif expected == "doctor":
+                detail_msg = "Tài khoản này không có quyền truy cập cổng bác sĩ."
+            else:  # expected == "patient"
+                if db_role == "admin":
+                    detail_msg = "Vui lòng đăng nhập bằng cổng quản trị viên."
+                elif db_role == "doctor":
+                    detail_msg = "Vui lòng đăng nhập bằng cổng bác sĩ."
+                else:
+                    detail_msg = "Tài khoản này không có quyền truy cập cổng đăng nhập hiện tại."
+            
+            raise HTTPException(status_code=403, detail=detail_msg)
+
     token = create_access_token({
         "sub": user["id"],
         "email": user["email"],
-        "role": normalize_role(user["role"])
+        "role": db_role
     })
 
     # Ghi nhận đăng nhập thành công

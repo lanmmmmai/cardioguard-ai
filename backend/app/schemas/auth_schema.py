@@ -17,6 +17,10 @@ def validate_full_name(value: str) -> str:
 class RegisterOtpRequest(BaseModel):
     full_name: str
     email: EmailStr
+    role: Optional[str] = "patient"
+    phone: Optional[str] = None
+    specialty: Optional[str] = None
+    department: Optional[str] = None
 
     @field_validator("full_name")
     @classmethod
@@ -29,6 +33,10 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
     otp: str
+    role: Optional[str] = "patient"
+    phone: Optional[str] = None
+    specialty: Optional[str] = None
+    department: Optional[str] = None
 
     @field_validator("full_name")
     @classmethod
@@ -51,6 +59,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    expected_role: Optional[str] = None
 
 
 class ForgotPasswordRequest(BaseModel):

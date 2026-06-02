@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Activity, Mail, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
 import { API_URL } from '../config';
+import { UserRole } from '../auth/roles';
 
 interface ForgotPasswordProps {
+  role: UserRole;
   onNavigateToLogin: () => void;
 }
 
-export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogin }) => {
+export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ role, onNavigateToLogin }) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -118,6 +120,12 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
     }
   };
 
+  const getRoleTitle = () => {
+    if (role === 'admin') return 'Quên Mật Khẩu Admin';
+    if (role === 'doctor') return 'Quên Mật Khẩu Bác Sĩ';
+    return 'Quên Mật Khẩu';
+  };
+
   return (
     <div className="auth-container">
       <div className="panel auth-panel">
@@ -132,7 +140,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
           <span className="brand-name">HEART MONITOR</span>
         </div>
 
-        <h2 className="auth-title">Quên Mật Khẩu</h2>
+        <h2 className="auth-title">{getRoleTitle()}</h2>
         <p className="auth-subtitle">
           {step === 1 
             ? 'Nhập email của bạn để nhận mã xác nhận đặt lại mật khẩu.' 
@@ -176,7 +184,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onNavigateToLogi
                   id="email"
                   type="email"
                   className="form-control"
-                  placeholder="admin/doctor/patient@email.com"
+                  placeholder={role === 'admin' ? 'admin@email.com' : (role === 'doctor' ? 'doctor@email.com' : 'patient@email.com')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   style={{ paddingLeft: '45px' }}

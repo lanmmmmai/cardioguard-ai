@@ -1,9 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Activity, ArrowLeft, CheckCircle2, Lock, Mail, ShieldCheck, User, Loader2 } from 'lucide-react';
+import { Activity, ArrowLeft, CheckCircle2, Lock, Mail, ShieldCheck, User, Loader2, Phone, Stethoscope, Building } from 'lucide-react';
 import { API_URL } from '../config';
 import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
+import { UserRole } from '../auth/roles';
 
 interface RegisterProps {
+  role: UserRole;
   onRegisterSuccess: () => void;
   onNavigateToLogin: () => void;
 }
@@ -12,11 +14,14 @@ const fullNamePattern = /^[A-Za-zÀ-ỹ]+(?:[ '-][A-Za-zÀ-ỹ]+)+$/;
 
 const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ');
 
-export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigateToLogin }) => {
+export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onNavigateToLogin }) => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [specialty, setSpecialty] = useState('');
+  const [department, setDepartment] = useState('');
   const [otp, setOtp] = useState('');
   const [step, setStep] = useState<'form' | 'otp'>('form');
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +50,12 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
 
     if (!normalizedName || !email || !password || !confirmPassword) {
       return 'Vui lòng nhập đầy đủ họ tên, Gmail và mật khẩu';
+    }
+
+    if (role === 'doctor') {
+      if (!phone || !specialty || !department) {
+        return 'Vui lòng nhập đầy đủ số điện thoại, chuyên khoa và phòng ban bác sĩ';
+      }
     }
 
     if (!fullNamePattern.test(normalizedName)) {
@@ -84,6 +95,10 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
         body: JSON.stringify({
           full_name: normalizeName(fullName),
           email: email.toLowerCase(),
+          role,
+          phone: role === 'doctor' ? phone : undefined,
+          specialty: role === 'doctor' ? specialty : undefined,
+          department: role === 'doctor' ? department : undefined,
         }),
       });
 
@@ -172,6 +187,10 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
           email: email.toLowerCase(),
           password,
           otp: otp.trim(),
+          role,
+          phone: role === 'doctor' ? phone : undefined,
+          specialty: role === 'doctor' ? specialty : undefined,
+          department: role === 'doctor' ? department : undefined,
         }),
       });
 
@@ -196,7 +215,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
         throw new Error(data.detail || 'Đăng ký thất bại. Email có thể đã tồn tại hoặc OTP không đúng');
       }
 
-      setSuccess('Đăng ký tài khoản bệnh nhân thành công! Đang chuyển sang đăng nhập...');
+      setSuccess(`Đăng ký tài khoản ${role === 'doctor' ? 'bác sĩ' : 'bệnh nhân'} thành công! Đang chuyển sang đăng nhập...`);
       timerRef.current = setTimeout(onRegisterSuccess, 1800);
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
@@ -222,8 +241,12 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
           <span className="brand-name">CARDIOGUARD AI</span>
         </div>
 
-        <h2 className="auth-title">Đăng Ký Bệnh Nhân</h2>
-        <p className="auth-subtitle register-subtitle">Tạo tài khoản Patient bằng Gmail OTP. Admin và Doctor dùng tài khoản được cấp riêng.</p>
+        <h2 className="auth-title">{role === 'doctor' ? 'Đăng Ký Bác Sĩ' : 'Đăng Ký Bệnh Nhân'}</h2>
+        <p className="auth-subtitle register-subtitle">
+          {role === 'doctor' 
+            ? 'Tạo tài khoản Doctor bằng Gmail OTP.' 
+            : 'Tạo tài khoản Patient bằng Gmail OTP. Admin và Doctor dùng tài khoản được cấp riêng.'}
+        </p>
 
         <div className="auth-stepper">
           <div className={`auth-step ${step === 'form' ? 'active' : 'done'}`}>
@@ -262,14 +285,14 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
 
         <form onSubmit={handleSubmit} className="register-form">
           <div className="form-group">
-            <label htmlFor="fullName">Họ và tên bệnh nhân</label>
+            <label htmlFor="fullName">{role === 'doctor' ? 'Họ và tên bác sĩ' : 'Họ và tên bệnh nhân'}</label>
             <div style={{ position: 'relative' }}>
               <User size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 id="fullName"
                 type="text"
                 className="form-control"
-                placeholder="Nguyễn Văn An"
+                placeholder={role === 'doctor' ? 'Bác sĩ Nguyễn Văn An' : 'Nguyễn Văn An'}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 style={{ paddingLeft: '45px' }}
@@ -279,15 +302,73 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
             </div>
           </div>
 
+          {role === 'doctor' && (
+            <>
+              <div className="form-group">
+                <label htmlFor="phone">Số điện thoại liên hệ</label>
+                <div style={{ position: 'relative' }}>
+                  <Phone size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    id="phone"
+                    type="text"
+                    className="form-control"
+                    placeholder="0912345678"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    style={{ paddingLeft: '45px' }}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="specialty">Chuyên khoa</label>
+                <div style={{ position: 'relative' }}>
+                  <Stethoscope size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    id="specialty"
+                    type="text"
+                    className="form-control"
+                    placeholder="Ví dụ: Tim mạch, Nội khoa"
+                    value={specialty}
+                    onChange={(e) => setSpecialty(e.target.value)}
+                    style={{ paddingLeft: '45px' }}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="department">Khoa / Phòng ban</label>
+                <div style={{ position: 'relative' }}>
+                  <Building size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    id="department"
+                    type="text"
+                    className="form-control"
+                    placeholder="Ví dụ: Khoa Khám bệnh, Khoa Tim mạch"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    style={{ paddingLeft: '45px' }}
+                    disabled={isLoading}
+                    required
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
           <div className="form-group">
-            <label htmlFor="email">Gmail nhận OTP</label>
+            <label htmlFor="email">{role === 'doctor' ? 'Gmail bác sĩ nhận OTP' : 'Gmail nhận OTP'}</label>
             <div style={{ position: 'relative' }}>
               <Mail size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 id="email"
                 type="email"
                 className="form-control"
-                placeholder="benhnhan@gmail.com"
+                placeholder={role === 'doctor' ? 'bacsi@gmail.com' : 'benhnhan@gmail.com'}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={{ paddingLeft: '45px' }}

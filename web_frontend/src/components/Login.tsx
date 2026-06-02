@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { Activity, Mail, Lock, Loader2 } from 'lucide-react';
 import { API_URL } from '../config';
+import { UserRole } from '../auth/roles';
 
 interface LoginProps {
+  role: UserRole;
   onLoginSuccess: (token: string, user: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean }) => void;
   onNavigateToRegister: () => void;
   onNavigateToForgotPassword: () => void;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegister, onNavigateToForgotPassword }) => {
+export const Login: React.FC<LoginProps> = ({ role, onLoginSuccess, onNavigateToRegister, onNavigateToForgotPassword }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +32,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, expected_role: role }),
       });
 
       let data;
@@ -62,6 +64,24 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
     }
   };
 
+  const getRoleTitle = () => {
+    if (role === 'admin') return 'Đăng Nhập Quản Trị Viên';
+    if (role === 'doctor') return 'Đăng Nhập Bác Sĩ';
+    return 'Đăng Nhập Bệnh Nhân';
+  };
+
+  const getRoleSubtitle = () => {
+    if (role === 'admin') return 'Cổng quản trị hệ thống CardioGuard AI dành cho quản trị viên.';
+    if (role === 'doctor') return 'Cổng đăng nhập dành cho bác sĩ theo dõi bệnh nhân và dữ liệu sức khỏe.';
+    return 'Cổng đăng nhập dành cho bệnh nhân sử dụng hệ thống CardioGuard AI.';
+  };
+
+  const getSubmitText = () => {
+    if (role === 'admin') return 'Đăng Nhập Quản Trị';
+    if (role === 'doctor') return 'Đăng Nhập Bác Sĩ';
+    return 'Đăng Nhập';
+  };
+
   return (
     <div className="auth-container">
       <div className="panel auth-panel">
@@ -72,8 +92,8 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
           <span className="brand-name">HEART MONITOR</span>
         </div>
 
-        <h2 className="auth-title">Đăng Nhập Hệ Thống</h2>
-        <p className="auth-subtitle">Dành cho Admin, Doctor và Patient trong hệ thống CardioGuard AI</p>
+        <h2 className="auth-title">{getRoleTitle()}</h2>
+        <p className="auth-subtitle">{getRoleSubtitle()}</p>
 
         {error && (
           <div className="alert-strip high" style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
@@ -102,7 +122,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
                 id="email"
                 type="email"
                 className="form-control"
-                placeholder="admin/doctor/patient@email.com"
+                placeholder={role === 'admin' ? 'admin@email.com' : (role === 'doctor' ? 'doctor@email.com' : 'patient@email.com')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={{ paddingLeft: '45px' }}
@@ -149,18 +169,20 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
                 Đang xử lý...
               </>
             ) : (
-              'Đăng Nhập'
+              getSubmitText()
             )}
           </button>
         </form>
 
         <div className="auth-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div>
-            Bệnh nhân chưa có tài khoản?{' '}
-            <span className="auth-link" onClick={onNavigateToRegister}>
-              Đăng ký ngay
-            </span>
-          </div>
+          {role !== 'admin' && (
+            <div>
+              {role === 'doctor' ? 'Bác sĩ chưa có tài khoản?' : 'Bệnh nhân chưa có tài khoản?'}{' '}
+              <span className="auth-link" onClick={onNavigateToRegister}>
+                Đăng ký ngay
+              </span>
+            </div>
+          )}
           <div>
             <span className="auth-link" onClick={onNavigateToForgotPassword}>
               Quên mật khẩu?

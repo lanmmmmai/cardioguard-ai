@@ -21,7 +21,7 @@ import { UsersManager } from './components/UsersManager';
 import { SystemSettings } from './components/SystemSettings';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
-import { defaultRouteByRole, normalizeRole } from './auth/roles';
+import { defaultRouteByRole, normalizeRole, UserRole } from './auth/roles';
 import { AdminLayout, DoctorLayout, PatientLayout } from './layouts/RoleLayout';
 import { AdminDashboard, DoctorDashboard, PatientHome, PlaceholderPage } from './pages/RolePages';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -76,10 +76,15 @@ const AppContent: React.FC = () => {
   }, [theme]);
 
   useEffect(() => {
-    if (loading) return;
+    const authPaths = [
+      '/login', '/login-doctor', '/login-admin',
+      '/register', '/register-doctor', '/register-admin',
+      '/forgot-password', '/forgot-password-doctor', '/forgot-password-admin',
+      '/reset-password', '/reset-password-doctor', '/reset-password-admin'
+    ];
 
     if (path === '/' || !routeRole) {
-      if (path === '/' || !['/login', '/register', '/forgot-password', '/change-password'].includes(path)) {
+      if (path === '/' || (!authPaths.includes(path) && path !== '/change-password')) {
         if (!pageTitles[normalizedPath]) {
           navigate(role ? defaultRouteByRole[role] : '/login', true);
         }
@@ -95,7 +100,7 @@ const AppContent: React.FC = () => {
       if (!isAuthenticated || !role) {
         navigate('/login', true);
       }
-    } else if (['/login', '/register', '/forgot-password'].includes(path)) {
+    } else if (authPaths.includes(path)) {
       if (isAuthenticated && role) {
         navigate(defaultRouteByRole[role], true);
       }
@@ -379,12 +384,27 @@ const AppContent: React.FC = () => {
     return <div className="route-loading">Đang khôi phục phiên đăng nhập...</div>;
   }
 
+  // Xử lý các trang Register
   if (path === '/register') {
-    return <Register onRegisterSuccess={() => navigate('/login', true)} onNavigateToLogin={() => navigate('/login')} />;
+    return <Register role="patient" onRegisterSuccess={() => navigate('/login', true)} onNavigateToLogin={() => navigate('/login')} />;
+  }
+  if (path === '/register-doctor') {
+    return <Register role="doctor" onRegisterSuccess={() => navigate('/login-doctor', true)} onNavigateToLogin={() => navigate('/login-doctor')} />;
+  }
+  if (path === '/register-admin') {
+    navigate('/login-admin', true);
+    return null;
   }
 
-  if (path === '/forgot-password') {
-    return <ForgotPassword onNavigateToLogin={() => navigate('/login')} />;
+  // Xử lý các trang Forgot Password / Reset Password
+  if (path === '/forgot-password' || path === '/reset-password') {
+    return <ForgotPassword role="patient" onNavigateToLogin={() => navigate('/login')} />;
+  }
+  if (path === '/forgot-password-doctor' || path === '/reset-password-doctor') {
+    return <ForgotPassword role="doctor" onNavigateToLogin={() => navigate('/login-doctor')} />;
+  }
+  if (path === '/forgot-password-admin' || path === '/reset-password-admin') {
+    return <ForgotPassword role="admin" onNavigateToLogin={() => navigate('/login-admin')} />;
   }
 
   if (path === '/change-password') {
@@ -401,12 +421,20 @@ const AppContent: React.FC = () => {
     }} />;
   }
 
-  if (path === '/login' || (!routeRole && path !== '/change-password')) {
+  if (['/login', '/login-doctor', '/login-admin'].includes(path) || (!routeRole && path !== '/change-password')) {
     if (!isAuthenticated) {
+      let targetRole: UserRole = 'patient';
+      if (path === '/login-doctor') {
+        targetRole = 'doctor';
+      } else if (path === '/login-admin') {
+        targetRole = 'admin';
+      }
+
       return <Login 
+        role={targetRole}
         onLoginSuccess={handleLoginSuccess} 
-        onNavigateToRegister={() => navigate('/register')} 
-        onNavigateToForgotPassword={() => navigate('/forgot-password')}
+        onNavigateToRegister={targetRole === 'admin' ? () => {} : (targetRole === 'doctor' ? () => navigate('/register-doctor') : () => navigate('/register'))} 
+        onNavigateToForgotPassword={targetRole === 'admin' ? () => navigate('/forgot-password-admin') : (targetRole === 'doctor' ? () => navigate('/forgot-password-doctor') : () => navigate('/forgot-password'))}
       />;
     }
     return null;

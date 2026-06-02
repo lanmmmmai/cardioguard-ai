@@ -16,7 +16,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, cu
     if (loading) return;
 
     if (!isAuthenticated || !role) {
-      navigate('/login', true);
+      let targetLogin = '/login';
+      if (currentPath.startsWith('/admin')) {
+        targetLogin = '/login-admin';
+      } else if (currentPath.startsWith('/doctor')) {
+        targetLogin = '/login-doctor';
+      } else if (currentPath.startsWith('/patient')) {
+        targetLogin = '/login';
+      }
+      navigate(targetLogin, true);
       return;
     }
 
@@ -44,7 +52,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, cu
 
   if (!defaultRouteByRole[role]) {
     logout();
-    navigate('/login', true);
+    let targetLogin = '/login';
+    if (currentPath.startsWith('/admin')) {
+      targetLogin = '/login-admin';
+    } else if (currentPath.startsWith('/doctor')) {
+      targetLogin = '/login-doctor';
+    }
+    navigate(targetLogin, true);
     return null;
   }
 
