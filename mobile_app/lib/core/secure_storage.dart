@@ -14,19 +14,30 @@ class SecureStorage {
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 
-  // Safe wrapper for all storage operations to handle Android key-store cryptographic issues
-  Future<T?> _safeOperation<T>(Future<T?> Function() operation) async {
-    try {
-      return await operation();
-    } catch (e) {
-      AppLogger.log('SecureStorage error: $e. Clearing storage to recover.');
+  // Safe wrapper for all storage operations to handle Android key-store cryptographic issues with retry and target-only deletion
+  Future<T?> _safeOperation<T>(Future<T?> Function() operation, {String? keyToDeleteOnError}) async {
+    int retries = 2;
+    while (retries > 0) {
       try {
-        await _storage.deleteAll();
-      } catch (clearError) {
-        AppLogger.log('Failed to clear SecureStorage: $clearError');
+        return await operation();
+      } catch (e) {
+        retries--;
+        if (retries == 0) {
+          AppLogger.log('SecureStorage error after retries: $e.');
+          if (keyToDeleteOnError != null) {
+            AppLogger.log('Deleting key: $keyToDeleteOnError to recover.');
+            try {
+              await _storage.delete(key: keyToDeleteOnError);
+            } catch (deleteError) {
+              AppLogger.log('Failed to delete key $keyToDeleteOnError: $deleteError');
+            }
+          }
+          return null;
+        }
+        await Future.delayed(const Duration(milliseconds: 100));
       }
-      return null;
     }
+    return null;
   }
 
   // Write token
@@ -36,7 +47,10 @@ class SecureStorage {
 
   // Read token
   Future<String?> getToken() async {
-    return await _safeOperation<String>(() => _storage.read(key: AppConfig.keyToken));
+    return await _safeOperation<String>(
+      () => _storage.read(key: AppConfig.keyToken),
+      keyToDeleteOnError: AppConfig.keyToken,
+    );
   }
 
   // Delete token
@@ -52,7 +66,10 @@ class SecureStorage {
 
   // Read user profile
   Future<Map<String, dynamic>?> getUser() async {
-    final userJson = await _safeOperation<String>(() => _storage.read(key: AppConfig.keyUser));
+    final userJson = await _safeOperation<String>(
+      () => _storage.read(key: AppConfig.keyUser),
+      keyToDeleteOnError: AppConfig.keyUser,
+    );
     if (userJson != null) {
       try {
         return json.decode(userJson) as Map<String, dynamic>;
