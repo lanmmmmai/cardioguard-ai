@@ -74,6 +74,21 @@ async def ensure_otp_table() -> None:
         ON auth_otp_tokens (expires_at)
         """
     )
+    # Đảm bảo bảng revoked_tokens tồn tại phòng trường hợp chưa chạy migration 011
+    await database.execute(
+        """
+        CREATE TABLE IF NOT EXISTS revoked_tokens (
+            jti        TEXT        PRIMARY KEY,
+            expires_at TIMESTAMPTZ NOT NULL
+        )
+        """
+    )
+    await database.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires_at
+        ON revoked_tokens (expires_at)
+        """
+    )
 
 
 async def create_otp_token(

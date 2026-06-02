@@ -179,6 +179,11 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       WebSocketService.disconnect();
+      try {
+        await _apiClient.post('/auth/logout');
+      } catch (e) {
+        AppLogger.log('Server logout failed: $e');
+      }
       await _secureStorage.clearSession();
       _currentUser = null;
       _isAuthenticated = false;

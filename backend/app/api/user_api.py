@@ -1,12 +1,14 @@
 import json
 from typing import Any, Optional, Dict
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Header, HTTPException, Request
+from jose import jwt
 
-from app.api.auth_api import get_user_from_token
+from app.api.auth_api import get_user_from_token, extract_bearer_token
 from app.services.audit_service import log_activity
 from app.core.database import database
-from app.core.security import hash_password, verify_password
+from app.core.security import hash_password, verify_password, ALGORITHM, SECRET_KEY
 from app.schemas.user_schema import PasswordUpdate, PatientMeUpdate, UserMeUpdate, UserAdminCreate, UserAdminUpdate
 
 router = APIRouter()
@@ -135,6 +137,21 @@ async def update_user_password(payload: PasswordUpdate, request: Request, author
         "UPDATE users SET password_hash = :password_hash, must_change_password = FALSE WHERE id::text = :user_id",
         {"password_hash": hash_password(payload.new_password), "user_id": current_user["id"]},
     )
+
+    if authorization:
+        try:
+            token = extract_bearer_token(authorization)
+            payload_decoded = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            jti = payload_decoded.get("jti")
+            exp = payload_decoded.get("exp")
+            if jti and exp:
+                expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+                await database.execute(
+                    "INSERT INTO revoked_tokens (jti, expires_at) VALUES (:jti, :exp) ON CONFLICT DO NOTHING",
+                    {"jti": jti, "exp": expires_at}
+                )
+        except Exception:
+            pass
 
     # Ghi nhận log đổi mật khẩu thành công
     await log_activity(

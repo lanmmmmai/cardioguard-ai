@@ -9,7 +9,7 @@ from jose import JWTError, jwt
 from app.core.config import settings
 from app.core.database import database
 from app.core.security import ALGORITHM, SECRET_KEY, hash_password, verify_password, create_access_token
-from app.core.rate_limit import check_rate_limit
+from app.core.rate_limit import check_rate_limit, get_client_ip
 from app.schemas.auth_schema import (
     RegisterRequest, LoginRequest, RegisterOtpRequest,
     ForgotPasswordRequest, ForgotPasswordVerifyRequest, ChangePasswordRequest
@@ -219,7 +219,7 @@ async def send_register_otp_email(email: str, full_name: str, otp: str) -> bool:
 
 @router.post("/auth/register/request-otp")
 async def request_register_otp(data: RegisterOtpRequest, request: Request):
-    ip = request.client.host if request.client else "unknown"
+    ip = get_client_ip(request)
     email = data.email.lower()
     check_rate_limit(ip, email, "/auth/register/request-otp", max_requests=5, window_seconds=60)
 
@@ -450,7 +450,7 @@ async def logout(authorization: Optional[str] = Header(default=None)):
 
 @router.post("/auth/forgot-password/request-otp")
 async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Request):
-    ip = request.client.host if request.client else "unknown"
+    ip = get_client_ip(request)
     email = data.email.lower()
     check_rate_limit(ip, email, "/auth/forgot-password/request-otp", max_requests=5, window_seconds=60)
 

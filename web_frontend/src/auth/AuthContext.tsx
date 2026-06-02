@@ -70,6 +70,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<string | null>(null);
 
   const logout = () => {
+    if (accessToken) {
+      fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }).catch((e) => console.error('API logout error:', e));
+    }
     storage.removeItem(USER_KEY);
     storage.removeItem(TOKEN_KEY);
     setAccessToken(null);
