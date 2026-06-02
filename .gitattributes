@@ -1,0 +1,21 @@
+* text=auto
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+# Keep executable scripts portable across Windows and Unix CI.
+gradlew text eol=lf
+**/gradlew text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Treat generated/runtime binaries as binary assets.
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pkl binary
+*.ttf binary
