@@ -44,7 +44,17 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
       if (response.ok) {
         setLocalAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_resolved: true } : a));
       } else {
-        const data = await response.json();
+        let data;
+
+        try {
+
+          data = await response.json();
+
+        } catch (e) {
+
+          throw new Error("Lỗi định dạng phản hồi từ server");
+
+        }
         alert(data.detail || 'Không thể xác nhận xử lý cảnh báo');
       }
     } catch (err) {

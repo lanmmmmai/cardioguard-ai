@@ -103,7 +103,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error(response.status === 401 ? 'Phiên đăng nhập đã hết hạn' : 'Không lấy được thông tin tài khoản');
     }
 
-    const data = await response.json();
+    let data;
+
+
+    try {
+
+
+      data = await response.json();
+
+
+    } catch (e) {
+
+
+      throw new Error("Lỗi định dạng phản hồi từ server");
+
+
+    }
     const normalizedUser = normalizeUser(data.user || data);
     if (!normalizedUser) {
       throw new Error('Tài khoản chưa được phân quyền');

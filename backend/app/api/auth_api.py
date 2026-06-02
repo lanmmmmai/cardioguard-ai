@@ -2,6 +2,7 @@ import asyncio
 import secrets
 import requests
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Request
 from jose import JWTError, jwt
@@ -77,11 +78,18 @@ async def get_user_from_token(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
+        jti = payload.get("jti")
     except JWTError as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
 
+    if jti:
+        revoked = await database.fetch_val("SELECT 1 FROM revoked_tokens WHERE jti = :jti", {"jti": jti})
+        if revoked:
+            raise HTTPException(status_code=401, detail="Token has been revoked")
+
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
+
 
     user_columns = await get_users_columns()
     select_columns = [
@@ -420,6 +428,25 @@ async def login(data: LoginRequest, request: Request):
         }
     }
 
+@router.post("/auth/logout")
+async def logout(authorization: Optional[str] = Header(default=None)):
+    if not authorization:
+        return {"message": "Logged out successfully"}
+    try:
+        token = extract_bearer_token(authorization)
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        if jti and exp:
+            expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+            await database.execute(
+                "INSERT INTO revoked_tokens (jti, expires_at) VALUES (:jti, :exp) ON CONFLICT DO NOTHING",
+                {"jti": jti, "exp": expires_at}
+            )
+    except Exception:
+        pass
+    return {"message": "Logged out successfully"}
+
 
 @router.post("/auth/forgot-password/request-otp")
 async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Request):
@@ -567,6 +594,20 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
         entity_id=current_user["id"],
         ip_address=request.client.host if request.client else "-"
     )
+
+    try:
+        token = extract_bearer_token(authorization)
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        if jti and exp:
+            expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+            await database.execute(
+                "INSERT INTO revoked_tokens (jti, expires_at) VALUES (:jti, :exp) ON CONFLICT DO NOTHING",
+                {"jti": jti, "exp": expires_at}
+            )
+    except Exception:
+        pass
 
     return {"message": "Password changed successfully"}
 

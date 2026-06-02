@@ -22,87 +22,12 @@
 ## 1. Backend Issues
 
 
-
-
-### 🟠 [HIGH] BE-07: JWT không có token revocation
-
-- **File:** `backend/app/core/security.py:27-31`
-- **Mô tả:** JWT tokens không có `jti` (unique ID) và không có refresh-token rotation. Khi phát hành, token valid đến hết expiry mà không có cách nào revoke (đổi password, logout, deactivate account đều vô dụng).
-- **Code:**
-  ```python
-  payload = {
-      "sub": str(user_id),
-      "role": role,
-      "exp": datetime.utcnow() + timedelta(hours=hours),
-  }
-  # Không có "jti" claim
-  ```
-- **Fix:** Thêm `jti` claim + token blacklist (Redis hoặc DB table) khi logout/password change.
-
----
-
-
-
-
-
-
 ## 2. Web Frontend Issues
 
-### 🟡 [MEDIUM] FE-10: No error handling cho `response.json()`
 
-- **File:** `Login.tsx:36`, `Register.tsx:81`, `Patients.tsx:75`, `Alerts.tsx:47`
-- **Mô tả:** Nếu server trả non-JSON response (HTML error page, 502), `response.json()` throw SyntaxError với message không hữu ích.
-- **Code:**
-  ```tsx
-  const data = await response.json();  // Throws nếu không phải JSON
-  ```
-- **Fix:** Wrap trong try/catch hoặc check `Content-Type` header trước.
 
----
 
-### 🟡 [MEDIUM] FE-11: Canvas resize không handled
 
-- **File:** `ECGChart.tsx:38-42`, `BeatingHeart3D.tsx:79-83`, `ICUCamera.tsx:16-20`
-- **Mô tả:** Canvas dimensions set một lần trong animation effect. Nếu window resize hoặc container thay đổi size (sidebar toggle), canvas bị stretched hoặc clipped.
-- **Fix:** Thêm `ResizeObserver` hoặc window resize listener.
-
----
-
-### 🟡 [MEDIUM] FE-12: ECG animation restart mỗi khi `liveEcgValue` thay đổi
-
-- **File:** `web_frontend/src/components/ECGChart.tsx:183`
-- **Mô tả:** Toàn bộ animation loop restart mỗi khi `liveEcgValue` thay đổi. Vì live ECG data arrive at high frequency, constant animation restarts xảy ra.
-- **Code:**
-  ```tsx
-  }, [liveEcgValue, heartRate]);  // liveEcgValue thay đổi → restart loop
-  ```
-- **Fix:** Lưu `liveEcgValue` trong `useRef` và read inside animation loop.
-
----
-
-### 🟡 [MEDIUM] FE-13: `setInterval` recreated mỗi telemetry update
-
-- **File:** `web_frontend/src/components/Dashboard.tsx:152-162`
-- **Mô tả:** `lastTelemetryTime` thay đổi mỗi khi telemetry arrive → interval clear và recreate.
-- **Fix:** Tạo interval một lần, đọc `lastTelemetryTime` qua ref.
-
----
-
-### 🟡 [MEDIUM] FE-14: Chat streaming tạo quá nhiều state updates
-
-- **File:** `web_frontend/src/components/chat/ChatWindow.tsx:76-82`
-- **Mô tả:** Streaming tạo state update cho MỖI word. Response 500 words = 500 state updates.
-- **Code:**
-  ```tsx
-  for (let i = 0; i < chunks.length; i++) {
-    currentText += (i === 0 ? '' : ' ') + chunks[i];
-    setMessages(prev => prev.map(m => m.id === aiMsgId ? {...m, message: currentText} : m));
-    await new Promise(r => setTimeout(r, 20 + Math.random() * 30));
-  }
-  ```
-- **Fix:** Dùng `requestAnimationFrame` hoặc batch updates.
-
----
 
 ### 🟡 [MEDIUM] FE-15: `filteredPatients` recomputed mỗi render
 
@@ -167,7 +92,6 @@
 - **Fix:** Lưu ID và clear trong cleanup.
 
 ---
-
 ## 3. Mobile App Issues
 
 ### 🟡 [MEDIUM] MO-11: Providers never disposed, init never called
@@ -289,7 +213,63 @@
 - **Fix:** Không trim password, hoặc document behavior.
 
 ---
+## 6. Infrastructure Issues
 
+### 🟠 [HIGH] INFRA-01: Massive dependency bloat trong `requirements.txt`
+
+- **File:** `backend/requirements.txt`
+- **Mô tả:** 250 packages包括 `torch`, `transformers`, `ultralytics`, `jupyter`, `selenium`, `paddleocr`, `easyocr`, `streamlit`. Không có package nào cần cho FastAPI backend. `requirements.runtime.txt` chỉ có 14 packages. Attack surface khổng lồ.
+- **Fix:** Dùng `requirements.runtime.txt` cho production, giữ `requirements.txt` cho dev.
+
+---
+
+### 🟡 [MEDIUM] INFRA-02: Docker container chạy root
+
+- **File:** `backend/Dockerfile`, `web_frontend/Dockerfile`
+- **Mô tả:** Cả hai Dockerfiles chạy processes dưới root user. Defense in depth thiếu.
+- **Fix:** Thêm `RUN adduser --disabled-password appuser && USER appuser`.
+
+---
+
+### 🟡 [MEDIUM] INFRA-03: Conflicting OpenCV packages
+
+- **File:** `backend/requirements.txt:130-132`
+- **Mô tả:** Install đồng thời `opencv-contrib-python`, `opencv-python`, `opencv-python-headless` — conflicts.
+- **Fix:** Chọn một package.
+
+---
+
+### 🟡 [MEDIUM] INFRA-04: Unpinned numpy, pyarrow
+
+- **File:** `backend/requirements.txt:129, 160`
+- **Mô tả:** Không có version pin. Major version bumps có thể break.
+- **Fix:** Pin known-working ranges.
+
+---
+
+### 🟢 [LOW] INFRA-05: `seed_data.py` dùng `datetime.now()` không timezone
+
+- **File:** `backend/seed_data.py:77, 78, 100, 101`
+- **Mô tả:** `datetime.now()` tạo naive datetime. Migration dùng `TIMESTAMPTZ`. Inconsistency.
+- **Fix:** Dùng `datetime.now(timezone.utc)`.
+
+---
+
+### 🟢 [LOW] INFRA-06: `web_frontend/Dockerfile` không có `.dockerignore`
+
+- **File:** `web_frontend/Dockerfile`
+- **Mô tả:** `COPY web_frontend/ ./` copy everything including `.git`, `node_modules`, `.env`.
+- **Fix:** Thêm `.dockerignore`.
+
+---
+
+### 🟢 [LOW] INFRA-07: `docker-compose.yml` không có healthcheck cho web
+
+- **File:** `docker-compose.yml:27-40`
+- **Mô tả:** Backend có healthcheck nhưng web không có. Failed nginx start undetected.
+- **Fix:** Thêm healthcheck cho web service.
+
+---
 ## 4. AI Model Issues
 
 ### 🟡 [MEDIUM] AI-02: CORS wildcard methods/headers
@@ -345,7 +325,6 @@
 - **Fix:** Pin known-working ranges.
 
 ---
-
 ## 5. Hardware Firmware Issues
 
 ### 🔴 [CRITICAL] HW-01: Hardcoded WiFi credentials trong source
@@ -446,65 +425,6 @@
 - **Fix:** Flag data loss cho caller.
 
 ---
-
-## 6. Infrastructure Issues
-
-### 🟠 [HIGH] INFRA-01: Massive dependency bloat trong `requirements.txt`
-
-- **File:** `backend/requirements.txt`
-- **Mô tả:** 250 packages包括 `torch`, `transformers`, `ultralytics`, `jupyter`, `selenium`, `paddleocr`, `easyocr`, `streamlit`. Không có package nào cần cho FastAPI backend. `requirements.runtime.txt` chỉ có 14 packages. Attack surface khổng lồ.
-- **Fix:** Dùng `requirements.runtime.txt` cho production, giữ `requirements.txt` cho dev.
-
----
-
-### 🟡 [MEDIUM] INFRA-02: Docker container chạy root
-
-- **File:** `backend/Dockerfile`, `web_frontend/Dockerfile`
-- **Mô tả:** Cả hai Dockerfiles chạy processes dưới root user. Defense in depth thiếu.
-- **Fix:** Thêm `RUN adduser --disabled-password appuser && USER appuser`.
-
----
-
-### 🟡 [MEDIUM] INFRA-03: Conflicting OpenCV packages
-
-- **File:** `backend/requirements.txt:130-132`
-- **Mô tả:** Install đồng thời `opencv-contrib-python`, `opencv-python`, `opencv-python-headless` — conflicts.
-- **Fix:** Chọn một package.
-
----
-
-### 🟡 [MEDIUM] INFRA-04: Unpinned numpy, pyarrow
-
-- **File:** `backend/requirements.txt:129, 160`
-- **Mô tả:** Không có version pin. Major version bumps có thể break.
-- **Fix:** Pin known-working ranges.
-
----
-
-### 🟢 [LOW] INFRA-05: `seed_data.py` dùng `datetime.now()` không timezone
-
-- **File:** `backend/seed_data.py:77, 78, 100, 101`
-- **Mô tả:** `datetime.now()` tạo naive datetime. Migration dùng `TIMESTAMPTZ`. Inconsistency.
-- **Fix:** Dùng `datetime.now(timezone.utc)`.
-
----
-
-### 🟢 [LOW] INFRA-06: `web_frontend/Dockerfile` không có `.dockerignore`
-
-- **File:** `web_frontend/Dockerfile`
-- **Mô tả:** `COPY web_frontend/ ./` copy everything including `.git`, `node_modules`, `.env`.
-- **Fix:** Thêm `.dockerignore`.
-
----
-
-### 🟢 [LOW] INFRA-07: `docker-compose.yml` không có healthcheck cho web
-
-- **File:** `docker-compose.yml:27-40`
-- **Mô tả:** Backend có healthcheck nhưng web không có. Failed nginx start undetected.
-- **Fix:** Thêm healthcheck cho web service.
-
----
-
 ## 7. Priority Matrix
 
 ### Tier 1 — Sửa ngay (blocking / data loss / security)
@@ -559,9 +479,26 @@
 *Report generated by opencode — CardioGuard AI Code Review*
 
 ---
-
 ## 8. Lỗi Đã Khắc Phục (Resolved)
 
+### 🟢 [RESOLVED] BE-07: JWT không có token revocation
+
+---
+### 🟢 [RESOLVED] FE-10: No error handling cho `response.json()`
+
+---
+### 🟢 [RESOLVED] FE-11: Canvas resize không handled
+
+---
+### 🟢 [RESOLVED] FE-12: ECG animation restart mỗi khi `liveEcgValue` thay đổi
+
+---
+### 🟢 [RESOLVED] FE-13: `setInterval` recreated mỗi telemetry update
+
+---
+### 🟢 [RESOLVED] FE-14: Chat streaming tạo quá nhiều state updates
+
+---
 ### 🟢 [RESOLVED] BE-01: Rate limiting vô hiệu trong multi-worker
 
 ---

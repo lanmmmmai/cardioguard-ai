@@ -46,7 +46,17 @@ const formatDate = (value?: string | null) => {
 
 const getErrorMessage = async (response: Response, fallback: string) => {
   try {
-    const data = await response.json();
+    let data;
+
+    try {
+
+      data = await response.json();
+
+    } catch (e) {
+
+      throw new Error("Lỗi định dạng phản hồi từ server");
+
+    }
     if (Array.isArray(data.detail)) return data.detail.map((item: any) => item.msg).join(', ');
     return data.detail || fallback;
   } catch {

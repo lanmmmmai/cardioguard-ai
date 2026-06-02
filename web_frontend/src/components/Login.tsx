@@ -33,7 +33,22 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegist
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      let data;
+
+
+      try {
+
+
+        data = await response.json();
+
+
+      } catch (e) {
+
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+
+      }
 
       if (!response.ok) {
         throw new Error(data.detail || 'Email hoặc mật khẩu không chính xác');

@@ -75,19 +75,23 @@ export const BeatingHeart3D: React.FC<BeatingHeart3DProps> = ({ heartRate }) => 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Handle high DPI screens
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    const width = rect.width;
-    const height = rect.height;
-    const centerX = width / 2;
-    const centerY = height / 2 - 10; // offset slightly up
-
     const render = (timestamp: number) => {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const currentWidth = rect.width * dpr;
+      const currentHeight = rect.height * dpr;
+      
+      if (canvas.width !== currentWidth || canvas.height !== currentHeight) {
+        canvas.width = currentWidth;
+        canvas.height = currentHeight;
+        ctx.scale(dpr, dpr);
+      }
+      
+      const width = rect.width;
+      const height = rect.height;
+      const centerX = width / 2;
+      const centerY = height / 2 - 10; // offset slightly up
+
       ctx.clearRect(0, 0, width, height);
 
       // Heart contraction pulse simulation based on current heartRate

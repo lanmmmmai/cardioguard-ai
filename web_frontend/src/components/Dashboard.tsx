@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Heart, Activity, AlertTriangle, User, Play, Radio, Plus, Clock } from 'lucide-react';
 import { ECGChart } from './ECGChart';
 import { BeatingHeart3D } from './BeatingHeart3D';
@@ -149,17 +149,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
   }, [latestTelemetry, selectedPatientId]);
 
   // Telemetry stale state: check if gap exceeds 30 seconds
+  const lastTelemetryTimeRef = useRef<Date | null>(null);
+  useEffect(() => {
+    lastTelemetryTimeRef.current = lastTelemetryTime;
+  }, [lastTelemetryTime]);
+
   useEffect(() => {
     const interval = setInterval(() => {
-      if (lastTelemetryTime) {
-        const diffSeconds = (new Date().getTime() - lastTelemetryTime.getTime()) / 1000;
+      if (lastTelemetryTimeRef.current) {
+        const diffSeconds = (new Date().getTime() - lastTelemetryTimeRef.current.getTime()) / 1000;
         setIsStale(diffSeconds > 30);
       } else {
         setIsStale(true);
       }
     }, 5000);
     return () => clearInterval(interval);
-  }, [lastTelemetryTime]);
+  }, []);
 
   // Find details of the active patient
   const activePatient = patients.find(p => p.id === selectedPatientId);

@@ -35,7 +35,17 @@ const jsonHeaders = (token: string) => ({
 
 const readError = async (response: Response) => {
   try {
-    const data = await response.json();
+    let data;
+
+    try {
+
+      data = await response.json();
+
+    } catch (e) {
+
+      throw new Error("Lỗi định dạng phản hồi từ server");
+
+    }
     if (Array.isArray(data.detail)) return data.detail.map((item: any) => item.msg || item).join(', ');
     return data.detail || 'Yêu cầu CMS thất bại';
   } catch {

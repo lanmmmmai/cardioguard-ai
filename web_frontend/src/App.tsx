@@ -126,7 +126,14 @@ const AppContent: React.FC = () => {
       const response = await fetch(`${API_URL}/patients`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
-      if (response.ok) setPatients(await response.json());
+      if (response.ok) {
+        try {
+          const data = await response.json();
+          setPatients(data);
+        } catch(e) {
+          console.error("Invalid JSON format");
+        }
+      }
     } catch (err) {
       console.error('Failed to fetch patients:', err);
     }
@@ -137,7 +144,14 @@ const AppContent: React.FC = () => {
       const response = await fetch(`${API_URL}/alerts`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
-      if (response.ok) setAlerts(await response.json());
+      if (response.ok) {
+        try {
+          const data = await response.json();
+          setAlerts(data);
+        } catch(e) {
+          console.error("Invalid JSON format");
+        }
+      }
     } catch (err) {
       console.error('Failed to fetch alerts:', err);
     }
@@ -148,7 +162,14 @@ const AppContent: React.FC = () => {
       const response = await fetch(`${API_URL}/admin/doctors`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
-      if (response.ok) setDoctors(await response.json());
+      if (response.ok) {
+        try {
+          const data = await response.json();
+          setDoctors(data);
+        } catch(e) {
+          console.error("Invalid JSON format");
+        }
+      }
     } catch (err) {
       console.error('Failed to fetch doctors:', err);
     }

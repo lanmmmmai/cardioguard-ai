@@ -59,7 +59,22 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }
         body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
       });
 
-      const data = await response.json();
+      let data;
+
+
+      try {
+
+
+        data = await response.json();
+
+
+      } catch (e) {
+
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+
+      }
 
       if (!response.ok) {
         throw new Error(data.detail || 'Thay đổi mật khẩu thất bại');

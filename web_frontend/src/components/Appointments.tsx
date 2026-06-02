@@ -59,7 +59,17 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
       const response = await fetch(`${API_URL}/appointments`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      const data = await response.json();
+      let data;
+
+      try {
+
+        data = await response.json();
+
+      } catch (e) {
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+      }
       if (!response.ok) throw new Error(data.detail || 'Không thể lấy dữ liệu lịch hẹn');
       
       const apptList = Array.isArray(data) ? data : [];
@@ -87,7 +97,17 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
       const response = await fetch(`${API_URL}/cms/users?filter=role:doctor&limit=100`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
-      const data = await response.json();
+      let data;
+
+      try {
+
+        data = await response.json();
+
+      } catch (e) {
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+      }
       if (response.ok && data.items) {
         setDoctors(data.items);
         const docMap: Record<string, string> = {};
@@ -151,7 +171,17 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
         await fetchAppointments();
         alert('Gửi yêu cầu đặt lịch hẹn khám thành công!');
       } else {
-        const data = await response.json();
+        let data;
+
+        try {
+
+          data = await response.json();
+
+        } catch (e) {
+
+          throw new Error("Lỗi định dạng phản hồi từ server");
+
+        }
         alert(data.detail || 'Đặt lịch khám thất bại.');
       }
     } catch (err) {
@@ -179,7 +209,17 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
       if (response.ok) {
         await fetchAppointments();
       } else {
-        const data = await response.json();
+        let data;
+
+        try {
+
+          data = await response.json();
+
+        } catch (e) {
+
+          throw new Error("Lỗi định dạng phản hồi từ server");
+
+        }
         alert(data.detail || 'Cập nhật trạng thái thất bại.');
       }
     } catch (err) {

@@ -76,7 +76,17 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
       const response = await fetch(`${API_URL}${meta.endpoint}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      const data = await response.json();
+      let data;
+
+      try {
+
+        data = await response.json();
+
+      } catch (e) {
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+      }
       if (!response.ok) throw new Error(data.detail || 'Không lấy được dữ liệu');
       setRecords(Array.isArray(data) ? data : []);
     } catch (err: any) {

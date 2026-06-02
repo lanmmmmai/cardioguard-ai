@@ -73,12 +73,19 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
       const chunks = aiResponseText.split(' ');
       let currentText = '';
       
+      let batchUpdateCount = 0;
       for (let i = 0; i < chunks.length; i++) {
         currentText += (i === 0 ? '' : ' ') + chunks[i];
-        setMessages(prev => 
-          prev.map(m => m.id === aiMsgId ? { ...m, message: currentText } : m)
-        );
-        await new Promise(r => setTimeout(r, 20 + Math.random() * 30));
+        batchUpdateCount++;
+        
+        // Batch state updates to prevent excessive re-renders (FE-14 fix)
+        if (batchUpdateCount >= 4 || i === chunks.length - 1) {
+          setMessages(prev => 
+            prev.map(m => m.id === aiMsgId ? { ...m, message: currentText } : m)
+          );
+          batchUpdateCount = 0;
+          await new Promise(r => setTimeout(r, 40 + Math.random() * 40));
+        }
       }
       
       setMessages(prev => 

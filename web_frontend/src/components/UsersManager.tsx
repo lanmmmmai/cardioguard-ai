@@ -48,7 +48,17 @@ export const UsersManager: React.FC = () => {
       const response = await fetch(`${API_URL}/admin/users`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      const data = await response.json();
+      let data;
+
+      try {
+
+        data = await response.json();
+
+      } catch (e) {
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+      }
       if (!response.ok) {
         throw new Error(data.detail || 'Không lấy được danh sách tài khoản');
       }
@@ -153,7 +163,22 @@ export const UsersManager: React.FC = () => {
         }),
       });
 
-      const data = await response.json();
+      let data;
+
+
+      try {
+
+
+        data = await response.json();
+
+
+      } catch (e) {
+
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+
+      }
       if (!response.ok) {
         throw new Error(data.detail || 'Lỗi thêm tài khoản mới');
       }
@@ -202,7 +227,22 @@ export const UsersManager: React.FC = () => {
         body: JSON.stringify(updatePayload),
       });
 
-      const data = await response.json();
+      let data;
+
+
+      try {
+
+
+        data = await response.json();
+
+
+      } catch (e) {
+
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+
+      }
       if (!response.ok) {
         throw new Error(data.detail || 'Lỗi cập nhật tài khoản');
       }
@@ -228,7 +268,22 @@ export const UsersManager: React.FC = () => {
         },
       });
 
-      const data = await response.json();
+      let data;
+
+
+      try {
+
+
+        data = await response.json();
+
+
+      } catch (e) {
+
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+
+      }
       if (!response.ok) {
         throw new Error(data.detail || 'Lỗi khi xóa tài khoản');
       }

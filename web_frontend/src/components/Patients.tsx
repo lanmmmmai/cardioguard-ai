@@ -75,7 +75,22 @@ export const Patients: React.FC<PatientsProps> = ({
         }),
       });
 
-      const data = await response.json();
+      let data;
+
+
+      try {
+
+
+        data = await response.json();
+
+
+      } catch (e) {
+
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+
+      }
 
       if (!response.ok) {
         throw new Error(data.detail || 'Lỗi thêm bệnh nhân mới');

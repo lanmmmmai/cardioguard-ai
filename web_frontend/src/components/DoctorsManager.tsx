@@ -48,7 +48,17 @@ export const DoctorsManager: React.FC = () => {
       const response = await fetch(`${API_URL}/admin/doctors`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      const data = await response.json();
+      let data;
+
+      try {
+
+        data = await response.json();
+
+      } catch (e) {
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+      }
       if (!response.ok) {
         throw new Error(data.detail || 'Không lấy được danh sách bác sĩ');
       }
@@ -154,7 +164,22 @@ export const DoctorsManager: React.FC = () => {
         }),
       });
 
-      const data = await response.json();
+      let data;
+
+
+      try {
+
+
+        data = await response.json();
+
+
+      } catch (e) {
+
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+
+      }
       if (!response.ok) {
         throw new Error(data.detail || 'Lỗi thêm bác sĩ mới');
       }
@@ -205,7 +230,22 @@ export const DoctorsManager: React.FC = () => {
         body: JSON.stringify(updatePayload),
       });
 
-      const data = await response.json();
+      let data;
+
+
+      try {
+
+
+        data = await response.json();
+
+
+      } catch (e) {
+
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+
+      }
       if (!response.ok) {
         throw new Error(data.detail || 'Lỗi cập nhật thông tin bác sĩ');
       }
@@ -231,7 +271,22 @@ export const DoctorsManager: React.FC = () => {
         },
       });
 
-      const data = await response.json();
+      let data;
+
+
+      try {
+
+
+        data = await response.json();
+
+
+      } catch (e) {
+
+
+        throw new Error("Lỗi định dạng phản hồi từ server");
+
+
+      }
       if (!response.ok) {
         throw new Error(data.detail || 'Lỗi khi xóa bác sĩ');
       }

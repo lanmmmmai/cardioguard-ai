@@ -60,7 +60,7 @@ def send_smtp_email_sync(
     """Gửi email đồng bộ qua máy chủ SMTP Gmail hoặc cấu hình khác trong .env."""
     host = settings.SMTP_HOST
     port = int(settings.SMTP_PORT or 587)
-    user = settings.SMTP_USERNAME or settings.SMTP_USER
+    user = settings.SMTP_USERNAME
     password = settings.SMTP_PASSWORD
     from_email = settings.SMTP_FROM_EMAIL or settings.EMAIL_FROM_EMAIL or "noreply@cardioguard.ai"
     from_name = settings.SMTP_FROM_NAME or settings.EMAIL_FROM_NAME or "CardioGuard AI"

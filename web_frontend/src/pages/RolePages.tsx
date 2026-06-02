@@ -195,7 +195,17 @@ export const PatientHome: React.FC<{
         alert('Cảnh báo SOS khẩn cấp đã được phát đi thành công tới hệ thống và các bác sĩ phụ trách!');
         setShowSosConfirm(false);
       } else {
-        const data = await response.json();
+        let data;
+
+        try {
+
+          data = await response.json();
+
+        } catch (e) {
+
+          throw new Error("Lỗi định dạng phản hồi từ server");
+
+        }
         alert(data.detail || 'Lỗi gửi yêu cầu SOS khẩn cấp');
       }
     } catch (err) {

@@ -12,17 +12,20 @@ export const ICUCamera: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Handle high DPI screens
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    const width = rect.width;
-    const height = rect.height;
-
     const render = (timestamp: number) => {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const currentWidth = rect.width * dpr;
+      const currentHeight = rect.height * dpr;
+      
+      if (canvas.width !== currentWidth || canvas.height !== currentHeight) {
+        canvas.width = currentWidth;
+        canvas.height = currentHeight;
+        ctx.scale(dpr, dpr);
+      }
+      
+      const width = rect.width;
+      const height = rect.height;
       ctx.clearRect(0, 0, width, height);
 
       // Night vision thermal green wash background
