@@ -64,19 +64,7 @@
 
 ---
 
-### 🔴 [CRITICAL] BE-06: CORS regex quá broad
-
-- **File:** `backend/app/main.py:29-46`
-- **Mô tả:** CORS regex `172\.\d+\.\d+\.\d+` match toàn bộ range 172.0.0.0/8 (16 triệu IP), không chỉ 172.16-31.x.x. Kết hợp với `allow_credentials=True` và `allow_methods=["*"]`, `allow_headers=["*"]` — quá permissive.
-- **Code:**
-  ```python
-  allow_origins=[
-      r"https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|172\.\d+\.\d+\.\d+)(:\d+)?",
-  ],
-  allow_methods=["*"],
-  allow_headers=["*"],
-  ```
-- **Fix:** Dùng danh sách cụ thể các origin, methods, headers.
+### 🟢 [RESOLVED] BE-06: CORS regex quá broad
 
 ---
 
@@ -436,19 +424,7 @@
 
 ---
 
-### 🟠 [HIGH] MO-08: TextEditingController leak trong bottom sheets
-
-- **File:** `mobile_app/lib/screens/patient_detail_screen.dart:104-106, 185-188`
-- **Mô tả:** Controllers tạo trong method nhưng **không bao giờ dispose**. `showModalBottomSheet` builder không guarantee disposal khi sheet close.
-- **Code:**
-  ```dart
-  void _showAddRecordSheet() {
-    final typeController = TextEditingController(text: 'Khám lâm sàng');
-    final diagnosisController = TextEditingController();
-    // Không dispose
-  }
-  ```
-- **Fix:** Dùng StatefulWidget cho sheet content và dispose trong `dispose()`.
+### 🟢 [RESOLVED] MO-08: TextEditingController leak trong bottom sheets
 
 ---
 

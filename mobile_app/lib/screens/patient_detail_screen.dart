@@ -101,10 +101,6 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
   // Doctor Sheet: Add Medical Record
   void _showAddRecordSheet() {
-    final typeController = TextEditingController(text: 'Khám lâm sàng');
-    final diagnosisController = TextEditingController();
-    final summaryController = TextEditingController();
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -113,68 +109,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Thêm Bệnh Án Mới',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                TextField(
-                    controller: typeController,
-                    decoration: const InputDecoration(labelText: 'Loại khám')),
-                const SizedBox(height: 12),
-                TextField(
-                    controller: diagnosisController,
-                    decoration: const InputDecoration(labelText: 'Chẩn đoán')),
-                const SizedBox(height: 12),
-                TextField(
-                    controller: summaryController,
-                    maxLines: 3,
-                    decoration:
-                        const InputDecoration(labelText: 'Tóm tắt / Kết luận')),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF3366)),
-                    onPressed: () async {
-                      if (diagnosisController.text.isEmpty ||
-                          summaryController.text.isEmpty) {
-                        return;
-                      }
-                      final patientProvider =
-                          Provider.of<PatientProvider>(context, listen: false);
-                      final success = await patientProvider.addMedicalRecord(
-                        patientId: widget.patient['id'],
-                        type: typeController.text.trim(),
-                        diagnosis: diagnosisController.text.trim(),
-                        summary: summaryController.text.trim(),
-                      );
-                      if (success && context.mounted) {
-                        Navigator.pop(context);
-                      }
-                    },
-                    child: const Text('Lưu Bệnh Án',
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
-          ),
+        return AddRecordSheetContent(
+          patient: widget.patient,
+          isDarkTheme: widget.isDarkTheme,
         );
       },
     );
@@ -182,11 +119,6 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
   // Doctor Sheet: Add Prescription
   void _showAddPrescriptionSheet() {
-    final medController = TextEditingController();
-    final dosageController = TextEditingController();
-    final freqController = TextEditingController();
-    final instructController = TextEditingController();
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -195,74 +127,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Kê Đơn Thuốc Mới',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                TextField(
-                    controller: medController,
-                    decoration: const InputDecoration(labelText: 'Tên thuốc')),
-                const SizedBox(height: 12),
-                TextField(
-                    controller: dosageController,
-                    decoration: const InputDecoration(
-                        labelText: 'Liều lượng (e.g. 500mg)')),
-                const SizedBox(height: 12),
-                TextField(
-                    controller: freqController,
-                    decoration: const InputDecoration(
-                        labelText: 'Tần suất (e.g. 2 lần/ngày)')),
-                const SizedBox(height: 12),
-                TextField(
-                    controller: instructController,
-                    decoration:
-                        const InputDecoration(labelText: 'Hướng dẫn sử dụng')),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF3366)),
-                    onPressed: () async {
-                      if (medController.text.isEmpty ||
-                          dosageController.text.isEmpty) {
-                        return;
-                      }
-                      final patientProvider =
-                          Provider.of<PatientProvider>(context, listen: false);
-                      final success = await patientProvider.addPrescription(
-                        patientId: widget.patient['id'],
-                        medicationName: medController.text.trim(),
-                        dosage: dosageController.text.trim(),
-                        frequency: freqController.text.trim(),
-                        instructions: instructController.text.trim(),
-                      );
-                      if (success && context.mounted) {
-                        Navigator.pop(context);
-                      }
-                    },
-                    child: const Text('Lưu Đơn Thuốc',
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
-          ),
+        return AddPrescriptionSheetContent(
+          patient: widget.patient,
+          isDarkTheme: widget.isDarkTheme,
         );
       },
     );
@@ -790,6 +657,217 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               child: Text(value,
                   style: TextStyle(fontSize: 12, color: textColor))),
         ],
+      ),
+    );
+  }
+}
+
+class AddRecordSheetContent extends StatefulWidget {
+  final Map<String, dynamic> patient;
+  final bool isDarkTheme;
+
+  const AddRecordSheetContent({
+    super.key,
+    required this.patient,
+    required this.isDarkTheme,
+  });
+
+  @override
+  State<AddRecordSheetContent> createState() => _AddRecordSheetContentState();
+}
+
+class _AddRecordSheetContentState extends State<AddRecordSheetContent> {
+  late final TextEditingController _typeController;
+  late final TextEditingController _diagnosisController;
+  late final TextEditingController _summaryController;
+
+  @override
+  void initState() {
+    super.initState();
+    _typeController = TextEditingController(text: 'Khám lâm sàng');
+    _diagnosisController = TextEditingController();
+    _summaryController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _typeController.dispose();
+    _diagnosisController.dispose();
+    _summaryController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 20,
+        right: 20,
+        top: 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Thêm Bệnh Án Mới',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            TextField(
+                controller: _typeController,
+                decoration: const InputDecoration(labelText: 'Loại khám')),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _diagnosisController,
+                decoration: const InputDecoration(labelText: 'Chẩn đoán')),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _summaryController,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Tóm tắt / Kết luận')),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF3366)),
+                onPressed: () async {
+                  if (_diagnosisController.text.isEmpty ||
+                      _summaryController.text.isEmpty) {
+                    return;
+                  }
+                  final patientProvider =
+                      Provider.of<PatientProvider>(context, listen: false);
+                  final success = await patientProvider.addMedicalRecord(
+                    patientId: widget.patient['id'],
+                    type: _typeController.text.trim(),
+                    diagnosis: _diagnosisController.text.trim(),
+                    summary: _summaryController.text.trim(),
+                  );
+                  if (success && context.mounted) {
+                    Navigator.pop(context);
+                  }
+                },
+                child: const Text('Lưu Bệnh Án',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AddPrescriptionSheetContent extends StatefulWidget {
+  final Map<String, dynamic> patient;
+  final bool isDarkTheme;
+
+  const AddPrescriptionSheetContent({
+    super.key,
+    required this.patient,
+    required this.isDarkTheme,
+  });
+
+  @override
+  State<AddPrescriptionSheetContent> createState() => _AddPrescriptionSheetContentState();
+}
+
+class _AddPrescriptionSheetContentState extends State<AddPrescriptionSheetContent> {
+  late final TextEditingController _medController;
+  late final TextEditingController _dosageController;
+  late final TextEditingController _freqController;
+  late final TextEditingController _instructController;
+
+  @override
+  void initState() {
+    super.initState();
+    _medController = TextEditingController();
+    _dosageController = TextEditingController();
+    _freqController = TextEditingController();
+    _instructController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _medController.dispose();
+    _dosageController.dispose();
+    _freqController.dispose();
+    _instructController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 20,
+        right: 20,
+        top: 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Kê Đơn Thuốc Mới',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            TextField(
+                controller: _medController,
+                decoration: const InputDecoration(labelText: 'Tên thuốc')),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _dosageController,
+                decoration: const InputDecoration(
+                    labelText: 'Liều lượng (e.g. 500mg)')),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _freqController,
+                decoration: const InputDecoration(
+                    labelText: 'Tần suất (e.g. 2 lần/ngày)')),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _instructController,
+                decoration: const InputDecoration(labelText: 'Hướng dẫn sử dụng')),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF3366)),
+                onPressed: () async {
+                  if (_medController.text.isEmpty ||
+                      _dosageController.text.isEmpty) {
+                    return;
+                  }
+                  final patientProvider =
+                      Provider.of<PatientProvider>(context, listen: false);
+                  final success = await patientProvider.addPrescription(
+                    patientId: widget.patient['id'],
+                    medicationName: _medController.text.trim(),
+                    dosage: _dosageController.text.trim(),
+                    frequency: _freqController.text.trim(),
+                    instructions: _instructController.text.trim(),
+                  );
+                  if (success && context.mounted) {
+                    Navigator.pop(context);
+                  }
+                },
+                child: const Text('Lưu Đơn Thuốc',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
