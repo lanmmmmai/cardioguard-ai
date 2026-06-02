@@ -34,31 +34,9 @@
 
 ### 🟢 [RESOLVED] BE-02: Race condition TOCTOU trong registration
 
-- **File:** `backend/app/api/auth_api.py:257-311`
-- **Mô tả:** Kiểm tra email tồn tại (line 257-264) và INSERT (line 266-311) không nằm trong cùng một transaction. Hai request concurrent với cùng email đều pass check và đều insert, gây duplicate user hoặc constraint violation.
-- **Code:**
-  ```python
-  # Line 257: Check email
-  existing = await database.fetch_one(query, values={"email": ...})
-  if existing:
-      raise HTTPException(status_code=409, detail="Email already exists")
-  # Line 266: INSERT — gap giữa check và insert
-  await database.execute(query, values={...})
-  ```
-- **Fix:** Dùng `INSERT ... ON CONFLICT DO NOTHING` hoặc wrapping trong transaction với SELECT FOR UPDATE.
-
 ---
 
 ### 🟢 [RESOLVED] BE-03: Duplicate route path conflict
-
-- **File:** `backend/app/api/sensor_api.py:508, 554`
-- **Mô tả:** Cả hai route `/sensor-data` (GET) và `/api/sensors/history` (GET) đều tồn tại. Route `/api/sensors/history` có prefix `/api/` có thể conflict với router prefix setup, tạo endpoint không thể truy cập được.
-- **Code:**
-  ```python
-  @router.get("/sensor-data")  # Line 508
-  @router.get("/api/sensors/history")  # Line 554 — conflict
-  ```
-- **Fix:** Kiểm tra lại router prefix và xóa duplicate.
 
 ---
 
@@ -121,71 +99,25 @@
 
 ### 🟢 [RESOLVED] BE-08: Internal error messages leak cho client
 
-- **File:** `backend/app/api/auth_api.py:235, 444`
-- **Mô tả:** Raw exception text (có thể chứa DB connection strings, internal IPs) được trả về cho user qua API.
-- **Code:**
-  ```python
-  raise HTTPException(status_code=502, detail=str(exc) or "Unable to send OTP email")  # Line 235
-  raise HTTPException(status_code=500, detail=f"Lỗi thêm tài khoản mới: {str(e)}")  # Line 444
-  ```
-- **Fix:** Log exception server-side, trả về generic error message cho client.
-
 ---
 
 ### 🟢 [RESOLVED] BE-09: Admin có thể đổi role của bất kỳ user nào
-
-- **File:** `backend/app/api/user_api.py:484-486`
-- **Mô tả:** Endpoint `update_user` cho phép admin设置 `payload.role` thành bất kỳ giá trị nào. Admin có thể đổi role của admin khác thành patient/doctor, hoặc đổi role của chính mình.
-- **Code:**
-  ```python
-  # Không có validation role transitions
-  if payload.role:
-      updates["role"] = payload.role
-  ```
-- **Fix:** Thêm role transition validation — chỉ cho phép admin set role thấp hơn, hoặc không cho phép self-role-change.
 
 ---
 
 ### 🟢 [RESOLVED] BE-10: Race condition trong OTP creation
 
-- **File:** `backend/app/services/otp_service.py:90-119`
-- **Mô tả:** UPDATE (invalidate old tokens) và INSERT (create new token) không nằm trong transaction. Hai concurrent OTP request cho cùng email có thể invalidate token của nhau và cả hai đều thành công, tạo duplicate valid OTPs.
-- **Code:**
-  ```python
-  # UPDATE old tokens — không có lock
-  await database.execute(update_query, values={"email": email})
-  # INSERT new token — gap vulnerability
-  await database.execute(insert_query, values={...})
-  ```
-- **Fix:** Wrapping trong transaction với `SELECT FOR UPDATE` hoặc dùng `INSERT ... ON CONFLICT`.
-
 ---
 
 ### 🟢 [RESOLVED] BE-11: Không có rate limiting trên IoT telemetry
-
-- **File:** `backend/app/api/sensor_api.py:300-441`
-- **Mô tả:** Endpoint `/iot/telemetry` chấp nhận unlimited requests từ authenticated devices. Device bị compromised hoặc buggy có thể flood database.
-- **Fix:** Thêm per-device rate limiting (ví dụ: max 60 readings/minute/device).
 
 ---
 
 ### 🟢 [RESOLVED] BE-12: AI error message leak exception internals
 
-- **File:** `backend/app/services/ai_service.py:82`
-- **Mô tả:** Khi AI service gặp lỗi, exception string (có thể chứa API keys, hostnames, stack traces) được trả về trong chat response visible cho patients/doctors.
-- **Code:**
-  ```python
-  return f"Xin lỗi, hệ thống AI đang bận hoặc gặp sự cố ({str(e)}). Vui lòng thử lại sau."
-  ```
-- **Fix:** Chỉ trả về message chung, log exception chi tiết server-side.
-
 ---
 
 ### 🟢 [RESOLVED] BE-13: SMTP TLS không verify
-
-- **File:** `backend/app/services/email_service.py:92-97`
-- **Mô tả:** `smtplib.SMTP` và `smtplib.SMTP_SSL` dùng mà không set certificate verification context. SMTP connections dễ bị MITM attack.
-- **Fix:** Tạo `ssl.create_default_context()` và truyền vào `SMTP_SSL`.
 
 ---
 
@@ -299,33 +231,9 @@
 
 ### 🟢 [RESOLVED] FE-01: POST request tạo patient thiếu Authorization header
 
-- **File:** `web_frontend/src/components/Patients.tsx:60-64`
-- **Mô tả:** POST request tạo patient KHÔNG có `Authorization` header. Compare với `App.tsx:122-124` có header. Call sẽ fail cho non-admin users hoặc backend sẽ reject.
-- **Code:**
-  ```tsx
-  const response = await fetch(`${API_URL}/patients`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      // THIẾU: Authorization: `Bearer ${accessToken}`
-    },
-    body: JSON.stringify({...}),
-  });
-  ```
-- **Fix:** Thêm `Authorization: \`Bearer ${accessToken}\`` vào headers.
-
 ---
 
 ### 🟢 [RESOLVED] FE-02: Canvas CSS variables không render được
-
-- **File:** `web_frontend/src/components/ECGChart.tsx:134-135`
-- **Mô tả:** Canvas 2D context không hiểu CSS custom properties (`var(--color-spo2)`). Giá trị sẽ là invalid/empty string → ECG line invisible hoặc black.
-- **Code:**
-  ```tsx
-  ctx.shadowColor = 'var(--color-spo2)';  // Canvas không parse CSS vars
-  ctx.strokeStyle = 'var(--color-spo2)';  // → invisible line
-  ```
-- **Fix:** Resolve CSS variable sang hex值: `getComputedStyle(document.documentElement).getPropertyValue('--color-spo2')` hoặc hardcode hex.
 
 ---
 
@@ -345,78 +253,25 @@
 
 ### 🟢 [RESOLVED] FE-04: Stale closure gây WebSocket reconnect liên tục
 
-- **File:** `web_frontend/src/components/App.tsx:162-200`
-- **Mô tả:** `handleSensorTelemetry` phụ thuộc vào `patients` state. Khi patients list thay đổi, callback mới tạo → `handleRealtimeMessage` mới → WebSocket reconnect. Gây frequent reconnections.
-- **Code:**
-  ```tsx
-  const handleSensorTelemetry = useCallback((data: SensorData) => {
-    const matchingPatient = patients.find(p => p.id === data.patient_id);
-    // ...
-  }, [patients]);  // patients thay đổi → reconnect
-  ```
-- **Fix:** Dùng `useRef` cho patients list thay vì state dependency, hoặc tách logic tìm patient ra khỏi callback.
-
 ---
 
 ### 🟢 [RESOLVED] FE-05: JWT token gửi qua WebSocket plaintext
-
-- **File:** `web_frontend/src/hooks/useWebSocket.ts:74-76`
-- **Mô tả:** Token gửi qua WebSocket auth message. Nếu `WS_URL` dùng `ws://` (default), token travel in cleartext. Config default là `ws://localhost:8000/ws/realtime`.
-- **Code:**
-  ```tsx
-  socket.send(JSON.stringify({ type: 'auth', token }));  // ws:// = plaintext
-  ```
-- **Fix:** Validate WS_URL starts with `wss://` trong production, hoặc fallback sang HTTP polling.
 
 ---
 
 ### 🟢 [RESOLVED] FE-06: User data plaintext trong sessionStorage
 
-- **File:** `web_frontend/src/auth/AuthContext.tsx:19, 65`
-- **Mô tả:** User object (role, id, email) lưu plaintext trong `sessionStorage`. Accessible bởi bất kỳ script nào trên cùng origin (XSS vector).
-- **Code:**
-  ```tsx
-  storage.setItem('user', JSON.stringify(normalizedUser));  // plaintext
-  ```
-- **Fix:** Không lưu sensitive data trong sessionStorage, hoặc encrypt.
-
 ---
 
 ### 🟢 [RESOLVED] FE-07: `useEffect` infinite loop risk
-
-- **File:** `web_frontend/src/auth/AuthContext.tsx:95-114`
-- **Mô tả:** `refreshUser` không trong dependency array nhưng đọc `accessToken` từ closure. `refreshUser` gọi `setAccessToken(accessToken)` (no-op nhưng trigger re-render) → effect re-fire. `refreshUser` không wrapped trong `useCallback` nên recreated mỗi render.
-- **Code:**
-  ```tsx
-  useEffect(() => {
-    const restoreSession = async () => {
-      if (!accessToken) { ... return; }
-      try { await refreshUser(); } catch (err) { logout(); }
-    };
-    restoreSession();
-  }, [accessToken]);  // refreshUser không stable
-  ```
-- **Fix:** Wrap `refreshUser` trong `useCallback` hoặc tách logic.
 
 ---
 
 ### 🟢 [RESOLVED] FE-08: `routeContent` useMemo missing dependencies
 
-- **File:** `web_frontend/src/components/App.tsx:287-351`
-- **Mô tả:** `renderPatientList()` gọi trong useMemo nhưng定义 outside. Nó close over nhiều state variables nhưng dependency array không đầy đủ.
-- **Fix:** Đưa logic vào trong useMemo hoặc ensure dependencies đầy đủ.
-
 ---
 
 ### 🟢 [RESOLVED] FE-09: `setTimeout` leaks không clear on unmount
-
-- **File:** `web_frontend/src/components/ChangePassword.tsx:59-61`, `Register.tsx:163`
-- **Mô tả:** `setTimeout` không được clear khi component unmount. Gây "setState on unmounted component" warning và potential memory leak.
-- **Code:**
-  ```tsx
-  setTimeout(() => { onNavigateNext(); }, 2000);  // Không clear
-  ```
-- **Fix:** Lưu timeout ID và clear trong `useEffect` cleanup.
 
 ---
 
@@ -544,54 +399,17 @@
 
 ### 🟢 [RESOLVED] MO-01: `DropdownButtonFormField` dùng `initialValue` (không tồn tại)
 
-- **File:** `mobile_app/lib/screens/alerts_screen.dart:145`
-- **Mô tả:** `DropdownButtonFormField` không có parameter `initialValue`. Parameter đúng là `value`. Đây là **compile-time error** hoặc dropdown sẽ luôn reset về item đầu tiên.
-- **Code:**
-  ```dart
-  DropdownButtonFormField<String>(
-    initialValue: _severityFilter,  // ← KHÔNG TỒN TẠI
-  ```
-- **Fix:** Thay `initialValue` bằng `value`.
-
 ---
 
 ### 🟢 [RESOLVED] MO-02: `_currentIndex` reset trong `build()` gây infinite rebuild
-
-- **File:** `mobile_app/lib/main.dart:169-171`
-- **Mô tả:** Mutating state inside `build()` vi phạm Flutter contract. Khi `role` thay đổi, screen list shrink, `_currentIndex` out of bounds → setState-like mutation → rebuild loop.
-- **Code:**
-  ```dart
-  @override
-  Widget build(BuildContext context) {
-    if (_currentIndex >= screens.length) {
-      _currentIndex = 0;  // ← MUTATION TRONG build()
-    }
-  ```
-- **Fix:** Xử lý trong `didUpdateWidget` hoặc state-change callback.
 
 ---
 
 ### 🟢 [RESOLVED] MO-03: Unsafe cast `event['data']` không null check
 
-- **File:** `mobile_app/lib/screens/dashboard_screen.dart:109, 123`
-- **Mô tả:** Nếu WebSocket event malformed hoặc `data` null, cast throw TypeError.
-- **Code:**
-  ```dart
-  final metrics = event['data'] as Map<String, dynamic>;  // Crash nếu null
-  ```
-- **Fix:** Thêm null check: `final metrics = event['data'] as Map<String, dynamic>?; if (metrics == null) return;`
-
 ---
 
 ### 🟢 [RESOLVED] MO-04: Unsafe `.toDouble()` trên null/incorrect-type value
-
-- **File:** `mobile_app/lib/screens/dashboard_screen.dart:117`, `patient_detail_screen.dart:80-83, 159`
-- **Mô tả:** Nếu `ecg_value` null hoặc không phải `num`, crash.
-- **Code:**
-  ```dart
-  final double ecgVal = (metrics['ecg_value'] as num).toDouble();  // Crash
-  ```
-- **Fix:** Safe cast: `(metrics['ecg_value'] as num?)?.toDouble() ?? 0.0`
 
 ---
 
@@ -612,29 +430,9 @@
 
 ### 🟢 [RESOLVED] MO-06: `authProvider.init()` chưa bao giờ được gọi
 
-- **File:** `mobile_app/lib/providers/auth_provider.dart:28-31`, `mobile_app/lib/main.dart`
-- **Mô tả:** `init()` register 401 callback nhưng **không có code nào gọi init()**. Silent logout on 401 là dead code hoàn toàn.
-- **Code:**
-  ```dart
-  void init() {
-    ApiClient.onUnauthorized = () { _logoutSilent(); };
-  }
-  // main.dart: Không có authProvider.init()
-  ```
-- **Fix:** Gọi `authProvider.init()` trong `main.dart` sau khi tạo provider.
-
 ---
 
 ### 🟢 [RESOLVED] MO-07: Read error gây `deleteAll()` — xóa sạch credentials
-
-- **File:** `mobile_app/lib/core/secure_storage.dart:22-27`
-- **Mô tả:** Transient read error trên một key gây `deleteAll()`, phá hủy toàn bộ stored credentials. Strategy quá aggressive.
-- **Code:**
-  ```dart
-  AppLogger.log('SecureStorage error: $e. Clearing storage to recover.');
-  await _storage.deleteAll();  // Xóa sạch tất cả
-  ```
-- **Fix:** Chỉ retry read, không delete all. Hoặc delete key cụ thể bị error.
 
 ---
 
@@ -656,34 +454,9 @@
 
 ### 🟢 [RESOLVED] MO-09: Banner flash timer không hoạt động đúng
 
-- **File:** `mobile_app/lib/screens/dashboard_screen.dart:140-152`
-- **Mô tả:** `_bannerTimer` never assigned Timer object. `Future.delayed` không tạo `Timer.periodic`. `_bannerTimer?.cancel()` là no-op. `_isBannerFlash` set true nhưng **không bao giờ set false** trong callback.
-- **Code:**
-  ```dart
-  void _triggerBannerFlash() {
-    _bannerTimer?.cancel();  // _bannerTimer is null — no-op
-    _isBannerFlash = true;
-    Future.delayed(const Duration(seconds: 8), () {
-      _bannerTimer?.cancel();  // Vẫn null
-      // _isBannerFlash không được set false
-    });
-  }
-  ```
-- **Fix:** Dùng `Timer` thay vì `Future.delayed`, set `_isBannerFlash = false` trong callback.
-
 ---
 
 ### 🟢 [RESOLVED] MO-10: ECG buffer dùng `removeAt(0)` O(n)
-
-- **File:** `mobile_app/lib/screens/dashboard_screen.dart:34`
-- **Mô tả:** `List.filled(240, 0.0, growable: true)` dùng `removeAt(0)` + `add()`. `removeAt(0)` trên List là O(n) — shift all elements. 240 elements × 60fps = 14,400 shifts/giây.
-- **Code:**
-  ```dart
-  final List<double> _ecgPoints = List.filled(240, 0.0, growable: true);
-  // _ecgPoints.removeAt(0);  // O(n) shift
-  // _ecgPoints.add(newValue);
-  ```
-- **Fix:** Dùng `ListQueue` hoặc circular buffer với index pointer.
 
 ---
 
@@ -811,14 +584,6 @@
 
 ### 🟢 [RESOLVED] AI-01: Exception detail leak cho API client
 
-- **File:** `ai_model/app.py:204`
-- **Mô tả:** `str(exc)` returned to client — có thể expose stack traces, file paths, library versions.
-- **Code:**
-  ```python
-  detail=f"Lỗi khi thực hiện dự đoán: {str(exc)}"
-  ```
-- **Fix:** Log server-side, trả generic message.
-
 ---
 
 ### 🟡 [MEDIUM] AI-02: CORS wildcard methods/headers
@@ -853,17 +618,9 @@
 
 ### 🟢 [RESOLVED] AI-05: `thal` field không có bounds
 
-- **File:** `ai_model/app.py:96`
-- **Mô tả:** All other numeric fields have `ge`/`le` constraints nhưng `thal` không có. Description nói valid values 3, 6, 7.
-- **Fix:** Thêm `ge=3, le=7` hoặc dùng Enum.
-
 ---
 
 ### 🟢 [RESOLVED] AI-06: Health endpoint leak model path
-
-- **File:** `ai_model/app.py:229`
-- **Mô tả:** `"model_path": MODEL_PATH` — reveal internal filesystem path.
-- **Fix:** Không trả về model path.
 
 ---
 
@@ -909,47 +666,13 @@
 
 ### 🟢 [RESOLVED] HW-02: HTTP endpoint — tất cả data gửi plaintext
 
-- **File:** `hardware/esp32_s3_supermini/firmware/include/config.h:9`
-- **Mô tả:** `http://192.168.1.10:8000/api/iot/telemetry` — bao gồm `X-Device-Token` header, gửi qua plaintext HTTP. Network observer có thể đọc/sửa data.
-- **Code:**
-  ```cpp
-  static const char *kTelemetryEndpoint = "http://192.168.1.10:8000/api/iot/telemetry";
-  ```
-- **Fix:** Chuyển sang `https://`.
-
 ---
 
 ### 🟢 [RESOLVED] HW-03: State machine logic bị overwrite
 
-- **File:** `hardware/esp32_s3_supermini/firmware/src/main.cpp:155`
-- **Mô tả:** State set ở lines 137-145 (ví dụ: `wifi_disconnected`, `backend_unavailable`, `offline_buffering`) ngay lập tức bị overwrite ở line 155 về `measuring`. Tất cả state ngoài `auth_failed` đều là no-op.
-- **Code:**
-  ```cpp
-  // Lines 137-145: Set state based on result
-  if (result.wifi_connected == false) g_state = RuntimeState::wifi_disconnected;
-  // ...
-  if (g_state != RuntimeState::auth_failed) {
-      g_state = RuntimeState::measuring;  // Line 155: OVERWRITE!
-  }
-  ```
-- **Fix:** Bỏ line 155 hoặc chuyển logic state transition ra ngoài.
-
 ---
 
 ### 🟢 [RESOLVED] HW-04: Buffered frame bị drop khi server trả 400/404
-
-- **File:** `hardware/esp32_s3_supermini/firmware/src/telemetry_sender.cpp:148-154`
-- **Mô tả:** Khi buffer full, oldest frame bị silently overwrite. Khi server trả 400/404, current `payload` bị push back (không phải `send_payload` bị fail). Dữ liệu y tế bị mất.
-- **Code:**
-  ```cpp
-  if (result.status_code == 400 || result.status_code == 404) {
-      if (send_payload != payload) {
-          PushBufferedPayload(payload);  // Push current, NOT failed one
-          result.buffered = true;
-      }
-  }
-  ```
-- **Fix:** Push `send_payload` (failed frame) thay vì `payload`. Thêm error reporting khi buffer full.
 
 ---
 
