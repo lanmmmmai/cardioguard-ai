@@ -317,16 +317,47 @@ class Patient {
 
 ## 5. Version Control & Commit Standards
 
-### Commit Messages (Conventional Commits)
-```
-<type>: <short description>
+### Commit Format (Conventional Commits)
+Mọi commit message **phải** theo format:
 
-Types: feat, fix, chore, refactor, test, docs, style, perf
-Examples:
-  feat: add patient vitals history chart
-  fix: correct OTP expiration check
-  chore: update dependencies
-  test: add WebSocket reconnection tests
+```
+<type>(<scope>): <short description>
+
+<body>  ← optional, subject + body cách 1 dòng trống
+```
+
+### Type (bắt buộc)
+| Type | Khi nào dùng |
+|------|-------------|
+| `feat` | Thêm tính năng mới |
+| `fix` | Sửa lỗi |
+| `chore` | Dọn dẹp, config, dependencies |
+| `refactor` | Sửa code nhưng không đổi behavior |
+| `test` | Thêm/sửa test |
+| `docs` | Chỉ sửa tài liệu |
+| `style` | Format code, CSS, lint (không logic) |
+| `perf` | Tối ưu hiệu năng |
+
+### Scope (không bắt buộc, nhưng khuyến khích)
+Scope = module bị ảnh hưởng: `backend`, `web`, `mobile`, `ai`, `hardware`, `docs`, `config`, `deps`
+
+### Rules
+- Subject tối đa **72 ký tự**, viết **thường**, không `.` ở cuối
+- Dùng imperative mood: `add` không phải `added` / `adds`
+- Scope **lowercase**, không space (`backend` không phải `Backend` / `back end`)
+- Nếu liên quan issue, thêm `Closes #BE-01` hoặc `Related to CODE_REVIEW.md` ở body
+
+### Ví dụ
+```
+feat(backend): add OTP rate limiting per IP
+fix(web): correct vitals chart y-axis scale
+chore: update FastAPI to 0.128.0
+refactor(mobile): extract ECG painter into reusable widget
+test(backend): add WebSocket reconnection tests
+docs: update API contract for sensor endpoints
+
+Includes retry logic with exponential backoff (2s, 4s, 8s).
+Closes #BE-03
 ```
 
 ### Before Committing
