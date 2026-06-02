@@ -1,8 +1,0 @@
-{
-  "buildCommand": "npm install --prefix web_frontend && npm run build --prefix web_frontend",
-  "outputDirectory": "web_frontend/dist",
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/.*", "dest": "/index.html" }
-  ]
-}
