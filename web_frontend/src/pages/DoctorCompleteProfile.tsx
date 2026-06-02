@@ -2,7 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useBrowserPath } from '../hooks/useBrowserPath';
 import { API_URL } from '../config';
-import { Camera, User, FileText, AlertTriangle, Info, CheckCircle, ShieldAlert } from 'lucide-react';
+import { 
+  Camera, 
+  User, 
+  FileText, 
+  AlertTriangle, 
+  Info, 
+  CheckCircle, 
+  ShieldAlert,
+  Save,
+  Loader2,
+  Calendar,
+  Phone,
+  MapPin,
+  Award
+} from 'lucide-react';
 
 export const DoctorCompleteProfile: React.FC = () => {
   const { accessToken, user, refreshUser } = useAuth();
@@ -44,7 +58,7 @@ export const DoctorCompleteProfile: React.FC = () => {
   useEffect(() => {
     if (!accessToken) return;
     
-    // 1. Get profile details
+    // Get profile details
     fetch(`${API_URL}/doctor/profile`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
@@ -196,7 +210,6 @@ export const DoctorCompleteProfile: React.FC = () => {
   const getMediaSrc = (path: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    // Add token as query param for auth download check
     return `${API_URL}${path}?token=${accessToken}`;
   };
 
@@ -205,37 +218,37 @@ export const DoctorCompleteProfile: React.FC = () => {
       <div className="onboarding-card doctor-card">
         <div className="onboarding-header">
           <div className="icon-wrapper bg-teal-soft">
-            <CheckCircle className="teal-color" size={32} />
+            <CheckCircle className="teal-color" size={32} style={{ color: 'var(--color-bp)' }} />
           </div>
           <h1>Hoàn thiện hồ sơ bác sĩ</h1>
           <p className="subtitle">
-            Cung cấp các thông tin y khoa chuyên môn và giấy tờ xác minh để ban quản trị phê duyệt quyền khám chữa bệnh của bạn trên hệ thống CardioGuard AI.
+            Cung cấp các thông tin y khoa chuyên môn và giấy tờ xác minh pháp lý để ban quản trị phê duyệt quyền khám chữa bệnh của bạn trên hệ thống CardioGuard AI.
           </p>
         </div>
 
         {/* Display feedback banner if status is need_update */}
         {currentStatus === 'need_update' && (
-          <div className="alert-box warning-box" style={{ margin: '16px 0', padding: '16px', borderRadius: '12px', borderLeft: '5px solid var(--color-warning)', backgroundColor: 'var(--color-bg-tertiary)' }}>
+          <div className="alert-box warning-box" style={{ margin: '0 0 24px 0', padding: '16px', borderRadius: '12px', borderLeft: '5px solid var(--color-warning)', backgroundColor: 'rgba(245, 158, 11, 0.05)' }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-              <ShieldAlert className="warning-color" size={24} style={{ marginRight: '8px' }} />
-              <strong style={{ color: 'var(--color-warning)' }}>YÊU CẦU BỔ SUNG HỒ SƠ TỪ ADMIN</strong>
+              <ShieldAlert className="warning-color" size={20} style={{ marginRight: '8px', color: 'var(--color-warning)' }} />
+              <strong style={{ color: 'var(--color-warning)', fontSize: '0.9rem' }}>YÊU CẦU BỔ SUNG HỒ SƠ TỪ ADMIN</strong>
             </div>
-            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
               {verificationNote || 'Vui lòng chỉnh sửa lại các thông tin hoặc ảnh tài liệu không rõ nét.'}
             </p>
           </div>
         )}
 
         {errorMsg && (
-          <div className="alert-message error">
+          <div className="alert-message error" style={{ marginBottom: '24px' }}>
             <AlertTriangle size={18} />
             <span>{errorMsg}</span>
           </div>
         )}
 
         {successMsg && (
-          <div className="alert-message success">
-            <CheckCircle size={18} style={{ color: 'var(--color-success)' }} />
+          <div className="alert-message success" style={{ marginBottom: '24px' }}>
+            <CheckCircle size={18} />
             <span>{successMsg}</span>
           </div>
         )}
@@ -270,15 +283,18 @@ export const DoctorCompleteProfile: React.FC = () => {
 
           <hr className="divider" />
 
-          {/* Section: Thông tin cơ bản */}
+          {/* Section: Thông tin cá nhân bác sĩ */}
           <h3 className="section-title">
-            <User size={18} style={{ marginRight: '8px', color: 'var(--color-teal)' }} />
+            <User size={18} style={{ marginRight: '8px', color: 'var(--color-bp)' }} />
             Thông tin cá nhân bác sĩ
           </h3>
 
           <div className="form-grid">
             <div className="form-group">
-              <label className="required-field">Họ và tên</label>
+              <label className="required-field">
+                <User size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                Họ và tên bác sĩ
+              </label>
               <input
                 type="text"
                 className="form-control"
@@ -290,7 +306,10 @@ export const DoctorCompleteProfile: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label className="required-field">Số điện thoại</label>
+              <label className="required-field">
+                <Phone size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                Số điện thoại liên lạc
+              </label>
               <input
                 type="tel"
                 className="form-control"
@@ -302,7 +321,10 @@ export const DoctorCompleteProfile: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label>Ngày sinh</label>
+              <label>
+                <Calendar size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                Ngày sinh
+              </label>
               <input
                 type="date"
                 className="form-control"
@@ -312,7 +334,10 @@ export const DoctorCompleteProfile: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label>Giới tính</label>
+              <label>
+                <User size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                Giới tính
+              </label>
               <select
                 className="form-control"
                 value={gender}
@@ -326,12 +351,15 @@ export const DoctorCompleteProfile: React.FC = () => {
             </div>
           </div>
 
-          <div className="form-group" style={{ marginTop: '16px' }}>
-            <label className="required-field">Địa chỉ liên hệ</label>
+          <div className="form-group">
+            <label className="required-field">
+              <MapPin size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+              Địa chỉ liên hệ
+            </label>
             <input
               type="text"
               className="form-control"
-              placeholder="Địa chỉ nhà riêng hoặc văn phòng"
+              placeholder="Địa chỉ nhà riêng hoặc văn phòng làm việc"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               required
@@ -342,17 +370,17 @@ export const DoctorCompleteProfile: React.FC = () => {
 
           {/* Section: Chuyên môn */}
           <h3 className="section-title">
-            <FileText size={18} style={{ marginRight: '8px', color: 'var(--color-primary)' }} />
+            <Award size={18} style={{ marginRight: '8px', color: 'var(--color-bp)' }} />
             Chuyên môn & Nơi công tác
           </h3>
 
           <div className="form-grid">
             <div className="form-group">
-              <label className="required-field">Chuyên khoa</label>
+              <label className="required-field">Chuyên khoa chuyên môn</label>
               <input
                 type="text"
                 className="form-control"
-                placeholder="Ví dụ: Tim mạch, Nội khoa, Can thiệp..."
+                placeholder="Ví dụ: Tim mạch, Nội khoa, Chẩn đoán hình ảnh..."
                 value={specialty}
                 onChange={(e) => setSpecialty(e.target.value)}
                 required
@@ -364,30 +392,30 @@ export const DoctorCompleteProfile: React.FC = () => {
               <input
                 type="text"
                 className="form-control"
-                placeholder="Ví dụ: Trưởng khoa, Bác sĩ điều trị..."
+                placeholder="Ví dụ: Bác sĩ điều trị, Trưởng khoa..."
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
               />
             </div>
 
             <div className="form-group">
-              <label>Bệnh viện / Nơi công tác</label>
+              <label>Bệnh viện / Nơi công tác hiện tại</label>
               <input
                 type="text"
                 className="form-control"
-                placeholder="Tên bệnh viện hoặc phòng khám"
+                placeholder="Tên bệnh viện hoặc cơ sở y khoa"
                 value={workplace}
                 onChange={(e) => setWorkplace(e.target.value)}
               />
             </div>
 
             <div className="form-group">
-              <label>Số năm kinh nghiệm</label>
+              <label>Số năm kinh nghiệm hành nghề</label>
               <input
                 type="number"
                 min="0"
                 className="form-control"
-                placeholder="Số năm"
+                placeholder="Nhập số năm kinh nghiệm"
                 value={experienceYears}
                 onChange={(e) => setExperienceYears(e.target.value === '' ? '' : Number(e.target.value))}
               />
@@ -398,13 +426,13 @@ export const DoctorCompleteProfile: React.FC = () => {
 
           {/* Section: Chứng chỉ hành nghề */}
           <h3 className="section-title">
-            <FileText size={18} style={{ marginRight: '8px', color: 'var(--color-primary)' }} />
-            Chứng chỉ hành nghề y khoa
+            <FileText size={18} style={{ marginRight: '8px', color: 'var(--color-bp)' }} />
+            Chứng chỉ hành nghề y khoa (CCHN)
           </h3>
 
           <div className="form-grid">
             <div className="form-group">
-              <label className="required-field">Số chứng chỉ hành nghề (CCHN)</label>
+              <label className="required-field">Số chứng chỉ hành nghề</label>
               <input
                 type="text"
                 className="form-control"
@@ -426,7 +454,7 @@ export const DoctorCompleteProfile: React.FC = () => {
             </div>
 
             <div className="form-group" style={{ gridColumn: 'span 2' }}>
-              <label>Nơi cấp chứng chỉ</label>
+              <label>Cơ quan / Đơn vị cấp chứng chỉ</label>
               <input
                 type="text"
                 className="form-control"
@@ -441,8 +469,8 @@ export const DoctorCompleteProfile: React.FC = () => {
 
           {/* Section: Tải lên giấy tờ tài liệu chứng minh */}
           <h3 className="section-title">
-            <Info size={18} style={{ marginRight: '8px', color: 'var(--color-teal)' }} />
-            Tài liệu xác thực (Bắt buộc)
+            <Info size={18} style={{ marginRight: '8px', color: 'var(--color-bp)' }} />
+            Tài liệu xác thực hành nghề (Bắt buộc)
           </h3>
 
           <div className="document-upload-grid">
@@ -454,12 +482,12 @@ export const DoctorCompleteProfile: React.FC = () => {
                   <img src={getMediaSrc(licenseUrl)} alt="License Certificate" className="doc-preview-img" />
                 ) : (
                   <div className="doc-placeholder">
-                    <FileText size={32} className="gray-color" />
+                    <FileText size={28} />
                     <span>Chưa tải ảnh lên</span>
                   </div>
                 )}
                 <label className="btn btn-secondary btn-small file-input-label">
-                  Tải lên ảnh CCHN
+                  Tải lên
                   <input
                     type="file"
                     accept=".jpg,.jpeg,.png,.webp"
@@ -474,18 +502,18 @@ export const DoctorCompleteProfile: React.FC = () => {
 
             {/* 2. CCCD mặt trước */}
             <div className="doc-upload-box">
-              <span className="doc-title required-field">CCCD/CMND Mặt trước</span>
+              <span className="doc-title required-field">CCCD Mặt trước</span>
               <div className="doc-preview-zone">
                 {cccdFrontUrl ? (
                   <img src={getMediaSrc(cccdFrontUrl)} alt="CCCD Front" className="doc-preview-img" />
                 ) : (
                   <div className="doc-placeholder">
-                    <User size={32} className="gray-color" />
+                    <User size={28} />
                     <span>Chưa tải ảnh lên</span>
                   </div>
                 )}
                 <label className="btn btn-secondary btn-small file-input-label">
-                  Tải lên mặt trước
+                  Tải lên
                   <input
                     type="file"
                     accept=".jpg,.jpeg,.png,.webp"
@@ -500,18 +528,18 @@ export const DoctorCompleteProfile: React.FC = () => {
 
             {/* 3. CCCD mặt sau */}
             <div className="doc-upload-box">
-              <span className="doc-title required-field">CCCD/CMND Mặt sau</span>
+              <span className="doc-title required-field">CCCD Mặt sau</span>
               <div className="doc-preview-zone">
                 {cccdBackUrl ? (
                   <img src={getMediaSrc(cccdBackUrl)} alt="CCCD Back" className="doc-preview-img" />
                 ) : (
                   <div className="doc-placeholder">
-                    <User size={32} className="gray-color" />
+                    <User size={28} />
                     <span>Chưa tải ảnh lên</span>
                   </div>
                 )}
                 <label className="btn btn-secondary btn-small file-input-label">
-                  Tải lên mặt sau
+                  Tải lên
                   <input
                     type="file"
                     accept=".jpg,.jpeg,.png,.webp"
@@ -537,9 +565,19 @@ export const DoctorCompleteProfile: React.FC = () => {
                 uploadingCccdFront || 
                 uploadingCccdBack
               }
-              style={{ width: '100%', marginTop: '32px' }}
+              style={{ width: '100%', marginTop: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
             >
-              {saving ? 'Đang gửi hồ sơ...' : 'Gửi hồ sơ yêu cầu xác thực'}
+              {saving ? (
+                <>
+                  <Loader2 className="profile-spin" size={18} />
+                  Đang gửi hồ sơ...
+                </>
+              ) : (
+                <>
+                  <Save size={18} />
+                  Gửi hồ sơ yêu cầu xác thực
+                </>
+              )}
             </button>
           </div>
         </form>

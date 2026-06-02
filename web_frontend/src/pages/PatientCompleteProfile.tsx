@@ -2,7 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useBrowserPath } from '../hooks/useBrowserPath';
 import { API_URL } from '../config';
-import { Camera, User, Heart, AlertTriangle, Shield, HeartHandshake } from 'lucide-react';
+import { 
+  Camera, 
+  User, 
+  Heart, 
+  AlertTriangle, 
+  Shield, 
+  HeartHandshake, 
+  Save, 
+  Loader2,
+  Calendar,
+  Phone,
+  MapPin,
+  Activity
+} from 'lucide-react';
 
 export const PatientCompleteProfile: React.FC = () => {
   const { accessToken, user, refreshUser } = useAuth();
@@ -173,7 +186,7 @@ export const PatientCompleteProfile: React.FC = () => {
   const getAvatarSrc = () => {
     if (!avatarUrl) return '';
     if (avatarUrl.startsWith('http')) return avatarUrl;
-    return `${API_URL}${avatarUrl}`;
+    return `${API_URL}${avatarUrl}?token=${accessToken}`;
   };
 
   return (
@@ -185,19 +198,19 @@ export const PatientCompleteProfile: React.FC = () => {
           </div>
           <h1>Hoàn thiện hồ sơ bệnh nhân</h1>
           <p className="subtitle">
-            Vui lòng điền đầy đủ các thông tin bắt buộc dưới đây để kích hoạt tài khoản CardioGuard AI và bắt đầu theo dõi sức khỏe của bạn.
+            Cập nhật các thông tin y khoa cơ bản dưới đây để kích hoạt tài khoản CardioGuard AI và bắt đầu theo dõi sức khỏe tim mạch của bạn.
           </p>
         </div>
 
         {errorMsg && (
-          <div className="alert-message error">
+          <div className="alert-message error" style={{ marginBottom: '24px' }}>
             <AlertTriangle size={18} />
             <span>{errorMsg}</span>
           </div>
         )}
 
         {successMsg && (
-          <div className="alert-message success">
+          <div className="alert-message success" style={{ marginBottom: '24px' }}>
             <Heart size={18} />
             <span>{successMsg}</span>
           </div>
@@ -227,7 +240,7 @@ export const PatientCompleteProfile: React.FC = () => {
               </label>
             </div>
             <p className="avatar-tip">
-              {uploading ? 'Đang tải ảnh...' : 'Tải lên ảnh đại diện (.jpg, .png, tối đa 5MB)'}
+              {uploading ? 'Đang tải ảnh...' : 'Tải lên ảnh đại diện cá nhân'}
             </p>
           </div>
 
@@ -241,11 +254,14 @@ export const PatientCompleteProfile: React.FC = () => {
 
           <div className="form-grid">
             <div className="form-group">
-              <label className="required-field">Họ và tên</label>
+              <label className="required-field">
+                <User size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                Họ và tên bệnh nhân
+              </label>
               <input
                 type="text"
                 className="form-control"
-                placeholder="Nhập họ và tên đầy đủ"
+                placeholder="Nhập đầy đủ họ và tên"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
@@ -253,11 +269,14 @@ export const PatientCompleteProfile: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label className="required-field">Số điện thoại</label>
+              <label className="required-field">
+                <Phone size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                Số điện thoại
+              </label>
               <input
                 type="tel"
                 className="form-control"
-                placeholder="Nhập số điện thoại liên hệ"
+                placeholder="Số điện thoại liên hệ"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
@@ -265,7 +284,10 @@ export const PatientCompleteProfile: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label className="required-field">Ngày sinh</label>
+              <label className="required-field">
+                <Calendar size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                Ngày sinh
+              </label>
               <input
                 type="date"
                 className="form-control"
@@ -276,7 +298,10 @@ export const PatientCompleteProfile: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label className="required-field">Giới tính</label>
+              <label className="required-field">
+                <User size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                Giới tính
+              </label>
               <select
                 className="form-control"
                 value={gender}
@@ -291,12 +316,15 @@ export const PatientCompleteProfile: React.FC = () => {
             </div>
           </div>
 
-          <div className="form-group" style={{ marginTop: '16px' }}>
-            <label className="required-field">Địa chỉ liên hệ</label>
+          <div className="form-group">
+            <label className="required-field">
+              <MapPin size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+              Địa chỉ liên hệ
+            </label>
             <input
               type="text"
               className="form-control"
-              placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố"
+              placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               required
@@ -307,13 +335,16 @@ export const PatientCompleteProfile: React.FC = () => {
 
           {/* Section: Chỉ số lâm sàng */}
           <h3 className="section-title">
-            <Heart size={18} style={{ marginRight: '8px', color: 'var(--color-critical)' }} />
-            Chỉ số y tế & Tiền sử bệnh (Không bắt buộc)
+            <Heart size={18} style={{ marginRight: '8px', color: 'var(--color-primary)' }} />
+            Chỉ số y tế & Tiền sử bệnh
           </h3>
 
           <div className="form-grid">
             <div className="form-group">
-              <label>Nhóm máu</label>
+              <label>
+                <Activity size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                Nhóm máu
+              </label>
               <select
                 className="form-control"
                 value={bloodType}
@@ -336,7 +367,10 @@ export const PatientCompleteProfile: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label>Dị ứng thuốc/thức ăn</label>
+              <label>
+                <AlertTriangle size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                Dị ứng thuốc/thức ăn
+              </label>
               <input
                 type="text"
                 className="form-control"
@@ -347,11 +381,11 @@ export const PatientCompleteProfile: React.FC = () => {
             </div>
           </div>
 
-          <div className="form-group" style={{ marginTop: '16px' }}>
+          <div className="form-group">
             <label>Tiền sử bệnh lý (Tim mạch, huyết áp...)</label>
             <textarea
               className="form-control"
-              placeholder="Nhập chi tiết các bệnh nền, phẫu thuật trước đây hoặc tình trạng hiện tại"
+              placeholder="Nhập chi tiết các bệnh nền, phẫu thuật trước đây hoặc tình trạng tim mạch hiện tại"
               rows={3}
               value={medicalHistory}
               onChange={(e) => setMedicalHistory(e.target.value)}
@@ -363,12 +397,15 @@ export const PatientCompleteProfile: React.FC = () => {
           {/* Section: Liên hệ khẩn cấp */}
           <h3 className="section-title">
             <HeartHandshake size={18} style={{ marginRight: '8px', color: 'var(--color-primary)' }} />
-            Liên hệ khẩn cấp (Không bắt buộc)
+            Liên hệ khẩn cấp (Người thân)
           </h3>
 
           <div className="form-grid">
             <div className="form-group">
-              <label>Tên người liên hệ khẩn cấp</label>
+              <label>
+                <User size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                Tên người liên hệ khẩn cấp
+              </label>
               <input
                 type="text"
                 className="form-control"
@@ -379,7 +416,10 @@ export const PatientCompleteProfile: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label>SĐT liên hệ khẩn cấp</label>
+              <label>
+                <Phone size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                SĐT liên hệ khẩn cấp
+              </label>
               <input
                 type="tel"
                 className="form-control"
@@ -396,9 +436,19 @@ export const PatientCompleteProfile: React.FC = () => {
               type="submit"
               className="btn btn-primary btn-large"
               disabled={saving || uploading}
-              style={{ width: '100%', marginTop: '24px' }}
+              style={{ width: '100%', marginTop: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
             >
-              {saving ? 'Đang lưu thông tin...' : 'Hoàn tất cập nhật hồ sơ'}
+              {saving ? (
+                <>
+                  <Loader2 className="profile-spin" size={18} />
+                  Đang lưu hồ sơ...
+                </>
+              ) : (
+                <>
+                  <Save size={18} />
+                  Hoàn tất cập nhật hồ sơ
+                </>
+              )}
             </button>
           </div>
         </form>
