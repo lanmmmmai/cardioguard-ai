@@ -141,7 +141,7 @@ async def get_user_from_token(
 from app.services.email_service import send_system_email
 
 
-async def send_forgot_password_otp_email(email: str, full_name: str, otp: str) -> bool:
+async def send_forgot_password_otp_email(email: str, full_name: str, otp: str, role: Optional[str] = None) -> bool:
     fallback_subject = "CardioGuard AI - Mã OTP đặt lại mật khẩu"
     fallback_html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
@@ -160,13 +160,13 @@ async def send_forgot_password_otp_email(email: str, full_name: str, otp: str) -
         email_type="password_reset",
         to_email=email,
         to_name=full_name,
-        variables={"full_name": full_name, "otp": otp},
+        variables={"full_name": full_name, "otp": otp, "role": role},
         fallback_subject=fallback_subject,
         fallback_html=fallback_html,
     )
 
 
-async def send_random_password_email(email: str, full_name: str, new_password: str) -> bool:
+async def send_random_password_email(email: str, full_name: str, new_password: str, role: Optional[str] = None) -> bool:
     fallback_subject = "CardioGuard AI - Mật khẩu mới của bạn"
     fallback_html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
@@ -185,13 +185,13 @@ async def send_random_password_email(email: str, full_name: str, new_password: s
         email_type="password_reset",
         to_email=email,
         to_name=full_name,
-        variables={"full_name": full_name, "new_password": new_password, "otp": new_password},
+        variables={"full_name": full_name, "new_password": new_password, "otp": new_password, "role": role},
         fallback_subject=fallback_subject,
         fallback_html=fallback_html,
     )
 
 
-async def send_register_otp_email(email: str, full_name: str, otp: str) -> bool:
+async def send_register_otp_email(email: str, full_name: str, otp: str, role: Optional[str] = "patient") -> bool:
     fallback_subject = "CardioGuard AI - Mã OTP đăng ký"
     fallback_html = f"""
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px">
@@ -210,7 +210,7 @@ async def send_register_otp_email(email: str, full_name: str, otp: str) -> bool:
         email_type="otp_register",
         to_email=email,
         to_name=full_name,
-        variables={"full_name": full_name, "otp": otp},
+        variables={"full_name": full_name, "otp": otp, "role": role},
         fallback_subject=fallback_subject,
         fallback_html=fallback_html,
     )
@@ -456,7 +456,7 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Requ
 
     response = generic_forgot_password_response(email)
     user = await database.fetch_one(
-        "SELECT id::text AS id, full_name FROM users WHERE email = :email",
+        "SELECT id::text AS id, full_name, role FROM users WHERE email = :email",
         {"email": email},
     )
     
@@ -470,7 +470,7 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Requ
     )
 
     try:
-        await send_forgot_password_otp_email(email, user["full_name"], otp)
+        await send_forgot_password_otp_email(email, user["full_name"], otp, role=user["role"])
     except Exception as exc:
         logger.exception("Unable to send forgot-password OTP email")
         if settings.BREVO_API_KEY:
@@ -508,12 +508,12 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
     user_id = otp_result.metadata.get("user_id")
     if user_id:
         user = await database.fetch_one(
-            "SELECT id, full_name FROM users WHERE id::text = :id",
+            "SELECT id, full_name, role FROM users WHERE id::text = :id",
             {"id": user_id},
         )
     else:
         user = await database.fetch_one(
-            "SELECT id, full_name FROM users WHERE email = :email",
+            "SELECT id, full_name, role FROM users WHERE email = :email",
             {"email": email},
         )
     if not user:
@@ -555,7 +555,7 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
     if data.new_password:
         return {"message": "Password has been reset successfully."}
 
-    email_sent = await send_random_password_email(email, user["full_name"], new_password)
+    email_sent = await send_random_password_email(email, user["full_name"], new_password, role=user["role"])
     return {
         "message": "Password has been reset. Please check your email for the new password.",
         "email_sent": email_sent,

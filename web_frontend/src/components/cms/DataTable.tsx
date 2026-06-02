@@ -77,9 +77,27 @@ export const DataTable: React.FC<DataTableProps> = ({
         <tbody>
           {rows.map((row) => (
             <tr key={String(row.id)}>
-              {orderedNames.map((column) => (
-                <td key={column}>{displayValue(row[column])}</td>
-              ))}
+              {orderedNames.map((column) => {
+                const val = row[column];
+                const isImg = (column.toLowerCase().includes('image') || column.toLowerCase().includes('avatar') || column.toLowerCase().includes('logo') || column.toLowerCase().includes('photo')) && 
+                              (typeof val === 'string' && (val.startsWith('http') || val.startsWith('/')));
+                return (
+                  <td key={column}>
+                    {isImg ? (
+                      <img 
+                        src={val} 
+                        alt="Preview" 
+                        style={{ maxWidth: '80px', maxHeight: '50px', borderRadius: '6px', objectFit: 'cover', border: '1px solid rgba(255, 255, 255, 0.1)' }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=200&auto=format&fit=crop';
+                        }}
+                      />
+                    ) : (
+                      displayValue(val)
+                    )}
+                  </td>
+                );
+              })}
               <td>
                 <div className="cms-row-actions">
                   <button 

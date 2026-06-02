@@ -23,7 +23,7 @@ const downloadText = (filename: string, content: string) => {
 
 export const CmsPage: React.FC = () => {
   const { accessToken, role } = useAuth();
-  const [activeModule, setActiveModule] = useState('cameras');
+  const [activeModule, setActiveModule] = useState('domain_links');
   const [rows, setRows] = useState<Array<Record<string, any>>>([]);
   const [columns, setColumns] = useState<CmsColumn[]>([]);
   const [total, setTotal] = useState(0);
