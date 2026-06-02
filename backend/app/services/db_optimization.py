@@ -227,6 +227,16 @@ async def ensure_email_cms_schema() -> None:
         END
         WHERE cms_email_id IS NULL OR cms_email_id = ''
         """,
+        """
+        UPDATE email_templates
+        SET cms_email_id = cms_email_id || '_' || id::text
+        WHERE id IN (
+            SELECT id FROM (
+                SELECT id, ROW_NUMBER() OVER (PARTITION BY cms_email_id ORDER BY updated_at DESC) as rn
+                FROM email_templates
+            ) t WHERE t.rn > 1
+        )
+        """,
         "ALTER TABLE email_templates ALTER COLUMN html_content SET DEFAULT ''",
         "ALTER TABLE email_templates ALTER COLUMN text_content SET DEFAULT ''",
         "ALTER TABLE email_templates ALTER COLUMN variables SET DEFAULT '[]'::jsonb",
@@ -492,7 +502,7 @@ async def ensure_email_cms_schema() -> None:
                     cms_email_id, email_type, name, subject, html_content, text_content, variables, type, is_active
                 )
                 VALUES (
-                    :cms_email_id, :email_type, :name, :subject, :html_content, :text_content, :variables::jsonb, :type, TRUE
+                    :cms_email_id, :email_type, :name, :subject, :html_content, :text_content, CAST(:variables AS jsonb), :type, TRUE
                 )
                 ON CONFLICT (cms_email_id) DO NOTHING
                 """,
