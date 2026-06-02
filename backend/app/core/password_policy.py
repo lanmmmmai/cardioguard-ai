@@ -8,8 +8,8 @@ PASSWORD_POLICY_MESSAGE = (
 
 
 def validate_password(value: str) -> str:
-    if not PASSWORD_PATTERN.fullmatch(value):
-        raise ValueError(PASSWORD_POLICY_MESSAGE)
     if len(value.encode("utf-8")) > 72:
         raise ValueError("Password cannot be longer than 72 bytes due to security hashing constraints")
+    if not PASSWORD_PATTERN.fullmatch(value):
+        raise ValueError(PASSWORD_POLICY_MESSAGE)
     return value

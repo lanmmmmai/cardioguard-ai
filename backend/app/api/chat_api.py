@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Header
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Any, Dict
 from app.core.database import database
 from app.api.auth_api import get_user_from_token
@@ -13,7 +13,7 @@ CHAT_SESSIONS_TABLE = "chat_sessions"
 CHAT_MESSAGES_TABLE = "chatbot_messages"
 
 class ChatMessageRequest(BaseModel):
-    message: str
+    message: str = Field(..., max_length=4000)
     session_id: Optional[str] = None
     role: str = "patient" # 'patient' or 'doctor'
     context_data: Optional[Dict[str, Any]] = None

@@ -121,19 +121,11 @@
 
 ---
 
-### 🟡 [MEDIUM] BE-16: Chat message không có length limit
-
-- **File:** `backend/app/api/chat_api.py:15-16`
-- **Mô tả:** `ChatMessageRequest.message` không có `max_length`. User có thể gửi messages vô hạn, consuming OpenAI tokens và database storage.
-- **Fix:** Thêm `max_length=4000` hoặc tương tự.
+### 🟢 [RESOLVED] BE-16: Chat message không có length limit
 
 ---
 
-### 🟡 [MEDIUM] BE-17: Password policy regex đếm chars không phải bytes
-
-- **File:** `backend/app/core/password_policy.py:4`
-- **Mô tả:** Regex `.{8,72}` đếm characters, không phải bytes. String 72 chars Unicode 4-byte = 288 bytes, bcrypt truncate silently → hai password khác nhau có thể hash giống nhau.
-- **Fix:** Thêm byte-count validation trước regex.
+### 🟢 [RESOLVED] BE-17: Password policy regex đếm chars không phải bytes
 
 ---
 
