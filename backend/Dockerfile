@@ -6,13 +6,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /workspace/backend
 
-COPY backend/requirements.runtime.txt ./requirements.runtime.txt
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --upgrade pip && \
-    pip install -r requirements.runtime.txt
+    pip install -r requirements.txt
 
 COPY backend/app ./app
 COPY backend/migrations ./migrations
-COPY backend/run_migration.py ./run_migration.py
+COPY backend/scripts/run_migration.py ./scripts/run_migration.py
 
 RUN adduser --disabled-password --gecos "" appuser && \
     chown -R appuser:appuser /workspace/backend
