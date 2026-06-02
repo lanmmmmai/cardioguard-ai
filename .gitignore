@@ -83,6 +83,13 @@ web_frontend/coverage/
 .npm/
 .pnpm-store/
 
+# AI training generated artifacts
+ai_model/runs/
+ai_model/checkpoints/
+ai_model/outputs/
+ai_model/artifacts/
+ai_model/mlruns/
+
 # Flutter / Dart generated files
 mobile_app/.dart_tool/
 mobile_app/.flutter-plugins
