@@ -1,8 +1,10 @@
 * text=auto
 .gitattributes text eol=lf
 .gitignore text eol=lf
+**/.gitignore text eol=lf
+**/.metadata text eol=lf
 
-# Keep executable scripts portable across Windows and Unix CI.
+# Keep executable scripts portable across Android, Windows, macOS, and web builds.
 gradlew text eol=lf
 **/gradlew text eol=lf
 *.sh text eol=lf

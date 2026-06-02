@@ -118,10 +118,6 @@ mobile_app/android/key.properties
 mobile_app/android/app/debug/
 mobile_app/android/app/profile/
 mobile_app/android/app/release/
-mobile_app/ios/Flutter/Generated.xcconfig
-mobile_app/ios/Flutter/flutter_export_environment.sh
-mobile_app/ios/Flutter/ephemeral/
-mobile_app/linux/flutter/ephemeral/
 mobile_app/macos/Flutter/ephemeral/
 mobile_app/windows/flutter/ephemeral/
 
