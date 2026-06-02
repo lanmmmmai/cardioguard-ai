@@ -14,17 +14,18 @@ unsigned long g_backoff_until_ms = 0UL;
 uint16_t g_backoff_ms = kBackoffMinMs;
 String g_device_mac;
 
-void PushBufferedPayload(const String &payload) {
+bool PushBufferedPayload(const String &payload) {
   if (g_buffer_count < kOfflineBufferMaxFrames) {
     const uint16_t tail = (g_buffer_head + g_buffer_count) % kOfflineBufferMaxFrames;
     g_buffer[tail] = payload;
     g_buffer_count++;
-    return;
+    return true;
   }
 
   Serial.println("[CardioGuard] WARNING: Buffer full! Oldest frame overwritten.");
   g_buffer[g_buffer_head] = payload;
   g_buffer_head = (g_buffer_head + 1) % kOfflineBufferMaxFrames;
+  return false;
 }
 
 bool PopBufferedPayload(String &payload) {
@@ -98,18 +99,19 @@ SendResult SendTelemetryFrame(const String &payload) {
   result.auth_failed = false;
   result.should_backoff = false;
   result.buffered = false;
+  result.buffer_overwritten = false;
 
   const unsigned long now = millis();
 
   if (!IsWifiConnected()) {
-    PushBufferedPayload(payload);
+    result.buffer_overwritten = !PushBufferedPayload(payload);
     result.buffered = true;
     result.buffer_size = PendingBufferSize();
     return result;
   }
 
   if (now < g_backoff_until_ms) {
-    PushBufferedPayload(payload);
+    result.buffer_overwritten = !PushBufferedPayload(payload);
     result.should_backoff = true;
     result.buffered = true;
     result.buffer_size = PendingBufferSize();
@@ -117,8 +119,10 @@ SendResult SendTelemetryFrame(const String &payload) {
   }
 
   String send_payload = payload;
+  bool is_buffered_frame = false;
   if (g_buffer_count > 0) {
     PopBufferedPayload(send_payload);
+    is_buffered_frame = true;
   }
 
   result.status_code = PostPayload(send_payload);
@@ -129,8 +133,8 @@ SendResult SendTelemetryFrame(const String &payload) {
     g_backoff_ms = kBackoffMinMs;
     g_backoff_until_ms = 0UL;
 
-    if (send_payload != payload) {
-      PushBufferedPayload(payload);
+    if (is_buffered_frame) {
+      result.buffer_overwritten = !PushBufferedPayload(payload);
       result.buffered = true;
       result.buffer_size = PendingBufferSize();
     }
@@ -139,26 +143,27 @@ SendResult SendTelemetryFrame(const String &payload) {
 
   if (result.status_code == 401 || result.status_code == 403) {
     result.auth_failed = true;
-    if (send_payload != payload) {
-      PushBufferedPayload(send_payload);
+    if (is_buffered_frame) {
+      result.buffer_overwritten = !PushBufferedPayload(send_payload);
     }
     result.buffer_size = PendingBufferSize();
     return result;
   }
 
   if (result.status_code == 400 || result.status_code == 404) {
-    if (send_payload != payload) {
-      PushBufferedPayload(send_payload);
+    if (is_buffered_frame) {
+      result.buffer_overwritten = !PushBufferedPayload(send_payload);
       result.buffered = true;
     }
     result.buffer_size = PendingBufferSize();
     return result;
   }
 
-  if (send_payload != payload) {
-    PushBufferedPayload(send_payload);
+  if (is_buffered_frame) {
+    result.buffer_overwritten = !PushBufferedPayload(send_payload);
   }
-  PushBufferedPayload(payload);
+  const bool over = !PushBufferedPayload(payload);
+  result.buffer_overwritten = result.buffer_overwritten || over;
   result.buffered = true;
   result.buffer_size = PendingBufferSize();
 

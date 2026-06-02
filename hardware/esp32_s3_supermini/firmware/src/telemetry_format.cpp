@@ -16,18 +16,45 @@ void AppendNullableFloat(String &json, bool has_value, float value, int precisio
     json += "null";
   }
 }
+
+String EscapeJsonString(const String &input) {
+  String output;
+  output.reserve(input.length() + 8);
+  for (size_t i = 0; i < input.length(); i++) {
+    char c = input[i];
+    switch (c) {
+      case '"':  output += "\\\""; break;
+      case '\\': output += "\\\\"; break;
+      case '\b': output += "\\b";  break;
+      case '\f': output += "\\f";  break;
+      case '\n': output += "\\n";  break;
+      case '\r': output += "\\r";  break;
+      case '\t': output += "\\t";  break;
+      default:
+        if (c < 32) {
+          char buf[8];
+          snprintf(buf, sizeof(buf), "\\u%04x", c);
+          output += buf;
+        } else {
+          output += c;
+        }
+        break;
+    }
+  }
+  return output;
+}
 }  // namespace
 
 String BuildTelemetryJson(const TelemetryFrame &frame) {
   String json;
-  json.reserve(512);
+  json.reserve(1024);
 
   json += "{\"device_uid\":\"";
-  json += frame.device_uid;
+  json += EscapeJsonString(frame.device_uid);
   json += "\",\"sequence\":";
   json += String(frame.sequence);
   json += ",\"mode\":\"";
-  json += frame.mode;
+  json += EscapeJsonString(frame.mode);
   json += "\",\"readings\":{\"heart_rate\":";
   json += String(frame.readings.heart_rate);
   json += ",\"spo2\":";
@@ -43,9 +70,9 @@ String BuildTelemetryJson(const TelemetryFrame &frame) {
   json += ",\"motion_value\":";
   AppendNullableFloat(json, frame.readings.has_motion_value, frame.readings.motion_value, 3);
   json += "},\"signal\":{\"ppg_quality\":\"";
-  json += frame.signal.ppg_quality;
+  json += EscapeJsonString(frame.signal.ppg_quality);
   json += "\",\"ecg_quality\":\"";
-  json += frame.signal.ecg_quality;
+  json += EscapeJsonString(frame.signal.ecg_quality);
   json += "\",\"leads_off\":";
   json += frame.signal.leads_off ? "true" : "false";
   json += ",\"motion_detected\":";
@@ -55,7 +82,7 @@ String BuildTelemetryJson(const TelemetryFrame &frame) {
   json += ",\"rssi\":";
   json += String(frame.device.rssi);
   json += ",\"firmware_version\":\"";
-  json += frame.device.firmware_version;
+  json += EscapeJsonString(frame.device.firmware_version);
   json += "\",\"uptime_ms\":";
   json += String(frame.device.uptime_ms);
   json += "}}";

@@ -77,6 +77,9 @@ void PollSerialCommands() {
 
     if (g_serial_line.length() < 80) {
       g_serial_line += ch;
+    } else {
+      Serial.println("[CardioGuard] WARNING: Serial command buffer overflow! Clearing.");
+      g_serial_line = "";
     }
   }
 }
@@ -106,11 +109,42 @@ void loop() {
   }
   g_last_tick_ms = now_ms;
 
-  if (g_state == RuntimeState::boot || g_state == RuntimeState::wifi_connecting ||
-      g_state == RuntimeState::time_syncing || g_state == RuntimeState::paired_ready) {
-    g_state = NextState(g_state);
-    Serial.print("[CardioGuard] Transition -> ");
-    Serial.println(StateToString(g_state));
+  if (g_state == RuntimeState::boot) {
+    g_state = RuntimeState::wifi_connecting;
+    g_last_tick_ms = now_ms;
+    Serial.println("[CardioGuard] State: BOOT -> WIFI_CONNECTING");
+    return;
+  }
+
+  if (g_state == RuntimeState::wifi_connecting) {
+    if (IsWifiConnected()) {
+      g_state = RuntimeState::time_syncing;
+      g_last_tick_ms = now_ms;
+      Serial.println("[CardioGuard] WiFi connected! Transition -> TIME_SYNCING");
+    } else {
+      static unsigned long last_conn_print = 0;
+      if (now_ms - last_conn_print > 3000) {
+        Serial.println("[CardioGuard] Connecting to WiFi...");
+        last_conn_print = now_ms;
+      }
+    }
+    return;
+  }
+
+  if (g_state == RuntimeState::time_syncing) {
+    if (now_ms - g_last_tick_ms >= 2000UL) {
+      g_state = RuntimeState::paired_ready;
+      g_last_tick_ms = now_ms;
+      Serial.println("[CardioGuard] Time synced (NTP)! Transition -> PAIRED_READY");
+    }
+    return;
+  }
+
+  if (g_state == RuntimeState::paired_ready) {
+    if (now_ms - g_last_tick_ms >= 1000UL) {
+      g_state = RuntimeState::measuring;
+      Serial.println("[CardioGuard] Device paired & ready! Transition -> MEASURING");
+    }
     return;
   }
 

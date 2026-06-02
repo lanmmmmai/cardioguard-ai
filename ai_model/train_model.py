@@ -17,9 +17,11 @@
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report, precision_score, recall_score, f1_score, roc_auc_score
 import joblib
 import os
+import json
+import sklearn
 
 # -----------------------------------------------------------
 # 1. Đọc dữ liệu từ file CSV
@@ -97,12 +99,22 @@ print("✅ Huấn luyện hoàn tất!")
 # 5. Đánh giá mô hình trên tập kiểm thử
 # -----------------------------------------------------------
 y_pred = model.predict(X_test)
+y_prob = model.predict_proba(X_test)[:, 1]
+
 accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred)
+recall = recall_score(y_test, y_pred)
+f1 = f1_score(y_test, y_pred)
+auc_roc = roc_auc_score(y_test, y_prob)
 
 print(f"\n{'=' * 60}")
 print(f"  KẾT QUẢ ĐÁNH GIÁ MÔ HÌNH")
 print(f"{'=' * 60}")
 print(f"\n🎯 Accuracy (Độ chính xác): {accuracy * 100:.2f}%")
+print(f"🎯 Precision (Độ chính xác dự đoán dương tính): {precision * 100:.2f}%")
+print(f"🎯 Recall (Độ nhạy): {recall * 100:.2f}%")
+print(f"🎯 F1-Score (Điểm F1): {f1 * 100:.2f}%")
+print(f"🎯 AUC-ROC Score: {auc_roc:.4f}")
 print(f"\n📋 Classification Report:")
 print(classification_report(
     y_test, y_pred,
@@ -118,11 +130,24 @@ for feat, score in importances_sorted.items():
     print(f"   {feat:<12}: {score:.4f}  {bar}")
 
 # -----------------------------------------------------------
-# 6. Lưu model vào file .pkl
+# 6. Lưu model và metadata
 # -----------------------------------------------------------
 MODEL_PATH = os.path.join(BASE_DIR, "heart_disease_model.pkl")
 joblib.dump(model, MODEL_PATH)
 
+METADATA_PATH = os.path.join(BASE_DIR, "model_metadata.json")
+metadata = {
+    "scikit_learn_version": sklearn.__version__,
+    "accuracy": float(accuracy),
+    "precision": float(precision),
+    "recall": float(recall),
+    "f1_score": float(f1),
+    "auc_roc": float(auc_roc)
+}
+with open(METADATA_PATH, "w", encoding="utf-8") as f:
+    json.dump(metadata, f, indent=4, ensure_ascii=False)
+
 print(f"\n💾 Model đã được lưu tại: {MODEL_PATH}")
+print(f"💾 Metadata đã được lưu tại: {METADATA_PATH}")
 print("\n🚀 Tiếp theo: Chạy 'python app.py' để khởi động API dự đoán.")
 print("=" * 60)

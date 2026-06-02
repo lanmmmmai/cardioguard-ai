@@ -49,9 +49,34 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
+
+# -----------------------------------------------------------
+# Bộ giới hạn tần suất (Rate Limiter) bộ nhớ trong
+# -----------------------------------------------------------
+import time
+from collections import defaultdict
+from fastapi import Request
+
+_rate_limits = defaultdict(list)
+
+def check_rate_limit(ip: str, endpoint: str, max_requests: int = 10, window_seconds: int = 60):
+    now = time.time()
+    key = (ip, endpoint)
+    
+    timestamps = _rate_limits[key]
+    timestamps = [t for t in timestamps if now - t < window_seconds]
+    
+    if len(timestamps) >= max_requests:
+        wait_time = int(window_seconds - (now - timestamps[0]))
+        raise HTTPException(
+            status_code=429,
+            detail=f"Quá nhiều yêu cầu gửi tới {endpoint}. Vui lòng thử lại sau {wait_time} giây."
+        )
+    timestamps.append(now)
+    _rate_limits[key] = timestamps
 
 # -----------------------------------------------------------
 # Load model khi server khởi động
@@ -69,6 +94,24 @@ if not os.path.exists(MODEL_PATH):
 # Nạp model vào bộ nhớ một lần duy nhất khi server khởi động
 model = joblib.load(MODEL_PATH)
 print(f"✅ Model đã được nạp thành công từ: {MODEL_PATH}")
+
+# Kiểm tra phiên bản scikit-learn
+METADATA_PATH = os.path.join(BASE_DIR, "model_metadata.json")
+if os.path.exists(METADATA_PATH):
+    import json
+    import sklearn
+    try:
+        with open(METADATA_PATH, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+        train_version = metadata.get("scikit_learn_version")
+        current_version = sklearn.__version__
+        if train_version != current_version:
+            logger.warning(
+                f"⚠️ CẢNH BÁO: Phiên bản scikit-learn lúc huấn luyện ({train_version}) "
+                f"khác phiên bản hiện tại ({current_version}). Mô hình có thể dự đoán không chính xác."
+            )
+    except Exception as err:
+        logger.error(f"Không thể đọc model metadata: {err}")
 
 # Thứ tự cột đầu vào phải khớp với lúc huấn luyện
 FEATURE_COLUMNS = [
@@ -157,13 +200,15 @@ def classify_risk_level(probability: float) -> str:
     summary="Dự đoán nguy cơ bệnh tim",
     tags=["Dự đoán"]
 )
-async def predict_heart_risk(data: HeartRiskInput):
+def predict_heart_risk(data: HeartRiskInput, request: Request):
     """
     Nhận các chỉ số sức khỏe và trả về kết quả dự đoán nguy cơ bệnh tim.
 
     **Lưu ý:** Kết quả chỉ mang tính tham khảo hỗ trợ bác sĩ,
     không thay thế chẩn đoán y khoa chính thức.
     """
+    ip = request.client.host if request.client else "unknown"
+    check_rate_limit(ip, "/predict-heart-risk", max_requests=10, window_seconds=60)
     try:
         # Chuyển dữ liệu đầu vào thành mảng numpy theo đúng thứ tự cột
         input_data = np.array([[

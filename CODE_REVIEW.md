@@ -19,219 +19,42 @@
 
 ---
 
-## 1. Backend Issues
-
-
-## 6. Infrastructure Issues
-
-### 🟠 [HIGH] INFRA-01: Massive dependency bloat trong `requirements.txt`
-
-- **File:** `backend/requirements.txt`
-- **Mô tả:** 250 packages包括 `torch`, `transformers`, `ultralytics`, `jupyter`, `selenium`, `paddleocr`, `easyocr`, `streamlit`. Không có package nào cần cho FastAPI backend. `requirements.runtime.txt` chỉ có 14 packages. Attack surface khổng lồ.
-- **Fix:** Dùng `requirements.runtime.txt` cho production, giữ `requirements.txt` cho dev.
 
 ---
 
-### 🟡 [MEDIUM] INFRA-02: Docker container chạy root
-
-- **File:** `backend/Dockerfile`, `web_frontend/Dockerfile`
-- **Mô tả:** Cả hai Dockerfiles chạy processes dưới root user. Defense in depth thiếu.
-- **Fix:** Thêm `RUN adduser --disabled-password appuser && USER appuser`.
 
 ---
 
-### 🟡 [MEDIUM] INFRA-03: Conflicting OpenCV packages
-
-- **File:** `backend/requirements.txt:130-132`
-- **Mô tả:** Install đồng thời `opencv-contrib-python`, `opencv-python`, `opencv-python-headless` — conflicts.
-- **Fix:** Chọn một package.
 
 ---
 
-### 🟡 [MEDIUM] INFRA-04: Unpinned numpy, pyarrow
-
-- **File:** `backend/requirements.txt:129, 160`
-- **Mô tả:** Không có version pin. Major version bumps có thể break.
-- **Fix:** Pin known-working ranges.
-
----
-
-### 🟢 [LOW] INFRA-05: `seed_data.py` dùng `datetime.now()` không timezone
-
-- **File:** `backend/seed_data.py:77, 78, 100, 101`
-- **Mô tả:** `datetime.now()` tạo naive datetime. Migration dùng `TIMESTAMPTZ`. Inconsistency.
-- **Fix:** Dùng `datetime.now(timezone.utc)`.
-
----
-
-### 🟢 [LOW] INFRA-06: `web_frontend/Dockerfile` không có `.dockerignore`
-
-- **File:** `web_frontend/Dockerfile`
-- **Mô tả:** `COPY web_frontend/ ./` copy everything including `.git`, `node_modules`, `.env`.
-- **Fix:** Thêm `.dockerignore`.
-
----
-
-### 🟢 [LOW] INFRA-07: `docker-compose.yml` không có healthcheck cho web
-
-- **File:** `docker-compose.yml:27-40`
-- **Mô tả:** Backend có healthcheck nhưng web không có. Failed nginx start undetected.
-- **Fix:** Thêm healthcheck cho web service.
 
 ---
 ## 4. AI Model Issues
 
-### 🟡 [MEDIUM] AI-02: CORS wildcard methods/headers
-
-- **File:** `ai_model/app.py:49-50`
-- **Mô tả:** `allow_methods=["*"]`, `allow_headers=["*"]` với `allow_credentials=True` — quá permissive.
-- **Fix:** Restrict actual methods/headers.
 
 ---
 
-### 🟡 [MEDIUM] AI-03: Không có rate limiting
-
-- **File:** `ai_model/app.py` (toàn bộ)
-- **Mô tả:** `/predict-heart-risk` không có rate limiting. CPU-bound inference có thể bị DoS.
-- **Fix:** Thêm rate limiting.
 
 ---
 
-### 🟡 [MEDIUM] AI-04: Synchronous model inference trong async handler
-
-- **File:** `ai_model/app.py:183-188`
-- **Mô tả:** `model.predict()` và `model.predict_proba()` là CPU-blocking calls. Trong async FastAPI handler, block event loop.
-- **Code:**
-  ```python
-  @app.post("/predict-heart-risk")
-  async def predict_risk(...):
-      prediction = model.predict(input_df)  # BLOCKING
-  ```
-- **Fix:** Dùng `run_in_executor` hoặc sync endpoint.
 
 ---
 
-### 🟢 [LOW] AI-07: No model validation beyond accuracy
+---
 
-- **File:** `ai_model/train_model.py:100-110`
-- **Mô tả:** Chỉ report accuracy. Với medical prediction model, precision, recall, F1, AUC-ROC quan trọng hơn.
-- **Fix:** Lưu và evaluate thêm metrics.
 
 ---
 
-### 🟢 [LOW] AI-08: `joblib.dump` không pin version
-
-- **File:** `ai_model/train_model.py:124`
-- **Mô tả:** Pickle format phụ thuộc scikit-learn version. Nếu upgrade, old `.pkl` có thể fail load.
-- **Fix:** Pin scikit-learn version hoặc dùng `skops`.
 
 ---
 
-### 🟢 [LOW] AI-09: `requirements.txt` không có upper bounds
-
-- **File:** `ai_model/requirements.txt`
-- **Mô tả:** Tất cả packages dùng `>=` — breaking changes có thể silent break API.
-- **Fix:** Pin known-working ranges.
-
----
-## 5. Hardware Firmware Issues
-
-### 🔴 [CRITICAL] HW-01: Hardcoded WiFi credentials trong source
-
-- **File:** `hardware/esp32_s3_supermini/firmware/include/config.h:7-10`
-- **Mô tả:** WiFi SSID/password và device auth token stored as plaintext `static const char*`. Ai đó có firmware source hoặc decompiled binary có thể extract.
-- **Code:**
-  ```cpp
-  static const char *kWifiSsid = "REPLACE_WIFI_SSID";
-  static const char *kWifiPassword = "REPLACE_WIFI_PASSWORD";
-  static const char *kDeviceToken = "REPLACE_DEVICE_TOKEN";
-  ```
-- **Fix:** Dùng encrypted NVS partition hoặc provisioning flow. Không commit credentials.
 
 ---
 
-### 🟠 [HIGH] HW-05: JSON injection qua unescaped string concatenation
-
-- **File:** `hardware/esp32_s3_supermini/firmware/src/telemetry_format.cpp:26-58`
-- **Mô tả:** String values concat trực tiếp vào JSON mà không escape. Nếu string chứa `"`, `\`, hoặc control chars → malformed JSON.
-- **Code:**
-  ```cpp
-  json += frame.device_uid;      // Không escape
-  json += frame.mode;            // Không escape
-  ```
-- **Fix:** Dùng proper JSON library hoặc escape values.
 
 ---
 
-### 🟠 [HIGH] HW-06: Boot state transitions quá nhanh
-
-- **File:** `hardware/esp32_s3_supermini/firmware/src/main.cpp:109-115`
-- **Mô tả:** Boot→wifi_connecting→time_syncing→paired_ready xảy ra trong một `loop()` call (1s). Không có actual WiFi connection waiting, NTP sync, hay pairing verification.
-- **Fix:** Thêm actual waiting/validation cho mỗi state.
-
----
-
-### 🟡 [MEDIUM] HW-07: `static` variables trong header gây ODR issues
-
-- **File:** `hardware/esp32_s3_supermini/firmware/include/config.h:4-15`
-- **Mô tả:** `static const char*` trong header — mỗi translation unit có copy riêng. Flash/RAM waste trên embedded.
-- **Fix:** Dùng `constexpr` hoặc `inline` (C++17).
-
----
-
-### 🟡 [MEDIUM] HW-08: `g_serial_line` unbounded accumulation
-
-- **File:** `hardware/esp32_s3_supermini/firmware/src/main.cpp:14, 79`
-- **Mô tả:** Global `String` never freed/cleared on error paths. ESP32 heap limited.
-- **Fix:** Clear `g_serial_line` trên error paths.
-
----
-
-### 🟡 [MEDIUM] HW-09: String concatenation repeated heap allocation
-
-- **File:** `hardware/esp32_s3_supermini/firmware/src/telemetry_format.cpp:25-61`
-- **Mô tả:** Mỗi `+=` trên Arduino `String` có thể trigger heap reallocation. `json.reserve(512)` có thể insufficient nếu payload > 512 bytes.
-- **Fix:** Dùng fixed buffer hoặc `snprintf`.
-
----
-
-### 🟡 [MEDIUM] HW-10: `send_payload != payload` comparison unreliable
-
-- **File:** `hardware/esp32_s3_supermini/firmware/src/telemetry_sender.cpp:131`
-- **Mô tả:** So sánh hai `String` objects by value. Nếu buffer có identical payload, sẽ incorrect.
-- **Fix:** Dùng index tracking thay vì string comparison.
-
----
-
-### 🟢 [LOW] HW-11: Static local variables never reset
-
-- **File:** `hardware/esp32_s3_supermini/firmware/src/random_telemetry.cpp:85-89`
-- **Mô tả:** `hr_base`, `spo2_base` etc. persist qua calls. Device restart → jump back defaults. Mode switch → carry over values.
-- **Fix:** Reset statics khi mode thay đổi.
-
----
-
-### 🟢 [LOW] HW-12: `RandomWalk` chỉ add positive step
-
-- **File:** `hardware/esp32_s3_supermini/firmware/src/random_telemetry.cpp:40-41`
-- **Mô tả:** Function chỉ hoạt động đúng khi `step_min < 0 < step_max`. Nếu cả hai positive, value chỉ increase.
-- **Fix:** Document limitation hoặc refactor.
-
----
-
-### 🟢 [LOW] HW-13: Battery clamp after sequence 3825
-
-- **File:** `hardware/esp32_s3_supermini/firmware/src/random_telemetry.cpp:141`
-- **Mô tả:** Sau sequence 3825, battery permanently clamped to 15. Expected behavior nhưng không có warning.
-- **Fix:** Thêm wrap-around hoặc warning.
-
----
-
-### 🟢 [LOW] HW-14: TelemetrySender buffer overwrite oldest frame
-
-- **File:** `hardware/esp32_s3_supermini/firmware/src/telemetry_sender.cpp:17-27`
-- **Mô tả:** Buffer full → oldest frame silently overwritten. Không error report.
-- **Fix:** Flag data loss cho caller.
 
 ---
 ## 7. Priority Matrix
@@ -457,6 +280,54 @@
 ---
 
 ## 6. Archive (Đã Sửa)
+### 🟢 [RESOLVED] INFRA-01: Massive dependency bloat trong `requirements.txt`
+
+### 🟢 [RESOLVED] INFRA-02: Docker container chạy root
+
+### 🟢 [RESOLVED] INFRA-03: Conflicting OpenCV packages
+
+### 🟢 [RESOLVED] INFRA-04: Unpinned numpy, pyarrow
+
+### 🟢 [RESOLVED] INFRA-05: `seed_data.py` dùng `datetime.now()` không timezone
+
+### 🟢 [RESOLVED] INFRA-06: `web_frontend/Dockerfile` không có `.dockerignore`
+
+### 🟢 [RESOLVED] INFRA-07: `docker-compose.yml` không có healthcheck cho web
+
+### 🟢 [RESOLVED] AI-02: CORS wildcard methods/headers
+
+### 🟢 [RESOLVED] AI-03: Không có rate limiting
+
+### 🟢 [RESOLVED] AI-04: Synchronous model inference trong async handler
+
+### 🟢 [RESOLVED] AI-07: No model validation beyond accuracy
+
+### 🟢 [RESOLVED] AI-08: `joblib.dump` không pin version
+
+### 🟢 [RESOLVED] AI-09: `requirements.txt` không có upper bounds
+
+### 🟢 [RESOLVED] HW-01: Hardcoded WiFi credentials trong source
+
+### 🟢 [RESOLVED] HW-05: JSON injection qua unescaped string concatenation
+
+### 🟢 [RESOLVED] HW-06: Boot state transitions quá nhanh
+
+### 🟢 [RESOLVED] HW-07: `static` variables trong header gây ODR issues
+
+### 🟢 [RESOLVED] HW-08: `g_serial_line` unbounded accumulation
+
+### 🟢 [RESOLVED] HW-09: String concatenation repeated heap allocation
+
+### 🟢 [RESOLVED] HW-10: `send_payload != payload` comparison unreliable
+
+### 🟢 [RESOLVED] HW-11: Static local variables never reset
+
+### 🟢 [RESOLVED] HW-12: `RandomWalk` chỉ add positive step
+
+### 🟢 [RESOLVED] HW-13: Battery clamp after sequence 3825
+
+### 🟢 [RESOLVED] HW-14: TelemetrySender buffer overwrite oldest frame
+
 ### 🟢 [RESOLVED] MO-11: Provider init thiếu `lazy: false` / `init()`
 
 ### 🟢 [RESOLVED] MO-12: Animation tick tạo `Random` object mỗi frame

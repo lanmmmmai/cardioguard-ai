@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.core.config import settings
 from app.core.database import database
 
@@ -74,8 +74,8 @@ async def main():
                 if "location" in cameras_cols: cam_data1["location"] = "Phòng Cấp cứu ICU 01"
                 if "stream_url" in cameras_cols: cam_data1["stream_url"] = "https://www.w3schools.com/html/mov_bbb.mp4"
                 if "status" in cameras_cols: cam_data1["status"] = "online"
-                if "created_at" in cameras_cols: cam_data1["created_at"] = datetime.now()
-                if "updated_at" in cameras_cols: cam_data1["updated_at"] = datetime.now()
+                if "created_at" in cameras_cols: cam_data1["created_at"] = datetime.now(timezone.utc)
+                if "updated_at" in cameras_cols: cam_data1["updated_at"] = datetime.now(timezone.utc)
                 
                 if "assigned_patient_id" in cameras_cols:
                     cam_data1["assigned_patient_id"] = target_patient_id
@@ -97,8 +97,8 @@ async def main():
                 if "location" in cameras_cols: cam_data2["location"] = "Phòng Điều trị Đặc biệt 302"
                 if "stream_url" in cameras_cols: cam_data2["stream_url"] = "https://www.w3schools.com/html/movie.mp4"
                 if "status" in cameras_cols: cam_data2["status"] = "online"
-                if "created_at" in cameras_cols: cam_data2["created_at"] = datetime.now()
-                if "updated_at" in cameras_cols: cam_data2["updated_at"] = datetime.now()
+                if "created_at" in cameras_cols: cam_data2["created_at"] = datetime.now(timezone.utc)
+                if "updated_at" in cameras_cols: cam_data2["updated_at"] = datetime.now(timezone.utc)
                 
                 if "assigned_patient_id" in cameras_cols:
                     cam_data2["assigned_patient_id"] = target_patient_id
@@ -130,8 +130,8 @@ async def main():
                 if "report_type" in reports_cols: rep_data1["report_type"] = "ECG Analysis"
                 if "content" in reports_cols: rep_data1["content"] = "Bệnh nhân có chỉ số ECG tương đối ổn định. Xuất hiện một vài nhịp ngoại tâm thu thất thưa thớt nhưng không nguy kịch. Khuyến nghị theo dõi thêm và duy trì chế độ dinh dưỡng giảm muối."
                 if "data" in reports_cols: rep_data1["data"] = json.dumps({"avg_heart_rate": 78, "max_heart_rate": 112, "ecg_quality": "High"})
-                if "created_at" in reports_cols: rep_data1["created_at"] = datetime.now() - timedelta(days=1)
-                if "updated_at" in reports_cols: rep_data1["updated_at"] = datetime.now() - timedelta(days=1)
+                if "created_at" in reports_cols: rep_data1["created_at"] = datetime.now(timezone.utc) - timedelta(days=1)
+                if "updated_at" in reports_cols: rep_data1["updated_at"] = datetime.now(timezone.utc) - timedelta(days=1)
                 
                 if "patient_id" in reports_cols:
                     rep_data1["patient_id"] = target_patient_id
@@ -157,8 +157,8 @@ async def main():
                 if "report_type" in reports_cols: rep_data2["report_type"] = "Clinical Summary"
                 if "content" in reports_cols: rep_data2["content"] = "Ghi nhận chỉ số huyết áp tâm thu có dấu hiệu tăng nhẹ vào các khung giờ chiều tối (150/90 mmHg). Chỉ số oxy máu SpO2 duy trì tốt trên 96%. Đã điều chỉnh liều lượng thuốc hạ huyết áp."
                 if "data" in reports_cols: rep_data2["data"] = json.dumps({"avg_systolic_bp": 138, "avg_diastolic_bp": 86, "avg_spo2": 97.5})
-                if "created_at" in reports_cols: rep_data2["created_at"] = datetime.now() - timedelta(days=3)
-                if "updated_at" in reports_cols: rep_data2["updated_at"] = datetime.now() - timedelta(days=3)
+                if "created_at" in reports_cols: rep_data2["created_at"] = datetime.now(timezone.utc) - timedelta(days=3)
+                if "updated_at" in reports_cols: rep_data2["updated_at"] = datetime.now(timezone.utc) - timedelta(days=3)
                 
                 if "patient_id" in reports_cols:
                     rep_data2["patient_id"] = target_patient_id
@@ -191,7 +191,7 @@ async def main():
                 if "entity_type" in audit_cols: log_data1["entity_type"] = "users"
                 if "entity_id" in audit_cols: log_data1["entity_id"] = target_admin_id if target_admin_id else str(uuid.uuid4())
                 if "details" in audit_cols: log_data1["details"] = json.dumps({"ip_address": "127.0.0.1", "browser": "Chrome/MacOS", "status": "success"})
-                if "created_at" in audit_cols: log_data1["created_at"] = datetime.now() - timedelta(minutes=15)
+                if "created_at" in audit_cols: log_data1["created_at"] = datetime.now(timezone.utc) - timedelta(minutes=15)
                 
                 if "user_id" in audit_cols and target_admin_id:
                     log_data1["user_id"] = target_admin_id
@@ -210,7 +210,7 @@ async def main():
                 if "entity_type" in audit_cols: log_data2["entity_type"] = "patients"
                 if "entity_id" in audit_cols: log_data2["entity_id"] = target_patient_id if target_patient_id else str(uuid.uuid4())
                 if "details" in audit_cols: log_data2["details"] = json.dumps({"email": "patient@gmail.com", "gateway": "SMTP"})
-                if "created_at" in audit_cols: log_data2["created_at"] = datetime.now() - timedelta(hours=2)
+                if "created_at" in audit_cols: log_data2["created_at"] = datetime.now(timezone.utc) - timedelta(hours=2)
                 
                 if "user_id" in audit_cols and target_admin_id:
                     log_data2["user_id"] = target_admin_id
@@ -244,11 +244,11 @@ async def main():
                 if "battery_level" in devices_cols: dev1["battery_level"] = 88
                 elif "battery" in devices_cols: dev1["battery"] = 88
                 
-                if "last_seen" in devices_cols: dev1["last_seen"] = datetime.now()
-                elif "last_seen_at" in devices_cols: dev1["last_seen_at"] = datetime.now()
+                if "last_seen" in devices_cols: dev1["last_seen"] = datetime.now(timezone.utc)
+                elif "last_seen_at" in devices_cols: dev1["last_seen_at"] = datetime.now(timezone.utc)
                 
-                if "created_at" in devices_cols: dev1["created_at"] = datetime.now()
-                if "updated_at" in devices_cols: dev1["updated_at"] = datetime.now()
+                if "created_at" in devices_cols: dev1["created_at"] = datetime.now(timezone.utc)
+                if "updated_at" in devices_cols: dev1["updated_at"] = datetime.now(timezone.utc)
                 
                 if "patient_id" in devices_cols: dev1["patient_id"] = target_patient_id
                 elif "assigned_patient_id" in devices_cols: dev1["assigned_patient_id"] = target_patient_id
@@ -270,11 +270,11 @@ async def main():
                 if "battery_level" in devices_cols: dev2["battery_level"] = 45
                 elif "battery" in devices_cols: dev2["battery"] = 45
                 
-                if "last_seen" in devices_cols: dev2["last_seen"] = datetime.now()
-                elif "last_seen_at" in devices_cols: dev2["last_seen_at"] = datetime.now()
+                if "last_seen" in devices_cols: dev2["last_seen"] = datetime.now(timezone.utc)
+                elif "last_seen_at" in devices_cols: dev2["last_seen_at"] = datetime.now(timezone.utc)
                 
-                if "created_at" in devices_cols: dev2["created_at"] = datetime.now()
-                if "updated_at" in devices_cols: dev2["updated_at"] = datetime.now()
+                if "created_at" in devices_cols: dev2["created_at"] = datetime.now(timezone.utc)
+                if "updated_at" in devices_cols: dev2["updated_at"] = datetime.now(timezone.utc)
                 
                 if "patient_id" in devices_cols: dev2["patient_id"] = target_patient_id
                 elif "assigned_patient_id" in devices_cols: dev2["assigned_patient_id"] = target_patient_id
@@ -301,14 +301,14 @@ async def main():
                 if "status" in app_cols: app1["status"] = "confirmed"
                 if "channel" in app_cols: app1["channel"] = "Video Call trực tuyến"
                 
-                if "appointment_date" in app_cols: app1["appointment_date"] = datetime.now() + timedelta(days=2)
-                elif "scheduled_at" in app_cols: app1["scheduled_at"] = datetime.now() + timedelta(days=2)
+                if "appointment_date" in app_cols: app1["appointment_date"] = datetime.now(timezone.utc) + timedelta(days=2)
+                elif "scheduled_at" in app_cols: app1["scheduled_at"] = datetime.now(timezone.utc) + timedelta(days=2)
                 
                 if "note" in app_cols: app1["note"] = "Bệnh nhân có tiền sử suy tim độ 2, khám để điều chỉnh liều lượng thuốc."
                 elif "notes" in app_cols: app1["notes"] = "Bệnh nhân có tiền sử suy tim độ 2, khám để điều chỉnh liều lượng thuốc."
                 
-                if "created_at" in app_cols: app1["created_at"] = datetime.now()
-                if "updated_at" in app_cols: app1["updated_at"] = datetime.now()
+                if "created_at" in app_cols: app1["created_at"] = datetime.now(timezone.utc)
+                if "updated_at" in app_cols: app1["updated_at"] = datetime.now(timezone.utc)
                 
                 if "patient_id" in app_cols: app1["patient_id"] = target_patient_id
                 elif "assigned_patient_id" in app_cols: app1["assigned_patient_id"] = target_patient_id
@@ -342,8 +342,8 @@ async def main():
                 elif "summary" in rec_cols: rec1["summary"] = "Nhịp tim không đều. ECG phát hiện ngoại tâm thu thất. Đã kê đơn thuốc và yêu cầu đeo Apple Watch giám sát 24/7."
                 
                 if "files" in rec_cols: rec1["files"] = json.dumps([{"name": "Kết quả ECG.pdf", "url": "https://example.com/ecg_result.pdf"}])
-                if "created_at" in rec_cols: rec1["created_at"] = datetime.now() - timedelta(days=5)
-                if "updated_at" in rec_cols: rec1["updated_at"] = datetime.now() - timedelta(days=5)
+                if "created_at" in rec_cols: rec1["created_at"] = datetime.now(timezone.utc) - timedelta(days=5)
+                if "updated_at" in rec_cols: rec1["updated_at"] = datetime.now(timezone.utc) - timedelta(days=5)
                 
                 if "patient_id" in rec_cols: rec1["patient_id"] = target_patient_id
                 elif "assigned_patient_id" in rec_cols: rec1["assigned_patient_id"] = target_patient_id

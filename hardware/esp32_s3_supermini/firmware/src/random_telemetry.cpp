@@ -36,6 +36,10 @@ float ClampFloat(float value, float min_value, float max_value) {
   return value;
 }
 
+/**
+ * @brief Performs a random walk step.
+ * Note: step_min must be <= 0 and step_max must be >= 0 for unbiased random walk.
+ */
 float RandomWalk(float current_value, float step_min, float step_max, float out_min, float out_max) {
   const float step = RandomRangeFloat(step_min, step_max);
   return ClampFloat(current_value + step, out_min, out_max);
@@ -82,11 +86,21 @@ DemoMode ParseModeFromText(const String &text, DemoMode fallback_mode) {
 }
 
 TelemetryFrame GenerateRandomTelemetry(unsigned long sequence, DemoMode mode) {
+  static DemoMode last_mode = DemoMode::normal;
   static int hr_base = 78;
   static int spo2_base = 98;
   static float ecg_base = 0.02f;
   static float motion_base = 0.08f;
   static float temp_base = 36.9f;
+
+  if (mode != last_mode) {
+    hr_base = 78;
+    spo2_base = 98;
+    ecg_base = 0.02f;
+    motion_base = 0.08f;
+    temp_base = 36.9f;
+    last_mode = mode;
+  }
 
   hr_base = ClampInt(hr_base + RandomRange(-2, 2), 62, 98);
   spo2_base = ClampInt(spo2_base + RandomRange(-1, 1), 95, 100);
@@ -138,7 +152,11 @@ TelemetryFrame GenerateRandomTelemetry(unsigned long sequence, DemoMode mode) {
     frame.readings.ecg_value = RandomRangeFloat(-0.75f, 0.75f);
   }
 
-  frame.device.battery = ClampInt(100 - static_cast<int>(sequence / 45UL), 15, 100);
+  const int battery_calc = 100 - static_cast<int>((sequence % 3825UL) / 45UL);
+  frame.device.battery = ClampInt(battery_calc, 15, 100);
+  if (frame.device.battery <= 15 && (sequence % 45UL == 0UL)) {
+    Serial.println("[CardioGuard] WARNING: Device battery low (15%).");
+  }
   frame.device.rssi = ClampInt(-58 + RandomRange(-10, 6), -78, -45);
   frame.device.firmware_version = kFirmwareVersion;
   frame.device.uptime_ms = millis();

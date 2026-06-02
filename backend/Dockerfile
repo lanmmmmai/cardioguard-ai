@@ -14,6 +14,10 @@ COPY backend/app ./app
 COPY backend/migrations ./migrations
 COPY backend/run_migration.py ./run_migration.py
 
+RUN adduser --disabled-password --gecos "" appuser && \
+    chown -R appuser:appuser /workspace/backend
+USER appuser
+
 EXPOSE 8000
 
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
