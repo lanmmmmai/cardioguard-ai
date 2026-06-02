@@ -25,7 +25,7 @@ async def get_patient_profile(authorization: Optional[str] = Header(default=None
         raise HTTPException(status_code=403, detail="Chỉ bệnh nhân mới có quyền truy cập hồ sơ này")
     
     row = await database.fetch_one(
-        "SELECT * FROM patient_profiles WHERE user_id = :user_id",
+        "SELECT * FROM patient_profiles WHERE user_id::text = :user_id",
         {"user_id": user["id"]}
     )
     if not row:
@@ -55,7 +55,7 @@ async def update_patient_profile(payload: PatientProfileUpdate, authorization: O
         raise HTTPException(status_code=403, detail="Chỉ bệnh nhân mới có quyền cập nhật hồ sơ này")
         
     user_id = user["id"]
-    exists = await database.fetch_one("SELECT 1 FROM patient_profiles WHERE user_id = :user_id", {"user_id": user_id})
+    exists = await database.fetch_one("SELECT 1 FROM patient_profiles WHERE user_id::text = :user_id", {"user_id": user_id})
     
     profile_completed = bool(
         payload.full_name and 
@@ -91,7 +91,7 @@ async def update_patient_profile(payload: PatientProfileUpdate, authorization: O
                     allergies = :allergies, emergency_contact_name = :emergency_contact_name,
                     emergency_contact_phone = :emergency_contact_phone, avatar_url = :avatar_url,
                     profile_completed = :profile_completed, updated_at = NOW()
-                WHERE user_id = :user_id
+                WHERE user_id::text = :user_id
                 """,
                 values
             )
@@ -113,7 +113,7 @@ async def update_patient_profile(payload: PatientProfileUpdate, authorization: O
             """
             UPDATE users
             SET status = :status, profile_completed = :profile_completed, avatar_url = :avatar_url, full_name = :full_name, phone = :phone
-            WHERE id = :user_id
+            WHERE id::text = :user_id
             """,
             {
                 "status": user_status,
@@ -125,7 +125,7 @@ async def update_patient_profile(payload: PatientProfileUpdate, authorization: O
             }
         )
         
-        patients_exists = await database.fetch_one("SELECT 1 FROM patients WHERE user_id = :user_id OR id = :user_id", {"user_id": user_id})
+        patients_exists = await database.fetch_one("SELECT 1 FROM patients WHERE user_id::text = :user_id OR id::text = :user_id", {"user_id": user_id})
         age = None
         if payload.date_of_birth:
             age = datetime.now().year - payload.date_of_birth.year
@@ -146,7 +146,7 @@ async def update_patient_profile(payload: PatientProfileUpdate, authorization: O
                 """
                 UPDATE patients
                 SET full_name = :full_name, age = :age, gender = :gender, phone = :phone, address = :address, medical_history = :medical_history
-                WHERE user_id = :user_id OR id = :user_id
+                WHERE user_id::text = :user_id OR id::text = :user_id
                 """,
                 {
                     "full_name": payload.full_name,
@@ -186,11 +186,11 @@ async def get_doctor_profile(authorization: Optional[str] = Header(default=None)
         raise HTTPException(status_code=403, detail="Chỉ bác sĩ mới có quyền truy cập hồ sơ này")
         
     row = await database.fetch_one(
-        "SELECT * FROM doctor_profiles WHERE user_id = :user_id",
+        "SELECT * FROM doctor_profiles WHERE user_id::text = :user_id",
         {"user_id": user["id"]}
     )
     if not row:
-        user_row = await database.fetch_one("SELECT specialty, department FROM users WHERE id = :id", {"id": user["id"]})
+        user_row = await database.fetch_one("SELECT specialty, department FROM users WHERE id::text = :id", {"id": user["id"]})
         specialty = user_row["specialty"] if user_row else None
         department = user_row["department"] if user_row else None
         return {
@@ -227,7 +227,7 @@ async def update_doctor_profile(payload: DoctorProfileUpdate, authorization: Opt
         raise HTTPException(status_code=403, detail="Chỉ bác sĩ mới có quyền cập nhật hồ sơ này")
         
     user_id = user["id"]
-    exists = await database.fetch_one("SELECT 1 FROM doctor_profiles WHERE user_id = :user_id", {"user_id": user_id})
+    exists = await database.fetch_one("SELECT 1 FROM doctor_profiles WHERE user_id::text = :user_id", {"user_id": user_id})
     
     profile_completed = bool(
         payload.full_name and
@@ -277,7 +277,7 @@ async def update_doctor_profile(payload: DoctorProfileUpdate, authorization: Opt
                     license_certificate_url = :license_certificate_url, cccd_front_url = :cccd_front_url,
                     cccd_back_url = :cccd_back_url, avatar_url = :avatar_url, is_verified = FALSE,
                     status = 'pending_verification', updated_at = NOW()
-                WHERE user_id = :user_id
+                WHERE user_id::text = :user_id
                 """,
                 values
             )
@@ -301,7 +301,7 @@ async def update_doctor_profile(payload: DoctorProfileUpdate, authorization: Opt
             UPDATE users
             SET status = 'pending_verification', profile_completed = TRUE, is_verified = FALSE, 
                 avatar_url = :avatar_url, full_name = :full_name, phone = :phone, specialty = :specialty, department = :department
-            WHERE id = :user_id
+            WHERE id::text = :user_id
             """,
             {
                 "avatar_url": payload.avatar_url,
@@ -335,7 +335,7 @@ async def get_doctor_verification_status(authorization: Optional[str] = Header(d
         raise HTTPException(status_code=403, detail="Chỉ bác sĩ mới có quyền truy cập thông tin này")
         
     row = await database.fetch_one(
-        "SELECT status, is_verified, verification_note FROM doctor_profiles WHERE user_id = :user_id",
+        "SELECT status, is_verified, verification_note FROM doctor_profiles WHERE user_id::text = :user_id",
         {"user_id": user["id"]}
     )
     if not row:

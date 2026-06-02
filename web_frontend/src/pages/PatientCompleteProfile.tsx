@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useBrowserPath } from '../hooks/useBrowserPath';
 import { API_URL } from '../config';
+import { getRequestErrorMessage } from '../utils/apiErrors';
 import { 
   Camera, 
   User, 
@@ -63,7 +64,7 @@ export const PatientCompleteProfile: React.FC = () => {
           if (data.avatar_url) setAvatarUrl(data.avatar_url);
         }
       })
-      .catch((err) => console.warn(err.message));
+      .catch((err) => console.warn(getRequestErrorMessage(err, 'Không thể tải thông tin hồ sơ.')));
   }, [accessToken]);
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,8 +107,8 @@ export const PatientCompleteProfile: React.FC = () => {
       setAvatarUrl(resData.url);
       setSuccessMsg('Tải ảnh đại diện thành công!');
       setTimeout(() => setSuccessMsg(null), 3000);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi kết nối khi tải ảnh.');
+    } catch (err) {
+      setErrorMsg(getRequestErrorMessage(err, 'Lỗi kết nối khi tải ảnh.'));
     } finally {
       setUploading(false);
     }
@@ -175,8 +176,8 @@ export const PatientCompleteProfile: React.FC = () => {
       setTimeout(() => {
         navigate('/patient/dashboard', true);
       }, 1500);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi lưu trữ thông tin hồ sơ.');
+    } catch (err) {
+      setErrorMsg(getRequestErrorMessage(err, 'Lỗi lưu trữ thông tin hồ sơ.'));
     } finally {
       setSaving(false);
     }

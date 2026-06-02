@@ -17,6 +17,7 @@ import {
 import { API_URL } from '../config';
 import { useAuth } from '../auth/AuthContext';
 import { roleLabel, type UserRole } from '../auth/roles';
+import { getRequestErrorMessage } from '../utils/apiErrors';
 import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
 
 interface ProfilePageProps {
@@ -190,8 +191,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
           setVerificationStatus(vData);
         }
       }
-    } catch (err: any) {
-      setError(err.message || 'Lỗi kết nối khi tải hồ sơ');
+    } catch (err) {
+      setError(getRequestErrorMessage(err, 'Lỗi kết nối khi tải hồ sơ'));
     } finally {
       setLoading(false);
     }
@@ -262,8 +263,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
         setSuccess('Cập nhật CCCD mặt sau thành công!');
       }
       setTimeout(() => setSuccess(null), 4000);
-    } catch (err: any) {
-      setError(err.message || 'Lỗi tải tài liệu lên.');
+    } catch (err) {
+      setError(getRequestErrorMessage(err, 'Lỗi tải tài liệu lên.'));
     } finally {
       setUploading(false);
     }
@@ -300,8 +301,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       await refreshUser();
       setSuccess('Cập nhật thông tin tài khoản thành công.');
       setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Không cập nhật được tài khoản');
+    } catch (err) {
+      setError(getRequestErrorMessage(err, 'Không cập nhật được tài khoản'));
     } finally {
       setSaving(false);
     }
@@ -332,8 +333,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       await fetchProfileData();
       setSuccess('Cập nhật hồ sơ bệnh nhân thành công.');
       setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Lỗi cập nhật hồ sơ bệnh nhân');
+    } catch (err) {
+      setError(getRequestErrorMessage(err, 'Lỗi cập nhật hồ sơ bệnh nhân'));
     } finally {
       setSaving(false);
     }
@@ -372,8 +373,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       await fetchProfileData();
       setSuccess('Gửi hồ sơ cập nhật thành công! Trạng thái tài khoản đổi về Chờ duyệt.');
       setTimeout(() => setSuccess(null), 4000);
-    } catch (err: any) {
-      setError(err.message || 'Lỗi cập nhật hồ sơ bác sĩ');
+    } catch (err) {
+      setError(getRequestErrorMessage(err, 'Lỗi cập nhật hồ sơ bác sĩ'));
     } finally {
       setSaving(false);
     }
@@ -402,8 +403,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       await refreshUser();
       setSuccess('Đổi mật khẩu đăng nhập thành công.');
       setTimeout(() => setSuccess(null), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Lỗi đổi mật khẩu');
+    } catch (err) {
+      setError(getRequestErrorMessage(err, 'Lỗi đổi mật khẩu'));
     } finally {
       setSaving(false);
     }

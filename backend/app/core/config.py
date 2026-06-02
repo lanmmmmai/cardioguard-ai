@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = ""
     OPENAI_API_KEY: str = ""
     IOT_DEVICE_SHARED_TOKEN: str = ""
+    FRONTEND_ORIGINS: str = ""
     SECRET_KEY: str = Field(..., min_length=32)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     EXPOSE_DEV_OTP: bool = False

@@ -19,7 +19,7 @@ from app.api.profile_api import router as profile_router
 from app.api.email_api import router as email_router
 from app.api.chat_api import router as chat_router
 from app.services.otp_service import ensure_otp_table
-from app.services.db_optimization import ensure_performance_indexes, ensure_user_account_timestamps
+from app.services.db_optimization import ensure_performance_indexes, ensure_profile_schema, ensure_user_account_timestamps
 
 
 logging.basicConfig(
@@ -35,22 +35,39 @@ app = FastAPI(
     version="1.0.0"
 )
 
+DEFAULT_CORS_ORIGINS = [
+    "https://giatky.site",
+    "https://www.giatky.site",
+    "https://cardioguard-ai.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://192.168.1.64:5173",
+    "http://192.168.1.64:5174",
+    "http://192.168.1.13:5173",
+    "http://192.168.1.13:5174",
+    "http://192.168.1.64",
+    "http://192.168.1.13",
+]
+
+
+def get_cors_origins() -> list[str]:
+    configured = [
+        origin.strip()
+        for origin in settings.FRONTEND_ORIGINS.split(",")
+        if origin.strip()
+    ]
+    return list(dict.fromkeys([*DEFAULT_CORS_ORIGINS, *configured]))
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://giatky.site",
-        "https://cardioguard-ai.vercel.app",
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5173",
-        "http://192.168.1.64:5173",
-        "http://192.168.1.64:5174",
-        "http://192.168.1.13:5173",
-        "http://192.168.1.13:5174",
-        "http://192.168.1.64",
-        "http://192.168.1.13",
-    ],
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?",
+    allow_origins=get_cors_origins(),
+    allow_origin_regex=(
+        r"^(https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?"
+        r"|https://([A-Za-z0-9-]+\.)*giatky\.site"
+        r"|https://[A-Za-z0-9-]+\.vercel\.app)$"
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,6 +80,7 @@ async def startup():
     await connect_db()
     await ensure_otp_table()
     await ensure_user_account_timestamps()
+    await ensure_profile_schema()
     await ensure_performance_indexes()
     logger.info("Application startup complete")
 

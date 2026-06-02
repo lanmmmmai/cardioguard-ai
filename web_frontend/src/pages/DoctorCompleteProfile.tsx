@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useBrowserPath } from '../hooks/useBrowserPath';
 import { API_URL } from '../config';
+import { getRequestErrorMessage } from '../utils/apiErrors';
 import { 
   Camera, 
   User, 
@@ -90,7 +91,7 @@ export const DoctorCompleteProfile: React.FC = () => {
           if (data.status) setCurrentStatus(data.status);
         }
       })
-      .catch((err) => console.warn(err.message));
+      .catch((err) => console.warn(getRequestErrorMessage(err, 'Không thể tải thông tin hồ sơ.')));
   }, [accessToken]);
 
   const handleFileUpload = async (
@@ -138,8 +139,8 @@ export const DoctorCompleteProfile: React.FC = () => {
       setUrlState(resData.url);
       setSuccessMsg('Tải tài liệu lên thành công!');
       setTimeout(() => setSuccessMsg(null), 3000);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi tải tài liệu.');
+    } catch (err) {
+      setErrorMsg(getRequestErrorMessage(err, 'Lỗi tải tài liệu.'));
     } finally {
       setUploadingState(false);
     }
@@ -200,8 +201,8 @@ export const DoctorCompleteProfile: React.FC = () => {
       setTimeout(() => {
         navigate('/doctor/pending-verification', true);
       }, 1500);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi lưu thông tin hồ sơ bác sĩ.');
+    } catch (err) {
+      setErrorMsg(getRequestErrorMessage(err, 'Lỗi lưu thông tin hồ sơ bác sĩ.'));
     } finally {
       setSaving(false);
     }

@@ -104,7 +104,11 @@ async def fetch_patient_profile(user_id: str) -> Optional[Dict[str, Any]]:
 
 @router.put("/users/me")
 async def update_user_me(payload: UserMeUpdate, request: Request, authorization: Optional[str] = Header(default=None)):
-    current_user = await get_user_from_token(authorization)
+    current_user = await get_user_from_token(
+        authorization,
+        allow_uncompleted=True,
+        allow_unverified=True,
+    )
     columns = await table_columns("users")
     values = payload.model_dump(exclude_unset=True)
     update_values = {key: value for key, value in values.items() if key in {"full_name", "phone", "avatar_url"} and key in columns}
