@@ -63,6 +63,14 @@ CMS_MODULES = {
     "medical_records": {"table": "medical_records", "hidden": set(), "readonly": {"id", "created_at", "updated_at"}, "required": set(), "aliases": {}},
     "notifications": {"table": "notifications", "hidden": set(), "readonly": {"id", "created_at", "updated_at"}, "required": set(), "aliases": {}},
     "reports": {"table": "reports", "hidden": set(), "readonly": {"id", "created_at", "updated_at"}, "required": set(), "aliases": {}},
+    "domain_links": {
+        "table": "domain_links",
+        "hidden": set(),
+        "readonly": {"id", "created_at", "updated_at"},
+        "required": {"url"},
+        "aliases": {},
+        "csv_columns": ["url", "domain", "title", "description", "image_url"],
+    },
 }
 
 TEXT_TYPES = {"text", "varchar", "bpchar", "citext", "uuid"}
