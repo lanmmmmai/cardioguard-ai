@@ -33,6 +33,7 @@ export const useWebSocket = (
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const intentionalCloseRef = useRef<boolean>(false);
+  const authenticatedRef = useRef<boolean>(false);
   const reconnectDelayRef = useRef<number>(5000); // Khởi đầu từ 5 giây
 
   // Sử dụng ref để giữ tham chiếu callback mới nhất, tránh tình trạng re-connect liên tục khi callback thay đổi
@@ -41,10 +42,19 @@ export const useWebSocket = (
     onMessageReceivedRef.current = onMessageReceived;
   }, [onMessageReceived]);
 
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+  }, []);
+
   const connect = useCallback(() => {
     if (socketRef.current?.readyState === WebSocket.OPEN) return;
 
     intentionalCloseRef.current = false;
+    authenticatedRef.current = false;
+    clearReconnectTimer();
 
     // Resolve URL dynamically if window is available
     let wsUrl = url;
@@ -53,20 +63,33 @@ export const useWebSocket = (
       wsUrl = `${protocol}//${window.location.host}${url}`;
     }
     try {
-      const socket = token
-        ? new WebSocket(wsUrl, [`cardioguard.jwt.${token}`])
-        : new WebSocket(wsUrl);
+      const socket = new WebSocket(wsUrl);
       socketRef.current = socket;
 
       socket.onopen = () => {
+        if (socketRef.current !== socket) return;
         setIsConnected(true);
         reconnectDelayRef.current = 5000; // Reset độ trễ khi kết nối thành công
-        console.log('Realtime WebSocket connection established');
+        if (token) {
+          try {
+            socket.send(JSON.stringify({ type: 'auth', token }));
+          } catch (err) {
+            socket.close();
+          }
+        }
       };
 
       socket.onmessage = (event) => {
         try {
           const parsedData = JSON.parse(event.data) as RealtimeEnvelope | SensorTelemetryMessage;
+          if (
+            typeof parsedData === 'object' &&
+            parsedData !== null &&
+            'type' in parsedData &&
+            (parsedData as RealtimeEnvelope).type === 'connected'
+          ) {
+            authenticatedRef.current = true;
+          }
           if (onMessageReceivedRef.current) {
             onMessageReceivedRef.current(parsedData);
           }
@@ -76,9 +99,12 @@ export const useWebSocket = (
       };
 
       socket.onclose = () => {
+        if (socketRef.current !== socket) return;
+        socketRef.current = null;
         setIsConnected(false);
         if (intentionalCloseRef.current) return; // Bỏ qua nếu chủ động đóng
         if (!onMessageReceivedRef.current) return;
+        if (!token || !authenticatedRef.current) return;
         
         console.warn(`Realtime WebSocket disconnected. Retrying connection in ${reconnectDelayRef.current / 1000} seconds...`);
         
@@ -90,6 +116,7 @@ export const useWebSocket = (
       };
 
       socket.onerror = () => {
+        if (socketRef.current !== socket) return;
         if (intentionalCloseRef.current) return; // Bỏ qua thông báo lỗi khi unmount trong StrictMode
         // Không sử dụng console.error để tránh làm ngập tràn (flooding) console đỏ khi server offline. 
         // Trình duyệt đã tự động log lỗi kết nối thất bại mặc định.
@@ -106,15 +133,16 @@ export const useWebSocket = (
     connect();
 
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+      clearReconnectTimer();
       if (socketRef.current) {
         intentionalCloseRef.current = true; // Đánh dấu chủ động đóng trong React cleanup
-        socketRef.current.close();
+        const currentSocket = socketRef.current;
+        socketRef.current = null;
+        setIsConnected(false);
+        currentSocket.close();
       }
     };
-  }, [connect, token]);
+  }, [clearReconnectTimer, connect, token]);
 
   return { isConnected };
 };

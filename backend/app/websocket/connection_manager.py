@@ -1,6 +1,10 @@
+import logging
+
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 from app.core.database import database
+
+logger = logging.getLogger(__name__)
 
 class ConnectionManager:
     def __init__(self):
@@ -9,12 +13,12 @@ class ConnectionManager:
 
     async def connect(self, websocket: WebSocket, user_info: dict):
         self.active_connections[websocket] = user_info
-        print(f"WebSocket connected: User {user_info['email']} ({user_info['role']})")
+        logger.info("WebSocket connected: user_id=%s role=%s", user_info.get("id"), user_info.get("role"))
 
     def disconnect(self, websocket: WebSocket):
         user_info = self.active_connections.pop(websocket, None)
         if user_info:
-            print(f"WebSocket disconnected: User {user_info['email']} ({user_info['role']})")
+            logger.info("WebSocket disconnected: user_id=%s role=%s", user_info.get("id"), user_info.get("role"))
 
     async def get_assigned_doctors(self, patient_id: str) -> list[str]:
         """Fetch IDs of doctors assigned to the given patient."""
@@ -25,7 +29,7 @@ class ConnectionManager:
             )
             return [row["doctor_id"] for row in rows]
         except Exception as e:
-            print(f"Error fetching assigned doctors: {e}")
+            logger.exception("Error fetching assigned doctors for patient_id=%s", patient_id)
             return []
 
     async def broadcast_sensor_data(self, patient_id: str, data: dict):

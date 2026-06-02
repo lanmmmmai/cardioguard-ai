@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from typing import Any, Dict, List
 from app.core.config import settings
 
@@ -77,7 +78,7 @@ class AIService:
             )
             return response.choices[0].message.content
         except Exception as e:
-            print(f"AI Error: {e}")
+            logging.getLogger(__name__).exception("AI response generation failed")
             return f"Xin lỗi, hệ thống AI đang bận hoặc gặp sự cố ({str(e)}). Vui lòng thử lại sau."
 
     @staticmethod

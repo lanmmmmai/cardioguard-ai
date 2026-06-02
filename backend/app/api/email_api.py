@@ -8,6 +8,7 @@ import csv
 import io
 import re
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -22,6 +23,7 @@ from app.core.sqlalchemy_async import AsyncSessionLocal
 from app.services.audit_service import log_activity
 
 router = APIRouter(prefix="/email", tags=["email"])
+logger = logging.getLogger(__name__)
 
 # Danh sách biến động được hỗ trợ
 SUPPORTED_VARIABLES = [
@@ -110,7 +112,7 @@ def send_brevo_email(
                 cc=cc,
                 bcc=bcc,
             )
-        print(f"[DEV EMAIL] To: {to_email} | Subject: {subject}")
+        logger.info("Email CMS dev send skipped: subject logged suppressed")
         return False
 
     payload: dict[str, Any] = {

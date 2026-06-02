@@ -3,6 +3,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Optional
+import logging
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 
@@ -31,6 +32,7 @@ from app.schemas.crud_schema import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 TABLES = {
     "appointments": {"path": "/appointments", "create": AppointmentCreate, "update": AppointmentUpdate},
@@ -300,7 +302,7 @@ async def trigger_websocket_broadcast(table: str, record: dict[str, Any]):
             if user_id:
                 await manager.broadcast_notification(str(user_id), record)
     except Exception as e:
-        print(f"Error triggering WebSocket broadcast for table {table}: {e}")
+        logger.exception("Error triggering WebSocket broadcast for table=%s", table)
 
 
 async def create_record(table: str, payload: dict[str, Any], authorization: Optional[str], request: Optional[Request] = None):

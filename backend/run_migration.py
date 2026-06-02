@@ -147,15 +147,15 @@ def split_sql_statements(sql: str) -> list[str]:
     return statements
 
 
-async def main():
+async def main() -> int:
     if len(sys.argv) < 2:
         print("Sử dụng: python run_migration.py <đường_dẫn_file_sql>")
-        return
+        return 1
 
     filepath = sys.argv[1]
     if not os.path.exists(filepath):
         print(f"Lỗi: Không tìm thấy tệp {filepath}")
-        return
+        return 1
     migration_name = os.path.basename(filepath)
 
     print(f"Đang kết nối cơ sở dữ liệu...")
@@ -172,9 +172,9 @@ async def main():
         if applied:
             if applied["checksum"] == checksum:
                 print(f"⏭️ Migration '{migration_name}' đã được áp dụng trước đó lúc {applied['applied_at']}. Bỏ qua.")
-                return
+                return 0
             print(f"❌ Migration '{migration_name}' đã tồn tại nhưng checksum khác. Dừng để tránh drift schema.")
-            return
+            return 1
 
         statements = split_sql_statements(sql)
 
@@ -198,15 +198,13 @@ async def main():
             )
             
         print("🎉 Thực thi migration thành công tốt đẹp!")
+        return 0
     except Exception as e:
         print(f"❌ Lỗi khi thực thi SQL: {e}")
-        raise
+        return 1
     finally:
         await database.disconnect()
         print("Đã ngắt kết nối cơ sở dữ liệu an toàn.")
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except Exception:
-        sys.exit(1)
+    sys.exit(asyncio.run(main()))

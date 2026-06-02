@@ -1,5 +1,8 @@
 import os
+import logging
 from app.core.database import database
+
+logger = logging.getLogger(__name__)
 
 async def ensure_performance_indexes() -> None:
     migration_path = os.path.join(
@@ -9,10 +12,10 @@ async def ensure_performance_indexes() -> None:
     )
     
     if not os.path.exists(migration_path):
-        print(f"[Database Optimization] Migration file not found at {migration_path}")
+        logger.warning("Performance index migration file not found: %s", migration_path)
         return
 
-    print("[Database Optimization] Đang đồng bộ hóa các Index tối ưu hóa hiệu năng vào database...")
+    logger.info("Synchronizing performance indexes")
     try:
         with open(migration_path, "r", encoding="utf-8") as f:
             sql_content = f.read()
@@ -35,6 +38,6 @@ async def ensure_performance_indexes() -> None:
             await database.execute(clean_stmt)
             executed_count += 1
 
-        print(f"[Database Optimization] Đã đồng bộ thành công {executed_count} Index tối ưu hóa hiệu năng!")
+        logger.info("Performance indexes synchronized: count=%s", executed_count)
     except Exception as e:
-        print(f"[Database Optimization] Gặp lỗi khi thiết lập các Index: {e}")
+        logger.exception("Failed to synchronize performance indexes")

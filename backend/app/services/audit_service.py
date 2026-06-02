@@ -1,10 +1,12 @@
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 from app.core.database import database
 
 _audit_columns_cache: Optional[set[str]] = None
+logger = logging.getLogger(__name__)
 
 async def log_activity(
     user_id: Optional[str],
@@ -28,7 +30,7 @@ async def log_activity(
             
         columns = _audit_columns_cache
         if not columns:
-            print("[Audit Service] Table audit_logs does not exist in database")
+            logger.debug("audit_logs table is not available; skipping audit write")
             return
             
         payload = {}
@@ -60,7 +62,7 @@ async def log_activity(
             f"INSERT INTO audit_logs ({insert_cols}) VALUES ({bind_cols})",
             payload
         )
-        print(f"[Audit Service] Ghi log thành công: {action} (User: {user_id})")
+        logger.debug("Audit log recorded: action=%s user_id=%s", action, user_id)
     except Exception as e:
         # Xử lý ngoại lệ an toàn để không làm hỏng luồng nghiệp vụ chính của người dùng
-        print(f"[Audit Service] Lỗi khi ghi log hoạt động hệ thống: {e}")
+        logger.exception("Failed to write audit log for action=%s user_id=%s", action, user_id)

@@ -6,6 +6,7 @@
 
 import asyncio
 import re
+import logging
 import smtplib
 import uuid
 import requests
@@ -18,6 +19,8 @@ from typing import Any, Optional
 from fastapi.concurrency import run_in_threadpool
 from app.core.config import settings
 from app.core.database import database
+
+logger = logging.getLogger(__name__)
 
 
 def render_template(html: str, variables: dict[str, str]) -> str:
@@ -63,7 +66,7 @@ def send_smtp_email_sync(
     from_name = settings.SMTP_FROM_NAME or settings.EMAIL_FROM_NAME or "CardioGuard AI"
 
     if not host:
-        print("[SMTP WARN] SMTP_HOST is not configured.")
+        logger.warning("SMTP_HOST is not configured; SMTP send skipped")
         return False
 
     msg = MIMEMultipart("alternative")
@@ -100,7 +103,7 @@ def send_smtp_email_sync(
         server.quit()
         return True
     except Exception as e:
-        print(f"[SMTP SEND ERROR] Failed to send email to {to_email}: {e}")
+        logger.exception("SMTP send failed")
         raise e
 
 
@@ -185,7 +188,7 @@ async def send_system_email(
     try:
         template = await database.fetch_one(query=query, values={"type": email_type})
     except Exception as e:
-        print(f"[DB WARN] Failed to fetch email template: {e}")
+        logger.warning("Failed to fetch email template for type=%s", email_type)
 
     # 2. Xác định subject và html_content
     if template:
@@ -219,13 +222,13 @@ async def send_system_email(
             sent_at = datetime.now(timezone.utc)
         else:
             # Dev Mode / Fallback không gửi
-            print(f"[DEV EMAIL LOG] To: {to_email} | Subject: {rendered_subject}")
+            logger.info("Email delivery skipped in dev mode: type=%s", email_type)
             status = "sent"
             sent_at = datetime.now(timezone.utc)
     except Exception as exc:
         status = "failed"
         error_message = str(exc)
-        print(f"[EMAIL SEND CRASH] Error sending to {to_email}: {exc}")
+        logger.exception("Email send crashed for type=%s", email_type)
 
     # 5. Ghi log lịch sử gửi vào DB
     log_id = str(uuid.uuid4())
@@ -248,6 +251,6 @@ async def send_system_email(
             }
         )
     except Exception as exc:
-        print(f"[DB LOG ERROR] Failed to write email log for {to_email}: {exc}")
+        logger.exception("Failed to write email log for type=%s", email_type)
 
     return status == "sent"

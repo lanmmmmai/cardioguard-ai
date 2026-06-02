@@ -1,5 +1,6 @@
 import secrets
 import requests
+import logging
 from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Request
 from jose import JWTError, jwt
@@ -20,6 +21,7 @@ from app.services.otp_service import (
 )
 from app.services.audit_service import log_activity
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 VALID_ROLES = {"admin", "doctor", "patient"}
 PRODUCTION_ENVIRONMENTS = {"prod", "production"}
@@ -229,7 +231,7 @@ async def request_register_otp(data: RegisterOtpRequest, request: Request):
         email_sent = await send_register_otp_email(email, data.full_name, otp)
     except Exception as exc:
         await invalidate_otp_tokens(purpose=OTP_PURPOSE_REGISTER, email=email)
-        print(f"[SMTP ERROR] Unable to send OTP to {email}: {exc}")
+        logger.exception("Unable to send registration OTP email")
         raise HTTPException(status_code=502, detail=str(exc) or "Unable to send OTP email") from exc
 
     response = {"message": "OTP sent to email", "email": email, "email_sent": email_sent}
@@ -444,7 +446,7 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Requ
     try:
         await send_forgot_password_otp_email(email, user["full_name"], otp)
     except Exception as exc:
-        print(f"[SMTP ERROR] Unable to send OTP to {email}: {exc}")
+        logger.exception("Unable to send forgot-password OTP email")
         if settings.BREVO_API_KEY:
             await invalidate_otp_tokens(purpose=OTP_PURPOSE_FORGOT_PASSWORD, email=email)
 
