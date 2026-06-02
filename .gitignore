@@ -121,6 +121,9 @@ mobile_app/android/app/release/
 mobile_app/macos/Flutter/ephemeral/
 mobile_app/windows/flutter/ephemeral/
 
+# Mobile app assets added at build time
+mobile_app/assets/fonts/Futura.ttf
+
 # Hardware / PlatformIO generated files
 .pio/
 hardware/**/firmware/.pio/

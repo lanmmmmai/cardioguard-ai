@@ -11,8 +11,6 @@ dependencies:
   flutter:
     sdk: flutter
 
-  cupertino_icons: ^1.0.6
-  supabase_flutter: ^2.6.0
   web_socket_channel: ^2.4.5
   fl_chart: ^0.66.0
   lucide_flutter: ^1.16.0
