@@ -39,3 +39,8 @@ Use this skill for backend development, database schema migrations, authorizatio
 - In `web_frontend/src/hooks/useWebSocket.ts`, React StrictMode in development will mount and unmount components instantly, causing connection churn.
 - **Intentional Closures**: Use flags (like `intentionalCloseRef`) to distinguish between expected cleanups and sudden disconnects. This prevents red WebSocket disconnect warnings from flooding the browser developer tools.
 - **State Cleanups**: Ensure that all WebSocket subscriptions and listener events are properly unmounted on component destruction.
+
+### 6. Code Commenting & Documentation (Mandatory)
+- **File Header Comment**: Every new or modified backend/integration file must include a descriptive header comment detailing its purpose, system scope, and relationship with other components.
+- **Detailed Inline Comments**: Write clear, comprehensive comments for all functions, endpoints, classes, and logic blocks (explaining what it does, the workflow/execution path, and its purpose).
+

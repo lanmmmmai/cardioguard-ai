@@ -28,7 +28,10 @@ graph TD
 
 #### 🛠️ Bước 3: Thực Thi Sửa Đổi (Implementation)
 * **Hành động**: Tiến hành áp dụng thay đổi vào mã nguồn sử dụng công cụ thay thế nội dung file.
-* **Quy tắc**: Tuân thủ quy tắc xuất mã nguồn đầy đủ, không viết code tắt hoặc để lại các đoạn mã giả (placeholder) không hoạt động.
+* **Quy tắc**:
+  * Tuân thủ quy tắc xuất mã nguồn đầy đủ, không viết code tắt hoặc để lại các đoạn mã giả (placeholder) không hoạt động.
+  * **Chính sách chú thích mã nguồn (Code Commenting Policy)**: Mỗi tệp tin được tạo mới hoặc sửa đổi phải có phần chú thích chi tiết ở đầu file giải thích tác dụng của file đó và vai trò của nó. Đồng thời, các hàm, lớp, khối logic phức tạp phải có comment giải thích chi tiết tác dụng, luồng hoạt động (workflow) và mục đích để làm gì.
+
 
 #### 🧪 Bước 4: Biên Dịch & Xác Minh (Verification)
 * **Hành động**: Chạy các lệnh kiểm tra lỗi cú pháp, biên dịch thử dự án tùy theo module đang sửa:

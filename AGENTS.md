@@ -21,3 +21,5 @@ Before adding a dependency, check the relevant package file first. Keep existing
 
 - **Git Commit Policy**: Always compile, verify, and commit changes to git immediately after making any modifications or completing a task. Never leave unstaged or uncommitted changes in the workspace when finishing a response.
 - **Language Policy**: Always communicate with the user in Vietnamese (Luôn luôn giao tiếp với người dùng bằng tiếng Việt).
+- **Code Commenting & Documentation Policy**: Always add a detailed file header comment in every new or modified file explaining its purpose and overall flow. For any functions, classes, and complex code blocks, write detailed inline comments explaining their purpose, workflow, and what they do (Luôn thêm chú thích chi tiết ở đầu mỗi tệp tin mới hoặc tệp tin được chỉnh sửa để giải thích tác dụng và luồng hoạt động tổng thể. Đối với các hàm, lớp, và các khối mã phức tạp, phải viết comment chi tiết giải thích rõ mục đích, luồng xử lý và tác dụng của chúng).
+
