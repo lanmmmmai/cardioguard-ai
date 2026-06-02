@@ -46,7 +46,13 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
 
   const handleLogout = () => {
     logout();
-    navigate('/login', true);
+    if (role === 'admin') {
+      navigate('/login-admin', true);
+    } else if (role === 'doctor') {
+      navigate('/login-doctor', true);
+    } else {
+      navigate('/login', true);
+    }
   };
 
   return (

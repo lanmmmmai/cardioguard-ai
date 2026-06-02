@@ -57,7 +57,7 @@ export const DoctorPendingVerification: React.FC = () => {
           <button 
             type="button" 
             className="btn btn-danger-outline" 
-            onClick={logout}
+            onClick={() => { logout(); navigate('/login-doctor', true); }}
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <LogOut size={16} />
@@ -71,6 +71,7 @@ export const DoctorPendingVerification: React.FC = () => {
 
 export const DoctorVerificationRejected: React.FC = () => {
   const { logout } = useAuth();
+  const { navigate } = useBrowserPath();
   const [note, setNote] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -124,7 +125,7 @@ export const DoctorVerificationRejected: React.FC = () => {
           <button 
             type="button" 
             className="btn btn-secondary" 
-            onClick={logout}
+            onClick={() => { logout(); navigate('/login-doctor', true); }}
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <LogOut size={16} />

@@ -41,7 +41,16 @@ async def table_columns(table: str) -> set[str]:
 def row_to_dict(row: Optional[Any]) -> Optional[Dict[str, Any]]:
     if not row:
         return None
-    return {key: row[key] for key in row.keys()}
+    result: Dict[str, Any] = {}
+    for key in row.keys():
+        value = row[key]
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            result[key] = value.astimezone(timezone.utc).isoformat()
+        else:
+            result[key] = value
+    return result
 
 
 async def fetch_current_user(user_id: str) -> dict[str, Any]:
@@ -98,7 +107,7 @@ async def update_user_me(payload: UserMeUpdate, request: Request, authorization:
     current_user = await get_user_from_token(authorization)
     columns = await table_columns("users")
     values = payload.model_dump(exclude_unset=True)
-    update_values = {key: value for key, value in values.items() if key in {"full_name", "phone"} and key in columns}
+    update_values = {key: value for key, value in values.items() if key in {"full_name", "phone", "avatar_url"} and key in columns}
 
     if not update_values:
         return {"user": await fetch_current_user(current_user["id"])}
@@ -389,7 +398,7 @@ async def list_users(
         query += " AND (lower(full_name) LIKE :search OR lower(email) LIKE :search OR phone LIKE :search)"
         params["search"] = f"%{search.lower()}%"
         
-    query += " ORDER BY created_at DESC"
+    query += " ORDER BY created_at DESC NULLS LAST"
     
     rows = await database.fetch_all(query, params)
     return [row_to_dict(row) for row in rows]
@@ -429,7 +438,7 @@ async def create_user(
                 "status": payload.status or "active"
             }
         )
-        created_user = dict(row)
+        created_user = row_to_dict(row) or {}
         
         # Nếu role là patient, tự động tạo hồ sơ trống trong bảng patients
         if payload.role == "patient":
@@ -535,7 +544,7 @@ async def update_user(
     
     try:
         row = await database.fetch_one(update_query, values)
-        updated_user = dict(row)
+        updated_user = row_to_dict(row) or {}
         
         # Nếu đổi sang role patient hoặc cập nhật thông tin patient hiện tại, đồng bộ bảng patients
         target_role = payload.role if payload.role is not None else check_user["role"]
@@ -608,15 +617,50 @@ async def delete_user(
     user = await require_admin(authorization)
     
     # Check user exists
-    check_user = await database.fetch_one("SELECT id, role FROM users WHERE id::text = :user_id", {"user_id": user_id})
+    check_user = await database.fetch_one("SELECT id, role, status FROM users WHERE id::text = :user_id", {"user_id": user_id})
     if not check_user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
         
     if user_id == user["id"]:
         raise HTTPException(status_code=400, detail="Không thể tự xóa hoặc vô hiệu hóa tài khoản của chính mình")
         
-    # Luôn sử dụng Soft Delete để bảo toàn dữ liệu y tế lâm sàng nhạy cảm và lịch sử audit
-    await database.execute("UPDATE users SET status = 'inactive' WHERE id::text = :user_id", {"user_id": user_id})
+    # Luôn sử dụng Soft Delete để bảo toàn dữ liệu y tế lâm sàng nhạy cảm và lịch sử audit.
+    columns = await table_columns("users")
+    update_fields = ["status = 'inactive'"]
+    if "updated_at" in columns:
+        update_fields.append("updated_at = NOW()")
+
+    await database.execute(
+        f"UPDATE users SET {', '.join(update_fields)} WHERE id::text = :user_id",
+        {"user_id": user_id},
+    )
+
+    role = (check_user["role"] or "").strip().lower()
+    if role == "doctor":
+        try:
+            doctor_profile_columns = await table_columns("doctor_profiles")
+            doctor_update_fields = []
+            if "status" in doctor_profile_columns:
+                doctor_update_fields.append("status = 'inactive'")
+            if "updated_at" in doctor_profile_columns:
+                doctor_update_fields.append("updated_at = NOW()")
+            if doctor_update_fields:
+                await database.execute(
+                    f"UPDATE doctor_profiles SET {', '.join(doctor_update_fields)} WHERE user_id::text = :user_id",
+                    {"user_id": user_id},
+                )
+        except HTTPException:
+            logger.debug("doctor_profiles table unavailable while deactivating user_id=%s", user_id)
+    elif role == "patient":
+        try:
+            patient_profile_columns = await table_columns("patient_profiles")
+            if "updated_at" in patient_profile_columns:
+                await database.execute(
+                    "UPDATE patient_profiles SET updated_at = NOW() WHERE user_id::text = :user_id",
+                    {"user_id": user_id},
+                )
+        except HTTPException:
+            logger.debug("patient_profiles table unavailable while deactivating user_id=%s", user_id)
 
     logger.info("Admin soft-deleted user: admin_id=%s, target_user=%s", user["id"], user_id)
     await log_activity(
@@ -630,7 +674,8 @@ async def delete_user(
     return {
         "message": "Tài khoản đã được vô hiệu hóa an toàn (Soft Delete) để bảo toàn dữ liệu lâm sàng", 
         "id": user_id, 
-        "status": "inactive"
+        "status": "inactive",
+        "deactivated_at": datetime.now(timezone.utc).isoformat()
     }
 
 

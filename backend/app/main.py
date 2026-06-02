@@ -19,7 +19,7 @@ from app.api.profile_api import router as profile_router
 from app.api.email_api import router as email_router
 from app.api.chat_api import router as chat_router
 from app.services.otp_service import ensure_otp_table
-from app.services.db_optimization import ensure_performance_indexes
+from app.services.db_optimization import ensure_performance_indexes, ensure_user_account_timestamps
 
 
 logging.basicConfig(
@@ -62,6 +62,7 @@ async def startup():
     logger.info("Starting CardioGuard AI backend...")
     await connect_db()
     await ensure_otp_table()
+    await ensure_user_account_timestamps()
     await ensure_performance_indexes()
     logger.info("Application startup complete")
 

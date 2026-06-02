@@ -14,12 +14,50 @@ interface UserAccount {
   created_at: string | null;
 }
 
+const accountCreatedAtFormatter = new Intl.DateTimeFormat('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+});
+
+const parseAccountDate = (dateStr: string | null) => {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatRelativeCreatedAt = (dateStr: string | null, now: Date) => {
+  const date = parseAccountDate(dateStr);
+  if (!date) return 'Không có thời gian server';
+
+  const diffSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
+  if (diffSeconds < 10) return 'vừa tạo';
+  if (diffSeconds < 60) return `${diffSeconds} giây trước`;
+
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) return `${diffDays} ngày trước`;
+
+  return 'đã tạo trước đó';
+};
+
 export const UsersManager: React.FC = () => {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('active');
+  const [now, setNow] = useState(() => new Date());
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,9 +78,13 @@ export const UsersManager: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
-  const fetchUsers = React.useCallback(async () => {
-    if (!accessToken) return;
-    setIsLoading(true);
+  const fetchUsers = React.useCallback(async (showSpinner = true) => {
+    if (!accessToken) {
+      setUsers([]);
+      setIsLoading(false);
+      return;
+    }
+    if (showSpinner) setIsLoading(true);
     setError(null);
     try {
       const response = await fetch(`${API_URL}/admin/users`, {
@@ -71,8 +113,15 @@ export const UsersManager: React.FC = () => {
   }, [accessToken]);
 
   useEffect(() => {
-    fetchUsers();
+    fetchUsers(true);
+    const refreshInterval = window.setInterval(() => fetchUsers(false), 30000);
+    return () => window.clearInterval(refreshInterval);
   }, [fetchUsers]);
+
+  useEffect(() => {
+    const clockInterval = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(clockInterval);
+  }, []);
 
   const validateForm = (isEdit: boolean) => {
     if (!fullName.trim()) {
@@ -131,6 +180,14 @@ export const UsersManager: React.FC = () => {
   };
 
   const handleOpenDeleteConfirm = (userAcc: UserAccount) => {
+    if (userAcc.id === user?.id) {
+      setError('Không thể tự vô hiệu hóa tài khoản đang đăng nhập');
+      return;
+    }
+    if ((userAcc.status || '').toLowerCase() === 'inactive') {
+      setError('Tài khoản này đã ở trạng thái tạm khóa');
+      return;
+    }
     setSelectedUser(userAcc);
     setShowDeleteConfirm(true);
   };
@@ -183,8 +240,9 @@ export const UsersManager: React.FC = () => {
         throw new Error(data.detail || 'Lỗi thêm tài khoản mới');
       }
 
+      setUsers((prev) => [data as UserAccount, ...prev.filter((item) => item.id !== data.id)]);
       setShowAddModal(false);
-      fetchUsers();
+      fetchUsers(false);
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
     } finally {
@@ -247,8 +305,9 @@ export const UsersManager: React.FC = () => {
         throw new Error(data.detail || 'Lỗi cập nhật tài khoản');
       }
 
+      setUsers((prev) => prev.map((item) => (item.id === selectedUser.id ? data as UserAccount : item)));
       setShowEditModal(false);
-      fetchUsers();
+      fetchUsers(false);
     } catch (err: unknown) {
       setFormError(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
     } finally {
@@ -288,8 +347,12 @@ export const UsersManager: React.FC = () => {
         throw new Error(data.detail || 'Lỗi khi xóa tài khoản');
       }
 
+      setUsers((prev) => prev.map((item) => (
+        item.id === selectedUser.id ? { ...item, status: data.status || 'inactive' } : item
+      )));
       setShowDeleteConfirm(false);
-      fetchUsers();
+      setSelectedUser(null);
+      fetchUsers(false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
       setTimeout(() => setError(null), 5000);
@@ -340,19 +403,9 @@ export const UsersManager: React.FC = () => {
   };
 
   const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return 'Chưa cập nhật';
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('vi-VN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
-      return dateStr;
-    }
+    const date = parseAccountDate(dateStr);
+    if (!date) return 'Chưa có thời gian';
+    return accountCreatedAtFormatter.format(date);
   };
 
   return (
@@ -441,7 +494,7 @@ export const UsersManager: React.FC = () => {
           <div className="alert-strip-body">
             <div className="alert-strip-title">Lỗi hệ thống</div>
             <div className="alert-strip-desc">{error}</div>
-            <button className="btn btn-secondary" onClick={fetchUsers} style={{ marginTop: '1rem', width: 'fit-content' }}>
+            <button className="btn btn-secondary" onClick={() => fetchUsers(true)} style={{ marginTop: '1rem', width: 'fit-content' }}>
               Thử lại
             </button>
           </div>
@@ -553,7 +606,12 @@ export const UsersManager: React.FC = () => {
 
                     {/* Created At */}
                     <td style={{ padding: '16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                      {formatDate(userAcc.created_at)}
+                      <div style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-primary)' }}>
+                        {formatDate(userAcc.created_at)}
+                      </div>
+                      <div style={{ marginTop: '4px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        {formatRelativeCreatedAt(userAcc.created_at, now)}
+                      </div>
                     </td>
 
                     {/* Status Badge */}
@@ -584,8 +642,10 @@ export const UsersManager: React.FC = () => {
                             background: 'linear-gradient(135deg, var(--color-critical), #c2003c)'
                           }}
                           onClick={() => handleOpenDeleteConfirm(userAcc)}
+                          disabled={userAcc.id === user?.id || userAcc.status === 'inactive'}
+                          title={userAcc.id === user?.id ? 'Không thể tự vô hiệu hóa tài khoản đang đăng nhập' : undefined}
                         >
-                          <Trash2 size={12} /> Xóa
+                          <Trash2 size={12} /> {userAcc.status === 'inactive' ? 'Đã khóa' : 'Vô hiệu hóa'}
                         </button>
                       </div>
                     </td>
@@ -854,12 +914,12 @@ export const UsersManager: React.FC = () => {
             </div>
 
             <h2 className="auth-title" style={{ marginBottom: '0.75rem', color: 'var(--color-critical)' }}>
-              Xác Nhận Xóa Tài Khoản
+              Xác nhận vô hiệu hóa tài khoản
             </h2>
             
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: '2rem' }}>
-              Bạn có chắc chắn muốn xóa tài khoản của <strong>{selectedUser.full_name}</strong> ({selectedUser.email})? 
-              Mọi dữ liệu liên quan đến hồ sơ của người dùng này sẽ bị loại bỏ vĩnh viễn và không thể khôi phục.
+              Bạn có chắc chắn muốn vô hiệu hóa tài khoản của <strong>{selectedUser.full_name}</strong> ({selectedUser.email})?
+              Người dùng sẽ không thể đăng nhập, nhưng dữ liệu hồ sơ và lịch sử lâm sàng vẫn được giữ để phục vụ audit.
             </p>
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
@@ -875,10 +935,10 @@ export const UsersManager: React.FC = () => {
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="beat-animated" size={16} /> Đang xóa...
+                    <Loader2 className="beat-animated" size={16} /> Đang xử lý...
                   </>
                 ) : (
-                  'Đồng ý xóa'
+                  'Vô hiệu hóa'
                 )}
               </button>
             </div>

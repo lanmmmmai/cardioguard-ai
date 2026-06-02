@@ -21,6 +21,7 @@ def validate_optional_phone(value: Optional[str]) -> Optional[str]:
 class UserMeUpdate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
+    avatar_url: Optional[str] = None
 
     @field_validator("full_name")
     @classmethod

@@ -64,7 +64,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
   const [success, setSuccess] = useState<string | null>(null);
 
   // Forms
-  const [accountForm, setAccountForm] = useState({ full_name: '', phone: '' });
+  const [accountForm, setAccountForm] = useState({ full_name: '', phone: '', avatar_url: '' });
   const [passwordForm, setPasswordForm] = useState(emptyPasswordForm);
 
   // Patient Profile State
@@ -131,6 +131,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       setAccountForm({
         full_name: loadedUser.full_name || '',
         phone: loadedUser.phone || '',
+        avatar_url: loadedUser.avatar_url || '',
       });
 
       // 2. Fetch role-specific profiles
@@ -246,6 +247,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
           setPatientForm(prev => ({ ...prev, avatar_url: resData.url }));
         } else if (role === 'doctor') {
           setDoctorForm(prev => ({ ...prev, avatar_url: resData.url }));
+        } else if (role === 'admin') {
+          setAccountForm(prev => ({ ...prev, avatar_url: resData.url }));
         }
         setSuccess('Tải ảnh đại diện mới thành công! Nhấp lưu để hoàn tất thay đổi.');
       } else if (fileType === 'doctor_license') {
@@ -289,6 +292,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
         body: JSON.stringify({
           full_name: accountForm.full_name.trim(),
           phone: accountForm.phone.trim() || null,
+          avatar_url: accountForm.avatar_url || null,
         }),
       });
 
@@ -413,7 +417,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
   };
 
   const getAvatarSource = () => {
-    const rawUrl = role === 'patient' ? patientForm.avatar_url : (role === 'doctor' ? doctorForm.avatar_url : '');
+    const rawUrl = role === 'patient' ? patientForm.avatar_url : (role === 'doctor' ? doctorForm.avatar_url : accountForm.avatar_url);
     if (rawUrl) return getMediaUrl(rawUrl);
     if (user?.avatar_url) return getMediaUrl(user.avatar_url);
     return '';
@@ -463,19 +467,17 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
                   <User size={40} className="gray-color" />
                 </div>
               )}
-              {role !== 'admin' && (
-                <label htmlFor="avatar-upload" className="avatar-edit-btn" style={{ width: '28px', height: '28px', bottom: '-4px', right: '-4px' }}>
-                  <Camera size={14} />
-                  <input 
-                    type="file" 
-                    id="avatar-upload" 
-                    accept=".jpg,.jpeg,.png,.webp" 
-                    style={{ display: 'none' }} 
-                    onChange={(e) => handleFileUpload(e, 'avatar')}
-                    disabled={uploading}
-                  />
-                </label>
-              )}
+              <label htmlFor="avatar-upload" className="avatar-edit-btn" style={{ width: '28px', height: '28px', bottom: '-4px', right: '-4px' }}>
+                <Camera size={14} />
+                <input 
+                  type="file" 
+                  id="avatar-upload" 
+                  accept=".jpg,.jpeg,.png,.webp" 
+                  style={{ display: 'none' }} 
+                  onChange={(e) => handleFileUpload(e, 'avatar')}
+                  disabled={uploading}
+                />
+              </label>
             </div>
             {uploading && <span className="avatar-tip" style={{ color: 'var(--color-warning)' }}>Đang tải...</span>}
           </div>
