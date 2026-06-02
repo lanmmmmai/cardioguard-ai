@@ -45,7 +45,8 @@ class PatientProvider extends ChangeNotifier {
     try {
       final response = await _apiClient.get(AppConfig.patientsEndpoint);
       if (response.statusCode == 200) {
-        final List<dynamic> list = response.data;
+        if (response.data is! List) throw Exception("Expected a list from server");
+        final List<dynamic> list = response.data as List<dynamic>;
         _patients = list.map((item) => Patient.fromJson(item)).toList();
       }
     } catch (e) {
@@ -110,7 +111,8 @@ class PatientProvider extends ChangeNotifier {
     try {
       final response = await _apiClient.get('/medical-records', queryParameters: {'patient_id': patientId});
       if (response.statusCode == 200) {
-        final List<dynamic> list = response.data;
+        if (response.data is! List) throw Exception("Expected a list from server");
+        final List<dynamic> list = response.data as List<dynamic>;
         _medicalRecords = list.map((item) => MedicalRecord.fromJson(item)).toList();
       }
     } catch (e) {
@@ -159,7 +161,8 @@ class PatientProvider extends ChangeNotifier {
     try {
       final response = await _apiClient.get('/prescriptions', queryParameters: {'patient_id': patientId});
       if (response.statusCode == 200) {
-        final List<dynamic> list = response.data;
+        if (response.data is! List) throw Exception("Expected a list from server");
+        final List<dynamic> list = response.data as List<dynamic>;
         _prescriptions = list.map((item) => Prescription.fromJson(item)).toList();
       }
     } catch (e) {

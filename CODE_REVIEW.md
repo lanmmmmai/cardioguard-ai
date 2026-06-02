@@ -22,127 +22,6 @@
 ## 1. Backend Issues
 
 
-## 3. Mobile App Issues
-
-### 🟡 [MEDIUM] MO-11: Providers never disposed, init never called
-
-- **File:** `mobile_app/lib/main.dart:47-51`
-- **Mô tả:** 5 providers created eagerly. `AuthProvider` storing JWT never initialized (init never called).
-- **Fix:** Thêm `lazy: false` nếu cần init, gọi `init()`.
-
----
-
-### 🟡 [MEDIUM] MO-12: Animation tick tạo `Random` object mỗi frame
-
-- **File:** `mobile_app/lib/screens/dashboard_screen.dart:155-204`
-- **Mô tả:** `math.Random()` tạo mới mỗi frame. 60fps = 60 Random instances/giây.
-- **Code:**
-  ```dart
-  simEcg = (math.Random().nextDouble() - 0.5) * 0.02;  // New Random mỗi frame
-  ```
-- **Fix:** Lưu `Random` instance как field.
-
----
-
-### 🟡 [MEDIUM] MO-13: `setState` gọi 60fps — full widget rebuild
-
-- **File:** `mobile_app/lib/screens/dashboard_screen.dart:161`
-- **Mô tả:** `setState` gọi mỗi animation frame → toàn bộ widget tree rebuild. `LayoutBuilder`, `Provider.of`, complex widgets đều rebuild.
-- **Fix:** Dùng `AnimatedBuilder` hoặc `CustomPainter` với `repaint`.
-
----
-
-### 🟡 [MEDIUM] MO-14: Không có exponential backoff khi reconnect
-
-- **File:** `mobile_app/lib/services/websocket_service.dart:87-92`
-- **Mô tả:** Nếu server down, reconnect loop mỗi 3s vô thời hạn → battery drain.
-- **Code:**
-  ```dart
-  Future.delayed(const Duration(seconds: 3), () async {
-    if (!_isConnected && !_isIntentionalDisconnect) {
-      await connect();  // Loop vô hạn
-    }
-  });
-  ```
-- **Fix:** Thêm exponential backoff và max retry count.
-
----
-
-### 🟡 [MEDIUM] MO-15: `response.data` không validate trước khi cast
-
-- **File:** `patient_provider.dart:46-50`, `alert_provider.dart:30`, `chat_provider.dart:29`, `appointment_provider.dart:26`
-- **Mô tả:** Nếu API trả JSON object thay vì array, throw TypeError.
-- **Code:**
-  ```dart
-  final List<dynamic> list = response.data;  // Crash nếu là Map
-  ```
-- **Fix:** Validate `response.data is List` trước khi cast.
-
----
-
-### 🟡 [MEDIUM] MO-16: `settings_screen.dart` age parse default to 0
-
-- **File:** `mobile_app/lib/screens/settings_screen.dart:146`
-- **Mô tả:** `int.tryParse` default 0 nếu non-numeric input. Age=0 gửi lên API.
-- **Code:**
-  ```dart
-  final age = int.tryParse(_ageController.text) ?? 0;  // age = 0 nếu invalid
-  ```
-- **Fix:** Thêm validation error hoặc dùng TextFormField với number keyboard.
-
----
-
-### 🟢 [LOW] MO-17: `dart:ui` import nặng chỉ dùng cho `VoidCallback`
-
-- **File:** `mobile_app/lib/core/api_client.dart:1`
-- **Mô tả:** `dart:ui` heavy import chỉ cho type alias.
-- **Fix:** Dùng `package:flutter/foundation.dart`.
-
----
-
-### 🟢 [LOW] MO-18: `app_logger.dart` không có log levels
-
-- **File:** `mobile_app/lib/core/app_logger.dart`
-- **Mô tả:** Chỉ có `log()` method. Không có DEBUG, INFO, WARN, ERROR. sensitive patient data có thể bị logged → HIPAA/GDPR violation.
-- **Fix:** Thêm log levels và conditional output.
-
----
-
-### 🟢 [LOW] MO-19: Redundant password validation rules
-
-- **File:** `mobile_app/lib/screens/settings_screen.dart:41-58`
-- **Mô tả:** Check uppercase (line 42) đã guarantee letter. Check "chữ cái" (line 44) redundant.
-- **Fix:** Merge hoặc bỏ redundant check.
-
----
-
-### 🟢 [LOW] MO-20: `ecg_painter.dart` dot vẽ ở `width` bị clip
-
-- **File:** `mobile_app/lib/widgets/ecg_painter.dart:90`
-- **Mô tả:** Dot vẽ ở `width` — right edge of canvas, bị clip.
-- **Code:**
-  ```dart
-  final lastX = width;  // Bị clip
-  ```
-- **Fix:** Dùng `width - 4` hoặc tương tự.
-
----
-
-### 🟢 [LOW] MO-21: `Provider.of` gọi trong animation listener
-
-- **File:** `mobile_app/lib/screens/dashboard_screen.dart:155-204`
-- **Mô tả:** `Provider.of<PatientProvider>(context, listen: false)` gọi 60fps — traverse element tree mỗi frame.
-- **Fix:** Cache provider reference.
-
----
-
-### 🟢 [LOW] MO-22: Password trimmed trước khi gửi
-
-- **File:** `mobile_app/lib/screens/login_screen.dart:34-35`
-- **Mô tả:** `_passwordController.text.trim()` — trim password. Users có thể intentional dùng spaces trong passphrase.
-- **Fix:** Không trim password, hoặc document behavior.
-
----
 ## 6. Infrastructure Issues
 
 ### 🟠 [HIGH] INFRA-01: Massive dependency bloat trong `requirements.txt`
@@ -578,6 +457,30 @@
 ---
 
 ## 6. Archive (Đã Sửa)
+### 🟢 [RESOLVED] MO-11: Provider init thiếu `lazy: false` / `init()`
+
+### 🟢 [RESOLVED] MO-12: Animation tick tạo `Random` object mỗi frame
+
+### 🟢 [RESOLVED] MO-13: `setState` gọi 60fps — full widget rebuild
+
+### 🟢 [RESOLVED] MO-14: Không có exponential backoff khi reconnect WebSocket
+
+### 🟢 [RESOLVED] MO-15: `response.data` không validate trước khi cast List
+
+### 🟢 [RESOLVED] MO-16: `settings_screen.dart` age parse default to 0
+
+### 🟢 [RESOLVED] MO-17: `dart:ui` import nặng chỉ dùng cho `VoidCallback`
+
+### 🟢 [RESOLVED] MO-18: `app_logger.dart` không có log levels, thiếu mask data nhạy cảm
+
+### 🟢 [RESOLVED] MO-19: Redundant password validation rules
+
+### 🟢 [RESOLVED] MO-20: `ecg_painter.dart` dot vẽ ở `width` bị clip
+
+### 🟢 [RESOLVED] MO-21: `Provider.of` gọi trong animation listener
+
+### 🟢 [RESOLVED] MO-22: Password trimmed trước khi gửi
+
 
 ### 🟢 [RESOLVED] FE-15: `filteredPatients` recomputed mỗi render
 

@@ -53,6 +53,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   String? _activeBannerMessage;
   bool _isBannerFlash = false;
   Timer? _bannerTimer;
+  final _random = math.Random();
+  PatientProvider? _cachedPatientProvider;
 
   @override
   void initState() {
@@ -89,6 +91,12 @@ class _DashboardScreenState extends State<DashboardScreen>
         });
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _cachedPatientProvider = Provider.of<PatientProvider>(context, listen: false);
   }
 
   @override
@@ -161,11 +169,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   void _onAnimationTick() {
     final elapsedMs = DateTime.now().millisecondsSinceEpoch;
-    final patientProvider =
-        Provider.of<PatientProvider>(context, listen: false);
-    final double hr = patientProvider.liveMetrics['heart_rate'].toDouble();
+    final double hr = _cachedPatientProvider?.liveMetrics['heart_rate']?.toDouble() ?? 75.0;
 
-    setState(() {
+    // Remove setState to avoid rebuilding the entire dashboard 60 times a second
+    // The AnimatedBuilder handles the repaint
       _angleY += 0.015;
       _angleX = 0.2 * math.sin(elapsedMs * 0.0005);
 
@@ -184,7 +191,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       }
 
       // If no live telemetry, generate mock ECG
-      final hasLiveWS = patientProvider.liveMetrics['ecg_value'] != 0.0;
+      final hasLiveWS = (_cachedPatientProvider?.liveMetrics['ecg_value'] ?? 0.0) != 0.0;
       if (!hasLiveWS) {
         double simEcg = 0.0;
         final tSim = (elapsedMs % cycleDuration) / cycleDuration;
@@ -202,14 +209,14 @@ class _DashboardScreenState extends State<DashboardScreen>
         } else if (tSim >= 0.35 && tSim < 0.45) {
           simEcg = 0.25 * math.sin((tSim - 0.35) * math.pi / 0.1);
         } else {
-          simEcg = (math.Random().nextDouble() - 0.5) * 0.02;
+          simEcg = (_random.nextDouble() - 0.5) * 0.02;
         }
 
         _ecgPoints.removeFirst();
         _ecgPoints.add(simEcg);
       }
-    });
   }
+
 
   void _triggerSos() {
     HapticFeedback.heavyImpact();
@@ -697,12 +704,17 @@ class _DashboardScreenState extends State<DashboardScreen>
                             ? Colors.black.withValues(alpha: 0.2)
                             : Colors.black.withValues(alpha: 0.02),
                         width: double.infinity,
-                        child: CustomPaint(
-                          painter: EcgPainter(
-                            dataPoints: _ecgPoints.toList(),
-                            heartRate: hrVal.toDouble(),
-                            isDarkTheme: isDark,
-                          ),
+                        child: AnimatedBuilder(
+                          animation: _tickerController,
+                          builder: (context, child) {
+                            return CustomPaint(
+                              painter: EcgPainter(
+                                dataPoints: _ecgPoints.toList(),
+                                heartRate: hrVal.toDouble(),
+                                isDarkTheme: isDark,
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -722,15 +734,20 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    CustomPaint(
-                      size: const Size(200, 200),
-                      painter: Heart3dPainter(
-                        points: _heartPoints,
-                        angleY: _angleY,
-                        angleX: _angleX,
-                        pulse: _pulse,
-                        isDarkTheme: isDark,
-                      ),
+                    AnimatedBuilder(
+                      animation: _tickerController,
+                      builder: (context, child) {
+                        return CustomPaint(
+                          size: const Size(200, 200),
+                          painter: Heart3dPainter(
+                            points: _heartPoints,
+                            angleY: _angleY,
+                            angleX: _angleX,
+                            pulse: _pulse,
+                            isDarkTheme: isDark,
+                          ),
+                        );
+                      },
                     ),
                     Positioned(
                       bottom: 12,

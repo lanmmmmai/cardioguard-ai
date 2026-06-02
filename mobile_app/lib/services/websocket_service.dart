@@ -11,6 +11,7 @@ class WebSocketService {
   static bool _isConnected = false;
   static bool _isIntentionalDisconnect = false;
   static final List<Function(Map<String, dynamic>)> _listeners = [];
+  static int _reconnectAttempts = 0;
 
   static void setWsUrl(String url) {
     wsUrl = url;
@@ -40,6 +41,7 @@ class WebSocketService {
 
       _channel = IOWebSocketChannel.connect(uri);
       _isConnected = true;
+      _reconnectAttempts = 0;
       AppLogger.log('WebSocket transport connected to $wsUrl');
       _channel!.sink.add(json.encode({"type": "auth", "token": token}));
 
@@ -83,10 +85,14 @@ class WebSocketService {
       return;
     }
     
-    // Auto-reconnect after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () async {
+    // Auto-reconnect with exponential backoff (max 60 seconds)
+    int delaySeconds = 3 * (1 << _reconnectAttempts);
+    if (delaySeconds > 60) delaySeconds = 60;
+    _reconnectAttempts++;
+    
+    Future.delayed(Duration(seconds: delaySeconds), () async {
       if (!_isConnected && !_isIntentionalDisconnect) {
-        AppLogger.log('Attempting to reconnect WebSocket...');
+        AppLogger.log('Attempting to reconnect WebSocket (Attempt $_reconnectAttempts)...');
         await connect();
       }
     });

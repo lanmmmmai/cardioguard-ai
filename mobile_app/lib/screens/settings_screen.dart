@@ -143,7 +143,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     final patientProvider =
         Provider.of<PatientProvider>(context, listen: false);
-    final age = int.tryParse(_ageController.text) ?? 0;
+    final age = int.tryParse(_ageController.text);
+    if (age == null || age <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập tuổi hợp lệ (số nguyên > 0)'), backgroundColor: Colors.red),
+      );
+      return;
+    }
 
     final success = await patientProvider.updateMyProfile(
       age: age,

@@ -87,7 +87,7 @@ class EcgPainter extends CustomPainter {
     canvas.drawPath(path, ecgPaint);
 
     // Draw leading sweeping pulse dot
-    final lastX = width;
+    final lastX = width - 4;
     final lastY = centerY - dataPoints.last * (height * 0.35);
 
     // Glow dot

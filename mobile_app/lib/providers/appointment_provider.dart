@@ -23,7 +23,8 @@ class AppointmentProvider extends ChangeNotifier {
     try {
       final response = await _apiClient.get('/appointments');
       if (response.statusCode == 200) {
-        final List<dynamic> list = response.data;
+        if (response.data is! List) throw Exception("Expected a list from server");
+        final List<dynamic> list = response.data as List<dynamic>;
         _appointments = list.map((item) => Appointment.fromJson(item)).toList();
         // Sort newest scheduled date first
         _appointments.sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));

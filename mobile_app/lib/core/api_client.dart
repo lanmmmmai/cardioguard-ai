@@ -1,4 +1,4 @@
-import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'app_logger.dart';
 import 'package:dio/dio.dart';
 import '../config/app_config.dart';

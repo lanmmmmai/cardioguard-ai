@@ -26,7 +26,8 @@ class ChatProvider extends ChangeNotifier {
         queryParameters: {'patient_id': patientId},
       );
       if (response.statusCode == 200) {
-        final List<dynamic> list = response.data;
+        if (response.data is! List) throw Exception("Expected a list from server");
+        final List<dynamic> list = response.data as List<dynamic>;
         _messages = list.map((item) => ChatMessage.fromJson(item)).toList();
         // Sort oldest first for chat flow
         _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));

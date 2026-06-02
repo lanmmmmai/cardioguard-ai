@@ -27,7 +27,8 @@ class AlertProvider extends ChangeNotifier {
     try {
       final response = await _apiClient.get(AppConfig.alertsEndpoint);
       if (response.statusCode == 200) {
-        final List<dynamic> list = response.data;
+        if (response.data is! List) throw Exception("Expected a list from server");
+        final List<dynamic> list = response.data as List<dynamic>;
         _alerts = list.map((item) => Alert.fromJson(item)).toList();
       }
     } catch (e) {
