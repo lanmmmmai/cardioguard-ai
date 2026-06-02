@@ -441,7 +441,7 @@ async def create_user(
             
         return created_user
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi thêm tài khoản mới: {str(e)}")
+        raise HTTPException(status_code=500, detail="Lỗi thêm tài khoản mới. Vui lòng thử lại sau.")
 
 
 @router.put("/admin/users/{user_id}")
@@ -457,6 +457,11 @@ async def update_user(
     check_user = await database.fetch_one("SELECT id, role, full_name FROM users WHERE id::text = :user_id", {"user_id": user_id})
     if not check_user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+        
+    # Chặn admin tự thay đổi vai trò của bản thân để tránh leo thang đặc quyền hoặc tự khóa mình
+    if payload.role is not None and payload.role != check_user["role"]:
+        if user_id == user["id"]:
+            raise HTTPException(status_code=400, detail="Không thể tự thay đổi vai trò của bản thân")
         
     # If email changed, check if exists
     if payload.email is not None:
@@ -569,7 +574,7 @@ async def update_user(
                 
         return updated_user
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi cập nhật người dùng: {str(e)}")
+        raise HTTPException(status_code=500, detail="Lỗi cập nhật người dùng. Vui lòng thử lại sau.")
 
 
 @router.delete("/admin/users/{user_id}")
@@ -707,5 +712,5 @@ async def db_performance(authorization: Optional[str] = Header(default=None)):
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Không thể lấy thông số hiệu năng DB. Vui lòng đảm bảo pg_stat_statements đã được kích hoạt và chạy migration. Lỗi: {str(e)}"
+            detail="Không thể lấy thông số hiệu năng DB. Vui lòng đảm bảo pg_stat_statements đã được kích hoạt."
         )

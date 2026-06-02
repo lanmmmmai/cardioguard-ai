@@ -79,7 +79,7 @@ class AIService:
             return response.choices[0].message.content
         except Exception as e:
             logging.getLogger(__name__).exception("AI response generation failed")
-            return f"Xin lỗi, hệ thống AI đang bận hoặc gặp sự cố ({str(e)}). Vui lòng thử lại sau."
+            return "Xin lỗi, hệ thống AI đang bận hoặc gặp sự cố. Vui lòng thử lại sau."
 
     @staticmethod
     def _mock_response(role: str, message: str, context_data: Dict[str, Any]) -> str:

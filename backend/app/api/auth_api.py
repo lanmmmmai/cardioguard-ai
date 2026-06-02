@@ -227,7 +227,7 @@ async def request_register_otp(data: RegisterOtpRequest, request: Request):
     except Exception as exc:
         await invalidate_otp_tokens(purpose=OTP_PURPOSE_REGISTER, email=email)
         logger.exception("Unable to send registration OTP email")
-        raise HTTPException(status_code=502, detail=str(exc) or "Unable to send OTP email") from exc
+        raise HTTPException(status_code=502, detail="Unable to send OTP email. Please try again later.") from exc
 
     response = {"message": "OTP sent to email", "email": email, "email_sent": email_sent}
     return response

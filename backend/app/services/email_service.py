@@ -88,12 +88,14 @@ def send_smtp_email_sync(
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     try:
+        import ssl
+        context = ssl.create_default_context()
         if port == 465:
-            server = smtplib.SMTP_SSL(host, port, timeout=15)
+            server = smtplib.SMTP_SSL(host, port, timeout=15, context=context)
         else:
             server = smtplib.SMTP(host, port, timeout=15)
             server.ehlo()
-            server.starttls()
+            server.starttls(context=context)
             server.ehlo()
 
         if user and password:
