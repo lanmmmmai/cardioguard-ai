@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Activity, Lock, Loader2, CheckCircle2 } from 'lucide-react';
 import { API_URL } from '../config';
 import { useAuth } from '../auth/AuthContext';
@@ -16,6 +16,16 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const timerRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +66,7 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }
       }
 
       setSuccess(true);
-      setTimeout(() => {
+      timerRef.current = setTimeout(() => {
         onNavigateNext();
       }, 2000);
     } catch (err: any) {

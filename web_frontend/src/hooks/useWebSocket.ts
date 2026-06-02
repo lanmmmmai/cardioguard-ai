@@ -61,6 +61,8 @@ export const useWebSocket = (
     if (url.startsWith('/')) {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       wsUrl = `${protocol}//${window.location.host}${url}`;
+    } else if (window.location.protocol === 'https:' && wsUrl.startsWith('ws://')) {
+      wsUrl = wsUrl.replace(/^ws:\/\//i, 'wss://');
     }
     try {
       const socket = new WebSocket(wsUrl);

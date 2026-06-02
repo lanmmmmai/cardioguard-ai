@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Activity, ArrowLeft, CheckCircle2, Lock, Mail, ShieldCheck, User, Loader2 } from 'lucide-react';
 import { API_URL } from '../config';
 import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
@@ -23,6 +23,15 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const timerRef = useRef<any>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   const passwordRules = [
     { label: 'Tối thiểu 8 ký tự', valid: password.length >= 8 },
@@ -158,7 +167,7 @@ export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess, onNavigat
       }
 
       setSuccess('Đăng ký tài khoản bệnh nhân thành công! Đang chuyển sang đăng nhập...');
-      setTimeout(onRegisterSuccess, 1800);
+      timerRef.current = setTimeout(onRegisterSuccess, 1800);
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
     } finally {

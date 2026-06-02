@@ -121,7 +121,7 @@ const AppContent: React.FC = () => {
     }
   }, [loading, path, role, isAuthenticated, routeRole, requiresPasswordChange]);
 
-  const fetchPatients = async () => {
+  const fetchPatients = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/patients`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
@@ -130,9 +130,9 @@ const AppContent: React.FC = () => {
     } catch (err) {
       console.error('Failed to fetch patients:', err);
     }
-  };
+  }, [accessToken]);
 
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/alerts`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
@@ -141,9 +141,9 @@ const AppContent: React.FC = () => {
     } catch (err) {
       console.error('Failed to fetch alerts:', err);
     }
-  };
+  }, [accessToken]);
 
-  const fetchDoctors = async () => {
+  const fetchDoctors = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/admin/doctors`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
@@ -152,7 +152,7 @@ const AppContent: React.FC = () => {
     } catch (err) {
       console.error('Failed to fetch doctors:', err);
     }
-  };
+  }, [accessToken]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -161,7 +161,7 @@ const AppContent: React.FC = () => {
     if (role === 'admin') {
       fetchDoctors();
     }
-  }, [accessToken, role]);
+  }, [accessToken, role, fetchPatients, fetchAlerts, fetchDoctors]);
 
   const handleSensorTelemetry = useCallback((data: SensorData) => {
     setLatestTelemetry(data);
@@ -262,7 +262,7 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const renderPatientList = () => {
+  const renderPatientList = useCallback(() => {
     if (selectedPatientId) {
       const patient = patients.find((item) => item.id === selectedPatientId);
       return patient ? (
@@ -287,7 +287,7 @@ const AppContent: React.FC = () => {
         onViewPatientDetail={setSelectedPatientId}
       />
     );
-  };
+  }, [selectedPatientId, patients, latestTelemetry, alerts, accessToken, fetchPatients, showAddPatientModal]);
 
   const routeContent = useMemo(() => {
     switch (normalizedPath) {
@@ -353,7 +353,7 @@ const AppContent: React.FC = () => {
         return meta ? <PlaceholderPage title={meta.title} subtitle={meta.subtitle} /> : null;
       }
     }
-  }, [alerts, latestTelemetry, normalizedPath, patients, routeRole, selectedPatientId, showAddPatientModal]);
+  }, [alerts, latestTelemetry, normalizedPath, patients, routeRole, selectedPatientId, showAddPatientModal, doctors, isConnected, navigate, renderPatientList]);
 
   if (loading) {
     return <div className="route-loading">Đang khôi phục phiên đăng nhập...</div>;
