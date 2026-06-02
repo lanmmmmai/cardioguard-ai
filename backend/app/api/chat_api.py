@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field
 from typing import Optional, Any, Dict
@@ -7,6 +8,7 @@ from app.services.ai_service import ai_service
 from datetime import datetime, timezone
 import json
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 VALID_CHAT_ROLES = {"patient", "doctor"}
 CHAT_SESSIONS_TABLE = "chat_sessions"
@@ -83,6 +85,8 @@ async def send_chat_message(
     chat_role = normalize_chat_role(request.role)
     enforce_chat_role(current_user, chat_role)
     
+    logger.info("Chat message: user_id=%s role=%s session=%s message_len=%d", user_id, chat_role, session_id or "new", len(request.message))
+
     # 1. Create or get session
     if not session_id:
         title = request.message[:30] + "..." if len(request.message) > 30 else request.message
@@ -196,6 +200,7 @@ async def analyze_patient(
     alerts = [dict(row) for row in alert_res]
 
     insight = await ai_service.analyze_patient_data(patient_id, sensor_data, alerts)
+    logger.info("Patient analyzed: doctor_id=%s patient_id=%s", current_user["id"], patient_id)
     return {"insight": insight}
 
 @router.get("/recommendations")

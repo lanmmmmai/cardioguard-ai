@@ -1,11 +1,14 @@
 import csv
 import io
+import logging
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Optional
 
 from fastapi import APIRouter, File, Header, HTTPException, Query, Response, UploadFile, Request
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import text
 
 from app.api.auth_api import get_user_from_token
@@ -325,6 +328,7 @@ async def list_cms_records(
         items = [normalize_row(dict(row)) for row in rows_result.mappings().all()]
 
     # Ghi nhận log (tránh ghi log audit_logs để ngăn đệ quy)
+    logger.info("CMS list: module=%s admin_id=%s total=%d", module, user["id"], total)
     if table != "audit_logs":
         await log_activity(
             user_id=user["id"],
@@ -412,7 +416,7 @@ async def create_cms_record(module: str, payload: dict[str, Any], request: Reque
         )
         await session.commit()
 
-    # Ghi nhận log tạo bản ghi
+    logger.info("CMS create: module=%s admin_id=%s record_id=%s", module, user["id"], values.get("id"))
     if table != "audit_logs":
         await log_activity(
             user_id=user["id"],
@@ -453,7 +457,7 @@ async def update_cms_record(module: str, record_id: str, payload: dict[str, Any]
             raise HTTPException(status_code=404, detail="Record not found")
         await session.commit()
 
-    # Ghi nhận log cập nhật bản ghi
+    logger.info("CMS update: module=%s admin_id=%s record_id=%s", module, user["id"], record_id)
     if table != "audit_logs":
         await log_activity(
             user_id=user["id"],
@@ -481,7 +485,7 @@ async def delete_cms_record(module: str, record_id: str, request: Request, autho
             raise HTTPException(status_code=404, detail="Record not found")
         await session.commit()
 
-    # Ghi nhận log xóa bản ghi
+    logger.info("CMS delete: module=%s admin_id=%s record_id=%s", module, user["id"], record_id)
     if table != "audit_logs":
         await log_activity(
             user_id=user["id"],

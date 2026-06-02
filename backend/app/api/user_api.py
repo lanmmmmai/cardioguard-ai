@@ -1,8 +1,11 @@
 import json
+import logging
 from typing import Any, Optional, Dict
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Header, HTTPException, Request
+
+logger = logging.getLogger(__name__)
 from jose import jwt
 
 from app.api.auth_api import get_user_from_token, extract_bearer_token
@@ -106,7 +109,7 @@ async def update_user_me(payload: UserMeUpdate, request: Request, authorization:
         {**update_values, "user_id": current_user["id"]},
     )
 
-    # Ghi nhận log cập nhật thông tin cá nhân
+    logger.info("User updated profile: user_id=%s", current_user["id"])
     await log_activity(
         user_id=current_user["id"],
         action="USER_UPDATE_PROFILE",
@@ -153,7 +156,7 @@ async def update_user_password(payload: PasswordUpdate, request: Request, author
         except Exception:
             pass
 
-    # Ghi nhận log đổi mật khẩu thành công
+    logger.info("User changed password: user_id=%s", current_user["id"])
     await log_activity(
         user_id=current_user["id"],
         action="USER_PASSWORD_CHANGE",
@@ -458,6 +461,7 @@ async def create_user(
             
         return created_user
     except Exception as e:
+        logger.exception("Admin create user failed: admin_id=%s, email=%s", user["id"], payload.email)
         raise HTTPException(status_code=500, detail="Lỗi thêm tài khoản mới. Vui lòng thử lại sau.")
 
 
@@ -591,6 +595,7 @@ async def update_user(
                 
         return updated_user
     except Exception as e:
+        logger.exception("Admin update user failed: admin_id=%s, target_user=%s", user["id"], user_id)
         raise HTTPException(status_code=500, detail="Lỗi cập nhật người dùng. Vui lòng thử lại sau.")
 
 
@@ -613,7 +618,7 @@ async def delete_user(
     # Luôn sử dụng Soft Delete để bảo toàn dữ liệu y tế lâm sàng nhạy cảm và lịch sử audit
     await database.execute("UPDATE users SET status = 'inactive' WHERE id::text = :user_id", {"user_id": user_id})
 
-    # Ghi nhận log Admin xóa user dạng vô hiệu hóa an toàn (Soft Delete)
+    logger.info("Admin soft-deleted user: admin_id=%s, target_user=%s", user["id"], user_id)
     await log_activity(
         user_id=user["id"],
         action="ADMIN_DELETE_USER",

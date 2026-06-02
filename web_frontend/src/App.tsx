@@ -111,9 +111,12 @@ const AppContent: React.FC = () => {
         try {
           const data = await response.json();
           setPatients(data);
+          console.info('Patients fetched:', data.length, 'records');
         } catch(e) {
           console.error("Invalid JSON format");
         }
+      } else {
+        console.warn('Fetch patients failed:', response.status);
       }
     } catch (err) {
       console.error('Failed to fetch patients:', err);
@@ -129,9 +132,12 @@ const AppContent: React.FC = () => {
         try {
           const data = await response.json();
           setAlerts(data);
+          console.info('Alerts fetched:', data.length, 'records');
         } catch(e) {
           console.error("Invalid JSON format");
         }
+      } else {
+        console.warn('Fetch alerts failed:', response.status);
       }
     } catch (err) {
       console.error('Failed to fetch alerts:', err);
@@ -147,9 +153,12 @@ const AppContent: React.FC = () => {
         try {
           const data = await response.json();
           setDoctors(data);
+          console.info('Doctors fetched:', data.length, 'records');
         } catch(e) {
           console.error("Invalid JSON format");
         }
+      } else {
+        console.warn('Fetch doctors failed:', response.status);
       }
     } catch (err) {
       console.error('Failed to fetch doctors:', err);
@@ -254,6 +263,10 @@ const AppContent: React.FC = () => {
 
   const { isConnected } = useWebSocket(WS_URL, accessToken ? handleRealtimeMessage : undefined, accessToken);
 
+  useEffect(() => {
+    console.info('WebSocket connection:', isConnected ? 'connected' : 'disconnected');
+  }, [isConnected]);
+
   const handleLoginSuccess = (token: string, userData: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean }) => {
     const userRole = normalizeRole(userData.role);
     if (!userRole) {
@@ -261,6 +274,7 @@ const AppContent: React.FC = () => {
     }
 
     const normalizedUser = login(token, { ...userData, role: userRole });
+    console.info('Login success: role=%s name=%s', normalizedUser.role, normalizedUser.full_name);
     if (normalizedUser.must_change_password) {
       navigate('/change-password', true);
     } else {

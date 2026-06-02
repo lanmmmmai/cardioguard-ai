@@ -1,5 +1,6 @@
 import json
 import logging
+import sys
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -19,6 +20,14 @@ from app.api.chat_api import router as chat_router
 from app.services.otp_service import ensure_otp_table
 from app.services.db_optimization import ensure_performance_indexes
 
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Smart Heart Patient Monitoring API",
@@ -49,14 +58,18 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
+    logger.info("Starting CardioGuard AI backend...")
     await connect_db()
     await ensure_otp_table()
     await ensure_performance_indexes()
+    logger.info("Application startup complete")
 
 
 @app.on_event("shutdown")
 async def shutdown():
+    logger.info("Shutting down CardioGuard AI backend...")
     await disconnect_db()
+    logger.info("Application shutdown complete")
 
 app.include_router(realtime_router)
 app.include_router(auth_router)
@@ -85,7 +98,7 @@ async def health():
             }
         }
     except Exception as e:
-        logging.getLogger(__name__).exception("Database health check failed")
+        logger.exception("Database health check failed")
         return Response(
             content=json.dumps({
                 "status": "unhealthy",

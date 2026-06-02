@@ -1,9 +1,11 @@
+import logging
 from typing import Optional
 from fastapi import APIRouter, Header, HTTPException
 from app.schemas.patient_schema import PatientCreate
 from app.core.database import database
 from app.api.auth_api import get_user_from_token
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -75,6 +77,7 @@ async def get_patients(authorization: Optional[str] = Header(default=None)):
 
     query = f"{base_query} {where_sql} ORDER BY u.full_name ASC"
     rows = await database.fetch_all(query=query, values=values)
+    logger.info("Patients listed: role=%s user_id=%s count=%d", role, current_user["id"], len(rows))
 
     return [
         {

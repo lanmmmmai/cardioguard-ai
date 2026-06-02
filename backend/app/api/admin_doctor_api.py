@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Header, HTTPException, Depends
 from typing import List, Optional
 from app.core.database import database
@@ -5,6 +6,7 @@ from app.core.security import hash_password
 from app.api.auth_api import get_user_from_token
 from app.schemas.admin_doctor_schema import DoctorCreate, DoctorUpdate, DoctorResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin_doctors"])
 
 async def require_admin(authorization: Optional[str] = Header(default=None)):
@@ -67,6 +69,7 @@ async def create_doctor(payload: DoctorCreate, admin: dict = Depends(require_adm
         )
         return dict(row)
     except Exception as e:
+        logger.exception("Admin create doctor failed: full_name=%s", payload.full_name)
         raise HTTPException(status_code=500, detail=f"Lỗi thêm bác sĩ: {str(e)}")
 
 @router.put("/doctors/{doctor_id}", response_model=DoctorResponse)
@@ -129,6 +132,7 @@ async def update_doctor(doctor_id: str, payload: DoctorUpdate, admin: dict = Dep
         row = await database.fetch_one(update_query, values)
         return dict(row)
     except Exception as e:
+        logger.exception("Admin update doctor failed: doctor_id=%s", doctor_id)
         raise HTTPException(status_code=500, detail=f"Lỗi cập nhật bác sĩ: {str(e)}")
 
 @router.delete("/doctors/{doctor_id}")
@@ -137,7 +141,7 @@ async def delete_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
     if not check_doctor:
         raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
 
-    # Soft delete trực tiếp để giữ nguyên lịch sử phân công bác sĩ - bệnh nhân.
+    logger.info("Admin soft-deleted doctor: doctor_id=%s", doctor_id)
     await database.execute("UPDATE users SET status = 'inactive' WHERE role = 'doctor' AND id::text = :doctor_id", {"doctor_id": doctor_id})
     return {
         "message": "Vô hiệu hóa bác sĩ thành công (Soft Delete)",

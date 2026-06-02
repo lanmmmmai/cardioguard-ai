@@ -1,5 +1,8 @@
+import logging
 from databases import Database
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 database = Database(
     settings.DATABASE_URL,
@@ -8,8 +11,19 @@ database = Database(
 
 
 async def connect_db():
-    await database.connect()
+    logger.info("Connecting to database...")
+    try:
+        await database.connect()
+        logger.info("Database connected successfully")
+    except Exception as e:
+        logger.exception("Database connection failed")
+        raise
 
 
 async def disconnect_db():
-    await database.disconnect()
+    logger.info("Disconnecting from database...")
+    try:
+        await database.disconnect()
+        logger.info("Database disconnected successfully")
+    except Exception as e:
+        logger.exception("Database disconnection error")

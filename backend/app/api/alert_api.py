@@ -1,8 +1,10 @@
+import logging
 from typing import Optional
 from fastapi import APIRouter, Header
 from app.core.database import database
 from app.api.auth_api import get_user_from_token
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -54,6 +56,7 @@ async def get_alerts(
     values["offset"] = offset
 
     alerts = await database.fetch_all(query, values)
+    logger.info("Alerts fetched: role=%s user_id=%s count=%d", role, current_user["id"], len(alerts))
 
     return alerts
 
@@ -131,11 +134,11 @@ async def resolve_alert(alert_id: str, authorization: Optional[str] = Header(def
         if not assigned:
             raise HTTPException(status_code=403, detail="Bác sĩ chưa được phân công quản lý bệnh nhân này")
 
-    # Update is_resolved
     await database.execute(
         "UPDATE alerts SET is_resolved = TRUE WHERE id::text = :alert_id",
         {"alert_id": alert_id}
     )
+    logger.info("Alert resolved: alert_id=%s resolved_by=%s role=%s", alert_id, current_user["id"], role)
     
     # Fetch complete updated alert to broadcast
     updated_alert = await database.fetch_one(
@@ -194,6 +197,7 @@ async def create_sos_alert(payload: AlertCreate, authorization: Optional[str] = 
             "severity": "critical"
         }
     )
+    logger.warning("SOS alert created: alert_id=%s patient_id=%s message=%s", alert_id, current_user["id"], payload.message)
     
     updated_alert = await database.fetch_one(
         """

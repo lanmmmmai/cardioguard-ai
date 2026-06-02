@@ -53,6 +53,8 @@ class ConnectionManager:
                 
         for conn in disconnected:
             self.disconnect(conn)
+        if disconnected:
+            logger.warning("Sensor data broadcast: %d stale connections cleaned for patient_id=%s", len(disconnected), patient_id)
 
     async def broadcast_alert(self, patient_id: str, alert_data: dict):
         """Send warning/SOS alerts to the patient, assigned doctors, and all admins."""
@@ -75,6 +77,8 @@ class ConnectionManager:
                 
         for conn in disconnected:
             self.disconnect(conn)
+        if disconnected:
+            logger.warning("Alert broadcast: %d stale connections cleaned for patient_id=%s", len(disconnected), patient_id)
 
     async def broadcast_chat_message(self, sender_id: str, recipient_id: str, message_data: dict):
         """Send a real-time chat message to both the sender and recipient."""

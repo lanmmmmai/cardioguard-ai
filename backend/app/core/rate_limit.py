@@ -1,5 +1,8 @@
+import logging
 import time
 from fastapi import HTTPException, Request
+
+logger = logging.getLogger(__name__)
 
 # In-memory storage for rate limits: { (ip, email, endpoint): [timestamps] }
 _rate_limits = {}
@@ -24,6 +27,7 @@ def check_rate_limit(ip: str, email: str, endpoint: str, max_requests: int = 5, 
     
     if len(timestamps) >= max_requests:
         wait_time = int(window_seconds - (now - timestamps[0]))
+        logger.warning("Rate limit exceeded: ip=%s email=%s endpoint=%s wait=%ds", ip, email, endpoint, wait_time)
         raise HTTPException(
             status_code=429,
             detail=f"Quá nhiều yêu cầu gửi tới {endpoint}. Vui lòng thử lại sau {wait_time} giây."

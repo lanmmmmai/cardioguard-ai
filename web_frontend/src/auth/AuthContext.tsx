@@ -70,6 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<string | null>(null);
 
   const logout = () => {
+    console.info('Auth logout: user=%s', user?.email);
     if (accessToken) {
       fetch(`${API_URL}/auth/logout`, {
         method: 'POST',
@@ -90,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Tài khoản chưa được phân quyền');
     }
 
+    console.info('Auth login: email=%s role=%s', normalizedUser.email, normalizedUser.role);
     storage.setItem(USER_KEY, encryptData(normalizedUser));
     storage.setItem(TOKEN_KEY, token);
     setAccessToken(token);
@@ -146,7 +148,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       try {
         await refreshUser();
+        console.info('Session restored: user=%s role=%s', user?.email, user?.role);
       } catch (err: any) {
+        console.warn('Session restore failed:', err.message);
         logout();
         setAuthError(err.message || 'Không thể khôi phục phiên đăng nhập');
       } finally {

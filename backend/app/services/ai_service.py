@@ -4,6 +4,8 @@ import logging
 from typing import Any, Dict, List
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
 try:
     from openai import AsyncOpenAI
     if hasattr(settings, "OPENAI_API_KEY") and settings.OPENAI_API_KEY:
@@ -78,7 +80,7 @@ class AIService:
             )
             return response.choices[0].message.content
         except Exception as e:
-            logging.getLogger(__name__).exception("AI response generation failed")
+            logger.exception("AI response generation failed")
             return "Xin lỗi, hệ thống AI đang bận hoặc gặp sự cố. Vui lòng thử lại sau."
 
     @staticmethod

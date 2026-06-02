@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import logging
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -9,6 +10,8 @@ from uuid import uuid4
 
 from app.core.config import settings
 from app.core.database import database
+
+logger = logging.getLogger(__name__)
 
 
 OTP_PURPOSE_REGISTER = "register"
@@ -134,6 +137,7 @@ async def create_otp_token(
             },
         )
 
+    logger.info("OTP created: purpose=%s email=%s ttl=%dmin", purpose, normalized_email, ttl_minutes)
     return otp
 
 
@@ -166,6 +170,7 @@ async def verify_otp_token(*, purpose: str, email: str, otp: str) -> OtpVerifica
     )
 
     if not row:
+        logger.warning("OTP verify failed: purpose=%s email=%s reason=no_token_found", purpose, normalized_email)
         return OtpVerificationResult(False, "invalid", {})
 
     now = datetime.now(timezone.utc)
@@ -174,10 +179,12 @@ async def verify_otp_token(*, purpose: str, email: str, otp: str) -> OtpVerifica
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 
     if expires_at <= now:
+        logger.warning("OTP verify failed: purpose=%s email=%s reason=expired", purpose, normalized_email)
         await consume_otp_token(row["id"])
         return OtpVerificationResult(False, "expired", {})
 
     if row["attempts"] >= row["max_attempts"]:
+        logger.warning("OTP verify failed: purpose=%s email=%s reason=max_attempts_exceeded", purpose, normalized_email)
         await consume_otp_token(row["id"])
         return OtpVerificationResult(False, "invalid", {})
 

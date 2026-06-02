@@ -1,8 +1,11 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 import uuid
 import bcrypt
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = "HS256"
@@ -22,8 +25,7 @@ def verify_password(password: str, hashed_password: str) -> bool:
         hashed_bytes = hashed_password.encode("utf-8")
         return bcrypt.checkpw(password_bytes, hashed_bytes)
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).exception("Error verifying password")
+        logger.exception("Error verifying password")
         return False
 
 
