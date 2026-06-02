@@ -51,10 +51,11 @@ interface Template {
   updated_at: string;
 }
 
-// ───────────────────────────────────────────────────────────
-// Main Component
-// ───────────────────────────────────────────────────────────
-export const EmailCmsPage: React.FC = () => {
+interface EmailCmsPageProps {
+  embedded?: boolean;
+}
+
+export const EmailCmsPage: React.FC<EmailCmsPageProps> = ({ embedded = false }) => {
   const { accessToken, role } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>('templates');
 
@@ -186,27 +187,29 @@ export const EmailCmsPage: React.FC = () => {
       {toast && <div className="cms-toast">{toast}</div>}
 
       {/* Page Header */}
-      <div className="page-header cms-header">
-        <div>
-          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Mail size={22} style={{ color: 'var(--color-primary)' }} />
-            Email CMS
-          </h1>
-          <p className="page-subtitle">Quản lý mẫu email, gửi thông báo và theo dõi lịch sử gửi.</p>
+      {!embedded && (
+        <div className="page-header cms-header">
+          <div>
+            <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Mail size={22} style={{ color: 'var(--color-primary)' }} />
+              Email CMS
+            </h1>
+            <p className="page-subtitle">Quản lý mẫu email, gửi thông báo và theo dõi lịch sử gửi.</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {activeTab === 'templates' && (
+              <>
+                <button className="btn btn-secondary" type="button" onClick={fetchTemplates}>
+                  <RefreshCw size={14} /> Làm mới
+                </button>
+                <button className="btn btn-primary" type="button" onClick={handleNew}>
+                  <Plus size={14} /> Tạo template
+                </button>
+              </>
+            )}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {activeTab === 'templates' && (
-            <>
-              <button className="btn btn-secondary" type="button" onClick={fetchTemplates}>
-                <RefreshCw size={14} /> Làm mới
-              </button>
-              <button className="btn btn-primary" type="button" onClick={handleNew}>
-                <Plus size={14} /> Tạo template
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="email-cms-tabs">
@@ -227,8 +230,8 @@ export const EmailCmsPage: React.FC = () => {
       {activeTab === 'templates' && (
         <div className="panel email-cms-panel">
           {/* Filters */}
-          <div className="email-templates-toolbar">
-            <label className="email-logs-search-wrap">
+          <div className="email-templates-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <label className="email-logs-search-wrap" style={{ flex: 1, minWidth: '200px' }}>
               <Search size={15} style={{ color: 'var(--text-muted)' }} />
               <input
                 className="email-logs-search"
@@ -237,7 +240,19 @@ export const EmailCmsPage: React.FC = () => {
                 onChange={(e) => setQ(e.target.value)}
               />
             </label>
-            <span className="email-templates-count">{total} templates</span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span className="email-templates-count">{total} templates</span>
+              {embedded && (
+                <>
+                  <button className="btn btn-secondary btn-sm" type="button" onClick={fetchTemplates} style={{ height: '36px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <RefreshCw size={14} /> Làm mới
+                  </button>
+                  <button className="btn btn-primary btn-sm" type="button" onClick={handleNew} style={{ height: '36px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Plus size={14} /> Tạo template
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {error && <div className="cms-inline-error">{error}</div>}

@@ -1,4 +1,4 @@
-import { Globe } from 'lucide-react';
+import { Globe, Mail } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface CmsModuleConfig {
@@ -16,6 +16,13 @@ export const cmsModules: CmsModuleConfig[] = [
     icon: Globe, 
     templateColumns: ['url', 'domain', 'title', 'description', 'image_url'], 
     preferredColumns: ['url', 'domain', 'title', 'description', 'image_url'] 
+  },
+  { 
+    key: 'email_templates', 
+    label: 'Email CMS', 
+    icon: Mail, 
+    templateColumns: [], 
+    preferredColumns: [] 
   },
 ];
 

@@ -8,6 +8,7 @@ import { RecordFormModal } from './RecordFormModal';
 import { DetailModal } from './DetailModal';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CsvImportModal } from './CsvImportModal';
+import { EmailCmsPage } from './EmailCmsPage';
 
 const limit = 25;
 
@@ -55,7 +56,7 @@ export const CmsPage: React.FC = () => {
   }), [offset, search, filter, sortBy, sortDir]);
 
   const fetchRows = async () => {
-    if (!accessToken) return;
+    if (!accessToken || activeModule === 'email_templates') return;
     setLoading(true);
     setError(null);
     try {
@@ -160,49 +161,55 @@ export const CmsPage: React.FC = () => {
         </aside>
 
         <section className="panel cms-workspace">
-          <div className="cms-toolbar">
-            <div className="cms-toolbar-title">
-              <ActiveIcon size={20} />
-              <strong>{config.label}</strong>
-              <span>{total} records</span>
-            </div>
-            <div className="cms-toolbar-actions">
-              <button type="button" className="btn btn-primary" onClick={() => setEditing('new')}><Plus size={16} /> Add new</button>
-              <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}><FileUp size={16} /> Import CSV</button>
-              <button type="button" className="btn btn-secondary" onClick={exportCsv}><Download size={16} /> Export CSV</button>
-              <button type="button" className="btn btn-secondary" onClick={downloadTemplate}><FileDown size={16} /> Template</button>
-            </div>
-          </div>
+          {activeModule === 'email_templates' ? (
+            <EmailCmsPage embedded={true} />
+          ) : (
+            <>
+              <div className="cms-toolbar">
+                <div className="cms-toolbar-title">
+                  <ActiveIcon size={20} />
+                  <strong>{config.label}</strong>
+                  <span>{total} records</span>
+                </div>
+                <div className="cms-toolbar-actions">
+                  <button type="button" className="btn btn-primary" onClick={() => setEditing('new')}><Plus size={16} /> Add new</button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}><FileUp size={16} /> Import CSV</button>
+                  <button type="button" className="btn btn-secondary" onClick={exportCsv}><Download size={16} /> Export CSV</button>
+                  <button type="button" className="btn btn-secondary" onClick={downloadTemplate}><FileDown size={16} /> Template</button>
+                </div>
+              </div>
 
-          <div className="cms-filters">
-            <label>
-              <Search size={16} />
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search..." />
-            </label>
-            <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter: status:online,role:patient" />
-          </div>
+              <div className="cms-filters">
+                <label>
+                  <Search size={16} />
+                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search..." />
+                </label>
+                <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter: status:online,role:patient" />
+              </div>
 
-          {error && <div className="cms-inline-error">{error}</div>}
+              {error && <div className="cms-inline-error">{error}</div>}
 
-          <DataTable
-            rows={rows}
-            columns={columns}
-            preferredColumns={config.preferredColumns}
-            sortBy={sortBy}
-            sortDir={sortDir}
-            loading={loading}
-            onSort={sort}
-            onView={setDetail}
-            onEdit={setEditing}
-            onDelete={setDeleting}
-            onAssignPatient={activeModule === 'cameras' ? setEditing : undefined}
-          />
+              <DataTable
+                rows={rows}
+                columns={columns}
+                preferredColumns={config.preferredColumns}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                loading={loading}
+                onSort={sort}
+                onView={setDetail}
+                onEdit={setEditing}
+                onDelete={setDeleting}
+                onAssignPatient={activeModule === 'cameras' ? setEditing : undefined}
+              />
 
-          <div className="cms-pagination">
-            <button type="button" className="btn btn-secondary" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))}>Trước</button>
-            <span>Trang {page}/{totalPages}</span>
-            <button type="button" className="btn btn-secondary" disabled={page >= totalPages} onClick={() => setOffset(offset + limit)}>Sau</button>
-          </div>
+              <div className="cms-pagination">
+                <button type="button" className="btn btn-secondary" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))}>Trước</button>
+                <span>Trang {page}/{totalPages}</span>
+                <button type="button" className="btn btn-secondary" disabled={page >= totalPages} onClick={() => setOffset(offset + limit)}>Sau</button>
+              </div>
+            </>
+          )}
         </section>
       </div>
 

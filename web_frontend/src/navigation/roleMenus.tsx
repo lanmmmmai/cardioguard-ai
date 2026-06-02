@@ -11,7 +11,6 @@ import {
   FileText,
   HeartPulse,
   Home,
-  Mail,
   MessageCircle,
   Pill,
   Settings,
@@ -34,7 +33,6 @@ export const roleMenus: Record<UserRole, RoleMenuItem[]> = {
   admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: BarChart3 },
     { label: 'CMS dữ liệu',    path: '/admin/cms',    icon: Database },
-    { label: 'Email CMS',       path: '/admin/email',  icon: Mail },
     { label: 'Quản lý tài khoản', path: '/admin/users', icon: UserCog },
     { label: 'Quản lý bác sĩ', path: '/admin/doctors', icon: Stethoscope },
     { label: 'Quản lý bệnh nhân', path: '/admin/patients', icon: Users },
