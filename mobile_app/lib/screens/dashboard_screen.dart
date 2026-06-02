@@ -144,14 +144,16 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   void _triggerBannerFlash() {
     _bannerTimer?.cancel();
-    _isBannerFlash = true;
+    setState(() {
+      _isBannerFlash = true;
+    });
 
-    // Auto dismiss banner after 8 seconds
-    Future.delayed(const Duration(seconds: 8), () {
-      _bannerTimer?.cancel();
+    // Auto dismiss banner and reset flash state after 8 seconds
+    _bannerTimer = Timer(const Duration(seconds: 8), () {
       if (mounted) {
         setState(() {
           _activeBannerMessage = null;
+          _isBannerFlash = false;
         });
       }
     });
