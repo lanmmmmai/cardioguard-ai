@@ -33,6 +33,7 @@ export const useWebSocket = (
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const intentionalCloseRef = useRef<boolean>(false);
+  const reconnectDelayRef = useRef<number>(5000); // Khởi đầu từ 5 giây
 
   // Sử dụng ref để giữ tham chiếu callback mới nhất, tránh tình trạng re-connect liên tục khi callback thay đổi
   const onMessageReceivedRef = useRef(onMessageReceived);
@@ -59,6 +60,7 @@ export const useWebSocket = (
 
       socket.onopen = () => {
         setIsConnected(true);
+        reconnectDelayRef.current = 5000; // Reset độ trễ khi kết nối thành công
         console.log('Realtime WebSocket connection established');
       };
 
@@ -77,16 +79,20 @@ export const useWebSocket = (
         setIsConnected(false);
         if (intentionalCloseRef.current) return; // Bỏ qua nếu chủ động đóng
         if (!onMessageReceivedRef.current) return;
-        console.log('Realtime WebSocket disconnected, retrying connection in 3 seconds...');
-        // Attempt to reconnect after 3 seconds
+        
+        console.warn(`Realtime WebSocket disconnected. Retrying connection in ${reconnectDelayRef.current / 1000} seconds...`);
+        
+        // Attempt to reconnect with exponential backoff
         reconnectTimeoutRef.current = window.setTimeout(() => {
+          reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 1.5, 30000); // Tăng dần độ trễ, tối đa 30s
           connect();
-        }, 3000);
+        }, reconnectDelayRef.current);
       };
 
-      socket.onerror = (error) => {
+      socket.onerror = () => {
         if (intentionalCloseRef.current) return; // Bỏ qua thông báo lỗi khi unmount trong StrictMode
-        console.error('WebSocket connection error:', error);
+        // Không sử dụng console.error để tránh làm ngập tràn (flooding) console đỏ khi server offline. 
+        // Trình duyệt đã tự động log lỗi kết nối thất bại mặc định.
         socket.close();
       };
     } catch (e) {
