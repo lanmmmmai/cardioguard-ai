@@ -42,10 +42,10 @@ jobs:
 
       - name: Prepare Android release keystore (optional)
         env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_BASE64: "${{ secrets.ANDROID_KEYSTORE_BASE64 }}"
+          ANDROID_KEYSTORE_PASSWORD: "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          ANDROID_KEY_ALIAS: "${{ secrets.ANDROID_KEY_ALIAS }}"
+          ANDROID_KEY_PASSWORD: "${{ secrets.ANDROID_KEY_PASSWORD }}"
         run: |
           if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
@@ -59,7 +59,7 @@ jobs:
           fi
 
       - name: Build release APK
-        run: flutter build apk --release --dart-define=API_BASE_URL=${{ secrets.API_BASE_URL || 'https://cardioguard-ai-backend.onrender.com' }}
+        run: flutter build apk --release --dart-define=API_BASE_URL="${{ secrets.API_BASE_URL || 'https://cardioguard-ai-backend.onrender.com' }}"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
