@@ -87,36 +87,37 @@ async def create_otp_token(
     normalized_email = email.lower()
     otp = generate_otp()
 
-    await database.execute(
-        """
-        UPDATE auth_otp_tokens
-        SET consumed_at = NOW()
-        WHERE purpose = :purpose
-          AND email = :email
-          AND consumed_at IS NULL
-        """,
-        {"purpose": purpose, "email": normalized_email},
-    )
+    async with database.transaction():
+        await database.execute(
+            """
+            UPDATE auth_otp_tokens
+            SET consumed_at = NOW()
+            WHERE purpose = :purpose
+              AND email = :email
+              AND consumed_at IS NULL
+            """,
+            {"purpose": purpose, "email": normalized_email},
+        )
 
-    await database.execute(
-        """
-        INSERT INTO auth_otp_tokens (
-            id, purpose, email, otp_hash, metadata, max_attempts, expires_at
+        await database.execute(
+            """
+            INSERT INTO auth_otp_tokens (
+                id, purpose, email, otp_hash, metadata, max_attempts, expires_at
+            )
+            VALUES (
+                :id, :purpose, :email, :otp_hash, CAST(:metadata AS JSONB), :max_attempts, :expires_at
+            )
+            """,
+            {
+                "id": str(uuid4()),
+                "purpose": purpose,
+                "email": normalized_email,
+                "otp_hash": hash_otp(purpose, normalized_email, otp),
+                "metadata": json.dumps(metadata or {}),
+                "max_attempts": max_attempts,
+                "expires_at": datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes),
+            },
         )
-        VALUES (
-            :id, :purpose, :email, :otp_hash, CAST(:metadata AS JSONB), :max_attempts, :expires_at
-        )
-        """,
-        {
-            "id": str(uuid4()),
-            "purpose": purpose,
-            "email": normalized_email,
-            "otp_hash": hash_otp(purpose, normalized_email, otp),
-            "metadata": json.dumps(metadata or {}),
-            "max_attempts": max_attempts,
-            "expires_at": datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes),
-        },
-    )
 
     return otp
 

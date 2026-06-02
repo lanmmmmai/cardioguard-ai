@@ -11,6 +11,18 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
   const animationFrameIdRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
 
+  const heartRateRef = useRef(heartRate);
+  const liveEcgValueRef = useRef(liveEcgValue);
+
+  // Keep refs in sync with props
+  useEffect(() => {
+    heartRateRef.current = heartRate;
+  }, [heartRate]);
+
+  useEffect(() => {
+    liveEcgValueRef.current = liveEcgValue;
+  }, [liveEcgValue]);
+
   // Initialize buffer size
   useEffect(() => {
     // Fill buffer with baseline values
@@ -47,13 +59,13 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
 
     const render = (timestamp: number) => {
       // If we don't have live incoming data, simulate a realistic ECG signal
-      if (liveEcgValue === undefined) {
+      if (liveEcgValueRef.current === undefined) {
         if (!lastTimeRef.current) lastTimeRef.current = timestamp;
         const elapsed = timestamp - lastTimeRef.current;
 
         // Determine cardiac cycle duration based on heartRate (in ms)
         // e.g. 70 bpm -> 857ms per cycle
-        const cycleDuration = (60 / Math.max(heartRate, 40)) * 1000;
+        const cycleDuration = (60 / Math.max(heartRateRef.current, 40)) * 1000;
         
         // Render points in sync with timestamp
         if (elapsed > 16) { // ~60fps updates
@@ -131,8 +143,9 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
 
       // Draw ECG Curve with Neon Glow effect
       ctx.shadowBlur = 10;
-      ctx.shadowColor = 'var(--color-spo2)';
-      ctx.strokeStyle = 'var(--color-spo2)';
+      const computedColor = getComputedStyle(document.documentElement).getPropertyValue('--color-spo2').trim() || '#00e5ff';
+      ctx.shadowColor = computedColor;
+      ctx.strokeStyle = computedColor;
       ctx.lineWidth = 2.5;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
@@ -180,7 +193,7 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
         cancelAnimationFrame(animationFrameIdRef.current);
       }
     };
-  }, [liveEcgValue, heartRate]);
+  }, []);
 
   return (
     <div className="ecg-container">

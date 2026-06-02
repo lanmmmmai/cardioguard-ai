@@ -14,6 +14,7 @@ interface Patient {
 
 interface PatientsProps {
   patients: Patient[];
+  accessToken: string | null;
   onPatientAdded: () => void;
   showAddModal: boolean;
   setShowAddModal: (show: boolean) => void;
@@ -22,6 +23,7 @@ interface PatientsProps {
 
 export const Patients: React.FC<PatientsProps> = ({ 
   patients, 
+  accessToken,
   onPatientAdded,
   showAddModal,
   setShowAddModal,
@@ -61,6 +63,7 @@ export const Patients: React.FC<PatientsProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify({
           full_name: fullName,

@@ -151,7 +151,5 @@ void loop() {
   Serial.print(", pending=");
   Serial.println(send_result.buffer_size);
 
-  if (g_state != RuntimeState::auth_failed) {
-    g_state = RuntimeState::measuring;
-  }
+
 }

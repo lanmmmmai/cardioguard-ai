@@ -300,6 +300,7 @@ async def create_sensor_data(data: SensorDataCreate, request: Request, authoriza
 @router.post("/iot/telemetry")
 async def create_iot_telemetry(
     data: IotTelemetryPayload,
+    request: Request,
     x_device_uid: str = Header(..., alias="X-Device-Uid"),
     x_device_mac: str = Header(..., alias="X-Device-Mac"),
     x_device_token: str = Header(..., alias="X-Device-Token"),
@@ -307,6 +308,11 @@ async def create_iot_telemetry(
     device_key = normalize_device_identifier(x_device_mac)
     if len(device_key) != 12:
         raise HTTPException(status_code=400, detail="Invalid device MAC address")
+
+    # Áp dụng rate limit cho IoT thiết bị (tối đa 60 requests/phút)
+    from app.core.rate_limit import check_rate_limit
+    ip = request.client.host if request.client else "unknown"
+    check_rate_limit(ip, x_device_mac, "/iot/telemetry", max_requests=60, window_seconds=60)
 
     device_row = await get_device_by_mac(x_device_mac)
     if not device_row:

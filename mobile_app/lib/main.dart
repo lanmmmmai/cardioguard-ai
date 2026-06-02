@@ -166,13 +166,20 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
     }
 
     // Wrap in Safe Index Boundaries
+    final safeIndex = _currentIndex >= screens.length ? 0 : _currentIndex;
     if (_currentIndex >= screens.length) {
-      _currentIndex = 0;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _currentIndex = 0;
+          });
+        }
+      });
     }
 
     return Scaffold(
       body: IndexedStack(
-        index: _currentIndex,
+        index: safeIndex,
         children: screens,
       ),
       bottomNavigationBar: Container(

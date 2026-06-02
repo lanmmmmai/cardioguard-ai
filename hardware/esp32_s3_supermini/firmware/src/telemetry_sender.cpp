@@ -22,6 +22,7 @@ void PushBufferedPayload(const String &payload) {
     return;
   }
 
+  Serial.println("[CardioGuard] WARNING: Buffer full! Oldest frame overwritten.");
   g_buffer[g_buffer_head] = payload;
   g_buffer_head = (g_buffer_head + 1) % kOfflineBufferMaxFrames;
 }
@@ -147,7 +148,7 @@ SendResult SendTelemetryFrame(const String &payload) {
 
   if (result.status_code == 400 || result.status_code == 404) {
     if (send_payload != payload) {
-      PushBufferedPayload(payload);
+      PushBufferedPayload(send_payload);
       result.buffered = true;
     }
     result.buffer_size = PendingBufferSize();

@@ -247,61 +247,69 @@ async def register(data: RegisterRequest, request: Request):
             raise HTTPException(status_code=400, detail="OTP expired")
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
-    check_query = "SELECT id FROM users WHERE email = :email"
-    existing_user = await database.fetch_one(
-        query=check_query,
-        values={"email": email}
-    )
-
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already exists")
-
     insert_query = """
     INSERT INTO users(full_name, email, password_hash, role)
     VALUES (:full_name, :email, :password_hash, :role)
     """
 
     user_id = None
-    async with database.transaction():
-        await database.execute(
-            query=insert_query,
-            values={
-                "full_name": otp_result.metadata.get("full_name") or data.full_name,
-                "email": email,
-                "password_hash": hash_password(data.password),
-                "role": "patient"
-            }
-        )
+    try:
+        async with database.transaction():
+            check_query = "SELECT id FROM users WHERE email = :email"
+            existing_user = await database.fetch_one(
+                query=check_query,
+                values={"email": email}
+            )
 
-        # Đồng bộ hồ sơ patient ngay sau đăng ký để tránh /patients/me trả null.
-        created_user = await database.fetch_one(
-            "SELECT id::text as id, full_name FROM users WHERE email = :email",
-            {"email": email},
-        )
-        user_id = created_user["id"] if created_user else None
-        if created_user:
-            patient_columns = await database.fetch_all(
-                """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = 'public' AND table_name = 'patients'
-                """
-            )
-            patient_cols = {row["column_name"] for row in patient_columns}
-            patient_values = {
-                "id": user_id,
-                "full_name": created_user["full_name"],
-            }
-            if "user_id" in patient_cols:
-                patient_values["user_id"] = user_id
-            if "phone" in patient_cols:
-                patient_values["phone"] = None
-            insert_columns = ", ".join(patient_values.keys())
-            bind_columns = ", ".join(f":{key}" for key in patient_values.keys())
+            if existing_user:
+                raise HTTPException(status_code=400, detail="Email already exists")
+
             await database.execute(
-                f"INSERT INTO patients ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
-                patient_values,
+                query=insert_query,
+                values={
+                    "full_name": otp_result.metadata.get("full_name") or data.full_name,
+                    "email": email,
+                    "password_hash": hash_password(data.password),
+                    "role": "patient"
+                }
             )
+
+            # Đồng bộ hồ sơ patient ngay sau đăng ký để tránh /patients/me trả null.
+            created_user = await database.fetch_one(
+                "SELECT id::text as id, full_name FROM users WHERE email = :email",
+                {"email": email},
+            )
+            user_id = created_user["id"] if created_user else None
+            if created_user:
+                patient_columns = await database.fetch_all(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'patients'
+                    """
+                )
+                patient_cols = {row["column_name"] for row in patient_columns}
+                patient_values = {
+                    "id": user_id,
+                    "full_name": created_user["full_name"],
+                }
+                if "user_id" in patient_cols:
+                    patient_values["user_id"] = user_id
+                if "phone" in patient_cols:
+                    patient_values["phone"] = None
+                insert_columns = ", ".join(patient_values.keys())
+                bind_columns = ", ".join(f":{key}" for key in patient_values.keys())
+                await database.execute(
+                    f"INSERT INTO patients ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
+                    patient_values,
+                )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        err_msg = str(exc).lower()
+        if "unique constraint" in err_msg or "duplicate key" in err_msg:
+            raise HTTPException(status_code=400, detail="Email already exists")
+        raise
 
     # Ghi nhận log đăng ký thành công
     await log_activity(

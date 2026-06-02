@@ -276,6 +276,7 @@ const AppContent: React.FC = () => {
     return (
       <Patients
         patients={patients}
+        accessToken={accessToken}
         onPatientAdded={fetchPatients}
         showAddModal={showAddPatientModal}
         setShowAddModal={setShowAddPatientModal}
