@@ -20,13 +20,14 @@ Do not use `gpt-taste`, image-first workflows, GSAP-heavy motion, or marketing-p
 Before adding a dependency, check the relevant package file first. Keep existing icon libraries unless there is a concrete project reason to change them.
 
 - **Git Commit Policy**: Always compile, verify, and commit changes to git immediately after making any modifications or completing a task. Never leave unstaged or uncommitted changes in the workspace when finishing a response.
-- **Language Policy**: Always communicate with the user in Vietnamese (Luôn luôn giao tiếp với người dùng bằng tiếng Việt).
-- **Code Commenting & Documentation Policy**: Always add a detailed file header comment in every new or modified file explaining its purpose and overall flow. For any functions, classes, and complex code blocks, write detailed inline comments explaining their purpose, workflow, and what they do (Luôn thêm chú thích chi tiết ở đầu mỗi tệp tin mới hoặc tệp tin được chỉnh sửa để giải thích tác dụng và luồng hoạt động tổng thể. Đối với các hàm, lớp, và các khối mã phức tạp, phải viết comment chi tiết giải thích rõ mục đích, luồng xử lý và tác dụng của chúng).
+- **Language Policy**: Always communicate with the user in Vietnamese.
+- **Code Commenting & Documentation Policy**: Always add a detailed file header comment in every new or modified file explaining its purpose and overall flow. For any functions, classes, and complex code blocks, write detailed inline comments explaining their purpose, workflow, and what they do.
   * **Python (Backend)**: Use Google Style Python Docstrings for modules, classes, and functions (including inputs `Args`, outputs `Returns`, and exceptions `Raises`).
   * **TypeScript/React (Frontend)**: Use JSDoc/TSDoc format for functions and components to show descriptions on hover.
   * **Dart/Flutter (Mobile)**: Use triple-slash (`///`) document comments above classes and methods to enable DartDoc rendering.
   * **File Header structure**: Every file must start with a header block containing: (1) File purpose, (2) Overall workflow/logic, (3) System component relationships.
-- **Bug Fix & Task Execution Workflow**: Always follow the step-by-step issue-fix and verification workflow defined in [WORKFLOW.md](file:///e:/AIoT/cardioguard-ai/WORKFLOW.md) (Luôn tuân thủ quy trình sửa lỗi và xác minh từng bước được định nghĩa trong WORKFLOW.md).
+- **Bug Fix & Task Execution Workflow**: Always follow the step-by-step issue-fix and verification workflow defined in [WORKFLOW.md](file:///e:/AIoT/cardioguard-ai/WORKFLOW.md).
+
 
 
 
