@@ -94,75 +94,138 @@ export const cmsApi = {
   },
 
   async get(module: string, id: string, token: string) {
-    const response = await fetch(`${API_URL}/cms/${module}/${id}`, {
-      headers: authHeaders(token),
-    });
-    if (!response.ok) throw new Error(await readError(response));
-    return response.json();
+    console.debug('[cmsApi.get] module=%s id=%s', module, id);
+    const getUrl = `${API_URL}/cms/${module}/${id}`;
+    console.info('[cmsApi.get] GET %s', getUrl);
+    try {
+      const response = await fetch(getUrl, {
+        headers: authHeaders(token),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      console.info('[cmsApi.get] %d OK', response.status);
+      return response.json();
+    } catch (err) {
+      console.error('[cmsApi.get] %s', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
   },
 
   async create(module: string, payload: Record<string, any>, token: string) {
-    const response = await fetch(`${API_URL}/cms/${module}`, {
-      method: 'POST',
-      headers: jsonHeaders(token),
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) throw new Error(await readError(response));
-    return response.json();
+    console.debug('[cmsApi.create] module=%s', module);
+    const createUrl = `${API_URL}/cms/${module}`;
+    console.info('[cmsApi.create] POST %s', createUrl);
+    try {
+      const response = await fetch(createUrl, {
+        method: 'POST',
+        headers: jsonHeaders(token),
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      console.info('[cmsApi.create] %d OK', response.status);
+      return response.json();
+    } catch (err) {
+      console.error('[cmsApi.create] %s', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
   },
 
   async update(module: string, id: string, payload: Record<string, any>, token: string) {
-    const response = await fetch(`${API_URL}/cms/${module}/${id}`, {
-      method: 'PUT',
-      headers: jsonHeaders(token),
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) throw new Error(await readError(response));
-    return response.json();
+    console.debug('[cmsApi.update] module=%s id=%s', module, id);
+    const updateUrl = `${API_URL}/cms/${module}/${id}`;
+    console.info('[cmsApi.update] PUT %s', updateUrl);
+    try {
+      const response = await fetch(updateUrl, {
+        method: 'PUT',
+        headers: jsonHeaders(token),
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      console.info('[cmsApi.update] %d OK', response.status);
+      return response.json();
+    } catch (err) {
+      console.error('[cmsApi.update] %s', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
   },
 
   async remove(module: string, id: string, token: string) {
-    const response = await fetch(`${API_URL}/cms/${module}/${id}`, {
-      method: 'DELETE',
-      headers: authHeaders(token),
-    });
-    if (!response.ok) throw new Error(await readError(response));
-    return response.json();
+    console.debug('[cmsApi.remove] module=%s id=%s', module, id);
+    const removeUrl = `${API_URL}/cms/${module}/${id}`;
+    console.info('[cmsApi.remove] DELETE %s', removeUrl);
+    try {
+      const response = await fetch(removeUrl, {
+        method: 'DELETE',
+        headers: authHeaders(token),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      console.info('[cmsApi.remove] %d OK', response.status);
+      return response.json();
+    } catch (err) {
+      console.error('[cmsApi.remove] %s', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
   },
 
   async importCsv(module: string, file: File, token: string) {
-    const body = new FormData();
-    body.append('file', file);
-    const response = await fetch(`${API_URL}/cms/${module}/import-csv`, {
-      method: 'POST',
-      headers: authHeaders(token),
-      body,
-    });
-    if (!response.ok) throw new Error(await readError(response));
-    return response.json();
+    console.debug('[cmsApi.importCsv] module=%s fileName=%s size=%d', module, file.name, file.size);
+    const importUrl = `${API_URL}/cms/${module}/import-csv`;
+    console.info('[cmsApi.importCsv] POST %s', importUrl);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const response = await fetch(importUrl, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body,
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      console.info('[cmsApi.importCsv] %d OK', response.status);
+      return response.json();
+    } catch (err) {
+      console.error('[cmsApi.importCsv] %s', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
   },
 
   async exportCsv(module: string, token: string, query?: Pick<CmsQuery, 'q' | 'filter'>) {
+    console.debug('[cmsApi.exportCsv] module=%s hasQuery=%s', module, !!query);
     const params = new URLSearchParams();
     if (query?.q) params.set('q', query.q);
     if (query?.filter) params.set('filter', query.filter);
     const suffix = params.toString() ? `?${params.toString()}` : '';
-    const response = await fetch(`${API_URL}/cms/${module}/export-csv${suffix}`, {
-      headers: authHeaders(token),
-    });
-    if (!response.ok) throw new Error(await readError(response));
-    return response.blob();
+    const exportUrl = `${API_URL}/cms/${module}/export-csv${suffix}`;
+    console.info('[cmsApi.exportCsv] GET %s', exportUrl);
+    try {
+      const response = await fetch(exportUrl, {
+        headers: authHeaders(token),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      console.info('[cmsApi.exportCsv] %d OK', response.status);
+      return response.blob();
+    } catch (err) {
+      console.error('[cmsApi.exportCsv] %s', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
   },
 
   async uploadDomainLinkImage(file: File, token: string) {
-    const body = new FormData();
-    body.append('file', file);
-    const response = await fetch(`${API_URL}/cms/domain-links/upload-image`, {
-      method: 'POST',
-      headers: authHeaders(token),
-      body,
-    });
-    if (!response.ok) throw new Error(await readError(response));
-    return response.json();
+    console.debug('[cmsApi.uploadDomainLinkImage] fileName=%s size=%d', file.name, file.size);
+    const uploadUrl = `${API_URL}/cms/domain-links/upload-image`;
+    console.info('[cmsApi.uploadDomainLinkImage] POST %s', uploadUrl);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const response = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: authHeaders(token),
+        body,
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      console.info('[cmsApi.uploadDomainLinkImage] %d OK', response.status);
+      return response.json();
+    } catch (err) {
+      console.error('[cmsApi.uploadDomainLinkImage] %s', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
   },
 };

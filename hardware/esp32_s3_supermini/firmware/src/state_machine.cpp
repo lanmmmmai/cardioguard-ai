@@ -1,5 +1,8 @@
 #include "state_machine.h"
 
+// Ghi chú: Logging được ủy quyền cho caller (main.cpp). File này là pure lookup utility,
+// không chứa I/O hay logic nghiệp vụ cần log.
+
 // Trả về trạng thái tiếp theo dựa trên trạng thái hiện tại của máy trạng thái
 RuntimeState NextState(RuntimeState current_state) {
   switch (current_state) {

@@ -32,6 +32,7 @@ router = APIRouter()
 
 @router.post("/patients")
 async def create_patient(patient: PatientCreate):
+    logger.debug("Entry: create_patient() - blocked, user directed to OTP registration")
     """Bị chặn — bệnh nhân phải đăng ký qua luồng đăng ký OTP.
 
     Args:
@@ -67,11 +68,15 @@ async def get_patients(
     """
     current_user = await get_user_from_token(authorization)
     role = current_user["role"]
-    
+    logger.debug("Entry: get_patients(limit=%d, offset=%d, role=%s, user_id=%s)",
+                 limit, offset, role, current_user["id"])
+
     from app.api.user_api import table_columns
     try:
         columns = await table_columns("patients")
-    except Exception:
+        logger.debug("table_columns('patients') returned %d columns: %s", len(columns), sorted(columns))
+    except Exception as exc:
+        logger.warning("table_columns('patients') failed: %s", exc)
         columns = set()
 
     has_user_id = "user_id" in columns

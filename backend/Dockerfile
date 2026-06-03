@@ -14,10 +14,14 @@ COPY backend/app ./app
 COPY backend/migrations ./migrations
 COPY backend/scripts ./scripts
 
+# Auto-run migrations on startup
+COPY backend/scripts/start.sh ./start.sh
+RUN chmod +x ./start.sh
+
 RUN adduser --disabled-password --gecos "" appuser && \
     chown -R appuser:appuser /workspace/backend
 USER appuser
 
 EXPOSE 8000
 
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["./start.sh"]

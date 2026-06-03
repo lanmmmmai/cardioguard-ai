@@ -259,6 +259,7 @@ async def find_email_template(
     cms_email_id: Optional[str] = None,
 ) -> Optional[dict[str, Any]]:
     canonical_type, canonical_cms_id = resolve_template_identifier(email_type, cms_email_id)
+    logger.debug("Entry: find_email_template(email_type=%s, cms_email_id=%s)", canonical_type, canonical_cms_id)
     query = """
         SELECT id::text as id, function_id, cms_email_id, email_type, target_role, name, subject, html_content, text_content,
                variables, is_active, created_at, updated_at
@@ -394,6 +395,9 @@ def send_smtp_email_sync(
         logger.warning("SMTP_HOST is not configured; SMTP send skipped")
         return False
 
+    logger.debug("Entry: send_smtp_email_sync(to_email=%s)", to_email)
+    logger.info("Sending email via SMTP to=%s host=%s:%s", to_email, host, port)
+
     msg = MIMEMultipart("alternative")
     msg["Subject"] = Header(subject, "utf-8")
     msg["From"] = f"{Header(from_name, 'utf-8').encode()} <{from_email}>"
@@ -430,6 +434,7 @@ def send_smtp_email_sync(
 
         server.sendmail(from_email, recipients, msg.as_string())
         server.quit()
+        logger.info("SMTP email sent successfully to=%s", to_email)
         return True
     except Exception as e:
         logger.exception("SMTP send failed")
@@ -495,6 +500,9 @@ def send_brevo_email_sync(
     if not settings.BREVO_API_KEY:
         return False
 
+    logger.debug("Entry: send_brevo_email_sync(to_email=%s)", to_email)
+    logger.info("Sending email via Brevo API to=%s subject=%s", to_email, subject)
+
     payload: dict[str, Any] = {
         "sender": {
             "name": settings.SMTP_FROM_NAME or settings.EMAIL_FROM_NAME or "CardioGuard AI",
@@ -511,6 +519,7 @@ def send_brevo_email_sync(
     if bcc:
         payload["bcc"] = [{"email": addr.strip()} for addr in bcc.split(",") if addr.strip()]
 
+    logger.info("Executing Brevo API POST to=%s", to_email)
     response = requests.post(
         "https://api.brevo.com/v3/smtp/email",
         headers={
@@ -522,6 +531,7 @@ def send_brevo_email_sync(
         timeout=15,
     )
     response.raise_for_status()
+    logger.info("Brevo API email sent successfully to=%s", to_email)
     return True
 
 
@@ -549,6 +559,7 @@ async def render_and_deliver_email(
 
     try:
         if settings.BREVO_API_KEY:
+            logger.info("Delivery path: Brevo API for email_type=%s to=%s", email_type, to_email)
             email_sent = await run_in_threadpool(
                 send_brevo_email_sync,
                 to_email,
@@ -562,6 +573,7 @@ async def render_and_deliver_email(
             status = "sent" if email_sent else "failed"
             sent_at = datetime.now(timezone.utc)
         elif settings.SMTP_HOST:
+            logger.info("Delivery path: SMTP for email_type=%s to=%s", email_type, to_email)
             email_sent = await send_smtp_email(
                 to_email,
                 to_name,
@@ -574,7 +586,7 @@ async def render_and_deliver_email(
             status = "sent" if email_sent else "failed"
             sent_at = datetime.now(timezone.utc)
         else:
-            logger.info("Email delivery skipped in dev mode: type=%s", email_type)
+            logger.info("Delivery path: dev mode (skipped) for email_type=%s", email_type)
             status = "sent"
             sent_at = datetime.now(timezone.utc)
     except Exception as exc:
@@ -619,6 +631,7 @@ async def send_system_email(
     Gửi email hệ thống bằng template CMS.
     fallback_* được giữ lại để tương thích ngược, nhưng template CMS phải tồn tại.
     """
+    logger.debug("Entry: send_system_email(email_type=%s, to_email=%s)", email_type, to_email)
     template = await find_email_template(email_type=email_type)
     if not template:
         raise HTTPException(status_code=404, detail="Không tìm thấy mẫu email CMS cho chức năng này")

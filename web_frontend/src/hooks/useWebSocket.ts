@@ -96,6 +96,7 @@ export const useWebSocket = (
 
       socket.onopen = () => {
         if (socketRef.current !== socket) return;
+        console.debug('[useWebSocket] connection opened -> isConnected=true');
         setIsConnected(true);
         reconnectDelayRef.current = 5000; // Reset độ trễ khi kết nối thành công
         if (token) {
@@ -114,7 +115,10 @@ export const useWebSocket = (
 
       socket.onmessage = (event) => {
         try {
-          const parsedData = JSON.parse(event.data) as RealtimeEnvelope | SensorTelemetryMessage;
+          const raw = typeof event.data === 'string' ? event.data : '';
+          const parsedData = JSON.parse(raw) as RealtimeEnvelope | SensorTelemetryMessage;
+          const msgType = parsedData && typeof parsedData === 'object' && 'type' in parsedData ? (parsedData as RealtimeEnvelope).type : 'unknown';
+          console.debug('[useWebSocket] message type=%s size=%d bytes', msgType, raw.length);
           if (
             typeof parsedData === 'object' &&
             parsedData !== null &&
@@ -134,6 +138,7 @@ export const useWebSocket = (
       socket.onclose = () => {
         if (socketRef.current !== socket) return;
         socketRef.current = null;
+        console.debug('[useWebSocket] connection closed -> isConnected=false');
         setIsConnected(false);
         if (pingIntervalRef.current) {
           clearInterval(pingIntervalRef.current);

@@ -92,6 +92,8 @@ TelemetryFrame GenerateRandomTelemetry(unsigned long sequence, DemoMode mode) {
   static float temp_base = 36.9f;                  // Giá trị cơ sở của nhiệt độ cơ thể
 
   if (mode != last_mode) {
+    Serial.print("[CardioGuard] Demo mode reset: ");
+    Serial.println(ModeToString(mode));
     hr_base = 78;
     spo2_base = 98;
     ecg_base = 0.02f;

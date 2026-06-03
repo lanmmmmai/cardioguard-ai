@@ -360,6 +360,7 @@ async def request_register_otp(data: RegisterOtpRequest, request: Request):
     check_rate_limit(ip, email, "/auth/register/request-otp", max_requests=5, window_seconds=60)
 
     reg_role = (data.role or "patient").strip().lower()
+    logger.debug("Entry: request_register_otp(email=%s, role=%s)", email, reg_role)
     if reg_role == "admin":
         raise HTTPException(status_code=400, detail="Đăng ký tài khoản Admin không được phép công khai.")
     if reg_role not in VALID_ROLES:
@@ -416,6 +417,7 @@ async def register(data: RegisterRequest, request: Request):
         HTTPException 400: Nếu OTP không hợp lệ/hết hạn hoặc email đã tồn tại.
     """
     email = data.email.lower()
+    logger.debug("Entry: register(email=%s)", email)
     otp_result = await verify_otp_token(
         purpose=OTP_PURPOSE_REGISTER,
         email=email,
@@ -424,8 +426,11 @@ async def register(data: RegisterRequest, request: Request):
 
     if not otp_result.is_valid:
         if otp_result.reason == "expired":
+            logger.info("Register OTP expired for email=%s", email)
             raise HTTPException(status_code=400, detail="OTP expired")
+        logger.info("Invalid register OTP for email=%s", email)
         raise HTTPException(status_code=400, detail="Invalid OTP")
+    logger.info("Register OTP valid for email=%s", email)
 
     insert_query = """
     INSERT INTO users(full_name, email, password_hash, role, phone, specialty, department, status, profile_completed, is_verified)
@@ -501,6 +506,7 @@ async def register(data: RegisterRequest, request: Request):
         err_msg = str(exc).lower()
         if "unique constraint" in err_msg or "duplicate key" in err_msg:
             raise HTTPException(status_code=400, detail="Email already exists")
+        logger.exception("Registration failed unexpectedly for email=%s", email)
         raise
 
     # Ghi nhận log đăng ký thành công
@@ -641,6 +647,8 @@ async def login(data: LoginRequest, request: Request):
         "role": db_role
     })
 
+    logger.info("Login successful: email=%s role=%s", email, db_role)
+
     # Ghi nhận đăng nhập thành công
     await log_activity(
         user_id=user["id"],
@@ -721,6 +729,7 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Requ
     ip = get_client_ip(request)
     email = data.email.lower()
     check_rate_limit(ip, email, "/auth/forgot-password/request-otp", max_requests=5, window_seconds=60)
+    logger.debug("Entry: request_forgot_password_otp(email=%s)", email)
 
     response = generic_forgot_password_response(email)
     user = await database.fetch_one(
@@ -778,6 +787,7 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
     ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
     check_rate_limit(ip, email, "/auth/forgot-password/verify-otp", max_requests=5, window_seconds=60)
+    logger.debug("Entry: verify_forgot_password_otp(email=%s)", email)
 
     otp_result = await verify_otp_token(
         purpose=OTP_PURPOSE_FORGOT_PASSWORD,
@@ -787,8 +797,11 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
 
     if not otp_result.is_valid:
         if otp_result.reason == "expired":
+            logger.info("OTP expired for email=%s", email)
             raise HTTPException(status_code=400, detail="OTP expired")
+        logger.info("Invalid OTP for email=%s", email)
         raise HTTPException(status_code=400, detail="Invalid OTP")
+    logger.info("OTP valid for email=%s", email)
 
     user_id = otp_result.metadata.get("user_id")
     if user_id:
@@ -872,7 +885,8 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
         allow_uncompleted=True,
         allow_unverified=True,
     )
-    
+    logger.debug("Entry: change_password(user_id=%s)", current_user["id"])
+
     user = await database.fetch_one(
         "SELECT password_hash FROM users WHERE id = :id::uuid",
         {"id": current_user["id"]}
@@ -949,6 +963,7 @@ async def me(authorization: Optional[str] = Header(default=None)):
     Returns:
         Dict chứa đối tượng người dùng đã xác thực.
     """
+    logger.debug("Entry: me()")
     return {
         "user": await get_user_from_token(
             authorization,

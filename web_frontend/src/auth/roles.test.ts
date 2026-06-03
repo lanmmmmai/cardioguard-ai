@@ -28,6 +28,6 @@ describe("defaultRouteByRole", () => {
   it("ánh xạ mỗi vai trò đến đường dẫn mong đợi", () => {
     expect(defaultRouteByRole.admin).toBe("/admin/dashboard");
     expect(defaultRouteByRole.doctor).toBe("/doctor/dashboard");
-    expect(defaultRouteByRole.patient).toBe("/patient/home");
+    expect(defaultRouteByRole.patient).toBe("/patient/dashboard");
   });
 });

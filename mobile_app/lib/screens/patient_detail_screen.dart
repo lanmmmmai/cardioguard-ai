@@ -61,6 +61,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint(
+        '[CardioGuard] PatientDetailScreen initState | patientId=${widget.patient['id']}');
 
     // Điền ban đầu với các điểm giả định ổn định
     for (int i = 0; i < 15; i++) {
@@ -79,6 +81,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           Provider.of<PatientProvider>(context, listen: false);
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
+      debugPrint(
+          '[CardioGuard] PatientDetailScreen fetching data for patientId=$patientId');
       patientProvider.fetchMedicalRecords(patientId);
       patientProvider.fetchPrescriptions(patientId);
       chatProvider.fetchChatHistory(patientId);
@@ -87,6 +91,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         if (!mounted) return;
         final history = patientProvider.sensorHistory;
         if (history.isNotEmpty) {
+          debugPrint(
+              '[CardioGuard] PatientDetailScreen sensorHistory loaded | count=${history.length}');
           setState(() {
             _hrSpots.clear();
             _spo2Spots.clear();
@@ -112,6 +118,13 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    debugPrint(
+        '[CardioGuard] PatientDetailScreen didChangeDependencies | patientId=${widget.patient['id']}');
+  }
+
   // Xử lý các sự kiện WebSocket: tin nhắn chat cập nhật giao diện trò chuyện;
   // health_metrics cập nhật các chỉ số sinh tồn trực tiếp và dữ liệu biểu đồ xu hướng.
   void _onWebSocketEvent(Map<String, dynamic> event) {
@@ -124,6 +137,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     } else if (type == 'health_metrics' &&
         event['patient_id'] == widget.patient['id']) {
       final metrics = event['data'] as Map<String, dynamic>;
+      debugPrint(
+          '[CardioGuard] PatientDetailScreen WS health_metrics | HR=${metrics['heart_rate']} SpO2=${metrics['spo2']} BP=${metrics['systolic_bp']}/${metrics['diastolic_bp']}');
       setState(() {
         _currentHr = (metrics['heart_rate'] as num?)?.toDouble() ?? 75.0;
         _currentSpo2 = (metrics['spo2'] as num?)?.toDouble() ?? 98.0;
@@ -142,6 +157,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
   @override
   void dispose() {
+    debugPrint(
+        '[CardioGuard] PatientDetailScreen dispose | patientId=${widget.patient['id']}');
     WebSocketService.removeListener(_onWebSocketEvent);
     _messageController.dispose();
     super.dispose();
@@ -149,6 +166,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
   // Mở bottom sheet để bác sĩ thêm hồ sơ bệnh án mới.
   void _showAddRecordSheet() {
+    debugPrint(
+        '[CardioGuard] PatientDetailScreen opening AddRecordSheet | patientId=${widget.patient['id']}');
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -162,11 +181,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           isDarkTheme: widget.isDarkTheme,
         );
       },
-    );
+    ).whenComplete(() => debugPrint(
+        '[CardioGuard] PatientDetailScreen AddRecordSheet closed'));
   }
 
   // Mở bottom sheet để bác sĩ thêm đơn thuốc mới.
   void _showAddPrescriptionSheet() {
+    debugPrint(
+        '[CardioGuard] PatientDetailScreen opening AddPrescriptionSheet | patientId=${widget.patient['id']}');
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -180,7 +202,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           isDarkTheme: widget.isDarkTheme,
         );
       },
-    );
+    ).whenComplete(() => debugPrint(
+        '[CardioGuard] PatientDetailScreen AddPrescriptionSheet closed'));
   }
 
   // Gửi tin nhắn trò chuyện qua ChatProvider.sendMessage và xóa đầu vào.

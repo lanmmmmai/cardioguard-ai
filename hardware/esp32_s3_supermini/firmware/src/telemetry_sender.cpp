@@ -62,7 +62,17 @@ int PostPayload(const String &payload) {
     http.addHeader("X-Device-Mac", g_device_mac);
   }
   http.addHeader("X-Device-Token", kDeviceToken);
+  const unsigned long post_start = millis();
+  Serial.print("[CardioGuard] HTTP POST ");
+  Serial.print(kTelemetryEndpoint);
+  Serial.print(" payload_size=");
+  Serial.println(payload.length());
   const int status_code = http.POST(reinterpret_cast<const uint8_t *>(payload.c_str()), payload.length());
+  const unsigned long post_duration = millis() - post_start;
+  Serial.print("[CardioGuard] HTTP response status=");
+  Serial.print(status_code);
+  Serial.print(" duration=");
+  Serial.println(post_duration);
   http.end();
   return status_code;
 }
@@ -94,6 +104,7 @@ void MaintainConnectivity() {
 
   g_last_wifi_attempt_ms = now;
   WiFi.disconnect();
+  Serial.println("[CardioGuard] WiFi reconnecting...");
   WiFi.begin(kWifiSsid, kWifiPassword);
 }
 
@@ -160,6 +171,9 @@ SendResult SendTelemetryFrame(const String &payload) {
   if (result.status_code >= 200 && result.status_code < 300) {
     result.sent = true;
     result.buffer_size = PendingBufferSize();
+    if (g_buffer_count == 0 && is_buffered_frame) {
+      Serial.println("[CardioGuard] Buffer drained, all pending frames sent");
+    }
     g_backoff_ms = kBackoffMinMs;
     g_backoff_until_ms = 0UL;
 
@@ -201,6 +215,9 @@ SendResult SendTelemetryFrame(const String &payload) {
   if (IsRetryableStatus(result.status_code) || result.status_code <= 0) {
     result.should_backoff = true;
     g_backoff_until_ms = now + g_backoff_ms;
+    Serial.print("[CardioGuard] Backoff started, delay=");
+    Serial.print(g_backoff_ms);
+    Serial.println("ms");
     g_backoff_ms = static_cast<uint16_t>(min(static_cast<unsigned long>(kBackoffMaxMs), static_cast<unsigned long>(g_backoff_ms) * 2UL));
   }
 

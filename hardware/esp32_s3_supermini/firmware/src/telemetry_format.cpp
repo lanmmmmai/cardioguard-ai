@@ -91,5 +91,8 @@ String BuildTelemetryJson(const TelemetryFrame &frame) {
   json += String(frame.device.uptime_ms);
   json += "}}";
 
+  Serial.print("[CardioGuard] BuildTelemetryJson: json_len=");
+  Serial.println(json.length());
+
   return json;
 }

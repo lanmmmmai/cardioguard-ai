@@ -111,6 +111,11 @@ class FakePatientProvider extends PatientProvider {
   Future<void> fetchPrescriptions(String patientId) async {
     // Ghi đè để ngăn các lời gọi HTTP thực trong quá trình kiểm thử
   }
+
+  @override
+  Future<void> fetchSensorHistory(String patientId) async {
+    // Ghi đè để ngăn các lời gọi HTTP thực trong quá trình kiểm thử
+  }
 }
 
 // Giả lập AlertProvider với danh sách cảnh báo có thể kiểm soát.
@@ -325,7 +330,7 @@ void main() {
 
       // Panel detail bên phải lập tức hiển thị thông tin bệnh nhân
       expect(find.text('Chẩn đoán:'), findsNothing); // tab bệnh án mặc định trống hoặc chưa load
-      expect(find.text('Tuổi'), findsOneWidget); // Tab chỉ số hiển thị chi tiết tuổi bệnh nhân trực quan
+      expect(find.textContaining('Nam • 45 tuổi'), findsOneWidget); // Tab chỉ số hiển thị chi tiết tuổi bệnh nhân trực quan
     });
   });
 }
