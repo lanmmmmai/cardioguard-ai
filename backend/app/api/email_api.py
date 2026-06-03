@@ -53,9 +53,27 @@ VALID_EMAIL_TYPES = {
     "doctor_verified",
     "doctor_rejected",
     "doctor_need_update",
+    "doctor_verified_success",
+    "doctor_verified_rejected",
+    "doctor_profile_require_update",
 }
 
 LEGACY_EMAIL_TYPES = set(EMAIL_TYPE_ALIASES.keys())
+SYSTEM_EMAIL_GROUPS = {
+    "auth": {"otp_register", "otp_login", "welcome", "reset_password"},
+    "account": {
+        "doctor_pending_verification",
+        "doctor_verified",
+        "doctor_rejected",
+        "doctor_need_update",
+        "doctor_verified_success",
+        "doctor_verified_rejected",
+        "doctor_profile_require_update",
+    },
+    "appointment": {"appointment_reminder", "doctor_assignment"},
+    "health": {"emergency_alert", "health_alert"},
+    "report": {"monthly_report"},
+}
 
 
 # -----------------------------------------------------------
@@ -65,22 +83,51 @@ LEGACY_EMAIL_TYPES = set(EMAIL_TYPE_ALIASES.keys())
 class TemplateCreate(BaseModel):
     cms_email_id: Optional[str] = None
     email_type: str
+    function_id: Optional[str] = None
     name: str
     subject: str
     html_content: str
     text_content: str = ""
     variables: list[str] = Field(default_factory=list)
+    target_role: Optional[str] = None
     is_active: bool = True
 
 
 class TemplateUpdate(BaseModel):
     cms_email_id: Optional[str] = None
     email_type: Optional[str] = None
+    function_id: Optional[str] = None
     name: Optional[str] = None
     subject: Optional[str] = None
     html_content: Optional[str] = None
     text_content: Optional[str] = None
     variables: Optional[list[str]] = None
+    target_role: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class EmailFunctionCreate(BaseModel):
+    email_type: str
+    cms_email_id: str
+    name: str
+    group_key: str = "custom"
+    target_role: str = "all"
+    description: str = ""
+    required_variables: list[str] = Field(default_factory=list)
+    optional_variables: list[str] = Field(default_factory=list)
+    is_system: bool = False
+    is_active: bool = True
+
+
+class EmailFunctionUpdate(BaseModel):
+    email_type: Optional[str] = None
+    cms_email_id: Optional[str] = None
+    name: Optional[str] = None
+    group_key: Optional[str] = None
+    target_role: Optional[str] = None
+    description: Optional[str] = None
+    required_variables: Optional[list[str]] = None
+    optional_variables: Optional[list[str]] = None
     is_active: Optional[bool] = None
 
 
@@ -112,6 +159,49 @@ async def require_admin(authorization: Optional[str]) -> dict[str, Any]:
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Chỉ admin mới có quyền truy cập Email CMS")
     return user
+
+
+async def fetch_email_function_by_type(email_type: str) -> Optional[dict[str, Any]]:
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            text("SELECT * FROM cms_email_functions WHERE lower(email_type) = lower(:email_type) LIMIT 1"),
+            {"email_type": normalize_email_type(email_type)},
+        )
+        row = result.mappings().first()
+    return dict(row) if row else None
+
+
+async def fetch_email_function_by_id(function_id: str) -> Optional[dict[str, Any]]:
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            text("SELECT * FROM cms_email_functions WHERE id::text = :id LIMIT 1"),
+            {"id": function_id},
+        )
+        row = result.mappings().first()
+    return dict(row) if row else None
+
+
+async def resolve_email_function(email_type: Optional[str] = None, cms_email_id: Optional[str] = None) -> Optional[dict[str, Any]]:
+    canonical_type = normalize_email_type(email_type)
+    if canonical_type:
+        fn = await fetch_email_function_by_type(canonical_type)
+        if fn:
+            return fn
+    if cms_email_id:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                text("""
+                    SELECT *
+                    FROM cms_email_functions
+                    WHERE lower(cms_email_id) = lower(:cms_email_id)
+                    LIMIT 1
+                """),
+                {"cms_email_id": normalize_cms_email_id(cms_email_id, canonical_type)},
+            )
+            row = result.mappings().first()
+        if row:
+            return dict(row)
+    return None
 
 
 from app.services.email_service import render_template
@@ -187,9 +277,23 @@ def normalize_variables_value(value: Any) -> list[str]:
     return [str(value).strip()]
 
 
+def normalize_function_row(row: dict[str, Any]) -> dict[str, Any]:
+    result = dict(row)
+    if result.get("id") is not None:
+        result["id"] = str(result["id"])
+    for key in ("required_variables", "optional_variables"):
+        if key in result:
+            result[key] = normalize_variables_value(result[key])
+    if "email_type" in result and result["email_type"]:
+        result["email_type"] = normalize_email_type(result["email_type"])
+    if "cms_email_id" in result and result["cms_email_id"]:
+        result["cms_email_id"] = normalize_cms_email_id(result["cms_email_id"])
+    return result
+
+
 def template_row_to_dict(row: dict[str, Any]) -> dict[str, Any]:
     result = dict(row)
-    for key in ("id", "template_id"):
+    for key in ("id", "template_id", "function_id"):
         if key in result and result[key] is not None:
             result[key] = str(result[key])
     for key in ("created_at", "updated_at", "sent_at"):
@@ -263,10 +367,191 @@ async def maybe_toggle_active_template(email_type: str, template_id: Optional[st
         await deactivate_other_templates(email_type, template_id)
 
 
+@cms_router.get("/email-functions")
+async def list_email_functions(
+    authorization: Optional[str] = Header(default=None),
+    q: Optional[str] = Query(default=None),
+    group_key: Optional[str] = Query(default=None),
+    target_role: Optional[str] = Query(default=None),
+    is_active: Optional[bool] = Query(default=None),
+):
+    await require_admin(authorization)
+    params: dict[str, Any] = {}
+    where_parts = []
+    if q:
+        params["q"] = f"%{q}%"
+        where_parts.append("(name ILIKE :q OR email_type ILIKE :q OR cms_email_id ILIKE :q)")
+    if group_key:
+        params["group_key"] = group_key
+        where_parts.append("group_key = :group_key")
+    if target_role:
+        params["target_role"] = target_role
+        where_parts.append("target_role = :target_role")
+    if is_active is not None:
+        params["is_active"] = is_active
+        where_parts.append("is_active = :is_active")
+
+    where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            text(f"""
+                SELECT *
+                FROM cms_email_functions
+                {where_sql}
+                ORDER BY is_system DESC, updated_at DESC
+            """),
+            params,
+        )
+        items = [normalize_function_row(dict(row)) for row in result.mappings().all()]
+    return {"items": items, "total": len(items)}
+
+
+@cms_router.post("/email-functions")
+async def create_email_function(
+    payload: EmailFunctionCreate,
+    request: Request,
+    authorization: Optional[str] = Header(default=None),
+):
+    admin = await require_admin(authorization)
+    email_type = normalize_email_type(payload.email_type)
+    cms_email_id = normalize_cms_email_id(payload.cms_email_id, email_type)
+    if not email_type:
+        raise HTTPException(status_code=422, detail="email_type không hợp lệ")
+    if email_type == "custom":
+        raise HTTPException(status_code=422, detail="Không được lưu email_type = custom")
+    if not cms_email_id:
+        raise HTTPException(status_code=422, detail="cms_email_id không hợp lệ")
+
+    async with AsyncSessionLocal() as session:
+        dup_type = await session.execute(
+            text("SELECT id FROM cms_email_functions WHERE lower(email_type) = lower(:email_type) LIMIT 1"),
+            {"email_type": email_type},
+        )
+        if dup_type.first():
+            raise HTTPException(status_code=409, detail="Không được trùng email_type")
+        dup_cms = await session.execute(
+            text("SELECT id FROM cms_email_functions WHERE lower(cms_email_id) = lower(:cms_email_id) LIMIT 1"),
+            {"cms_email_id": cms_email_id},
+        )
+        if dup_cms.first():
+            raise HTTPException(status_code=409, detail="Không được trùng cms_email_id")
+
+        new_id = str(uuid.uuid4())
+        await session.execute(
+            text("""
+                INSERT INTO cms_email_functions (
+                    id, email_type, cms_email_id, name, group_key, target_role, description,
+                    required_variables, optional_variables, is_system, is_active
+                ) VALUES (
+                    :id, :email_type, :cms_email_id, :name, :group_key, :target_role, :description,
+                    :required_variables::jsonb, :optional_variables::jsonb, :is_system, :is_active
+                )
+            """),
+            {
+                "id": new_id,
+                "email_type": email_type,
+                "cms_email_id": cms_email_id,
+                "name": payload.name.strip(),
+                "group_key": payload.group_key.strip() or "custom",
+                "target_role": payload.target_role.strip() or "all",
+                "description": payload.description.strip(),
+                "required_variables": json.dumps(normalize_variables_value(payload.required_variables)),
+                "optional_variables": json.dumps(normalize_variables_value(payload.optional_variables)),
+                "is_system": payload.is_system,
+                "is_active": payload.is_active,
+            },
+        )
+        await session.commit()
+
+    await log_activity(
+        user_id=admin["id"],
+        action="EMAIL_FUNCTION_CREATE",
+        entity_type="cms_email_functions",
+        entity_id=new_id,
+        ip_address=request.client.host if request.client else "-",
+    )
+    return await fetch_email_function_by_id(new_id)
+
+
+@cms_router.put("/email-functions/{function_id}")
+async def update_email_function(
+    function_id: str,
+    payload: EmailFunctionUpdate,
+    request: Request,
+    authorization: Optional[str] = Header(default=None),
+):
+    admin = await require_admin(authorization)
+    existing = await fetch_email_function_by_id(function_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Chức năng email không tồn tại")
+    if existing.get("is_system"):
+        raise HTTPException(status_code=403, detail="Không được sửa chức năng hệ thống")
+
+    updates: dict[str, Any] = {}
+    if payload.email_type is not None:
+        email_type = normalize_email_type(payload.email_type)
+        if not email_type or email_type == "custom":
+            raise HTTPException(status_code=422, detail="email_type không hợp lệ")
+        updates["email_type"] = email_type
+    if payload.cms_email_id is not None:
+        updates["cms_email_id"] = normalize_cms_email_id(payload.cms_email_id, payload.email_type or existing["email_type"])
+    if payload.name is not None:
+        updates["name"] = payload.name.strip()
+    if payload.group_key is not None:
+        updates["group_key"] = payload.group_key.strip()
+    if payload.target_role is not None:
+        updates["target_role"] = payload.target_role.strip()
+    if payload.description is not None:
+        updates["description"] = payload.description.strip()
+    if payload.required_variables is not None:
+        updates["required_variables"] = json.dumps(normalize_variables_value(payload.required_variables))
+    if payload.optional_variables is not None:
+        updates["optional_variables"] = json.dumps(normalize_variables_value(payload.optional_variables))
+    if payload.is_active is not None:
+        updates["is_active"] = payload.is_active
+
+    if not updates:
+        return existing
+
+    if "email_type" in updates:
+        dup_type = await database.fetch_one(
+            "SELECT id FROM cms_email_functions WHERE lower(email_type) = lower(:email_type) AND id::text != :id LIMIT 1",
+            {"email_type": updates["email_type"], "id": function_id},
+        )
+        if dup_type:
+            raise HTTPException(status_code=409, detail="Không được trùng email_type")
+    if "cms_email_id" in updates:
+        dup_cms = await database.fetch_one(
+            "SELECT id FROM cms_email_functions WHERE lower(cms_email_id) = lower(:cms_email_id) AND id::text != :id LIMIT 1",
+            {"cms_email_id": updates["cms_email_id"], "id": function_id},
+        )
+        if dup_cms:
+            raise HTTPException(status_code=409, detail="Không được trùng cms_email_id")
+
+    set_sql = ", ".join(f"{k} = :{k}" for k in updates)
+    await database.execute(
+        f"UPDATE cms_email_functions SET {set_sql}, updated_at = NOW() WHERE id::text = :id",
+        {**updates, "id": function_id},
+    )
+    await log_activity(
+        user_id=admin["id"],
+        action="EMAIL_FUNCTION_UPDATE",
+        entity_type="cms_email_functions",
+        entity_id=function_id,
+        ip_address=request.client.host if request.client else "-",
+    )
+    return await fetch_email_function_by_id(function_id)
+
+
 def normalize_template_summary(row: dict[str, Any]) -> dict[str, Any]:
     result = template_row_to_dict(row)
     result["variables"] = normalize_variables_value(result.get("variables"))
     return result
+
+
+async def ensure_email_function_exists(email_type: str, cms_email_id: Optional[str] = None) -> bool:
+    resolved = await resolve_email_function(email_type=email_type, cms_email_id=cms_email_id)
+    return bool(resolved)
 
 
 # -----------------------------------------------------------
@@ -313,7 +598,7 @@ async def list_templates(
 
         rows_result = await session.execute(
             text(f"""
-                SELECT id, cms_email_id, email_type, name, subject, text_content, variables, is_active, created_at, updated_at
+                SELECT id, function_id, cms_email_id, email_type, target_role, name, subject, text_content, variables, is_active, created_at, updated_at
                 FROM email_templates
                 {where_sql}
                 ORDER BY updated_at DESC
@@ -352,7 +637,9 @@ async def create_template(
     admin = await require_admin(authorization)
 
     email_type = normalize_email_type(payload.email_type)
-    if email_type not in VALID_EMAIL_TYPES:
+    if email_type == "custom":
+        raise HTTPException(status_code=422, detail="Không được lưu email_type = custom")
+    if not await ensure_email_function_exists(email_type, payload.cms_email_id):
         raise HTTPException(status_code=422, detail=f"Loại template không hợp lệ: {payload.email_type}")
     if not payload.name.strip():
         raise HTTPException(status_code=422, detail="Tên template không được để trống")
@@ -391,16 +678,18 @@ async def create_template(
         await session.execute(
             text("""
                 INSERT INTO email_templates (
-                    id, cms_email_id, email_type, name, subject, html_content, text_content, variables, type, is_active
+                    id, function_id, cms_email_id, email_type, target_role, name, subject, html_content, text_content, variables, type, is_active
                 )
                 VALUES (
-                    :id, :cms_email_id, :email_type, :name, :subject, :html_content, :text_content, :variables::jsonb, :type, :is_active
+                    :id, :function_id, :cms_email_id, :email_type, :target_role, :name, :subject, :html_content, :text_content, :variables::jsonb, :type, :is_active
                 )
             """),
             {
                 "id": new_id,
+                "function_id": payload.function_id,
                 "cms_email_id": cms_email_id,
                 "email_type": email_type,
+                "target_role": (payload.target_role or "all").strip(),
                 "name": payload.name.strip(),
                 "subject": payload.subject.strip(),
                 "html_content": payload.html_content,
@@ -441,10 +730,14 @@ async def update_template(
 
     updates: dict[str, Any] = {}
     email_type = normalize_email_type(payload.email_type or existing.get("email_type"))
-    if email_type not in VALID_EMAIL_TYPES:
+    if email_type == "custom":
+        raise HTTPException(status_code=422, detail="Không được lưu email_type = custom")
+    if not await ensure_email_function_exists(email_type, payload.cms_email_id or existing.get("cms_email_id")):
         raise HTTPException(status_code=422, detail=f"Loại không hợp lệ: {payload.email_type}")
     target_active = payload.is_active if payload.is_active is not None else bool(existing.get("is_active"))
 
+    if payload.function_id is not None:
+        updates["function_id"] = payload.function_id
     if payload.cms_email_id is not None:
         updates["cms_email_id"] = normalize_cms_email_id(payload.cms_email_id, email_type)
     if payload.name is not None:
@@ -458,6 +751,8 @@ async def update_template(
     if payload.email_type is not None:
         updates["email_type"] = email_type
         updates["type"] = email_type
+    if payload.target_role is not None:
+        updates["target_role"] = payload.target_role.strip()
     if payload.variables is not None:
         updates["variables"] = json.dumps(normalize_variables_value(payload.variables))
     if payload.is_active is not None:

@@ -65,6 +65,9 @@ EMAIL_TEMPLATE_CATALOG = {
     "doctor_verified": {"cms_email_id": "EMAIL_DOCTOR_VERIFIED", "label": "Bác sĩ đã xác thực"},
     "doctor_rejected": {"cms_email_id": "EMAIL_DOCTOR_REJECTED", "label": "Bác sĩ bị từ chối"},
     "doctor_need_update": {"cms_email_id": "EMAIL_DOCTOR_NEED_UPDATE", "label": "Bác sĩ cần bổ sung"},
+    "doctor_verified_success": {"cms_email_id": "EMAIL_DOCTOR_VERIFIED", "label": "Bác sĩ đã được xác thực"},
+    "doctor_verified_rejected": {"cms_email_id": "EMAIL_DOCTOR_REJECTED", "label": "Bác sĩ bị từ chối xác thực"},
+    "doctor_profile_require_update": {"cms_email_id": "EMAIL_DOCTOR_NEED_UPDATE", "label": "Bác sĩ cần bổ sung hồ sơ"},
 }
 
 EMAIL_TYPE_ALIASES = {
@@ -72,6 +75,9 @@ EMAIL_TYPE_ALIASES = {
     "alert_critical": "emergency_alert",
     "doctor_assigned": "doctor_assignment",
     "health_warning": "health_alert",
+    "doctor_verified_success": "doctor_verified",
+    "doctor_verified_rejected": "doctor_rejected",
+    "doctor_profile_require_update": "doctor_need_update",
 }
 
 DEFAULT_TEMPLATE_VARIABLES = [
@@ -96,9 +102,9 @@ DEFAULT_TEMPLATE_VARIABLES = [
 
 DOCTOR_STATUS_TEMPLATE_MAP = {
     "pending_verification": "doctor_pending_verification",
-    "active": "doctor_verified",
-    "rejected": "doctor_rejected",
-    "need_update": "doctor_need_update",
+    "active": "doctor_verified_success",
+    "rejected": "doctor_verified_rejected",
+    "need_update": "doctor_profile_require_update",
 }
 
 
@@ -223,7 +229,7 @@ async def find_email_template(
 ) -> Optional[dict[str, Any]]:
     canonical_type, canonical_cms_id = resolve_template_identifier(email_type, cms_email_id)
     query = """
-        SELECT id::text as id, cms_email_id, email_type, name, subject, html_content, text_content,
+        SELECT id::text as id, function_id, cms_email_id, email_type, target_role, name, subject, html_content, text_content,
                variables, is_active, created_at, updated_at
         FROM email_templates
         WHERE is_active = TRUE
@@ -512,6 +518,7 @@ async def send_system_email(
     variables: dict[str, str],
     fallback_subject: Optional[str] = None,
     fallback_html: Optional[str] = None,
+    target_role: Optional[str] = None,
 ) -> bool:
     """
     Gửi email hệ thống bằng template CMS.
@@ -520,6 +527,8 @@ async def send_system_email(
     template = await find_email_template(email_type=email_type)
     if not template:
         raise HTTPException(status_code=404, detail="Không tìm thấy mẫu email CMS cho chức năng này")
+    if target_role and template.get("target_role") and str(template["target_role"]).lower() not in {"all", str(target_role).lower()}:
+        raise HTTPException(status_code=403, detail="Template không phù hợp với vai trò người nhận")
 
     subject = template["subject"]
     html_content = template["html_content"]
@@ -558,4 +567,40 @@ async def send_doctor_status_email(email: str, full_name: str, status: str, note
         to_email=email,
         to_name=full_name,
         variables=variables,
+        target_role="doctor",
+    )
+
+
+async def send_email_by_type(
+    email_type: str,
+    to_email: str,
+    to_name: str,
+    variables: dict[str, str],
+    target_role: Optional[str] = None,
+) -> bool:
+    return await send_system_email(
+        email_type=email_type,
+        to_email=to_email,
+        to_name=to_name,
+        variables=variables,
+        target_role=target_role,
+    )
+
+
+async def send_email_by_cms_id(
+    cms_email_id: str,
+    to_email: str,
+    to_name: str,
+    variables: dict[str, str],
+    target_role: Optional[str] = None,
+) -> bool:
+    template = await find_email_template(cms_email_id=cms_email_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Không tìm thấy mẫu email CMS cho chức năng này")
+    return await send_system_email(
+        email_type=template["email_type"],
+        to_email=to_email,
+        to_name=to_name,
+        variables=variables,
+        target_role=target_role,
     )

@@ -214,10 +214,32 @@ async def ensure_email_cms_schema() -> None:
         logger.warning("Could not ensure pgcrypto extension for email CMS schema", exc_info=True)
 
     statements = [
+        """
+        CREATE TABLE IF NOT EXISTS cms_email_functions (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            email_type TEXT NOT NULL,
+            cms_email_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            group_key TEXT NOT NULL DEFAULT 'custom',
+            target_role TEXT NOT NULL DEFAULT 'all',
+            description TEXT DEFAULT '',
+            required_variables JSONB DEFAULT '[]'::jsonb,
+            optional_variables JSONB DEFAULT '[]'::jsonb,
+            is_system BOOLEAN DEFAULT FALSE,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+        """,
+        "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS function_id UUID REFERENCES cms_email_functions(id) ON DELETE SET NULL",
+        "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS target_role TEXT DEFAULT 'all'",
+        "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS sample_variables JSONB DEFAULT '{}'::jsonb",
+        "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ",
         "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS cms_email_id TEXT",
         "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS email_type TEXT",
         "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS text_content TEXT DEFAULT ''",
         "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS variables JSONB DEFAULT '[]'::jsonb",
+        "UPDATE email_templates SET target_role = COALESCE(NULLIF(target_role, ''), 'all')",
         "UPDATE email_templates SET email_type = COALESCE(NULLIF(email_type, ''), NULLIF(type, '')) WHERE email_type IS NULL OR email_type = ''",
         """
         UPDATE email_templates
@@ -265,6 +287,55 @@ async def ensure_email_cms_schema() -> None:
             await database.execute(statement)
     except Exception:
         logger.exception("Failed to synchronize email CMS schema")
+        raise
+
+    default_functions = [
+        {"email_type": "otp_register", "cms_email_id": "EMAIL_OTP_REGISTER", "name": "OTP Đăng ký", "group_key": "auth", "target_role": "patient", "description": "Gửi OTP khi đăng ký tài khoản bệnh nhân.", "required_variables": ["full_name", "otp"], "optional_variables": ["hospital_name", "current_date"], "is_system": True},
+        {"email_type": "otp_login", "cms_email_id": "EMAIL_OTP_LOGIN", "name": "OTP Đăng nhập", "group_key": "auth", "target_role": "all", "description": "Gửi OTP khi đăng nhập.", "required_variables": ["full_name", "otp"], "optional_variables": ["hospital_name", "current_date"], "is_system": True},
+        {"email_type": "welcome", "cms_email_id": "EMAIL_WELCOME", "name": "Welcome Email", "group_key": "auth", "target_role": "all", "description": "Chào mừng tài khoản mới.", "required_variables": ["full_name", "role_label"], "optional_variables": ["login_url", "login_button_text"], "is_system": True},
+        {"email_type": "reset_password", "cms_email_id": "EMAIL_RESET_PASSWORD", "name": "Đặt lại mật khẩu", "group_key": "auth", "target_role": "all", "description": "Gửi mật khẩu tạm thời hoặc link đặt lại.", "required_variables": ["full_name", "otp"], "optional_variables": [], "is_system": True},
+        {"email_type": "emergency_alert", "cms_email_id": "EMAIL_EMERGENCY_ALERT", "name": "Cảnh báo khẩn cấp", "group_key": "health", "target_role": "doctor", "description": "Cảnh báo chỉ số bất thường khẩn cấp.", "required_variables": ["full_name", "alert_message"], "optional_variables": ["heart_rate", "spo2"], "is_system": True},
+        {"email_type": "appointment_reminder", "cms_email_id": "EMAIL_APPOINTMENT_REMINDER", "name": "Nhắc lịch hẹn", "group_key": "appointment", "target_role": "all", "description": "Nhắc lịch tái khám.", "required_variables": ["full_name", "appointment_date"], "optional_variables": ["doctor_name"], "is_system": True},
+        {"email_type": "doctor_assignment", "cms_email_id": "EMAIL_DOCTOR_ASSIGNMENT", "name": "Phân công bác sĩ", "group_key": "appointment", "target_role": "all", "description": "Thông báo bác sĩ phụ trách.", "required_variables": ["full_name", "doctor_name"], "optional_variables": [], "is_system": True},
+        {"email_type": "health_alert", "cms_email_id": "EMAIL_HEALTH_ALERT", "name": "Cảnh báo sức khỏe", "group_key": "health", "target_role": "patient", "description": "Cảnh báo sức khỏe theo dõi định kỳ.", "required_variables": ["full_name", "alert_message"], "optional_variables": [], "is_system": True},
+        {"email_type": "monthly_report", "cms_email_id": "EMAIL_MONTHLY_REPORT", "name": "Báo cáo tháng", "group_key": "report", "target_role": "all", "description": "Báo cáo sức khỏe tháng.", "required_variables": ["full_name", "current_date"], "optional_variables": [], "is_system": True},
+        {"email_type": "doctor_pending_verification", "cms_email_id": "EMAIL_DOCTOR_PENDING_VERIFICATION", "name": "Bác sĩ chờ duyệt", "group_key": "account", "target_role": "doctor", "description": "Thông báo hồ sơ đang chờ xác thực.", "required_variables": ["full_name"], "optional_variables": [], "is_system": True},
+        {"email_type": "doctor_verified", "cms_email_id": "EMAIL_DOCTOR_VERIFIED", "name": "Bác sĩ đã xác thực", "group_key": "account", "target_role": "doctor", "description": "Thông báo hồ sơ bác sĩ đã được xác thực.", "required_variables": ["full_name"], "optional_variables": ["login_url", "login_button_text"], "is_system": True},
+        {"email_type": "doctor_rejected", "cms_email_id": "EMAIL_DOCTOR_REJECTED", "name": "Bác sĩ bị từ chối", "group_key": "account", "target_role": "doctor", "description": "Thông báo hồ sơ bị từ chối.", "required_variables": ["full_name", "verification_note"], "optional_variables": [], "is_system": True},
+        {"email_type": "doctor_need_update", "cms_email_id": "EMAIL_DOCTOR_NEED_UPDATE", "name": "Bác sĩ cần bổ sung hồ sơ", "group_key": "doctor_account", "target_role": "doctor", "description": "Yêu cầu bổ sung hồ sơ bác sĩ.", "required_variables": ["full_name", "verification_note"], "optional_variables": ["update_profile_url", "support_email"], "is_system": True},
+        {"email_type": "doctor_verified_success", "cms_email_id": "EMAIL_DOCTOR_VERIFIED", "name": "Bác sĩ đã được xác thực", "group_key": "account", "target_role": "doctor", "description": "Alias xác thực thành công.", "required_variables": ["full_name"], "optional_variables": ["login_url", "login_button_text"], "is_system": True},
+        {"email_type": "doctor_verified_rejected", "cms_email_id": "EMAIL_DOCTOR_REJECTED", "name": "Bác sĩ bị từ chối xác thực", "group_key": "account", "target_role": "doctor", "description": "Alias từ chối xác thực.", "required_variables": ["full_name", "verification_note"], "optional_variables": [], "is_system": True},
+        {"email_type": "doctor_profile_require_update", "cms_email_id": "EMAIL_DOCTOR_NEED_UPDATE", "name": "Bác sĩ cần bổ sung hồ sơ", "group_key": "doctor_account", "target_role": "doctor", "description": "Gửi email yêu cầu bác sĩ bổ sung hồ sơ.", "required_variables": ["full_name", "verification_note"], "optional_variables": ["update_profile_url", "support_email"], "is_system": True},
+    ]
+
+    try:
+        for function in default_functions:
+            await database.execute(
+                """
+                INSERT INTO cms_email_functions (
+                    email_type, cms_email_id, name, group_key, target_role, description,
+                    required_variables, optional_variables, is_system, is_active
+                )
+                VALUES (
+                    :email_type, :cms_email_id, :name, :group_key, :target_role, :description,
+                    CAST(:required_variables AS jsonb), CAST(:optional_variables AS jsonb), :is_system, TRUE
+                )
+                ON CONFLICT (email_type) DO NOTHING
+                """,
+                {
+                    "email_type": function["email_type"],
+                    "cms_email_id": function["cms_email_id"],
+                    "name": function["name"],
+                    "group_key": function["group_key"],
+                    "target_role": function["target_role"],
+                    "description": function["description"],
+                    "required_variables": json.dumps(function["required_variables"]),
+                    "optional_variables": json.dumps(function["optional_variables"]),
+                    "is_system": function["is_system"],
+                },
+            )
+    except Exception:
+        logger.exception("Failed to seed default email functions")
         raise
 
     default_templates = [
@@ -496,17 +567,25 @@ async def ensure_email_cms_schema() -> None:
 
     try:
         for template in default_templates:
+            function_row = await database.fetch_one(
+                "SELECT id, target_role FROM cms_email_functions WHERE lower(email_type) = lower(:email_type) LIMIT 1",
+                {"email_type": template["email_type"]},
+            )
+            function_id = str(function_row["id"]) if function_row else None
+            template_target_role = str(function_row["target_role"]) if function_row and function_row["target_role"] else "all"
             await database.execute(
                 """
                 INSERT INTO email_templates (
-                    cms_email_id, email_type, name, subject, html_content, text_content, variables, type, is_active
+                    function_id, target_role, cms_email_id, email_type, name, subject, html_content, text_content, variables, type, is_active
                 )
                 VALUES (
-                    :cms_email_id, :email_type, :name, :subject, :html_content, :text_content, CAST(:variables AS jsonb), :type, TRUE
+                    :function_id, :target_role, :cms_email_id, :email_type, :name, :subject, :html_content, :text_content, CAST(:variables AS jsonb), :type, TRUE
                 )
                 ON CONFLICT (cms_email_id) DO NOTHING
                 """,
                 {
+                    "function_id": function_id,
+                    "target_role": template_target_role,
                     "cms_email_id": template["cms_email_id"],
                     "email_type": template["email_type"],
                     "name": template["name"],

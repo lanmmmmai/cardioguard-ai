@@ -4,16 +4,22 @@ import { API_URL } from '../../../config';
 import { useAuth } from '../../../auth/AuthContext';
 import { EmailVariables } from './EmailVariables';
 import {
-  EMAIL_TEMPLATE_OPTIONS,
+  CUSTOM_TEMPLATE_HINTS,
+  EMAIL_GROUP_LABEL_MAP,
+  EMAIL_TARGET_ROLE_LABEL_MAP,
+  SYSTEM_EMAIL_FUNCTIONS,
   normalizeCmsEmailId,
+  normalizeEmailType,
   parseVariablesList,
   suggestCmsEmailId,
 } from './emailTemplateCatalog';
 
 interface Template {
   id?: string;
+  function_id?: string;
   cms_email_id?: string;
   email_type: string;
+  target_role?: string;
   name: string;
   subject: string;
   html_content: string;
@@ -21,6 +27,17 @@ interface Template {
   variables: string[];
   is_active: boolean;
 }
+
+type CustomFunctionDraft = {
+  email_type: string;
+  cms_email_id: string;
+  name: string;
+  group_key: string;
+  target_role: string;
+  description: string;
+  required_variables: string[];
+  optional_variables: string[];
+};
 
 interface TemplateEditorProps {
   template: Template | null;  // null = tạo mới
@@ -33,8 +50,10 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
   const { accessToken } = useAuth();
   const [form, setForm] = useState<Template>({
     id: template?.id,
+    function_id: template?.function_id,
     cms_email_id: template?.cms_email_id ?? '',
-    email_type: template?.email_type ?? EMAIL_TEMPLATE_OPTIONS[0].value,
+    email_type: template?.email_type ?? SYSTEM_EMAIL_FUNCTIONS[0].email_type,
+    target_role: template?.target_role ?? 'all',
     name: template?.name ?? '',
     subject: template?.subject ?? '',
     html_content: template?.id ? '' : DEFAULT_HTML,
@@ -44,6 +63,18 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
   });
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [customFunctions, setCustomFunctions] = useState<Array<(typeof SYSTEM_EMAIL_FUNCTIONS)[number]>>([]);
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [draftFunction, setDraftFunction] = useState<CustomFunctionDraft>({
+    email_type: '',
+    cms_email_id: '',
+    name: '',
+    group_key: 'custom',
+    target_role: 'doctor',
+    description: '',
+    required_variables: [],
+    optional_variables: [],
+  });
   const [error, setError] = useState<string | null>(null);
   const [showVariables, setShowVariables] = useState(false);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
@@ -53,11 +84,24 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
 
   useEffect(() => {
     const loadTemplateDetail = async () => {
+      try {
+        const fnRes = await fetch(`${API_URL}/cms/email-functions`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const fnData = await fnRes.json();
+        if (fnRes.ok) {
+          setCustomFunctions((fnData.items || []).filter((item: any) => !item.is_system));
+        }
+      } catch {
+        // ignore function list load failures; editor can still work with system options
+      }
+
       // Tạo mới template
       if (!template?.id) {
         const newForm: Template = {
-          cms_email_id: suggestCmsEmailId(EMAIL_TEMPLATE_OPTIONS[0].value),
-          email_type: EMAIL_TEMPLATE_OPTIONS[0].value,
+          cms_email_id: suggestCmsEmailId(SYSTEM_EMAIL_FUNCTIONS[0].email_type),
+          email_type: SYSTEM_EMAIL_FUNCTIONS[0].email_type,
+          target_role: SYSTEM_EMAIL_FUNCTIONS[0].target_role,
           name: '',
           subject: '',
           html_content: DEFAULT_HTML,
@@ -90,8 +134,10 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
 
         const nextForm: Template = {
           id: data.id,
+          function_id: data.function_id,
           cms_email_id: data.cms_email_id || '',
-          email_type: data.email_type || data.type || EMAIL_TEMPLATE_OPTIONS[0].value,
+          email_type: data.email_type || data.type || SYSTEM_EMAIL_FUNCTIONS[0].email_type,
+          target_role: data.target_role || 'all',
           name: data.name || '',
           subject: data.subject || '',
           html_content: data.html_content || '',
@@ -102,6 +148,19 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
 
         setForm(nextForm);
         setPreviewHtml(nextForm.html_content);
+        if (data.function_id || (!SYSTEM_EMAIL_FUNCTIONS.some((item) => item.email_type === nextForm.email_type) && nextForm.email_type)) {
+          setShowCustomForm(true);
+          setDraftFunction({
+            email_type: normalizeEmailType(data.email_type || ''),
+            cms_email_id: normalizeCmsEmailId(data.cms_email_id || ''),
+            name: data.name || '',
+            group_key: data.group_key || 'custom',
+            target_role: data.target_role || 'all',
+            description: data.description || '',
+            required_variables: Array.isArray(data.required_variables) ? data.required_variables : [],
+            optional_variables: Array.isArray(data.optional_variables) ? data.optional_variables : [],
+          });
+        }
       } catch (err: any) {
         setError(err.message || 'Không thể tải template');
       } finally {
@@ -127,13 +186,21 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleEmailTypeChange = (emailType: string) => {
+    if (emailType === '__custom__') {
+      setShowCustomForm(true);
+      setForm((prev) => ({ ...prev, email_type: '', cms_email_id: '', function_id: undefined }));
+      return;
+    }
+    setShowCustomForm(false);
+    const selected = SYSTEM_EMAIL_FUNCTIONS.find((item) => item.email_type === emailType) || customFunctions.find((item) => item.email_type === emailType);
     setForm((prev) => {
       const nextCmsEmailId = prev.cms_email_id && prev.cms_email_id !== suggestCmsEmailId(prev.email_type)
         ? prev.cms_email_id
-        : suggestCmsEmailId(emailType);
+        : (selected?.cms_email_id || suggestCmsEmailId(emailType));
       return {
         ...prev,
         email_type: emailType,
+        target_role: selected?.target_role || prev.target_role || 'all',
         cms_email_id: normalizeCmsEmailId(nextCmsEmailId || suggestCmsEmailId(emailType)),
       };
     });
@@ -161,10 +228,44 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
     if (!form.name.trim()) { setError('Tên template không được trống'); return; }
     if (!form.subject.trim()) { setError('Subject không được trống'); return; }
     if (!form.html_content.trim()) { setError('Nội dung HTML không được trống'); return; }
+    if (showCustomForm) {
+      if (!draftFunction.email_type.trim()) { setError('email_type của chức năng tùy chỉnh không được trống'); return; }
+      if (!draftFunction.cms_email_id.trim()) { setError('Mã ID Email CMS của chức năng tùy chỉnh không được trống'); return; }
+      if (!draftFunction.name.trim()) { setError('Tên loại template không được trống'); return; }
+    }
 
     setError(null);
     setIsSaving(true);
     try {
+      let functionId = form.function_id;
+      let emailType = form.email_type;
+      let cmsEmailId = normalizeCmsEmailId(form.cms_email_id || '');
+
+      if (showCustomForm) {
+        const functionPayload = {
+          email_type: normalizeEmailType(draftFunction.email_type),
+          cms_email_id: normalizeCmsEmailId(draftFunction.cms_email_id),
+          name: draftFunction.name,
+          group_key: draftFunction.group_key || 'custom',
+          target_role: draftFunction.target_role || 'all',
+          description: draftFunction.description,
+          required_variables: draftFunction.required_variables,
+          optional_variables: draftFunction.optional_variables,
+          is_system: false,
+          is_active: true,
+        };
+        const fnRes = await fetch(`${API_URL}/cms/email-functions${form.function_id ? `/${form.function_id}` : ''}`, {
+          method: form.function_id ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify(functionPayload),
+        });
+        const fnData = await fnRes.json();
+        if (!fnRes.ok) throw new Error(fnData.detail || 'Không thể lưu loại template tùy chỉnh');
+        functionId = fnData.id;
+        emailType = fnData.email_type;
+        cmsEmailId = fnData.cms_email_id;
+      }
+
       const url = template?.id
         ? `${API_URL}/cms/email-templates/${template.id}`
         : `${API_URL}/cms/email-templates`;
@@ -175,7 +276,10 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
           ...form,
-          cms_email_id: normalizeCmsEmailId(form.cms_email_id || ''),
+          function_id: functionId,
+          email_type: emailType,
+          cms_email_id: cmsEmailId,
+          target_role: form.target_role || 'all',
           variables: form.variables,
         }),
       });
@@ -286,16 +390,24 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
 
             <div className="email-editor-row">
               <div className="form-group" style={{ flex: 1 }}>
-                <label>Chức năng gửi mail <span style={{ color: 'var(--color-critical)' }}>*</span></label>
+                <label>Loại template <span style={{ color: 'var(--color-critical)' }}>*</span></label>
                 <select
                   className="form-control"
-                  value={form.email_type}
+                  value={showCustomForm ? '__custom__' : form.email_type}
                   onChange={(e) => handleEmailTypeChange(e.target.value)}
                   disabled={readOnly}
                 >
-                  {EMAIL_TEMPLATE_OPTIONS.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
+                  <optgroup label="Nhóm hệ thống">
+                    {SYSTEM_EMAIL_FUNCTIONS.map((t) => (
+                      <option key={t.email_type} value={t.email_type}>{t.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Nhóm tùy chỉnh">
+                    {customFunctions.map((t) => (
+                      <option key={t.email_type} value={t.email_type}>{t.name}</option>
+                    ))}
+                    <option value="__custom__">Tùy chỉnh...</option>
+                  </optgroup>
                 </select>
               </div>
               <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 24 }}>
@@ -311,6 +423,102 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
                 </label>
               </div>
             </div>
+
+            {showCustomForm && (
+              <div className="panel" style={{ marginBottom: 16, padding: 16 }}>
+                <h4 style={{ marginTop: 0 }}>Tạo loại template tùy chỉnh</h4>
+                <div className="cms-form-grid">
+                  <div className="form-group">
+                    <label>Mã chức năng gửi mail *</label>
+                    <input
+                      className="form-control"
+                      value={draftFunction.email_type}
+                      onChange={(e) => setDraftFunction((prev) => ({
+                        ...prev,
+                        email_type: normalizeEmailType(e.target.value),
+                        cms_email_id: prev.cms_email_id || suggestCmsEmailId(normalizeEmailType(e.target.value)),
+                      }))}
+                      placeholder="doctor_profile_require_update"
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Mã ID Email CMS *</label>
+                    <input
+                      className="form-control"
+                      value={draftFunction.cms_email_id}
+                      onChange={(e) => setDraftFunction((prev) => ({ ...prev, cms_email_id: normalizeCmsEmailId(e.target.value) }))}
+                      placeholder="EMAIL_DOCTOR_PROFILE_REQUIRE_UPDATE"
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Tên loại template *</label>
+                    <input
+                      className="form-control"
+                      value={draftFunction.name}
+                      onChange={(e) => setDraftFunction((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="Bác sĩ cần bổ sung hồ sơ"
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Nhóm chức năng</label>
+                    <select
+                      className="form-control"
+                      value={draftFunction.group_key}
+                      onChange={(e) => setDraftFunction((prev) => ({ ...prev, group_key: e.target.value }))}
+                      disabled={readOnly}
+                    >
+                      {Object.entries(EMAIL_GROUP_LABEL_MAP).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Vai trò người nhận</label>
+                    <select
+                      className="form-control"
+                      value={draftFunction.target_role}
+                      onChange={(e) => setDraftFunction((prev) => ({ ...prev, target_role: e.target.value }))}
+                      disabled={readOnly}
+                    >
+                      {Object.entries(EMAIL_TARGET_ROLE_LABEL_MAP).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Mô tả chức năng</label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      value={draftFunction.description}
+                      onChange={(e) => setDraftFunction((prev) => ({ ...prev, description: e.target.value }))}
+                      placeholder="Mô tả khi nào backend sẽ gửi email này"
+                      disabled={readOnly}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Biến hỗ trợ</label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      value={draftFunction.required_variables.concat(draftFunction.optional_variables).join('\n')}
+                      onChange={(e) => {
+                        const items = parseVariablesList(e.target.value);
+                        setDraftFunction((prev) => ({ ...prev, required_variables: items.slice(0, 4), optional_variables: items.slice(4) }));
+                      }}
+                      placeholder="{{full_name}}\n{{verification_note}}\n{{update_profile_url}}\n{{support_email}}"
+                      disabled={readOnly}
+                    />
+                  </div>
+                </div>
+                <div style={{ marginTop: 12, color: 'var(--text-muted)', fontSize: 12 }}>
+                  {CUSTOM_TEMPLATE_HINTS.join(' • ')}
+                </div>
+              </div>
+            )}
 
             <div className="form-group">
               <label>Biến hỗ trợ</label>
