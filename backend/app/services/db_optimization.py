@@ -231,6 +231,28 @@ async def ensure_email_cms_schema() -> None:
             updated_at TIMESTAMPTZ DEFAULT NOW()
         )
         """,
+        "ALTER TABLE cms_email_functions ADD COLUMN IF NOT EXISTS email_type TEXT",
+        "ALTER TABLE cms_email_functions ADD COLUMN IF NOT EXISTS cms_email_id TEXT",
+        "ALTER TABLE cms_email_functions ADD COLUMN IF NOT EXISTS name TEXT",
+        "ALTER TABLE cms_email_functions ADD COLUMN IF NOT EXISTS group_key TEXT DEFAULT 'custom'",
+        "ALTER TABLE cms_email_functions ADD COLUMN IF NOT EXISTS target_role TEXT DEFAULT 'all'",
+        "ALTER TABLE cms_email_functions ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''",
+        "ALTER TABLE cms_email_functions ADD COLUMN IF NOT EXISTS required_variables JSONB DEFAULT '[]'::jsonb",
+        "ALTER TABLE cms_email_functions ADD COLUMN IF NOT EXISTS optional_variables JSONB DEFAULT '[]'::jsonb",
+        "ALTER TABLE cms_email_functions ADD COLUMN IF NOT EXISTS is_system BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE cms_email_functions ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
+        """
+        DO $$ 
+        BEGIN 
+            IF EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_name='cms_email_functions' AND column_name='default_cms_email_id'
+            ) THEN 
+                ALTER TABLE cms_email_functions ALTER COLUMN default_cms_email_id DROP NOT NULL;
+            END IF; 
+        END $$;
+        """,
         "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS function_id UUID REFERENCES cms_email_functions(id) ON DELETE SET NULL",
         "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS target_role TEXT DEFAULT 'all'",
         "ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS sample_variables JSONB DEFAULT '{}'::jsonb",
