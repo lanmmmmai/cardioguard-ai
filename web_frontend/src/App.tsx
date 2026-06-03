@@ -149,8 +149,9 @@ const AppContent: React.FC = () => {
       if (response.ok) {
         try {
           const data = await response.json();
-          setPatients(data);
-          console.info('Đã tìm nạp bệnh nhân:', data.length, 'bản ghi');
+          const items = Array.isArray(data) ? data : (data.items || []);
+          setPatients(items);
+          console.info('Đã tìm nạp bệnh nhân:', items.length, 'bản ghi');
         } catch(e) {
           console.error("Định dạng JSON không hợp lệ");
         }
@@ -170,8 +171,9 @@ const AppContent: React.FC = () => {
       if (response.ok) {
         try {
           const data = await response.json();
-          setAlerts(data);
-          console.info('Đã tìm nạp cảnh báo:', data.length, 'bản ghi');
+          const items = Array.isArray(data) ? data : (data.items || []);
+          setAlerts(items);
+          console.info('Đã tìm nạp cảnh báo:', items.length, 'bản ghi');
         } catch(e) {
           console.error("Định dạng JSON không hợp lệ");
         }
@@ -191,8 +193,9 @@ const AppContent: React.FC = () => {
       if (response.ok) {
         try {
           const data = await response.json();
-          setDoctors(data);
-          console.info('Đã tìm nạp bác sĩ:', data.length, 'bản ghi');
+          const items = Array.isArray(data) ? data : (data.items || []);
+          setDoctors(items);
+          console.info('Đã tìm nạp bác sĩ:', items.length, 'bản ghi');
         } catch(e) {
           console.error("Định dạng JSON không hợp lệ");
         }

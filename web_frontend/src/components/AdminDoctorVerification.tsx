@@ -61,7 +61,8 @@ export const AdminDoctorVerification: React.FC = () => {
       });
       if (!response.ok) throw new Error('Không thể tải danh sách bác sĩ.');
       const data = await response.json();
-      setDoctors(data);
+      const items = Array.isArray(data) ? data : (data.items || []);
+      setDoctors(items);
     } catch (err: any) {
       setErrorMsg(err.message || 'Lỗi tải danh sách bác sĩ');
     } finally {

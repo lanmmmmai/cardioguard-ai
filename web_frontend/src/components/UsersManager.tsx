@@ -118,7 +118,8 @@ export const UsersManager: React.FC = () => {
       if (!response.ok) {
         throw new Error(data.detail || 'Không lấy được danh sách tài khoản');
       }
-      setUsers(data);
+      const items = Array.isArray(data) ? data : (data.items || []);
+      setUsers(items);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
     } finally {

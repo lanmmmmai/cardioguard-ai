@@ -33,7 +33,8 @@ export const DoctorChatbot: React.FC = () => {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         const data = await res.json();
-        setPatients(data || []);
+        const items = Array.isArray(data) ? data : (data.items || []);
+        setPatients(items);
       } catch (err) {
         console.error(err);
       }

@@ -75,7 +75,8 @@ export const DoctorsManager: React.FC = () => {
       if (!response.ok) {
         throw new Error(data.detail || 'Không lấy được danh sách bác sĩ');
       }
-      setDoctors(data);
+      const items = Array.isArray(data) ? data : (data.items || []);
+      setDoctors(items);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Lỗi kết nối máy chủ');
     } finally {

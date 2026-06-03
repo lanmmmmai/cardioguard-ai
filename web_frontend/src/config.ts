@@ -82,15 +82,26 @@ const runtimeDerivedWsUrl = isUsableWsUrl(deriveWsUrlFromApiUrl(runtimeApiUrl)) 
 const bakedDerivedWsUrl = isUsableWsUrl(deriveWsUrlFromApiUrl(normalizedBakedApiUrl || normalizedSavedApiUrl)) ? deriveWsUrlFromApiUrl(normalizedBakedApiUrl || normalizedSavedApiUrl) : undefined;
 const savedDerivedWsUrl = isUsableWsUrl(deriveWsUrlFromApiUrl(normalizedSavedApiUrl)) ? deriveWsUrlFromApiUrl(normalizedSavedApiUrl) : undefined;
 
+const ensureEndsWithApi = (url?: string) => {
+  if (!url) return undefined;
+  if (isPlaceholderUrl(url)) return url;
+  const trimmed = url.replace(/\/$/, '');
+  if (!trimmed.endsWith('/api')) {
+    return `${trimmed}/api`;
+  }
+  return trimmed;
+};
+
 /** URL cơ sở của REST API – dự phòng về localhost:8000 */
-export const API_URL =
+export const API_URL = ensureEndsWithApi(
   runtimeDerivedApiUrl ||
   (!isPlaceholderUrl(runtimeApiUrl) && isUsableApiUrl(runtimeApiUrl) ? runtimeApiUrl : undefined) ||
   normalizedSavedApiUrl ||
   normalizedBakedApiUrl ||
   savedDerivedApiUrl ||
   bakedDerivedApiUrl ||
-  (isLocalhost ? 'http://localhost:8000/api' : 'https://cardioguard-ai-backend.onrender.com/api');
+  (isLocalhost ? 'http://localhost:8000/api' : 'https://cardioguard-ai-backend.onrender.com/api')
+) as string;
 
 /** Điểm cuối WebSocket cho dữ liệu telemetry thời gian thực */
 export const WS_URL =
