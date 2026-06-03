@@ -1,3 +1,15 @@
+/**
+ * @purpose Biểu mẫu đăng nhập người dùng. Thu thập email và mật khẩu, xác thực
+ *          với backend và ủy quyền kết quả cho callback cha xử lý lưu phiên
+ *          và điều hướng.
+ * @workflow  1. Người dùng gửi email + mật khẩu → 2. POST đến /auth/login →
+ *            3. Khi thành công, gọi onLoginSuccess(token, user) → component cha
+ *            (App.tsx) lưu phiên và điều hướng đến route mặc định của vai trò →
+ *            4. Khi thất bại, hiển thị thông báo lỗi.
+ * @relationships
+ *   - App.tsx (callback handleLoginSuccess)
+ *   - Hằng số cấu hình API_URL
+ */
 import React, { useState } from 'react';
 import { Activity, Mail, Lock, Loader2 } from 'lucide-react';
 import { API_URL } from '../config';
@@ -8,6 +20,10 @@ interface LoginProps {
   onNavigateToForgotPassword: () => void;
 }
 
+/**
+ * Component biểu mẫu đăng nhập. Xác thực với email/mật khẩu và ủy quyền
+ * kết quả thành công cho trình xử lý cha.
+ */
 export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onNavigateToRegister, onNavigateToForgotPassword }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

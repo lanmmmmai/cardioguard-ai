@@ -1,3 +1,9 @@
+/**
+ * Mục đích: Hiển thị lưới các nút hành động nhanh đã được định nghĩa sẵn cho trợ lý chat AI.
+ * Luồng xử lý: Hiển thị bộ hành động theo vai trò (bệnh nhân vs bác sĩ); gọi hàm onSelect với
+ *              chuỗi truy vấn tương ứng khi người dùng bấm vào một nút.
+ * Quan hệ: Là component con của ChatWindow; cung cấp các gợi ý truy vấn cho luồng nhập chat.
+ */
 import React from 'react';
 import { Activity, HeartPulse, Pill, CalendarClock, Zap } from 'lucide-react';
 
@@ -24,6 +30,11 @@ const DOCTOR_ACTIONS: QuickAction[] = [
   { label: 'Cảnh báo gần đây', query: 'Tóm tắt các cảnh báo (alerts) quan trọng trong 24h qua.', icon: <Activity size={15} /> },
 ];
 
+/**
+ * Component AIQuickActions — hiển thị các nút gợi ý ngữ cảnh cho AI chat.
+ * Hành động của bệnh nhân bao gồm kiểm tra sức khỏe/nhắc thuốc;
+ * Hành động của bác sĩ bao gồm danh sách bệnh nhân nguy cơ cao và tóm tắt cảnh báo.
+ */
 export const AIQuickActions: React.FC<AIQuickActionsProps> = ({ role, onSelect }) => {
   const actions = role === 'patient' ? PATIENT_ACTIONS : DOCTOR_ACTIONS;
 

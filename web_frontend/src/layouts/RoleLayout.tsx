@@ -1,3 +1,18 @@
+/**
+ * Tệp: CardioGuard AI – Bố cục shell ứng dụng dựa trên vai trò
+ * Mục đích: Cung cấp vùng sidebar + tiêu đề + nội dung chung cho tất cả
+ *           vai trò đã xác thực. Bao gồm sidebar phản hồi, điều hướng dưới cùng
+ *           trên thiết bị di động, drawer di động, chuyển đổi chủ đề, thẻ người dùng
+ *           và trạng thái kết nối.
+ * Luồng xử lý: 1. Nhận vai trò, đường dẫn, điều hướng, chủ đề và thành phần con.
+ *              2. Hiển thị sidebar dọc (máy tính) + điều hướng dưới cùng (di động).
+ *              3. Trên di động, drawer trượt lên hiển thị menu đầy đủ.
+ *              4. Tiêu đề hiển thị nhãn vai trò, tiêu đề trang, nút chủ đề, thẻ người dùng.
+ * Quan hệ:
+ *   - sử dụng: AuthContext (user, logout), roleMenus, routeMeta (pageTitles)
+ *   - xuất AdminLayout, DoctorLayout, PatientLayout cho App.tsx
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Activity, LogOut, Menu, Moon, Sun, MoreHorizontal, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -20,6 +35,10 @@ const layoutTitle: Record<UserRole, string> = {
   patient: 'Patient Home',
 };
 
+/**
+ * RoleLayout – Shell ứng dụng đầy đủ với sidebar, tiêu đề, điều hướng di động
+ * và drawer trượt lên cho tất cả các mục điều hướng.
+ */
 export const RoleLayout: React.FC<RoleLayoutProps> = ({
   role,
   currentPath,
@@ -33,7 +52,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
   const menuItems = roleMenus[role];
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Close mobile drawer when pressing Escape key for accessibility
+  // Đóng drawer di động khi nhấn phím Escape để hỗ trợ trợ năng
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -127,7 +146,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
 
         <main className="role-content">{children}</main>
 
-        <nav className="role-mobile-nav" aria-label={`Mobile menu ${roleLabel[role]}`}>
+        <nav className="role-mobile-nav" aria-label={`Menu di động ${roleLabel[role]}`}>
           {menuItems.slice(0, 4).map((item) => {
             const Icon = item.icon;
             return (
@@ -205,7 +224,9 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
   );
 };
 
+/** RoleLayout được cấu hình sẵn cho các tuyến đường admin */
 export const AdminLayout = (props: Omit<RoleLayoutProps, 'role'>) => <RoleLayout {...props} role="admin" />;
+/** RoleLayout được cấu hình sẵn cho các tuyến đường bác sĩ */
 export const DoctorLayout = (props: Omit<RoleLayoutProps, 'role'>) => <RoleLayout {...props} role="doctor" />;
+/** RoleLayout được cấu hình sẵn cho các tuyến đường bệnh nhân */
 export const PatientLayout = (props: Omit<RoleLayoutProps, 'role'>) => <RoleLayout {...props} role="patient" />;
-

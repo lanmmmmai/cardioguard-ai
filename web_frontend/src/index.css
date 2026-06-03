@@ -1,6 +1,6 @@
-/* Custom Premium Dark Mode Design System for CardioGuard AI */
+/* Hệ thống thiết kế chế độ tối cao cấp cho CardioGuard AI */
 :root {
-  /* Harmonious Color Palette */
+  /* Bảng màu hài hòa */
   --bg-primary: #07080a;
   --bg-secondary: #0c0e12;
   --bg-tertiary: #12161f;
@@ -13,28 +13,28 @@
   --text-secondary: #9ea5b4;
   --text-muted: #616875;
   
-  /* Clinical Semantic Accents (Soften Colors, Less Cyber-Neon) */
-  --color-primary: #ef4444; /* Soft Red */
+  /* Màu sắc ngữ nghĩa lâm sàng (làm dịu màu, bớt kiểu cyber-neon) */
+  --color-primary: #ef4444; /* Đỏ nhẹ */
   --color-primary-glow: rgba(239, 68, 68, 0.15);
   
-  --color-spo2: #0ea5e9; /* Professional Sky Blue */
+  --color-spo2: #0ea5e9; /* Xanh da trời chuyên nghiệp */
   --color-spo2-glow: rgba(14, 165, 233, 0.15);
   
-  --color-bp: #10b981; /* Emerald Green */
+  --color-bp: #10b981; /* Xanh lục bảo */
   --color-bp-glow: rgba(16, 185, 129, 0.15);
   
-  --color-warning: #f59e0b; /* Amber Orange */
+  --color-warning: #f59e0b; /* Cam hổ phách */
   --color-warning-glow: rgba(245, 158, 11, 0.15);
   
-  --color-critical: #ef4444; /* Softer Crimson Red */
-  --color-safe: #10b981; /* Emerald Green */
-  --color-info: #3b82f6; /* Royal Blue */
+  --color-critical: #ef4444; /* Đỏ thẫm nhẹ hơn */
+  --color-safe: #10b981; /* Xanh lục bảo */
+  --color-info: #3b82f6; /* Xanh lam hoàng gia */
   
-  /* Unified Typography (Using Outfit for Headers, Inter for Body text) */
+  /* Kiểu chữ thống nhất (dùng Outfit cho tiêu đề, Inter cho thân văn bản) */
   --font-display: 'Outfit', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-sans: 'Inter', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
   
-  /* UI Constants */
+  /* Hằng số giao diện người dùng */
   --sidebar-width: 260px;
   --bottom-bar-height: 72px;
   --border-radius: 18px;
@@ -47,7 +47,7 @@
   --alert-strip-hover-bg: rgba(255, 255, 255, 0.04);
 }
 
-/* Base Styles & Resets */
+/* Kiểu cơ bản và thiết lập lại */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -65,7 +65,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom Scrollbar */
+/* Thanh cuộn tùy chỉnh */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -81,7 +81,7 @@ body {
   background: var(--text-muted);
 }
 
-/* Main Application Layout */
+/* Bố cục ứng dụng chính */
 .app-container {
   display: flex;
   min-height: 100vh;
@@ -98,7 +98,7 @@ body {
   padding-bottom: 2.5rem;
 }
 
-/* Desktop Sidebar Navigation */
+/* Thanh điều hướng bên cho máy tính để bàn */
 .sidebar {
   width: var(--sidebar-width);
   background-color: var(--bg-secondary);
@@ -235,7 +235,7 @@ body {
   color: var(--color-critical);
 }
 
-/* Mobile Navigation Bar */
+/* Thanh điều hướng di động */
 .mobile-nav-bar {
   display: none;
   position: fixed;
@@ -284,7 +284,7 @@ body {
   filter: drop-shadow(0 0 5px var(--color-primary-glow));
 }
 
-/* Page Headers & Structures */
+/* Tiêu đề trang và cấu trúc */
 .page-header {
   margin-bottom: 2rem;
   display: flex;
@@ -305,7 +305,7 @@ body {
   margin-top: 4px;
 }
 
-/* Button UI Components */
+/* Thành phần nút giao diện */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -362,7 +362,7 @@ body {
   color: var(--text-muted);
 }
 
-/* Glassmorphic Panel/Card System */
+/* Hệ thống bảng/thẻ kiểu kính mờ */
 .panel {
   background: var(--glass-bg);
   backdrop-filter: blur(12px);
@@ -378,7 +378,7 @@ body {
   border-color: var(--glass-border-hover);
 }
 
-/* Grid Layouts */
+/* Bố cục lưới */
 .grid-3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -393,7 +393,7 @@ body {
   margin-bottom: 1.5rem;
 }
 
-/* Metric Display Cards */
+/* Thẻ hiển thị chỉ số */
 .metric-card {
   position: relative;
   overflow: hidden;
@@ -469,7 +469,7 @@ body {
   gap: 6px;
 }
 
-/* Animations */
+/* Hoạt ảnh */
 @keyframes heart-beat {
   0% { transform: scale(1); }
   14% { transform: scale(1.15); }
@@ -495,7 +495,7 @@ body {
   border-color: var(--color-critical) !important;
 }
 
-/* ECG Graph Rendering styles */
+/* Kiểu hiển thị đồ thị ECG */
 .ecg-container {
   display: flex;
   flex-direction: column;
@@ -527,7 +527,7 @@ body {
   pointer-events: none;
 }
 
-/* Live Alert Sidebar Alerts list */
+/* Danh sách cảnh báo thanh bên trực tiếp */
 .alert-strip {
   display: flex;
   gap: 12px;
@@ -583,7 +583,7 @@ body {
   margin-top: 4px;
 }
 
-/* Patient List Table / Grid */
+/* Bảng/danh sách bệnh nhân */
 .patient-list {
   display: flex;
   flex-direction: column;
@@ -659,7 +659,7 @@ body {
   animation: pulse-halo 2s infinite;
 }
 
-/* Form Styles */
+/* Kiểu biểu mẫu */
 .form-group {
   margin-bottom: 1.25rem;
 }
@@ -1176,7 +1176,7 @@ body {
   }
 }
 
-/* Modal Overlay Styles */
+/* Kiểu lớp phủ modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1477,7 +1477,7 @@ body {
   }
 }
 
-/* Login/Register Panel Alignment */
+/* Căn chỉnh bảng đăng nhập/đăng ký */
 .auth-container {
   display: flex;
   align-items: center;
@@ -1525,7 +1525,7 @@ body {
   cursor: pointer;
 }
 
-/* Premium Floating Alert Notification Panel (Top Right - Clinical Style, No Layout Shifting) */
+/* Bảng thông báo cảnh báo nổi cao cấp (góc trên bên phải - phong cách lâm sàng, không làm xê dịch bố cục) */
 .global-notification-bar {
   position: fixed;
   top: 24px;
@@ -1615,7 +1615,7 @@ body {
   margin-top: 4px;
 }
 
-/* Connection Status Indicator Dot */
+/* Chấm chỉ báo trạng thái kết nối */
 .connection-status-dot {
   width: 8px;
   height: 8px;
@@ -1634,7 +1634,7 @@ body {
   box-shadow: 0 0 8px var(--color-critical);
 }
 
-/* Stale/Outdated Data Overlay warning for Vitals */
+/* Cảnh báo lớp phủ dữ liệu cũ/lỗi thời cho các chỉ số sinh tồn */
 .stale-vitals-banner {
   background: rgba(245, 158, 11, 0.08);
   border: 1px solid rgba(245, 158, 11, 0.25);
@@ -1649,9 +1649,9 @@ body {
   margin-bottom: 12px;
 }
 
-/* NOTE: .tabular-nums and .metric-status-badge base rules consolidated below (see ~line 3750+) */
+/* LƯU Ý: Các quy tắc cơ bản .tabular-nums và .metric-status-badge được hợp nhất bên dưới (xem ~dòng 3750+) */
 
-/* Standardized Alert Strip border mappings */
+/* Ánh xạ viền cảnh báo chuẩn hóa */
 .alert-strip.critical {
   border-left: 3px solid var(--color-critical);
   background: rgba(239, 68, 68, 0.03);
@@ -1667,7 +1667,7 @@ body {
   background: rgba(16, 185, 129, 0.03);
 }
 
-/* Accessibility settings for OS reduced motion */
+/* Thiết lập trợ năng cho hệ điều hành giảm chuyển động */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-duration: 0.01ms !important;
@@ -1680,7 +1680,7 @@ body {
   }
 }
 
-/* Mobile Nav Sheet Overlay Drawer */
+/* Ngăn kéo lớp phủ thanh điều hướng di động */
 .mobile-more-menu-overlay {
   position: fixed;
   top: 0;
@@ -1759,7 +1759,7 @@ body {
 }
 
 
-/* Badges */
+/* Huy hiệu */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -1773,7 +1773,7 @@ body {
 .badge.medium { background: rgba(255, 182, 6, 0.1); color: var(--color-warning); border: 1px solid rgba(255, 182, 6, 0.2); }
 .badge.low { background: rgba(57, 255, 20, 0.1); color: var(--color-bp); border: 1px solid rgba(57, 255, 20, 0.2); }
 
-/* Responsive Media Queries */
+/* Truy vấn phương tiện thích ứng */
 @media (max-width: 1024px) {
   .grid-3 {
     grid-template-columns: repeat(2, 1fr);
@@ -1789,11 +1789,11 @@ body {
   }
   
   .sidebar {
-    display: none; /* Hide desktop sidebar */
+    display: none; /* Ẩn thanh bên máy tính để bàn */
   }
   
   .mobile-nav-bar {
-    display: flex; /* Show mobile bottom tab bar */
+    display: flex; /* Hiển thị thanh tab dưới cùng di động */
   }
   
   .main-content {
@@ -1815,10 +1815,10 @@ body {
 }
 
 /* ==========================================================================
-   Advanced UI Features: Top Navigation, ICU Camera, 3D Heart & Stats
+   Tính năng giao diện nâng cao: Thanh điều hướng trên cùng, Camera ICU, Tim 3D & Thống kê
    ========================================================================== */
 
-/* Top Header Bar */
+/* Thanh tiêu đề trên cùng */
 .top-header {
   position: sticky;
   top: 0;
@@ -1854,7 +1854,7 @@ body {
   gap: 16px;
 }
 
-/* App Container for Vertical Stack */
+/* Vùng chứa ứng dụng dạng xếp chồng dọc */
 .app-vertical-layout {
   display: flex;
   flex-direction: column;
@@ -1870,7 +1870,7 @@ body {
   min-height: calc(100vh - 70px);
 }
 
-/* 3D Heart Overlay & Display */
+/* Lớp phủ và hiển thị tim 3D */
 .heart-3d-container {
   display: flex;
   flex-direction: column;
@@ -1889,7 +1889,7 @@ body {
   filter: drop-shadow(0 0 15px var(--color-primary-glow));
 }
 
-/* ICU Night-Vision Camera Feed Simulator */
+/* Trình mô phỏng luồng camera hồng ngoại ICU */
 .camera-monitor-wrapper {
   position: relative;
   width: 100%;
@@ -1907,7 +1907,7 @@ body {
   display: block;
 }
 
-/* CRT Screen Scanlines animation */
+/* Hoạt ảnh quét dòng màn hình CRT */
 @keyframes scanline {
   0% { transform: translateY(-100%); }
   100% { transform: translateY(100%); }
@@ -1955,7 +1955,7 @@ body {
   animation: flash-rec 1.2s infinite;
 }
 
-/* Statistics widgets */
+/* Tiện ích thống kê */
 .stat-widget-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1993,7 +1993,7 @@ body {
   margin-bottom: 1.5rem;
 }
 
-/* Custom SVG Chart designs */
+/* Thiết kế biểu đồ SVG tùy chỉnh */
 .svg-chart-container {
   width: 100%;
   height: 280px;
@@ -2030,14 +2030,14 @@ body {
   border-radius: 4px;
 }
 
-/* Responsive top header settings */
+/* Thiết lập thanh tiêu đề thích ứng */
 @media (max-width: 768px) {
   .top-header {
     padding: 0 1.25rem;
   }
   
   .top-header-menu {
-    display: none; /* Hide top menu on mobile, use bottom nav bar */
+    display: none; /* Ẩn menu trên cùng trên di động, dùng thanh điều hướng dưới */
   }
   
   .app-vertical-layout .main-content {
@@ -2055,7 +2055,7 @@ body {
 }
 
 /* ==========================================================================
-   Light Mode Theme Overrides
+   Ghi đè giao diện chế độ sáng
    ========================================================================== */
 
 [data-theme="light"] {
@@ -2078,7 +2078,7 @@ body {
   --alert-strip-bg: rgba(0, 0, 0, 0.015);
   --alert-strip-hover-bg: rgba(0, 0, 0, 0.03);
   
-  /* Adjusted neon accents glow for light background to look elegant */
+  /* Điều chỉnh ánh sáng neon cho nền sáng để trông thanh lịch */
   --color-primary-glow: rgba(255, 51, 102, 0.12);
   --color-spo2-glow: rgba(0, 242, 254, 0.12);
   --color-bp-glow: rgba(57, 255, 20, 0.12);
@@ -2129,7 +2129,7 @@ body {
 }
 
 /* ============================================================================
-   Role Based Shell
+   Giao diện dựa trên vai trò
    ============================================================================ */
 
 .route-loading {
@@ -2559,10 +2559,10 @@ body {
 }
 
 /* =============================================================================
-   EMAIL CMS — Complete Design System
+   EMAIL CMS — Hệ thống thiết kế hoàn chỉnh
    ============================================================================= */
 
-/* ── Page layout ── */
+/* ── Bố cục trang ── */
 .email-cms-page {
   display: flex;
   flex-direction: column;
@@ -2575,7 +2575,7 @@ body {
   border-top: none;
 }
 
-/* ── Tab navigation ── */
+/* ── Điều hướng tab ── */
 .email-cms-tabs {
   display: flex;
   gap: 0;
@@ -2614,7 +2614,7 @@ body {
   font-weight: 600;
 }
 
-/* ── Templates toolbar ── */
+/* ── Thanh công cụ mẫu ── */
 .email-templates-toolbar {
   display: flex;
   align-items: center;
@@ -2629,7 +2629,7 @@ body {
   margin-left: auto;
 }
 
-/* ── Logs toolbar ── */
+/* ── Thanh công cụ nhật ký ── */
 .email-logs-toolbar {
   display: flex;
   align-items: center;
@@ -2679,7 +2679,7 @@ body {
   font-size: 0.875rem;
 }
 
-/* ── Shared Table styles ── */
+/* ── Kiểu bảng dùng chung ── */
 .email-logs-table-wrap {
   overflow-x: auto;
   border-radius: 12px;
@@ -2752,7 +2752,7 @@ body {
   position: relative;
 }
 
-/* ── Status & type badges ── */
+/* ── Huy hiệu trạng thái & loại ── */
 .email-status-badge {
   display: inline-flex;
   align-items: center;
@@ -2790,7 +2790,7 @@ body {
   opacity: 0.75;
 }
 
-/* ── Action buttons in table ── */
+/* ── Nút hành động trong bảng ── */
 .email-template-actions {
   display: flex;
   gap: 4px;
@@ -2831,7 +2831,7 @@ body {
   font-size: 0.75rem;
 }
 
-/* ── Template Editor Modal/Overlay ── */
+/* ── Trình chỉnh sửa mẫu Modal/Lớp phủ ── */
 .email-editor-overlay {
   position: fixed;
   inset: 0;
@@ -2903,7 +2903,7 @@ body {
   min-height: 0;
 }
 
-/* ── Editor LEFT panel ── */
+/* ── Bảng điều khiển BÊN TRÁI trình chỉnh sửa ── */
 .email-editor-left {
   display: flex;
   flex-direction: column;
@@ -2964,7 +2964,7 @@ body {
   background: rgba(0, 0, 0, 0.3);
 }
 
-/* ── Editor RIGHT panel (Preview) ── */
+/* ── Bảng điều khiển BÊN PHẢI trình chỉnh sửa (Xem trước) ── */
 .email-editor-right {
   display: flex;
   flex-direction: column;
@@ -3043,7 +3043,7 @@ body {
   background: white;
 }
 
-/* ── Send form layout ── */
+/* ── Bố cục gửi thư ── */
 .email-send-layout {
   display: flex;
   gap: 20px;
@@ -3095,7 +3095,7 @@ body {
   border-color: var(--color-critical);
 }
 
-/* ── Variables reference ── */
+/* ── Tham chiếu biến ── */
 .email-variables-panel {
   padding: 20px;
 }
@@ -3175,7 +3175,7 @@ body {
   white-space: pre;
 }
 
-/* ── Responsive ── */
+/* ── Thích ứng ── */
 @media (max-width: 900px) {
   .email-editor-body {
     grid-template-columns: 1fr;
@@ -3209,7 +3209,7 @@ body {
    AI CHATBOT CMS
    ============================================================================= */
 
-/* Page layout */
+/* Bố cục trang */
 .patient-chatbot-page, .doctor-chatbot-page {
   display: flex;
   flex-direction: column;
@@ -3250,7 +3250,7 @@ body {
   overflow: hidden;
 }
 
-/* Chat Window */
+/* Cửa sổ trò chuyện */
 .chat-window-container {
   display: flex;
   flex-direction: column;
@@ -3282,7 +3282,7 @@ body {
   opacity: 0.6;
 }
 
-/* Chat Input */
+/* Đầu vào trò chuyện */
 .chat-input-area {
   padding: 20px;
   background: rgba(255, 255, 255, 0.02);
@@ -3346,7 +3346,7 @@ body {
   margin-top: 12px;
 }
 
-/* Message Bubble */
+/* Bong bóng tin nhắn */
 .chat-message-row {
   display: flex;
   gap: 16px;
@@ -3398,7 +3398,7 @@ body {
   padding: 8px 0;
 }
 
-/* Markdown AI Styles */
+/* Kiểu Markdown AI */
 .markdown-body h1, .markdown-body h2, .markdown-body h3 {
   margin-bottom: 10px;
   margin-top: 16px;
@@ -3419,7 +3419,7 @@ body {
   color: var(--color-primary);
 }
 
-/* Typing cursor */
+/* Con trỏ đang gõ */
 .typing-cursor {
   display: inline-block;
   width: 8px;
@@ -3442,7 +3442,7 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* Quick Actions */
+/* Hành động nhanh */
 .ai-quick-actions {
   margin-top: auto;
   padding: 16px;
@@ -3489,7 +3489,7 @@ body {
   font-weight: 500;
 }
 
-/* Side Panels */
+/* Bảng điều khiển bên */
 .info-panel-header {
   display: flex;
   align-items: center;
@@ -3543,7 +3543,7 @@ body {
 .p-name { font-size: 0.9rem; font-weight: 500; }
 .p-meta { font-size: 0.75rem; color: var(--text-muted); }
 
-/* Premium Mobile Navigation Bottom Sheet Drawer */
+/* Ngăn kéo đáy điều hướng di động cao cấp */
 .mobile-drawer-overlay {
   position: fixed;
   top: 0;
@@ -3659,7 +3659,7 @@ body {
 }
 
 
-/* Realtime Status Strip (Clinical Dashboard Polish) */
+/* Dải trạng thái thời gian thực (Tinh chỉnh bảng điều khiển lâm sàng) */
 .realtime-status-strip {
   display: flex;
   justify-content: space-between;
@@ -3717,7 +3717,7 @@ body {
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* Metric Status Badges & Polish */
+/* Huy hiệu trạng thái chỉ số và tinh chỉnh */
 .metric-status-badge {
   font-size: 0.75rem;
   font-weight: 700;
@@ -3767,7 +3767,7 @@ body {
   font-size: clamp(2rem, 4.5vw, 2.75rem) !important;
 }
 
-/* Tabular numbers formatting */
+/* Định dạng số dạng bảng */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
   letter-spacing: normal !important;
@@ -3776,7 +3776,7 @@ body {
   font-feature-settings: "tnum";
 }
 
-/* ECG Panel Header Polish */
+/* Tinh chỉnh tiêu đề bảng ECG */
 .ecg-panel-header {
   display: flex;
   justify-content: space-between;
@@ -3813,9 +3813,9 @@ body {
   border: 1px solid var(--glass-border);
 }
 
-/* NOTE: .ecg-canvas-wrapper consolidated above (see ~line 500) */
+/* LƯU Ý: .ecg-canvas-wrapper được hợp nhất ở trên (xem ~dòng 500) */
 
-/* Simulation Controls Redesign */
+/* Thiết kế lại bảng điều khiển mô phỏng */
 .simulation-controls-panel {
   margin-top: 1.5rem;
   padding: 1.25rem;
@@ -3834,7 +3834,7 @@ body {
   margin-bottom: 0.5rem;
 }
 
-/* Accessibility & Reduced Motion */
+/* Trợ năng & Giảm chuyển động */
 @media (prefers-reduced-motion: reduce) {
   .beat-animated,
   .critical-pulse,
@@ -3856,7 +3856,7 @@ body {
   100% { border-color: rgba(239, 68, 68, 0.3); }
 }
 
-/* Layout Classes to reduce inline styles */
+/* Lớp bố cục để giảm kiểu nội dòng */
 .dashboard-header {
   display: flex;
   justify-content: space-between;
@@ -3889,7 +3889,7 @@ body {
   gap: 1.5rem;
 }
 
-/* ── Dashboard Inline Style Cleanup ── */
+/* ── Dọn dẹp kiểu nội dòng Bảng điều khiển ── */
 
 .dashboard-empty-state {
   text-align: center;
@@ -3920,7 +3920,7 @@ body {
   padding: 6px 12px;
 }
 
-/* Connection Status Badges */
+/* Huy hiệu trạng thái kết nối */
 .connection-badge {
   display: inline-flex;
   align-items: center;
@@ -3975,7 +3975,7 @@ body {
   justify-content: center;
 }
 
-/* Patient Info Section */
+/* Phần thông tin bệnh nhân */
 .patient-summary-title {
   border-bottom: 1px solid var(--glass-border);
   padding-bottom: 8px;
@@ -4011,7 +4011,7 @@ body {
   font-weight: 500;
 }
 
-/* Alert Section Layout */
+/* Bố cục phần cảnh báo */
 .alert-section-title {
   margin-bottom: 1rem;
   display: flex;
@@ -4036,7 +4036,7 @@ body {
   padding-right: 8px;
 }
 
-/* Alert Strip — Complete Severity Styling */
+/* Dải cảnh báo — Định kiểu mức độ nghiêm trọng hoàn chỉnh */
 .alert-strip.warning {
   border-left: 3px solid var(--color-warning);
   background: rgba(245, 158, 11, 0.03);
@@ -4064,7 +4064,7 @@ body {
 .alert-strip.warning .alert-severity-badge { color: var(--color-warning); border: 1px solid rgba(245, 158, 11, 0.27); }
 .alert-strip.low .alert-severity-badge { color: var(--color-info); border: 1px solid rgba(59, 130, 246, 0.27); }
 
-/* Simulation Controls */
+/* Điều khiển mô phỏng */
 .sim-description {
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -4083,7 +4083,7 @@ body {
 }
 
 /* =============================================================================
-   CardioGuard AI — Premium Theme Toggle Button Style (Glassmorphism & Micro-animations)
+   CardioGuard AI — Kiểu nút chuyển đổi giao diện cao cấp (Hiệu ứng kính mờ & Vi hoạt ảnh)
    ============================================================================= */
 .theme-toggle-btn {
   display: inline-flex;
@@ -4113,14 +4113,14 @@ body {
   transform: translateY(-2px) scale(1.05);
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.18);
-  color: #eab308; /* Icon Sun màu vàng ấm áp ở Dark Mode */
+  color: #eab308; /* Biểu tượng Mặt trời màu vàng ấm áp ở chế độ Tối */
   box-shadow: 0 6px 20px rgba(234, 179, 8, 0.25);
 }
 
 [data-theme="light"] .theme-toggle-btn:hover {
   background: rgba(0, 0, 0, 0.06);
   border-color: rgba(0, 0, 0, 0.15);
-  color: #3b82f6; /* Icon Moon màu xanh dương dịu mát ở Light Mode */
+  color: #3b82f6; /* Biểu tượng Mặt trăng màu xanh dương dịu mát ở chế độ Sáng */
   box-shadow: 0 6px 20px rgba(59, 130, 246, 0.15);
 }
 
@@ -4128,13 +4128,13 @@ body {
   transform: translateY(0) scale(0.95);
 }
 
-/* Tabular Numbers & Monospace for Clinical Figures */
+/* Số dạng bảng & Monospace cho số liệu lâm sàng */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
 
-/* Premium Shimmer Skeleton Loading Indicators */
+/* Chỉ báo tải khung xương shimmer cao cấp */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }

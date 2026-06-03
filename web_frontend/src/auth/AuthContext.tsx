@@ -1,3 +1,19 @@
+/**
+ * Tệp: CardioGuard AI – Context xác thực và provider
+ * Mục đích: Cung cấp trạng thái xác thực toàn cục (token, người dùng, vai trò),
+ *           hành động đăng nhập/đăng xuất và tự động khôi phục phiên khi gắn
+ *           thông qua /auth/me.
+ * Luồng xử lý: 1. Provider đọc token và người dùng từ sessionStorage khi khởi tạo.
+ *              2. Khi gắn, nếu token tồn tại, nó gọi refreshUser() để
+ *                 xác thực phiên ở phía server.
+ *              3. login() lưu trữ thông tin đăng nhập, logout() xóa chúng và kích hoạt
+ *                 đăng xuất phía server.
+ *              4. useAuth() hook hiển thị trạng thái và hành động cho bất kỳ thành phần con nào.
+ * Quan hệ:
+ *   - sử dụng: ../config (API_URL), ./roles (AuthUser, normalizeRole)
+ *   - được tiêu thụ bởi: ProtectedRoute, RoleLayout, bất kỳ trang nào cần trạng thái xác thực
+ */
+
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { API_URL } from '../config';
 import { AuthUser, UserRole, normalizeRole } from './roles';
@@ -20,10 +36,12 @@ const storage = window.sessionStorage;
 const TOKEN_KEY = 'access_token';
 const USER_KEY = 'user';
 
+/** Mã hóa Base64 một giá trị có thể tuần tự hóa JSON cho sessionStorage */
 const encryptData = (data: any): string => {
   return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
 };
 
+/** Giải mã chuỗi mã hóa Base64 trở về giá trị gốc */
 const decryptData = (ciphertext: string): any => {
   try {
     return JSON.parse(decodeURIComponent(escape(atob(ciphertext))));
@@ -32,6 +50,10 @@ const decryptData = (ciphertext: string): any => {
   }
 };
 
+/**
+ * Ép kiểu đối tượng người dùng API thô thành AuthUser đã chuẩn hóa.
+ * Dự phòng về null nếu vai trò không hợp lệ hoặc người dùng là falsy.
+ */
 const normalizeUser = (user: any): AuthUser | null => {
   const role = normalizeRole(user?.role);
   if (!user || !role) return null;
@@ -48,6 +70,10 @@ const normalizeUser = (user: any): AuthUser | null => {
   };
 };
 
+/**
+ * AuthProvider – Bọc ứng dụng và cung cấp context xác thực cho tất cả các thành phần con.
+ * Khôi phục phiên từ sessionStorage khi gắn; cung cấp đăng nhập/đăng xuất/làm mới.
+ */
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [accessToken, setAccessToken] = useState<string | null>(() => {
     try {
@@ -69,13 +95,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  /** Xóa tất cả trạng thái xác thực, thông báo cho server và chuyển hướng đến trang đăng nhập */
   const logout = () => {
-    console.info('Auth logout: user=%s', user?.email);
+    console.info('Đăng xuất xác thực: người_dùng=%s', user?.email);
     if (accessToken) {
       fetch(`${API_URL}/auth/logout`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${accessToken}` },
-      }).catch((e) => console.error('API logout error:', e));
+      }).catch((e) => console.error('Lỗi API đăng xuất:', e));
     }
     storage.removeItem(USER_KEY);
     storage.removeItem(TOKEN_KEY);
@@ -84,6 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthError(null);
   };
 
+  /** Lưu trữ thông tin đăng nhập vào sessionStorage và đặt trạng thái trong bộ nhớ */
   const login = (token: string, rawUser: AuthUser) => {
     const normalizedUser = normalizeUser(rawUser);
     if (!normalizedUser) {
@@ -91,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Tài khoản chưa được phân quyền');
     }
 
-    console.info('Auth login: email=%s role=%s', normalizedUser.email, normalizedUser.role);
+    console.info('Đăng nhập xác thực: email=%s vai_trò=%s', normalizedUser.email, normalizedUser.role);
     storage.setItem(USER_KEY, encryptData(normalizedUser));
     storage.setItem(TOKEN_KEY, token);
     setAccessToken(token);
@@ -100,6 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return normalizedUser;
   };
 
+  /** Tìm nạp hồ sơ người dùng mới nhất từ /auth/me và cập nhật trạng thái */
   const refreshUser = useCallback(async () => {
     if (!accessToken) return null;
 
@@ -113,19 +142,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     let data;
 
-
     try {
-
-
       data = await response.json();
-
-
     } catch (e) {
-
-
       throw new Error("Lỗi định dạng phản hồi từ server");
-
-
     }
     const normalizedUser = normalizeUser(data.user || data);
     if (!normalizedUser) {
@@ -148,9 +168,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       try {
         await refreshUser();
-        console.info('Session restored: user=%s role=%s', user?.email, user?.role);
+        console.info('Phiên đã khôi phục: người_dùng=%s vai_trò=%s', user?.email, user?.role);
       } catch (err: any) {
-        console.warn('Session restore failed:', err.message);
+        console.warn('Khôi phục phiên thất bại:', err.message);
         logout();
         setAuthError(err.message || 'Không thể khôi phục phiên đăng nhập');
       } finally {
@@ -177,10 +197,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+/** Hook tiện lợi để truy cập context xác thực; ném lỗi nếu được sử dụng bên ngoài AuthProvider */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used inside AuthProvider');
+    throw new Error('useAuth phải được sử dụng bên trong AuthProvider');
   }
   return context;
 };

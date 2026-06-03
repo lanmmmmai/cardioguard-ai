@@ -1,3 +1,14 @@
+// Biểu mẫu bottom-sheet để đặt lịch hẹn khám mới.
+// Quy trình làm việc:
+// 1. Khi khởi tạo, tìm nạp danh sách bác sĩ từ /cms/users qua ApiClient.
+// 2. Người dùng chọn bác sĩ, nhập tiêu đề (lý do), chọn ngày/giờ qua
+//    showDatePicker / showTimePicker, chọn kênh (offline/online),
+//    và tùy chọn thêm ghi chú.
+// 3. Khi gửi, gọi AppointmentProvider.bookAppointment và đóng với true.
+// Mối quan hệ:
+// - Được sử dụng bởi: AppointmentsScreen.
+// - Sở hữu: AppointmentProvider, ApiClient.
+// - Trả về: true (thành công) hoặc null (đã đóng/lỗi) dưới dạng kết quả pop Navigator.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
@@ -6,7 +17,9 @@ import '../core/api_client.dart';
 import '../core/app_logger.dart';
 import '../ui/cg_tokens.dart';
 
+// Biểu mẫu bottom-sheet để đặt lịch hẹn khám mới.
 class BookAppointmentSheet extends StatefulWidget {
+  // Liệu sheet có sử dụng màu chủ đề tối hay không.
   final bool isDarkTheme;
 
   const BookAppointmentSheet({super.key, required this.isDarkTheme});
@@ -26,7 +39,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
-  String _selectedChannel = 'offline'; // offline or online
+  String _selectedChannel = 'offline'; // offline hoặc online
   bool _isSubmitting = false;
   String? _errorMessage;
 
@@ -43,6 +56,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
     super.dispose();
   }
 
+  // Tìm nạp danh sách bác sĩ từ API CMS cho dropdown chọn bác sĩ.
   Future<void> _fetchDoctors() async {
     try {
       final client = ApiClient();
@@ -55,7 +69,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
         });
       }
     } catch (e) {
-      AppLogger.log('Error fetching doctors in sheet: $e');
+      AppLogger.log('Lỗi tìm nạp bác sĩ trong sheet: $e');
       if (mounted) {
         setState(() {
           _isLoadingDoctors = false;
@@ -64,6 +78,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
     }
   }
 
+  // Mở bộ chọn ngày và cập nhật _selectedDate.
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -98,6 +113,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
     }
   }
 
+  // Mở bộ chọn giờ và cập nhật _selectedTime.
   Future<void> _selectTime(BuildContext context) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
@@ -130,6 +146,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
     }
   }
 
+  // Xác thực tất cả các trường và gửi lịch hẹn qua AppointmentProvider.bookAppointment.
   Future<void> _submitForm() async {
     setState(() => _errorMessage = null);
     if (!_formKey.currentState!.validate()) return;
@@ -233,7 +250,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
                 const SizedBox(height: 12),
               ],
 
-              // Doctor Select
+              // Chọn bác sĩ
               Text(
                 'BÁC SĨ ĐIỀU TRỊ',
                 style: TextStyle(
@@ -274,7 +291,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
                     ),
               const SizedBox(height: 14),
 
-              // Title input
+              // Nhập tiêu đề
               TextFormField(
                 controller: _titleController,
                 style: TextStyle(color: textColor, fontSize: 13),
@@ -289,7 +306,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
               ),
               const SizedBox(height: 14),
 
-              // Date and Time picker row
+              // Hàng chọn ngày và giờ
               Row(
                 children: [
                   Expanded(
@@ -383,7 +400,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
               ),
               const SizedBox(height: 14),
 
-              // Channel Select (Online / Offline)
+              // Chọn kênh khám (Trực tiếp / Trực tuyến)
               Text(
                 'HÌNH THỨC KHÁM',
                 style: TextStyle(
@@ -452,7 +469,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
               ),
               const SizedBox(height: 14),
 
-              // Notes Input
+              // Nhập ghi chú
               TextFormField(
                 controller: _notesController,
                 style: TextStyle(color: textColor, fontSize: 13),
@@ -464,7 +481,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
               ),
               const SizedBox(height: 20),
 
-              // Submit Button
+              // Nút gửi
               SizedBox(
                 width: double.infinity,
                 height: 48,

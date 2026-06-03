@@ -1,3 +1,11 @@
+/**
+ * Mục đích: Trang quản trị Email CMS: quản lý template, gửi email, xem tham chiếu biến động và nhật ký.
+ * Luồng xử lý: Giao diện bốn tab: Templates (danh sách/tìm kiếm/sửa/nhân bản/bật tắt/xóa), Send (soạn
+ *              và gửi với thay thế biến động), Variables (lưới tham chiếu), Logs (lịch sử gửi với
+ *              chức năng gửi lại). Trình chỉnh sửa template mở dưới dạng hộp thoại.
+ * Quan hệ: Sử dụng AuthContext cho accessToken/role; ủy quyền cho các component con
+ *          TemplateEditor, EmailSendForm, EmailLogsTable và EmailVariables.
+ */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   CheckCircle2, Copy, Edit2, FileText, History,
@@ -12,7 +20,7 @@ import { EmailLogsTable } from './email/EmailLogsTable';
 import { EmailVariables } from './email/EmailVariables';
 
 // ───────────────────────────────────────────────────────────
-// Tabs
+// Các tab
 // ───────────────────────────────────────────────────────────
 type TabKey = 'templates' | 'send' | 'variables' | 'logs';
 
@@ -24,7 +32,7 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
 ];
 
 // ───────────────────────────────────────────────────────────
-// Template type display map
+// Bản đồ hiển thị loại template
 // ───────────────────────────────────────────────────────────
 const TYPE_LABELS: Record<string, string> = {
   otp_register:         'OTP Đăng ký',
@@ -52,13 +60,13 @@ interface Template {
 }
 
 // ───────────────────────────────────────────────────────────
-// Main Component
+// Component chính
 // ───────────────────────────────────────────────────────────
 export const EmailCmsPage: React.FC = () => {
   const { accessToken, role } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>('templates');
 
-  // Templates state
+  // Trạng thái templates
   const [templates, setTemplates] = useState<Template[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -68,7 +76,7 @@ export const EmailCmsPage: React.FC = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [logRefreshSignal, setLogRefreshSignal] = useState(0);
 
-  // Editor state
+  // Trạng thái trình soạn thảo
   const [showEditor, setShowEditor] = useState(false);
   const [editorTemplate, setEditorTemplate] = useState<Template | null>(null);
 
@@ -80,7 +88,7 @@ export const EmailCmsPage: React.FC = () => {
   };
 
   // ──────────────────────────────
-  // Fetch templates
+  // Tải danh sách templates
   // ──────────────────────────────
   const fetchTemplates = useCallback(async () => {
     if (!accessToken) return;
@@ -107,7 +115,7 @@ export const EmailCmsPage: React.FC = () => {
   useEffect(() => { setOffset(0); }, [q]);
 
   // ──────────────────────────────
-  // Actions
+  // Các hành động
   // ──────────────────────────────
   const handleEdit = (tpl: Template) => {
     setEditorTemplate(tpl);
@@ -185,7 +193,7 @@ export const EmailCmsPage: React.FC = () => {
     <div className="email-cms-page">
       {toast && <div className="cms-toast">{toast}</div>}
 
-      {/* Page Header */}
+      {/* Tiêu đề trang */}
       <div className="page-header cms-header">
         <div>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -208,7 +216,7 @@ export const EmailCmsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Tab Navigation */}
+      {/* Điều hướng tab */}
       <div className="email-cms-tabs">
         {TABS.map((tab) => (
           <button
@@ -223,10 +231,10 @@ export const EmailCmsPage: React.FC = () => {
         ))}
       </div>
 
-      {/* ─── TAB: Templates list ─── */}
+      {/* ─── TAB: Danh sách templates ─── */}
       {activeTab === 'templates' && (
         <div className="panel email-cms-panel">
-          {/* Filters */}
+          {/* Bộ lọc */}
           <div className="email-templates-toolbar">
             <label className="email-logs-search-wrap">
               <Search size={15} style={{ color: 'var(--text-muted)' }} />
@@ -242,7 +250,7 @@ export const EmailCmsPage: React.FC = () => {
 
           {error && <div className="cms-inline-error">{error}</div>}
 
-          {/* Table */}
+          {/* Bảng */}
           <div className="email-logs-table-wrap">
             <table className="email-logs-table">
               <thead>
@@ -335,7 +343,7 @@ export const EmailCmsPage: React.FC = () => {
             </table>
           </div>
 
-          {/* Pagination */}
+          {/* Phân trang */}
           <div className="cms-pagination">
             <button
               type="button"
@@ -358,7 +366,7 @@ export const EmailCmsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── TAB: Send Email ─── */}
+      {/* ─── TAB: Gửi Email ─── */}
       {activeTab === 'send' && (
         <EmailSendForm
           onSent={() => {
@@ -368,21 +376,21 @@ export const EmailCmsPage: React.FC = () => {
         />
       )}
 
-      {/* ─── TAB: Variables Reference ─── */}
+      {/* ─── TAB: Tham chiếu Biến động ─── */}
       {activeTab === 'variables' && (
         <div className="panel email-cms-panel">
           <EmailVariables />
         </div>
       )}
 
-      {/* ─── TAB: Logs ─── */}
+      {/* ─── TAB: Nhật ký ─── */}
       {activeTab === 'logs' && (
         <div className="panel email-cms-panel">
           <EmailLogsTable refreshSignal={logRefreshSignal} />
         </div>
       )}
 
-      {/* ─── Template Editor Modal ─── */}
+      {/* ─── Hộp thoại chỉnh sửa Template ─── */}
       {showEditor && (
         <TemplateEditor
           template={editorTemplate}

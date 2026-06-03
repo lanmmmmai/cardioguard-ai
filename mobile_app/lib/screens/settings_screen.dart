@@ -1,3 +1,17 @@
+// Màn hình cài đặt tài khoản: chỉnh sửa hồ sơ, chuyển đổi chủ đề, đổi mật khẩu, đăng xuất.
+// Quy trình làm việc:
+// 1. Khi khởi tạo, nếu người dùng hiện tại là bệnh nhân, tìm nạp hồ sơ của họ qua
+//    PatientProvider.fetchMyProfile và điền vào các trường biểu mẫu.
+// 2. Biểu mẫu hồ sơ: tuổi, giới tính, điện thoại, địa chỉ, tiền sử bệnh lý — được lưu qua
+//    PatientProvider.updateMyProfile.
+// 3. Công tắc chủ đề: gọi callback onToggleTheme để chuyển đổi chế độ tối/sáng.
+// 4. Đổi mật khẩu: xác thực chính sách (>= 8 ký tự, chữ hoa, chữ thường, chữ số, ký tự đặc biệt),
+//    gọi /users/me/password qua ApiClient.
+// 5. Đăng xuất: gọi AuthProvider.logout và điều hướng đến /login.
+// Mối quan hệ:
+// - Sở hữu: AuthProvider, PatientProvider, ApiClient.
+// - Callback: onToggleTheme để chuyển đổi chủ đề.
+// - Điều hướng: đến /login (đăng xuất).
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
@@ -6,8 +20,11 @@ import '../providers/patient_provider.dart';
 import '../core/api_client.dart';
 import '../ui/cg_tokens.dart';
 
+// Màn hình cài đặt tài khoản với chỉnh sửa hồ sơ, chuyển đổi chủ đề, đổi mật khẩu và đăng xuất.
 class SettingsScreen extends StatefulWidget {
+  // Liệu màn hình có sử dụng màu chủ đề tối hay không.
   final bool isDarkTheme;
+  // Callback để chuyển đổi giữa chế độ tối và sáng.
   final VoidCallback onToggleTheme;
 
   const SettingsScreen({
@@ -33,11 +50,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _addressController = TextEditingController();
   final _historyController = TextEditingController();
 
+  // Liệu một yêu cầu đổi mật khẩu có đang được tiến hành hay không.
   bool _isChangingPassword = false;
+  // Liệu một yêu cầu lưu hồ sơ có đang được tiến hành hay không.
   bool _isSavingProfile = false;
+  // Thông báo lỗi cho xác thực biểu mẫu hồ sơ/lỗi API.
   String? _profileError;
+  // Thông báo lỗi cho xác thực biểu mẫu đổi mật khẩu/lỗi API.
   String? _passwordError;
 
+  // Xác thực độ mạnh mật khẩu: >= 8 ký tự, chữ hoa, chữ thường, chữ số, ký tự đặc biệt.
   String? _validatePasswordPolicy(String? value) {
     final v = value ?? '';
     if (v.length < 8 || v.length > 72) {
@@ -93,6 +115,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  // Đổi mật khẩu của người dùng hiện tại qua ApiClient.put đến /users/me/password.
   Future<void> _changePassword() async {
     if (!_passwordFormKey.currentState!.validate()) return;
     setState(() {
@@ -134,6 +157,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  // Lưu hồ sơ bệnh nhân (tuổi, giới tính, điện thoại, địa chỉ, tiền sử) qua PatientProvider.
   Future<void> _savePatientProfile() async {
     if (!_profileFormKey.currentState!.validate()) return;
     setState(() {
@@ -202,7 +226,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // User Card
+            // Thẻ người dùng
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -264,7 +288,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Profile Edit Form (only for Patient role)
+            // Biểu mẫu chỉnh sửa hồ sơ (chỉ dành cho vai trò bệnh nhân)
             if (currentUser.role == 'patient') ...[
               const Text('Hồ sơ cá nhân',
                   style: TextStyle(
@@ -373,7 +397,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 24),
             ],
 
-            // Theme Options
+            // Tùy chọn chủ đề
             const Text('Hệ thống',
                 style: TextStyle(
                     fontSize: 12,
@@ -400,7 +424,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Change Password Form
+            // Biểu mẫu đổi mật khẩu
             const Text('Đổi mật khẩu',
                 style: TextStyle(
                     fontSize: 12,
@@ -497,7 +521,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 32),
 
-            // Logout Button
+            // Nút đăng xuất
             SizedBox(
               width: double.infinity,
               height: 52,

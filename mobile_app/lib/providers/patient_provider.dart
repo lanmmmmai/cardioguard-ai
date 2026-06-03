@@ -1,3 +1,18 @@
+// Provider dữ liệu bệnh nhân — danh sách, hồ sơ, hồ sơ bệnh án, đơn thuốc,
+// telemetry trực tiếp và mô phỏng cảm biến.
+// Quy trình làm việc:
+//   1. fetchPatients lấy danh sách bệnh nhân (quản trị viên/bác sĩ) hoặc
+//      hồ sơ tự thân (bệnh nhân). fetchMyProfile lấy hồ sơ người dùng đã đăng nhập.
+//   2. updateMyProfile tạo hoặc cập nhật hồ sơ của chính bệnh nhân.
+//   3. fetchMedicalRecords / addMedicalRecord và fetchPrescriptions
+//      / addPrescription quản lý dữ liệu lâm sàng theo từng bệnh nhân.
+//   4. updateLiveMetrics lưu trữ đệm các chỉ số sinh tồn thời gian thực từ sự kiện WebSocket.
+//   5. triggerSimulation đăng các kết quả đọc cảm biến thử nghiệm (quản trị viên/bác sĩ).
+// Mối quan hệ:
+//   - Phụ thuộc vào: ApiClient, AppLogger, Patient, MedicalRecord,
+//     Prescription models, AppConfig.
+//   - liveMetrics được cập nhật từ callbacks của WebSocketService và điều khiển
+//     hiển thị bảng điều khiển thời gian thực.
 import 'package:flutter/material.dart';
 import '../core/app_logger.dart';
 import '../core/api_client.dart';
@@ -5,25 +20,36 @@ import '../models/models.dart';
 import '../config/app_config.dart';
 
 class PatientProvider extends ChangeNotifier {
+  // Phiên bản API client dùng chung.
   final ApiClient _apiClient = ApiClient();
 
   bool _isLoading = false;
+
+  // Liệu một yêu cầu mạng có đang được tiến hành hay không.
   bool get isLoading => _isLoading;
 
   List<Patient> _patients = [];
+
+  // Danh sách bệnh nhân (quản trị viên/bác sĩ) hoặc mục tự thân (bệnh nhân).
   List<Patient> get patients => _patients;
 
   Patient? _currentPatientProfile;
+
+  // Hồ sơ của bệnh nhân hiện đang đăng nhập (nếu vai trò là bệnh nhân).
   Patient? get currentPatientProfile => _currentPatientProfile;
 
-  // Patient history logs
   List<MedicalRecord> _medicalRecords = [];
+
+  // Hồ sơ bệnh án lâm sàng cho bệnh nhân đã chọn.
   List<MedicalRecord> get medicalRecords => _medicalRecords;
 
   List<Prescription> _prescriptions = [];
+
+  // Đơn thuốc cho bệnh nhân đã chọn.
   List<Prescription> get prescriptions => _prescriptions;
 
-  // Real-time telemetry cache for currently monitored patient
+  // Bộ đệm telemetry thời gian thực cho bệnh nhân đang được theo dõi, được cập nhật
+  // qua các sự kiện WebSocket. Mặc định là các giá trị nghỉ ngơi bình thường.
   Map<String, dynamic> _liveMetrics = {
     'heart_rate': 75,
     'spo2': 98,
@@ -32,31 +58,34 @@ class PatientProvider extends ChangeNotifier {
     'ecg_value': 0.0,
     'is_abnormal': false,
   };
+
+  // Các chỉ số sinh tồn trực tiếp mới nhất.
   Map<String, dynamic> get liveMetrics => _liveMetrics;
 
+  // Cập nhật trạng thái tải và thông báo cho listeners.
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
 
-  // Fetch list of patients (Doctor/Admin) or returns single list containing the patient themselves
+  // Tìm nạp danh sách bệnh nhân (quản trị viên/bác sĩ) hoặc mục tự thân (bệnh nhân).
   Future<void> fetchPatients() async {
     _setLoading(true);
     try {
       final response = await _apiClient.get(AppConfig.patientsEndpoint);
       if (response.statusCode == 200) {
-        if (response.data is! List) throw Exception("Expected a list from server");
+        if (response.data is! List) throw Exception("Dữ liệu trả về phải là một danh sách");
         final List<dynamic> list = response.data as List<dynamic>;
         _patients = list.map((item) => Patient.fromJson(item)).toList();
       }
     } catch (e) {
-      AppLogger.log('Fetch patients error: $e');
+      AppLogger.log('Lỗi tìm nạp bệnh nhân: $e');
     } finally {
       _setLoading(false);
     }
   }
 
-  // Fetch profile for the currently logged in patient
+  // Tìm nạp hồ sơ cho bệnh nhân hiện đang đăng nhập.
   Future<void> fetchMyProfile() async {
     _setLoading(true);
     try {
@@ -65,13 +94,13 @@ class PatientProvider extends ChangeNotifier {
         _currentPatientProfile = Patient.fromJson(response.data['patient']);
       }
     } catch (e) {
-      AppLogger.log('Fetch patient profile error: $e');
+      AppLogger.log('Lỗi tìm nạp hồ sơ bệnh nhân: $e');
     } finally {
       _setLoading(false);
     }
   }
 
-  // Update profile for the patient (or create if not exists)
+  // Tạo hoặc cập nhật hồ sơ nhân khẩu học của bệnh nhân đã đăng nhập.
   Future<bool> updateMyProfile({
     required int age,
     required String gender,
@@ -99,30 +128,30 @@ class PatientProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     } catch (e) {
-      AppLogger.log('Update patient profile error: $e');
+      AppLogger.log('Lỗi cập nhật hồ sơ bệnh nhân: $e');
       _setLoading(false);
       return false;
     }
   }
 
-  // Fetch Clinical Records (Medical Records)
+  // Tìm nạp hồ sơ bệnh án cho patientId đã cho.
   Future<void> fetchMedicalRecords(String patientId) async {
     _setLoading(true);
     try {
       final response = await _apiClient.get('/medical-records', queryParameters: {'patient_id': patientId});
       if (response.statusCode == 200) {
-        if (response.data is! List) throw Exception("Expected a list from server");
+        if (response.data is! List) throw Exception("Dữ liệu trả về phải là một danh sách");
         final List<dynamic> list = response.data as List<dynamic>;
         _medicalRecords = list.map((item) => MedicalRecord.fromJson(item)).toList();
       }
     } catch (e) {
-      AppLogger.log('Fetch medical records error: $e');
+      AppLogger.log('Lỗi tìm nạp hồ sơ bệnh án: $e');
     } finally {
       _setLoading(false);
     }
   }
 
-  // Add Medical Record (Doctor)
+  // Thêm một hồ sơ bệnh án mới cho bệnh nhân (thao tác của bác sĩ).
   Future<bool> addMedicalRecord({
     required String patientId,
     required String type,
@@ -149,30 +178,30 @@ class PatientProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     } catch (e) {
-      AppLogger.log('Add medical record error: $e');
+      AppLogger.log('Lỗi thêm hồ sơ bệnh án: $e');
       _setLoading(false);
       return false;
     }
   }
 
-  // Fetch Prescriptions
+  // Tìm nạp đơn thuốc cho patientId đã cho.
   Future<void> fetchPrescriptions(String patientId) async {
     _setLoading(true);
     try {
       final response = await _apiClient.get('/prescriptions', queryParameters: {'patient_id': patientId});
       if (response.statusCode == 200) {
-        if (response.data is! List) throw Exception("Expected a list from server");
+        if (response.data is! List) throw Exception("Dữ liệu trả về phải là một danh sách");
         final List<dynamic> list = response.data as List<dynamic>;
         _prescriptions = list.map((item) => Prescription.fromJson(item)).toList();
       }
     } catch (e) {
-      AppLogger.log('Fetch prescriptions error: $e');
+      AppLogger.log('Lỗi tìm nạp đơn thuốc: $e');
     } finally {
       _setLoading(false);
     }
   }
 
-  // Add Prescription (Doctor)
+  // Thêm một đơn thuốc mới cho bệnh nhân (thao tác của bác sĩ).
   Future<bool> addPrescription({
     required String patientId,
     required String medicationName,
@@ -202,13 +231,14 @@ class PatientProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     } catch (e) {
-      AppLogger.log('Add prescription error: $e');
+      AppLogger.log('Lỗi thêm đơn thuốc: $e');
       _setLoading(false);
       return false;
     }
   }
 
-  // Update Live Vitals Cache (called from WebSocket)
+  // Cập nhật các chỉ số sinh tồn trực tiếp đã lưu trong bộ đệm từ một sự kiện WebSocket.
+  // Dự phòng về giá trị trước đó cho bất kỳ trường nào bị thiếu.
   void updateLiveMetrics(Map<String, dynamic> metrics) {
     _liveMetrics = {
       'heart_rate': metrics['heart_rate'] ?? _liveMetrics['heart_rate'],
@@ -221,10 +251,11 @@ class PatientProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Trigger simulation normal / abnormal (Doctor/Admin testing)
+  // Đăng dữ liệu cảm biến mô phỏng để thử nghiệm (bác sĩ/quản trị viên). Khi isAbnormal
+  // là true, các giá trị bắt chước một sự kiện nguy kịch; nếu không thì các chỉ số sinh tồn nghỉ ngơi bình thường.
   Future<bool> triggerSimulation(String patientId, bool isAbnormal) async {
     try {
-      // POST to /sensor-data
+      // POST đến /sensor-data
       final response = await _apiClient.post(
         '/sensor-data',
         data: {
@@ -238,9 +269,8 @@ class PatientProvider extends ChangeNotifier {
       );
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      AppLogger.log('Trigger simulation error: $e');
+      AppLogger.log('Lỗi kích hoạt mô phỏng: $e');
       return false;
     }
   }
 }
-

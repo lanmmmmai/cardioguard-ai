@@ -1,8 +1,14 @@
+// Một thẻ chứa có chủ đề thích ứng với chế độ tối/sáng sử dụng CgTokens.
+// Cung cấp một thẻ hình chữ nhật bo góc nhất quán với đường viền và màu nền
+// dẫn xuất từ độ sáng Theme hiện tại.
+// Được sử dụng trong toàn bộ ứng dụng như thùng chứa bề mặt chính.
 import 'package:flutter/material.dart';
 import '../../ui/cg_tokens.dart';
 
 class CgCard extends StatelessWidget {
+  // Nội dung widget bên trong thẻ.
   final Widget child;
+  // Đệm tùy chọn; mặc định là CgSpacing.md.
   final EdgeInsetsGeometry? padding;
 
   const CgCard({super.key, required this.child, this.padding});

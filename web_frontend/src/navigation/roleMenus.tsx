@@ -1,3 +1,14 @@
+/**
+ * Tệp: CardioGuard AI – Menu điều hướng sidebar dựa trên vai trò
+ * Mục đích: Định nghĩa danh sách mục menu sidebar cho mỗi vai trò người dùng
+ *           với biểu tượng Lucide và nhãn tiếng Việt.
+ * Luồng xử lý: Mỗi vai trò (admin, doctor, patient) nhận một mảng tĩnh
+ *           các đối tượng RoleMenuItem. RoleLayout hiển thị chúng trong sidebar.
+ * Quan hệ:
+ *   - Được sử dụng bởi: RoleLayout (hiển thị menu cho vai trò hiện tại)
+ *   - Import biểu tượng lucide-react cho mỗi mục menu
+ */
+
 import {
   Activity,
   AlertTriangle,
@@ -24,12 +35,14 @@ import {
 } from 'lucide-react';
 import type { UserRole } from '../auth/roles';
 
+/** Một mục menu điều hướng đơn lẻ với nhãn, đường dẫn và biểu tượng */
 export interface RoleMenuItem {
   label: string;
   path: string;
   icon: LucideIcon;
 }
 
+/** Cây menu sidebar được lập chỉ mục theo vai trò người dùng */
 export const roleMenus: Record<UserRole, RoleMenuItem[]> = {
   admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: BarChart3 },

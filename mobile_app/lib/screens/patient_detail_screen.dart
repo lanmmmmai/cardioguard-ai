@@ -1,3 +1,15 @@
+// Màn hình chi tiết bệnh nhân với 4 tab: Chỉ số, Hồ sơ bệnh án, Đơn thuốc, Trò chuyện.
+// Quy trình làm việc:
+// 1. Khởi tạo các điểm xu hướng mô phỏng (HR/SpO2), lắng nghe WebSocket để cập nhật
+//    số liệu trực tiếp và tin nhắn trò chuyện, và tìm nạp hồ sơ bệnh án/đơn thuốc/trò chuyện.
+// 2. Tab 1: thẻ thông tin bệnh nhân + thẻ số liệu nhỏ + biểu đồ đường xu hướng HR/SpO2.
+// 3. Tab 2: danh sách hồ sơ bệnh án; bác sĩ có thể thêm qua AddRecordSheetContent.
+// 4. Tab 3: danh sách đơn thuốc; bác sĩ có thể thêm qua AddPrescriptionSheetContent.
+// 5. Tab 4: trò chuyện thời gian thực với giao diện bong bóng; tin nhắn được gửi qua ChatProvider.
+// Mối quan hệ:
+// - Sở hữu: AuthProvider, PatientProvider, ChatProvider, WebSocketService.
+// - Sử dụng: fl_chart cho biểu đồ xu hướng, CgCard, CgMetricValue, CgInlineState, CgStatusBadge.
+// - Chứa: AddRecordSheetContent, AddPrescriptionSheetContent.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
@@ -10,9 +22,13 @@ import '../services/websocket_service.dart';
 import '../widgets/cg_widgets.dart';
 import '../ui/cg_tokens.dart';
 
+// Màn hình hiển thị thông tin chi tiết bệnh nhân qua 4 tab (Chỉ số / Hồ sơ bệnh án / Đơn thuốc / Trò chuyện).
 class PatientDetailScreen extends StatefulWidget {
+  // Dữ liệu bệnh nhân (từ API hoặc mô hình provider).
   final Map<String, dynamic> patient;
+  // Liệu màn hình có sử dụng màu chủ đề tối hay không.
   final bool isDarkTheme;
+  // Liệu có hiển thị nút quay lại trong AppBar hay không.
   final bool showBackButton;
 
   const PatientDetailScreen({
@@ -27,8 +43,11 @@ class PatientDetailScreen extends StatefulWidget {
 }
 
 class _PatientDetailScreenState extends State<PatientDetailScreen> {
+  // Cửa sổ cuộn của các điểm dữ liệu HR cho biểu đồ xu hướng.
   final List<FlSpot> _hrSpots = [];
+  // Cửa sổ cuộn của các điểm dữ liệu SpO2 cho biểu đồ xu hướng.
   final List<FlSpot> _spo2Spots = [];
+  // Bộ đếm tích tắc được sử dụng làm chỉ số trục X cho các điểm biểu đồ.
   int _tickCount = 0;
 
   double _currentHr = 75.0;
@@ -36,24 +55,24 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   double _currentSysBp = 120.0;
   double _currentDiaBp = 80.0;
 
-  // Chat message text controller
+  // Bộ điều khiển văn bản tin nhắn trò chuyện
   final _messageController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
 
-    // Fill initially with dummy stable points
+    // Điền ban đầu với các điểm giả định ổn định
     for (int i = 0; i < 15; i++) {
       _hrSpots.add(FlSpot(i.toDouble(), 75.0));
       _spo2Spots.add(FlSpot(i.toDouble(), 98.0));
     }
     _tickCount = 15;
 
-    // Listen to WebSocket broadcasts
+    // Lắng nghe các chương trình phát sóng WebSocket
     WebSocketService.addListener(_onWebSocketEvent);
 
-    // Initial API fetches
+    // Tìm nạp API ban đầu
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final patientId = widget.patient['id'];
       final patientProvider =
@@ -66,6 +85,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     });
   }
 
+  // Xử lý các sự kiện WebSocket: tin nhắn chat cập nhật giao diện trò chuyện;
+  // health_metrics cập nhật các chỉ số sinh tồn trực tiếp và dữ liệu biểu đồ xu hướng.
   void _onWebSocketEvent(Map<String, dynamic> event) {
     if (!mounted) return;
 
@@ -99,7 +120,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     super.dispose();
   }
 
-  // Doctor Sheet: Add Medical Record
+  // Mở bottom sheet để bác sĩ thêm hồ sơ bệnh án mới.
   void _showAddRecordSheet() {
     showModalBottomSheet(
       context: context,
@@ -117,7 +138,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     );
   }
 
-  // Doctor Sheet: Add Prescription
+  // Mở bottom sheet để bác sĩ thêm đơn thuốc mới.
   void _showAddPrescriptionSheet() {
     showModalBottomSheet(
       context: context,
@@ -135,6 +156,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     );
   }
 
+  // Gửi tin nhắn trò chuyện qua ChatProvider.sendMessage và xóa đầu vào.
   void _sendChatMessage() {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
@@ -144,7 +166,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     final currentUserId = authProvider.currentUser!.id;
     final patientId = widget.patient['id'];
 
-    // Doctor or Admin
+    // Bác sĩ hoặc Quản trị viên
     final doctorId = authProvider.currentUser!.role == 'doctor'
         ? currentUserId
         : widget.patient['doctor_id'] ?? currentUserId;
@@ -213,12 +235,12 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         ),
         body: TabBarView(
           children: [
-            // Tab 1: Vitals & Charts
+            // Tab 1: Chỉ số và biểu đồ
             SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  // Patient Details
+                  // Thông tin bệnh nhân
                   CgCard(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -244,7 +266,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Mini Metrics Cards
+                  // Thẻ số liệu nhỏ
                   Row(
                     children: [
                       Expanded(
@@ -277,14 +299,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Heart Rate Trend
+                  // Xu hướng nhịp tim
                   RepaintBoundary(
                     child: _buildChartSection('XU HƯỚNG NHỊP TIM (HR)',
                         _hrSpots, CgColors.hr, 40, 160, cardBg, textMuted),
                   ),
                   const SizedBox(height: 16),
 
-                  // SpO2 Trend
+                  // Xu hướng SpO2
                   RepaintBoundary(
                     child: _buildChartSection('XU HƯỚNG NỒNG ĐỘ OXY (SPO2)',
                         _spo2Spots, CgColors.spo2, 80, 100, cardBg, textMuted),
@@ -293,7 +315,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               ),
             ),
 
-            // Tab 2: Medical Records (Bệnh án)
+            // Tab 2: Hồ sơ bệnh án
             Scaffold(
               backgroundColor: Colors.transparent,
               body: patientProvider.medicalRecords.isEmpty
@@ -365,7 +387,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                   : null,
             ),
 
-            // Tab 3: Prescriptions (Đơn thuốc)
+            // Tab 3: Đơn thuốc
             Scaffold(
               backgroundColor: Colors.transparent,
               body: patientProvider.prescriptions.isEmpty
@@ -439,7 +461,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                   : null,
             ),
 
-            // Tab 4: Chat (Trò chuyện)
+            // Tab 4: Trò chuyện
             Column(
               children: [
                 Expanded(
@@ -536,6 +558,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     );
   }
 
+  // Xây dựng một hàng nhãn-giá trị được sử dụng trong thẻ thông tin bệnh nhân.
   Widget _buildDetailRow(
       String label, String value, Color textColor, Color textMuted) {
     return Padding(
@@ -561,6 +584,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     );
   }
 
+  // Xây dựng một thẻ số liệu nhỏ cho HR / SpO2 / BP hiển thị trong tab chỉ số.
   Widget _buildMiniMetricCard(String title, String value, String unit,
       Color color, Color cardBg, Color textMuted) {
     return Container(
@@ -582,6 +606,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     );
   }
 
+  // Xây dựng một phần chứa biểu đồ đường với tiêu đề và LineChart sử dụng fl_chart.
   Widget _buildChartSection(String title, List<FlSpot> spots, Color lineColor,
       double minY, double maxY, Color cardBg, Color textMuted) {
     return Container(
@@ -643,6 +668,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     );
   }
 
+  // Xây dựng một hàng chi tiết duy nhất cho đơn thuốc (tên thuốc, liều lượng, tần suất, v.v.).
   Widget _buildPrescDetail(String label, String value, Color textColor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4.0),
@@ -662,6 +688,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   }
 }
 
+// Biểu mẫu bottom-sheet để thêm hồ sơ bệnh án mới cho bệnh nhân.
 class AddRecordSheetContent extends StatefulWidget {
   final Map<String, dynamic> patient;
   final bool isDarkTheme;
@@ -763,6 +790,7 @@ class _AddRecordSheetContentState extends State<AddRecordSheetContent> {
   }
 }
 
+// Biểu mẫu bottom-sheet để thêm đơn thuốc mới cho bệnh nhân.
 class AddPrescriptionSheetContent extends StatefulWidget {
   final Map<String, dynamic> patient;
   final bool isDarkTheme;

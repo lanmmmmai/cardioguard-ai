@@ -1,3 +1,9 @@
+/**
+ * Mục đích: Hiển thị một bong bóng tin nhắn chat đơn lẻ (người dùng hoặc AI) với hỗ trợ markdown.
+ * Luồng xử lý: Phân biệt tin nhắn AI và người dùng để tạo kiểu; hiển thị nội dung AI qua ReactMarkdown
+ *              với plugin GFM; hiển thị con trỏ nhấp nháy khi đang stream.
+ * Quan hệ: Là component con của ChatWindow; xuất interface ChatMessage được component cha sử dụng.
+ */
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -15,6 +21,10 @@ interface MessageBubbleProps {
   msg: ChatMessage;
 }
 
+/**
+ * Component MessageBubble — hiển thị markdown cho tin nhắn AI, văn bản thuần cho tin nhắn người dùng,
+ * và hiển thị con trỏ streaming khi phản hồi AI đang được xử lý.
+ */
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ msg }) => {
   const isAI = msg.sender === 'ai';
 

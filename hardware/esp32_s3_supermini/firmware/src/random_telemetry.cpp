@@ -36,15 +36,13 @@ float ClampFloat(float value, float min_value, float max_value) {
   return value;
 }
 
-/**
- * @brief Performs a random walk step.
- * Note: step_min must be <= 0 and step_max must be >= 0 for unbiased random walk.
- */
+/* Thực hiện một bước random walk.
+   Luu ý: step_min phải <= 0 và step_max phải >= 0 để đảm bảo bước đi không thiên lệch. */
 float RandomWalk(float current_value, float step_min, float step_max, float out_min, float out_max) {
   const float step = RandomRangeFloat(step_min, step_max);
   return ClampFloat(current_value + step, out_min, out_max);
 }
-}  // namespace
+}  // Kết thúc namespace ẩn danh
 
 const char *ModeToString(DemoMode mode) {
   switch (mode) {
@@ -86,12 +84,12 @@ DemoMode ParseModeFromText(const String &text, DemoMode fallback_mode) {
 }
 
 TelemetryFrame GenerateRandomTelemetry(unsigned long sequence, DemoMode mode) {
-  static DemoMode last_mode = DemoMode::normal;
-  static int hr_base = 78;
-  static int spo2_base = 98;
-  static float ecg_base = 0.02f;
-  static float motion_base = 0.08f;
-  static float temp_base = 36.9f;
+  static DemoMode last_mode = DemoMode::normal;   // Chế độ demo của lần sinh dữ liệu trước
+  static int hr_base = 78;                         // Giá trị cơ sở của nhịp tim
+  static int spo2_base = 98;                       // Giá trị cơ sở của SpO2
+  static float ecg_base = 0.02f;                   // Giá trị cơ sở của tín hiệu ECG
+  static float motion_base = 0.08f;                // Giá trị cơ sở của cảm biến chuyển động
+  static float temp_base = 36.9f;                  // Giá trị cơ sở của nhiệt độ cơ thể
 
   if (mode != last_mode) {
     hr_base = 78;

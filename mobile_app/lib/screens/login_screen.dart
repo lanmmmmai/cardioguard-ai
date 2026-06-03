@@ -1,3 +1,13 @@
+// Màn hình đăng nhập cho CardioGuard AI.
+// Quy trình làm việc:
+// 1. Người dùng nhập email + mật khẩu trong Form có xác thực.
+// 2. Khi gửi, gọi AuthProvider.login và điều hướng đến /dashboard khi thành công.
+// 3. Hiển thị thông báo lỗi từ AuthProvider.errorMessage hoặc xác thực cục bộ.
+// 4. Liên kết "Chưa có tài khoản?" điều hướng đến /register.
+// Mối quan hệ:
+// - Sở hữu: AuthProvider để xác thực.
+// - Sử dụng: CgCard cho thẻ chứa trung tâm.
+// - Điều hướng: đến /dashboard (thành công) hoặc /register (đăng ký).
 import 'package:flutter/material.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +15,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/cg_widgets.dart';
 
+// Màn hình biểu mẫu đăng nhập với xác thực email/mật khẩu.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -16,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  // Thông báo lỗi được quản lý cục bộ (ưu tiên hơn lỗi provider).
   String? _localError;
 
   @override
@@ -25,6 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  // Xác thực biểu mẫu và thử đăng nhập qua AuthProvider.
   Future<void> _handleLogin() async {
     setState(() => _localError = null);
     if (!_formKey.currentState!.validate()) return;

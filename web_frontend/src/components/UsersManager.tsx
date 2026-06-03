@@ -1,3 +1,12 @@
+/**
+ * @purpose Quản lý người dùng dành cho quản trị viên: danh sách, tìm kiếm, lọc, thêm,
+ *          sửa và xóa tài khoản người dùng.
+ * @workflow Tải danh sách người dùng từ /admin/users khi mount; quản lý ba luồng
+ *           modal (thêm/sửa/xóa) với xác thực biểu mẫu; hỗ trợ lọc theo vai trò/trạng
+ *           thái và tìm kiếm.
+ * @relationships Sử dụng AuthContext để lấy accessToken; tương tác với các endpoint API quản trị;
+ *                Sử dụng passwordPolicy util để kiểm tra độ mạnh mật khẩu.
+ */
 import React, { useEffect, useState } from 'react';
 import { Search, X, Loader2, Plus, Edit2, Trash2, User, Mail, Phone, UserCog, Shield, Activity, Lock, AlertOctagon } from 'lucide-react';
 import { API_URL } from '../config';
@@ -14,6 +23,10 @@ interface UserAccount {
   created_at: string | null;
 }
 
+/**
+ * Component UsersManager — bảng quản trị CRUD cho tài khoản người dùng với tìm kiếm/lọc.
+ * Quản lý ba modal: Thêm, Sửa (có đặt lại mật khẩu tùy chọn) và Xác nhận Xóa.
+ */
 export const UsersManager: React.FC = () => {
   const { accessToken } = useAuth();
   const [users, setUsers] = useState<UserAccount[]>([]);
@@ -24,13 +37,11 @@ export const UsersManager: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null);
 
-  // Form states
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -298,9 +309,7 @@ export const UsersManager: React.FC = () => {
     }
   };
 
-  // Filter users based on query and filters
   const filteredUsers = users.filter((userAcc) => {
-    // 1. Search Query Filter
     const term = searchQuery.toLowerCase().trim();
     const matchesSearch = !term || (
       (userAcc.full_name || '').toLowerCase().includes(term) ||
@@ -308,10 +317,8 @@ export const UsersManager: React.FC = () => {
       (userAcc.phone || '').includes(term)
     );
 
-    // 2. Role Filter
     const matchesRole = roleFilter === 'all' || userAcc.role === roleFilter;
 
-    // 3. Status Filter
     const matchesStatus = statusFilter === 'all' || userAcc.status === statusFilter;
 
     return matchesSearch && matchesRole && matchesStatus;
@@ -379,11 +386,9 @@ export const UsersManager: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter and Search Panel */}
       <div className="panel" style={{ marginBottom: '1.5rem', padding: '16px 20px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '16px', alignItems: 'center' }}>
           
-          {/* Search Box */}
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <Search size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
             <input
@@ -396,7 +401,6 @@ export const UsersManager: React.FC = () => {
             />
           </div>
 
-          {/* Role Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Vai trò:</span>
             <select 
@@ -412,7 +416,6 @@ export const UsersManager: React.FC = () => {
             </select>
           </div>
 
-          {/* Status Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Trạng thái:</span>
             <select 
@@ -430,7 +433,6 @@ export const UsersManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content Area */}
       {isLoading ? (
         <div className="panel" style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
           <Loader2 className="beat-animated" size={36} style={{ margin: '0 auto 1rem', color: 'var(--color-primary)' }} />
@@ -482,7 +484,6 @@ export const UsersManager: React.FC = () => {
               <tbody>
                 {filteredUsers.map((userAcc) => (
                   <tr key={userAcc.id} style={{ borderBottom: '1px solid var(--glass-border)' }} className="table-row-hover">
-                    {/* Name & Avatar */}
                     <td style={{ padding: '16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div 
@@ -512,7 +513,6 @@ export const UsersManager: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Email & Phone */}
                     <td style={{ padding: '16px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85rem' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)' }}>
@@ -526,7 +526,6 @@ export const UsersManager: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Role Badge */}
                     <td style={{ padding: '16px' }}>
                       <span 
                         style={{ 
@@ -551,19 +550,16 @@ export const UsersManager: React.FC = () => {
                       </span>
                     </td>
 
-                    {/* Created At */}
                     <td style={{ padding: '16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                       {formatDate(userAcc.created_at)}
                     </td>
 
-                    {/* Status Badge */}
                     <td style={{ padding: '16px' }}>
                       <span className={`patient-status ${userAcc.status === 'active' ? 'normal' : 'critical'}`} style={{ fontSize: '0.8rem', padding: '4px 8px' }}>
                         {userAcc.status === 'active' ? 'Hoạt động' : 'Tạm khóa'}
                       </span>
                     </td>
 
-                    {/* Actions */}
                     <td style={{ padding: '16px', textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                         <button
@@ -597,7 +593,6 @@ export const UsersManager: React.FC = () => {
         </div>
       )}
 
-      {/* Add User Modal */}
       {showAddModal && (
         <div className="modal-overlay">
           <div className="modal-content panel" style={{ maxWidth: '550px' }}>
@@ -719,7 +714,6 @@ export const UsersManager: React.FC = () => {
         </div>
       )}
 
-      {/* Edit User Modal */}
       {showEditModal && selectedUser && (
         <div className="modal-overlay">
           <div className="modal-content panel" style={{ maxWidth: '550px' }}>
@@ -845,7 +839,6 @@ export const UsersManager: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Confirm Modal */}
       {showDeleteConfirm && selectedUser && (
         <div className="modal-overlay">
           <div className="modal-content panel" style={{ maxWidth: '460px', textAlign: 'center' }}>

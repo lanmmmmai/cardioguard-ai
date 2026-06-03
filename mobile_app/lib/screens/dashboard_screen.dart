@@ -1,3 +1,22 @@
+/// Central real-time health monitoring dashboard (Giám Sát Trung Tâm).
+///
+/// Workflow:
+/// 1. On init, generates 3D heart point cloud, starts a 60 FPS animation ticker
+///    for heart rotation/pulse, connects WebSocket, and loads patient data.
+/// 2. Listens to `health_metrics` events to update live vitals (HR, SpO2, BP)
+///    and ECG waveform buffer; listens to `emergency_alerts` for banner flash.
+/// 3. The animation ticker drives heart rotation/beat simulation and mock ECG
+///    generation when no live telemetry is available.
+/// 4. Adapts layout: 2-column split-view on tablets (>=600 dp), single-column
+///    vertical scroll on phones.
+///    Admin sees summary KPI cards; Patient sees SOS button;
+///    Doctor/Admin see simulation controls for abnormal/normal vitals.
+///
+/// Relationships:
+/// - Owns: [AuthProvider], [PatientProvider], [AlertProvider], [WebSocketService].
+/// - Uses: [EcgPainter], [Heart3dPainter], [CgMetricValue], [CgInlineState].
+/// - Connected to: [WebSocketService] for live telemetry and emergency events.
+/// - Controls: [PatientProvider.triggerSimulation] for demo mode.
 import 'dart:async';
 import 'dart:collection';
 import 'dart:math' as math;
@@ -15,8 +34,11 @@ import '../widgets/heart_3d_painter.dart';
 import '../widgets/cg_widgets.dart';
 import '../ui/cg_tokens.dart';
 
+/// Main real-time monitoring dashboard with live vitals, ECG, 3D heart, and SOS.
 class DashboardScreen extends StatefulWidget {
+  /// Callback invoked when the user toggles dark/light theme.
   final VoidCallback onToggleTheme;
+  /// Whether the dashboard is rendered in dark mode.
   final bool isDarkTheme;
 
   const DashboardScreen({
@@ -31,29 +53,39 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
-  // Local ECG point buffer
+  /// Circular buffer holding the last 240 ECG data points for the waveform.
   final ListQueue<double> _ecgPoints = ListQueue<double>.from(List.filled(240, 0.0));
 
-  // Animation controller for 3D Heart
+  /// 60 FPS ticker driving heart rotation animation and pulse simulation.
   late AnimationController _tickerController;
+  /// Pre-generated point cloud for the 3D heart rendering.
   late List<Point3D> _heartPoints;
+  /// Accumulated Y-axis rotation angle (radians) for the 3D heart.
   double _angleY = 0.0;
+  /// X-axis tilt angle (radians) based on elapsed time sine wave.
   double _angleX = 0.0;
+  /// Current pulse expansion factor (0.0–0.22) derived from heart rate cycle.
   double _pulse = 0.0;
 
-  // Selected Patient for Doctor/Admin
+  /// Currently selected patient ID (doctor/admin view).
   String? _selectedPatientId;
 
-  // SOS state
+  /// Whether the SOS countdown is active.
   bool _isSosCounting = false;
+  /// Remaining seconds before SOS alert is sent.
   int _sosCountdown = 3;
+  /// Periodic timer for SOS countdown ticks.
   Timer? _sosTimer;
 
-  // Banner alert
+  /// Active banner warning message (shown at top of screen).
   String? _activeBannerMessage;
+  /// Whether the banner is in flashing state (alternating colours).
   bool _isBannerFlash = false;
+  /// Timer to auto-dismiss the banner after 8 seconds.
   Timer? _bannerTimer;
+  /// Random source for mock ECG noise.
   final _random = math.Random();
+  /// Cached reference to [PatientProvider] for use inside animation callbacks.
   PatientProvider? _cachedPatientProvider;
 
   @override
@@ -108,6 +140,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.dispose();
   }
 
+  /// Handles incoming WebSocket events: `health_metrics` updates live vitals
+  /// and ECG buffer; `emergency_alerts` triggers a warning banner.
   void _onWebSocketEvent(Map<String, dynamic> event) {
     if (!mounted) return;
 
@@ -150,6 +184,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  /// Shows the emergency banner and schedules auto-dismiss after 8 seconds.
   void _triggerBannerFlash() {
     _bannerTimer?.cancel();
     setState(() {
@@ -167,6 +202,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     });
   }
 
+  /// Called every frame by the animation ticker to update 3D heart rotation,
+  /// pulse physics, and generate mock ECG data when no live telemetry exists.
+  /// NOTE: Does NOT call setState — the [AnimatedBuilder] widgets handle repainting.
   void _onAnimationTick() {
     final elapsedMs = DateTime.now().millisecondsSinceEpoch;
     final double hr = _cachedPatientProvider?.liveMetrics['heart_rate']?.toDouble() ?? 75.0;
@@ -176,7 +214,11 @@ class _DashboardScreenState extends State<DashboardScreen>
       _angleY += 0.015;
       _angleX = 0.2 * math.sin(elapsedMs * 0.0005);
 
-      // Pulse physics
+      // Pulse physics — models the cardiac cycle in 4 phases:
+      // 0-10%  : rapid contraction (atrial kick)
+      // 15-22% : main ventricular contraction (QRS complex)
+      // 22-38% : relaxation / repolarisation (T wave)
+      // rest   : diastole (flat)
       final cycleDuration = (60 / math.max(hr, 40)) * 1000;
       final t = (elapsedMs % cycleDuration) / cycleDuration;
 
@@ -190,12 +232,13 @@ class _DashboardScreenState extends State<DashboardScreen>
         _pulse = 0.0;
       }
 
-      // If no live telemetry, generate mock ECG
+      // If no live telemetry, generate mock ECG using piecewise waveform
       final hasLiveWS = (_cachedPatientProvider?.liveMetrics['ecg_value'] ?? 0.0) != 0.0;
       if (!hasLiveWS) {
         double simEcg = 0.0;
         final tSim = (elapsedMs % cycleDuration) / cycleDuration;
 
+        // P-wave (atrial depolarisation)
         if (tSim > 0.1 && tSim < 0.15) {
           simEcg = 0.15 * math.sin((tSim - 0.1) * math.pi / 0.05);
         } else if (tSim >= 0.18 && tSim < 0.2) {
@@ -218,6 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
 
+  /// Begins the SOS countdown: haptic feedback + 3-second timer before sending.
   void _triggerSos() {
     HapticFeedback.heavyImpact();
     setState(() {
@@ -240,6 +284,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     });
   }
 
+  /// Cancels an active SOS countdown and shows a cancellation snackbar.
   void _cancelSos() {
     _sosTimer?.cancel();
     setState(() {
@@ -251,6 +296,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// Sends the SOS alert to the server and shows a success/failure snackbar.
   Future<void> _sendSosAlert() async {
     final alertProvider = Provider.of<AlertProvider>(context, listen: false);
     final success = await alertProvider
@@ -836,6 +882,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// Builds a small summary KPI card (used in admin dashboard grid).
   Widget _buildSummaryCard(
       String title,
       String value,
@@ -883,6 +930,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// Builds a vital-sign metric card with accent colour, critical-state border, and unit.
   Widget _buildMetricCard(
     String title,
     String value,

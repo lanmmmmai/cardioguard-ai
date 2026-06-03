@@ -1,5 +1,6 @@
 #include "state_machine.h"
 
+// Trả về trạng thái tiếp theo dựa trên trạng thái hiện tại của máy trạng thái
 RuntimeState NextState(RuntimeState current_state) {
   switch (current_state) {
     case RuntimeState::boot:
@@ -19,6 +20,7 @@ RuntimeState NextState(RuntimeState current_state) {
   }
 }
 
+// Chuyển đổi giá trị RuntimeState thành chuỗi ký tự để in ra màn hình
 const char *StateToString(RuntimeState state) {
   switch (state) {
     case RuntimeState::boot:

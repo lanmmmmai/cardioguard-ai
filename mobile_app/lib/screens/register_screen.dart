@@ -1,9 +1,21 @@
+// Màn hình đăng ký bệnh nhân với xác thực OTP qua email.
+// Quy trình làm việc:
+// 1. Người dùng điền tên, email, mật khẩu (với xác thực mật khẩu mạnh).
+// 2. Bước 1: nhấn "Nhận mã OTP" -> AuthProvider.requestRegisterOtp gửi OTP đến email.
+// 3. Bước 2: nhập mã OTP 6 chữ số và nhấn "Hoàn tất đăng ký"
+//    -> AuthProvider.registerPatient tạo tài khoản.
+// 4. Khi thành công, tự động quay lại đăng nhập sau 2 giây.
+// Mối quan hệ:
+// - Sở hữu: AuthProvider cho yêu cầu OTP và đăng ký.
+// - Sử dụng: CgCard cho thẻ biểu mẫu.
+// - Điều hướng: quay lại /login (pop sau khi thành công).
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../widgets/cg_widgets.dart';
 
+// Màn hình đăng ký bệnh nhân với quy trình xác thực OTP qua email.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -18,8 +30,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _otpController = TextEditingController();
 
+  // Liệu OTP đã được gửi hay chưa (chuyển biểu mẫu sang chế độ nhập OTP).
   bool _isOtpSent = false;
+  // Thông báo lỗi được quản lý cục bộ.
   String? _localError;
+  // Thông báo thành công hiển thị sau khi OTP được gửi hoặc đăng ký hoàn tất.
   String? _successMessage;
 
   @override
@@ -31,6 +46,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  // Xác thực độ mạnh mật khẩu: >= 8 ký tự, chữ hoa, chữ cái, chữ số, ký tự đặc biệt.
   String? _validatePassword(String? value) {
     final v = (value ?? '').trim();
     if (v.length < 8) return 'Mật khẩu phải từ 8 ký tự';
@@ -43,6 +59,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
+  // Gửi OTP đến email đã cung cấp qua AuthProvider.requestRegisterOtp.
   Future<void> _requestOtp() async {
     setState(() {
       _localError = null;
@@ -64,6 +81,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  // Hoàn tất đăng ký với xác thực OTP qua AuthProvider.registerPatient.
   Future<void> _handleRegister() async {
     setState(() {
       _localError = null;

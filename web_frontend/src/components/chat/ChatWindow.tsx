@@ -1,3 +1,10 @@
+/**
+ * Mục đích: Cửa sổ chat AI với lịch sử tin nhắn, biểu mẫu gửi, hiệu ứng gõ chữ và mô phỏng streaming.
+ * Luồng xử lý: Gửi tin nhắn người dùng đến /api/chat/send; nhận phản hồi AI và mô phỏng streaming
+ *              từng từ với cập nhật trạng thái theo lô (sửa lỗi FE-14); tự động cuộn đến tin nhắn mới nhất.
+ * Quan hệ: Sử dụng MessageBubble để hiển thị từng tin nhắn; sử dụng AuthContext để lấy token;
+ *          Có thể nhận contextData cho ngữ cảnh cụ thể của bệnh nhân.
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Loader2, Sparkles } from 'lucide-react';
 import { API_URL } from '../../config';
@@ -10,6 +17,10 @@ interface ChatWindowProps {
   placeholder?: string;
 }
 
+/**
+ * Component ChatWindow — giao diện chat AI đầy đủ với danh sách tin nhắn, biểu mẫu nhập,
+ * cập nhật UI lạc quan và hiển thị phản hồi streaming mô phỏng.
+ */
 export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, placeholder = "Hỏi trợ lý AI..." }) => {
   const { accessToken } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -27,7 +38,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
     scrollToBottom();
   }, [messages]);
 
-  // Load existing session history if needed (simplified: start fresh for now unless explicit)
+  // Tải lịch sử phiên làm việc nếu cần (đơn giản hóa: bắt đầu mới trừ khi có yêu cầu rõ ràng)
   
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -36,7 +47,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
     const userText = input.trim();
     setInput('');
     
-    // Optimistic add user message
+    // Thêm tin nhắn người dùng một cách lạc quan (optimistic)
     const tempUserId = `u-${Date.now()}`;
     setMessages(prev => [...prev, { id: tempUserId, sender: 'user', message: userText }]);
     setLoading(true);
@@ -63,13 +74,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
         setSessionId(data.session_id);
       }
 
-      // Simulated typing effect for AI response
+      // Hiệu ứng gõ chữ mô phỏng cho phản hồi AI — tách văn bản thành các từ và stream chúng
       const aiResponseText = data.ai_message.message;
       const aiMsgId = data.ai_message.id;
       
       setMessages(prev => [...prev, { id: aiMsgId, sender: 'ai', message: '', isStreaming: true }]);
       
-      // Simulate streaming chunks
+      // Mô phỏng các đoạn stream
       const chunks = aiResponseText.split(' ');
       let currentText = '';
       
@@ -78,7 +89,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
         currentText += (i === 0 ? '' : ' ') + chunks[i];
         batchUpdateCount++;
         
-        // Batch state updates to prevent excessive re-renders (FE-14 fix)
+        // Cập nhật trạng thái theo lô để ngăn render quá nhiều lần (sửa lỗi FE-14)
         if (batchUpdateCount >= 4 || i === chunks.length - 1) {
           setMessages(prev => 
             prev.map(m => m.id === aiMsgId ? { ...m, message: currentText } : m)

@@ -1,9 +1,18 @@
+// Màn hình chờ/tải được hiển thị khi khởi động ứng dụng.
+// Quy trình làm việc:
+// 1. Hiển thị logo CardioGuard AI với độ trễ ngắn (1.5 giây) cho nhãn hiệu.
+// 2. Khởi tạo các hook token của AuthProvider, sau đó thử tự động đăng nhập.
+// 3. Khi thành công, điều hướng đến /dashboard; nếu không thì đến /login.
+// Mối quan hệ:
+// - Sở hữu: AuthProvider để khôi phục phiên.
+// - Điều hướng: đến /dashboard (tự động đăng nhập OK) hoặc /login (không có phiên).
 import 'package:flutter/material.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/cg_widgets.dart';
 
+// Màn hình splash được hiển thị trong quá trình khởi tạo ứng dụng và tự động đăng nhập.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -18,13 +27,14 @@ class _SplashScreenState extends State<SplashScreen> {
     _initializeApp();
   }
 
+  // Trì hoãn cho nhãn hiệu, sau đó thử tự động đăng nhập và điều hướng tương ứng.
   Future<void> _initializeApp() async {
-    // Wait for the widgets binding to finish
+    // Đợi cho widgets binding hoàn tất
     await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    authProvider.init(); // Initialize token hooks
+    authProvider.init(); // Khởi tạo các hook token
 
     final autoLoginSuccess = await authProvider.tryAutoLogin();
     if (!mounted) return;

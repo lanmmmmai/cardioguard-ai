@@ -1,46 +1,46 @@
 -- Migration 009: Tối ưu hóa hiệu năng nâng cao cho cơ sở dữ liệu CardioGuard AI
 
--- 1. Kích hoạt extension pg_stat_statements phục vụ chẩn đoán hiệu năng câu lệnh
+-- 1. Kích hoạt extension pg_stat_statements để theo dõi và chẩn đoán hiệu năng của các câu lệnh SQL
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 
--- 2. Thiết lập Composite Index cho bảng chat_messages (tối ưu hóa lọc luồng tin nhắn và thời gian)
+-- 2. Tạo composite index chỉ mục kết hợp cho bảng chat_messages nhằm tối ưu hóa việc lọc tin nhắn theo phiên hội thoại và thời gian
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_time 
 ON chat_messages (session_id, created_at DESC);
 
--- 3. Thiết lập Partial Index (Index một phần) cho bảng alerts (tối ưu hóa lọc các cảnh báo nguy kịch chưa xử lý)
+-- 3. Tạo partial index chỉ mục một phần cho bảng alerts để tối ưu hóa truy vấn các cảnh báo nguy kịch chưa được xử lý
 CREATE INDEX IF NOT EXISTS idx_active_critical_alerts 
 ON alerts (patient_id) 
 WHERE is_resolved = false AND severity = 'critical';
 
--- 4. Thiết lập BRIN Index cho cột created_at của bảng nhật ký audit_logs khổng lồ (tiết kiệm 99% RAM so với B-Tree)
+-- 4. Tạo BRIN index chỉ mục khối cho cột created_at của bảng audit_logs dung lượng lớn, tiết kiệm đến 99 phần trăm dung lượng bộ nhớ so với B-Tree truyền thống
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at_brin 
 ON audit_logs USING brin (created_at);
 
--- 5. Thiết lập Materialized View cho báo cáo thống kê reports
+-- 5. Tạo materialized view khung nhìn vật lý cho báo cáo thống kê, tổng hợp số lượng báo cáo theo loại
 CREATE MATERIALIZED VIEW IF NOT EXISTS reports_summary_mv AS
 SELECT report_type, COUNT(*)::int AS total
 FROM reports
 GROUP BY report_type;
 
--- 6. Tạo Unique Index trên Materialized View (Bắt buộc để hỗ trợ REFRESH CONCURRENTLY)
+-- 6. Tạo chỉ mục duy nhất trên materialized view để hỗ trợ làm mới đồng thời REFRESH CONCURRENTLY
 CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_summary_mv_type 
 ON reports_summary_mv (report_type);
 
--- 7. Viết hàm Trigger tự động cập nhật Materialized View khi bảng reports thay đổi dữ liệu
+-- 7. Tạo hàm trigger tự động cập nhật materialized view mỗi khi bảng reports có thay đổi dữ liệu
 CREATE OR REPLACE FUNCTION refresh_reports_summary_mv()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Làm mới Materialized View phi tuần tự để tránh khóa bảng
+    -- Làm mới materialized view không khóa bảng để tránh ảnh hưởng đến các truy vấn đang chạy
     REFRESH MATERIALIZED VIEW CONCURRENTLY reports_summary_mv;
     RETURN NULL;
 EXCEPTION
-    -- Tránh làm treo luồng ghi nếu có lỗi xảy ra
+    -- Bỏ qua lỗi để không làm gián đoạn luồng ghi dữ liệu chính
     WHEN OTHERS THEN
         RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
--- 8. Tạo Trigger kích hoạt sau khi bảng reports có bất kỳ thay đổi INSERT/UPDATE/DELETE/TRUNCATE nào
+-- 8. Tạo trigger kích hoạt sau mọi thao tác thêm, sửa, xóa hoặc xóa toàn bộ dữ liệu trên bảng reports
 DROP TRIGGER IF EXISTS trg_refresh_reports_summary_mv ON reports;
 CREATE TRIGGER trg_refresh_reports_summary_mv
 AFTER INSERT OR UPDATE OR DELETE OR TRUNCATE

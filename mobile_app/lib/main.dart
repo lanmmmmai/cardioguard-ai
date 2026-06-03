@@ -1,3 +1,16 @@
+// Điểm vào và cây widget gốc cho ứng dụng di động CardioGuard AI.
+// Quy trình làm việc:
+//   1. main() khởi chạy HeartMonitorApp bọc MultiProvider với tất cả
+//      các provider trạng thái (auth, patient, alert, chat, appointment).
+//   2. MaterialApp sử dụng các route có tên bắt đầu từ /splash. Việc chuyển đổi
+//      chủ đề tối/sáng được quản lý bởi _HeartMonitorAppState.
+//   3. Sau xác thực, MainTabWrapper hiển thị thanh điều hướng dưới dựa trên vai trò với
+//      IndexedStack để giữ trạng thái tab khi điều hướng.
+// Mối quan hệ:
+//   - Phụ thuộc vào providers/*, screens/*, ui/cg_theme.dart, ui/cg_tokens.dart.
+//   - AuthProvider xác định vai trò hoạt động và trạng thái
+//      buộc đổi mật khẩu, giúp cấu hình lại bố cục tab một cách động.
+//   - MainTabWrapper nhận callback chuyển đổi chủ đề từ trạng thái cha.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
@@ -20,10 +33,13 @@ import 'providers/appointment_provider.dart';
 import 'ui/cg_theme.dart';
 import 'ui/cg_tokens.dart';
 
+// Điểm vào chính của ứng dụng. Tạo widget HeartMonitorApp gốc.
 void main() {
   runApp(const HeartMonitorApp());
 }
 
+// Widget ứng dụng gốc. Bọc cây widget trong MultiProvider và
+// cấu hình MaterialApp với các route có tên và hỗ trợ chủ đề.
 class HeartMonitorApp extends StatefulWidget {
   const HeartMonitorApp({super.key});
 
@@ -32,8 +48,10 @@ class HeartMonitorApp extends StatefulWidget {
 }
 
 class _HeartMonitorAppState extends State<HeartMonitorApp> {
+  // Theo dõi xem ứng dụng có đang sử dụng bảng màu tối hay không.
   bool _isDarkTheme = true;
 
+  // Chuyển đổi giữa chủ đề tối và sáng, kích hoạt xây dựng lại giao diện.
   void _toggleTheme() {
     setState(() {
       _isDarkTheme = !_isDarkTheme;
@@ -57,7 +75,7 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
         theme: buildCgTheme(Brightness.light),
         darkTheme: buildCgTheme(Brightness.dark),
 
-        // Initial route is splash for session verification
+        // Bắt đầu tại màn hình splash để xác thực phiên trước khi điều hướng tiếp.
         initialRoute: '/splash',
         routes: {
           '/splash': (context) => const SplashScreen(),
@@ -73,8 +91,13 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
   }
 }
 
+// Bọc điều hướng dưới dựa trên vai trò. Hiển thị IndexedStack gồm các màn hình
+// và một thanh dưới tùy chỉnh, với các tab được cấu hình động theo vai trò người dùng.
 class MainTabWrapper extends StatefulWidget {
+  // Xem chủ đề hiện tại có phải tối hay không; được chuyển tiếp từ HeartMonitorApp.
   final bool isDarkTheme;
+
+  // Callback được gọi khi người dùng chuyển đổi chủ đề.
   final VoidCallback onToggleTheme;
 
   const MainTabWrapper({
@@ -88,6 +111,7 @@ class MainTabWrapper extends StatefulWidget {
 }
 
 class _MainTabWrapperState extends State<MainTabWrapper> {
+  // Chỉ số của tab điều hướng dưới hiện đang được chọn.
   int _currentIndex = 0;
 
   @override
@@ -106,7 +130,8 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
     final role = authProvider.currentUser?.role ?? 'patient';
     final forcePasswordChange = authProvider.requiresPasswordChange;
 
-    // Configure items and screens dynamically based on the active role
+    // Cấu hình động các mục tab và màn hình dựa trên vai trò đang hoạt động
+    // và liệu có yêu cầu thay đổi mật khẩu bắt buộc hay không.
     final List<Widget> screens;
     final List<Map<String, dynamic>> tabConfig;
 
@@ -144,7 +169,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
         {'icon': LucideIcons.user, 'label': 'Cá nhân'},
       ];
     } else {
-      // Patient Role Specific Tabbed Screen Views
+      // Chế độ xem tab dành riêng cho vai trò bệnh nhân
       screens = [
         DashboardScreen(
           isDarkTheme: widget.isDarkTheme,
@@ -165,7 +190,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
       ];
     }
 
-    // Wrap in Safe Index Boundaries
+    // Kẹp chỉ số hiện tại để nó không vượt quá số lượng màn hình có sẵn
     final safeIndex = _currentIndex >= screens.length ? 0 : _currentIndex;
     if (_currentIndex >= screens.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -204,6 +229,9 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
     );
   }
 
+  // Xây dựng một mục điều hướng dưới dạng biểu tượng và nhãn.
+  // index là vị trí tab, icon và label xác định hình ảnh trực quan,
+  // activeColor / inactiveColor phản ánh trạng thái chọn.
   Widget _buildNavItem(int index, IconData icon, String label,
       Color activeColor, Color inactiveColor) {
     final isSelected = _currentIndex == index;

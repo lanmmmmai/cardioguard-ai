@@ -1,3 +1,18 @@
+/**
+ * Mục đích: Thành phần ứng dụng gốc. Xử lý xác thực, định tuyến, thu thập
+ *           dữ liệu telemetry WebSocket, banner cảnh báo thời gian thực và
+ *           hiển thị bố cục theo từng vai trò.
+ * Luồng xử lý: 1. AuthContext khôi phục phiên → 2. Phân giải tuyến đường dựa trên
+ *              đường dẫn → 3. Tìm nạp dữ liệu (bệnh nhân, cảnh báo, bác sĩ) →
+ *              4. Kết nối WebSocket cho telemetry trực tiếp → 5. Banner cảnh báo
+ *              cho các chỉ số bất thường → 6. Bọc nội dung trong bố cục vai trò cụ thể
+ *              (Admin|Doctor|Patient).
+ * Quan hệ:
+ *   - AuthContext, ProtectedRoute, bố cục vai trò (AdminLayout, DoctorLayout, PatientLayout)
+ *   - Tất cả thành phần trang (Dashboard, Alerts, Appointments, Chatbots, v.v.)
+ *   - Hook useWebSocket và kiểu SensorData/Alert cho pipeline thời gian thực
+ *   - pageTitles và routeMeta cho siêu dữ liệu tuyến đường
+ */
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { AlertOctagon } from 'lucide-react';
 import { Login } from './components/Login';
@@ -30,6 +45,10 @@ import { pageTitles, privateRouteRole } from './navigation/routeMeta';
 import { API_URL, WS_URL } from './config';
 import { Patient, Alert, SensorData } from './types';
 
+/**
+ * Thành phần bên trong có thể tiêu thụ AuthContext một cách an toàn. Điều phối tất cả
+ * trạng thái cấp ứng dụng, tìm nạp dữ liệu, nhắn tin thời gian thực và hiển thị tuyến đường.
+ */
 const AppContent: React.FC = () => {
   const { accessToken, isAuthenticated, loading, role, login, refreshUser, requiresPasswordChange } = useAuth();
   const { path, navigate } = useBrowserPath();
@@ -44,10 +63,10 @@ const AppContent: React.FC = () => {
   }, [patients]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
-  // Ref to hold banner timeout ID
+  // Giữ tham chiếu đến timeout của banner hoạt động để có thể xóa khi hủy gắn hoặc thay thế
   const bannerTimeoutRef = useRef<number | null>(null);
 
-  // Cleanup timeout on unmount
+  // Dọn dẹp timeout khi hủy gắn
   useEffect(() => {
     return () => {
       if (bannerTimeoutRef.current !== null) {
@@ -111,15 +130,15 @@ const AppContent: React.FC = () => {
         try {
           const data = await response.json();
           setPatients(data);
-          console.info('Patients fetched:', data.length, 'records');
+          console.info('Đã tìm nạp bệnh nhân:', data.length, 'bản ghi');
         } catch(e) {
-          console.error("Invalid JSON format");
+          console.error("Định dạng JSON không hợp lệ");
         }
       } else {
-        console.warn('Fetch patients failed:', response.status);
+        console.warn('Tìm nạp bệnh nhân thất bại:', response.status);
       }
     } catch (err) {
-      console.error('Failed to fetch patients:', err);
+      console.error('Không thể tìm nạp bệnh nhân:', err);
     }
   }, [accessToken]);
 
@@ -132,15 +151,15 @@ const AppContent: React.FC = () => {
         try {
           const data = await response.json();
           setAlerts(data);
-          console.info('Alerts fetched:', data.length, 'records');
+          console.info('Đã tìm nạp cảnh báo:', data.length, 'bản ghi');
         } catch(e) {
-          console.error("Invalid JSON format");
+          console.error("Định dạng JSON không hợp lệ");
         }
       } else {
-        console.warn('Fetch alerts failed:', response.status);
+        console.warn('Tìm nạp cảnh báo thất bại:', response.status);
       }
     } catch (err) {
-      console.error('Failed to fetch alerts:', err);
+      console.error('Không thể tìm nạp cảnh báo:', err);
     }
   }, [accessToken]);
 
@@ -153,15 +172,15 @@ const AppContent: React.FC = () => {
         try {
           const data = await response.json();
           setDoctors(data);
-          console.info('Doctors fetched:', data.length, 'records');
+          console.info('Đã tìm nạp bác sĩ:', data.length, 'bản ghi');
         } catch(e) {
-          console.error("Invalid JSON format");
+          console.error("Định dạng JSON không hợp lệ");
         }
       } else {
-        console.warn('Fetch doctors failed:', response.status);
+        console.warn('Tìm nạp bác sĩ thất bại:', response.status);
       }
     } catch (err) {
-      console.error('Failed to fetch doctors:', err);
+      console.error('Không thể tìm nạp bác sĩ:', err);
     }
   }, [accessToken]);
 
@@ -216,7 +235,13 @@ const AppContent: React.FC = () => {
     ]);
   }, []);
 
+  /**
+   * Phân phối các thông báo WebSocket đến: SensorData thô, tải trọng
+   * health_metrics hoặc emergency_alerts. Cập nhật cả trạng thái
+   * telemetry trực tiếp và banner cảnh báo hoạt động.
+   */
   const handleRealtimeMessage = useCallback((message: any) => {
+    // Các thông báo không có trường type được coi là SensorData thô
     if (!message?.type) {
       handleSensorTelemetry(message as SensorData);
       return;
@@ -264,9 +289,14 @@ const AppContent: React.FC = () => {
   const { isConnected } = useWebSocket(WS_URL, accessToken ? handleRealtimeMessage : undefined, accessToken);
 
   useEffect(() => {
-    console.info('WebSocket connection:', isConnected ? 'connected' : 'disconnected');
+    console.info('Kết nối WebSocket:', isConnected ? 'đã kết nối' : 'đã ngắt kết nối');
   }, [isConnected]);
 
+  /**
+   * Callback sau khi gửi biểu mẫu Đăng nhập thành công. Chuẩn hóa vai trò,
+   * lưu trữ phiên qua AuthContext và điều hướng đến tuyến đường mặc định
+   * thích hợp (hoặc buộc đổi mật khẩu nếu được yêu cầu).
+   */
   const handleLoginSuccess = (token: string, userData: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean }) => {
     const userRole = normalizeRole(userData.role);
     if (!userRole) {
@@ -274,7 +304,7 @@ const AppContent: React.FC = () => {
     }
 
     const normalizedUser = login(token, { ...userData, role: userRole });
-    console.info('Login success: role=%s name=%s', normalizedUser.role, normalizedUser.full_name);
+    console.info('Đăng nhập thành công: vai_trò=%s tên=%s', normalizedUser.role, normalizedUser.full_name);
     if (normalizedUser.must_change_password) {
       navigate('/change-password', true);
     } else {
@@ -392,7 +422,7 @@ const AppContent: React.FC = () => {
       return null;
     }
     return <ChangePassword onNavigateNext={() => {
-      // Once successfully changed, refresh user info and navigate to default route
+      // Sau khi đổi mật khẩu thành công, làm mới thông tin người dùng và điều hướng đến tuyến đường mặc định
       refreshUser().then(() => {
         navigate(defaultRouteByRole[role], true);
       }).catch(() => {
@@ -485,6 +515,10 @@ const AppContent: React.FC = () => {
   );
 };
 
+/**
+ * Xuất gốc. Bọc toàn bộ cây ứng dụng bên trong AuthProvider để
+ * mọi thành phần con có thể tiêu thụ context xác thực.
+ */
 export const App: React.FC = () => (
   <AuthProvider>
     <AppContent />

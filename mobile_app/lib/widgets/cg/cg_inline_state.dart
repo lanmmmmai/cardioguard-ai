@@ -1,12 +1,21 @@
+// Liệt kê các loại trạng thái nội tuyến cho widget CgInlineState.
+// - loading: hiển thị vòng tròn tải với tiêu đề + tin nhắn.
+// - empty, error, disconnected, permissionDenied: hiển thị biểu tượng.
 import 'package:flutter/material.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 
 enum CgStateType { loading, empty, error, disconnected, permissionDenied }
 
+// Một widget trạng thái nội tuyến có thể tái sử dụng (loading / empty / error / disconnected /
+// permission denied) được sử dụng trên tất cả các màn hình cho trải nghiệm trạng thái rỗng nhất quán.
 class CgInlineState extends StatelessWidget {
+  // Loại trạng thái cần hiển thị; xác định biểu tượng và màu sắc.
   final CgStateType type;
+  // Văn bản tiêu đề hiển thị bên dưới biểu tượng/vòng tròn tải.
   final String title;
+  // Văn bản nội dung mô tả.
   final String message;
+  // Callback thử lại tùy chọn (hiển thị dưới dạng nút cho các trạng thái không phải loading).
   final VoidCallback? onRetry;
 
   const CgInlineState({

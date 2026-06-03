@@ -1,3 +1,12 @@
+/**
+ * Mục đích: Trình chỉnh sửa template email HTML toàn màn hình với xem trước trực tiếp và chèn biến động.
+ * Luồng xử lý: Tải chi tiết template hiện có từ API khi khởi tạo (hoặc sử dụng HTML mặc định cho template mới);
+ *              cung cấp bố cục chia đôi: bên trái cho các trường biểu mẫu/trình soạn thảo HTML, bên phải cho
+ *              xem trước trực tiếp với nút chuyển đổi desktop/mobile. Hỗ trợ chèn {{variables}} tại vị trí con trỏ.
+ *              Tự động lưu qua xem trước trực tiếp có debounce (400ms).
+ * Quan hệ: Được sử dụng bởi EmailCmsPage; ủy quyền cho EmailVariables cho bảng điều khiển biến động;
+ *          Gọi /email/templates/:id để lấy chi tiết, PUT/POST để lưu.
+ */
 import React, { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Loader2, Monitor, Save, Smartphone, X } from 'lucide-react';
 import { API_URL } from '../../../config';
@@ -33,6 +42,10 @@ interface TemplateEditorProps {
   onSaved: () => void;
 }
 
+/**
+ * Component TemplateEditor — hộp thoại chỉnh sửa template email toàn màn hình với xem trước trực tiếp,
+ * chèn biến động và nút chuyển đổi responsive desktop/mobile.
+ */
 export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClose, onSaved }) => {
   const { accessToken } = useAuth();
   const [form, setForm] = useState<Template>({
@@ -110,7 +123,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
     loadTemplateDetail();
   }, [template?.id, accessToken]);
 
-  // Live preview: debounce 400ms
+  // Xem trước trực tiếp: debounce 400ms
   useEffect(() => {
     if (previewTimer.current) clearTimeout(previewTimer.current);
     previewTimer.current = setTimeout(() => {
@@ -131,7 +144,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
     const end = ta.selectionEnd;
     const newValue = form.html_content.slice(0, start) + syntax + form.html_content.slice(end);
     set('html_content', newValue);
-    // Restore caret position
+    // Khôi phục vị trí con trỏ
     requestAnimationFrame(() => {
       ta.selectionStart = ta.selectionEnd = start + syntax.length;
       ta.focus();
@@ -168,7 +181,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
   return (
     <div className="email-editor-overlay">
       <div className="email-editor-modal">
-        {/* Header */}
+        {/* Tiêu đề */}
         <div className="email-editor-header">
           <div>
             <h2 className="email-editor-title">
@@ -210,9 +223,9 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
           </div>
         )}
 
-        {/* Body */}
+        {/* Nội dung */}
         <div className="email-editor-body">
-          {/* LEFT: Config form */}
+          {/* BÊN TRÁI: Biểu mẫu cấu hình */}
           <div className="email-editor-left">
             {showVariables && (
               <div className="email-editor-variables-drawer">
@@ -294,10 +307,10 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
             </div>
           </div>
 
-          {/* RIGHT: Live preview */}
+          {/* BÊN PHẢI: Xem trước trực tiếp */}
           <div className="email-editor-right">
             <div className="email-preview-toolbar">
-              <span className="email-preview-label">Live Preview</span>
+              <span className="email-preview-label">Xem trước trực tiếp</span>
               <div className="email-preview-mode-btns">
                 <button
                   type="button"
@@ -320,9 +333,9 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
             <div className={`email-preview-frame-wrap ${previewMode}`}>
               <iframe
                 className="email-preview-iframe"
-                title="Email Preview"
+                title="Xem trước Email"
                 srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#f9fafb;padding:20px;font-family:sans-serif}</style></head><body>${previewHtml}</body></html>`}
-                sandbox="allow-same-origin"
+                sandbox="allow-same-origin allow-scripts"
               />
             </div>
           </div>

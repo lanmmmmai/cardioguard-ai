@@ -1,8 +1,25 @@
-# =============================================================================
-# CardioGuard AI — Email Service
-# File: backend/app/services/email_service.py
-# Dịch vụ gửi email động sử dụng template từ DB và SMTP/Brevo
-# =============================================================================
+"""Dịch vụ gửi email cho CardioGuard.
+
+Mục đích:
+    Gửi email giao dịch (OTP đăng ký, đặt lại mật khẩu, cảnh báo hệ thống)
+    thông qua API REST Brevo (Sendinblue) hoặc kết nối SMTP trực tiếp.
+    Các mẫu được lấy từ bảng email_templates trong cơ sở dữ liệu, hiển thị với
+    các biến dành riêng cho người dùng và vai trò, và việc gửi được ghi lại trong email_logs.
+
+Luồng công việc:
+    1. send_system_email() tra cứu một mẫu hoạt động theo email_type trong DB.
+    2. Dự phòng vào subject/html do người gọi cung cấp khi không tìm thấy mẫu.
+    3. Các biến như {{full_name}}, {{otp}}, {{role_label}} được thay thế
+       bởi render_template().
+    4. Việc gửi được thực hiện qua Brevo trước (nếu BREVO_API_KEY được đặt), sau đó
+       qua SMTP (nếu SMTP_HOST được cấu hình). Trong chế độ phát triển, việc gửi được bỏ qua.
+    5. Mọi lần thử đều được ghi lại trong bảng email_logs.
+
+Quan hệ:
+    - app.core.config.settings: Thông tin xác thực SMTP và Brevo.
+    - app.core.database.database: Được sử dụng để đọc mẫu và ghi nhật ký.
+    - Được gọi từ các tuyến xác thực, bộ xử lý cảnh báo và luồng thông báo quản trị.
+"""
 
 import asyncio
 import re
@@ -52,6 +69,20 @@ ROLE_EMAIL_MAP = {
 
 
 def get_role_email_context(role: Optional[str]) -> dict[str, str]:
+    """Trả về nhãn vai trò và mô tả đã được bản địa hóa cho các mẫu email.
+
+    Ánh xạ một chuỗi vai trò (ví dụ: "patient", "doctor", "admin") thành một
+    nhãn hiển thị tiếng Việt và một mô tả ngắn được sử dụng trong các biến mẫu
+    {{role_label}} và {{role_description}}.
+
+    Args:
+        role: Chuỗi vai trò thô từ bản ghi người dùng. Có thể là None hoặc
+            chứa khoảng trắng — hàm chuẩn hóa bằng cách cắt và chuyển thành chữ thường.
+            Các vai trò không xác định mặc định là "Người dùng".
+
+    Trả về:
+        Một dict với các khóa "role_label" (str) và "role_description" (str).
+    """
     role_key = (role or "").strip().lower()
 
     return ROLE_EMAIL_MAP.get(
@@ -64,8 +95,21 @@ def get_role_email_context(role: Optional[str]) -> dict[str, str]:
 
 
 def render_template(html: str, variables: dict[str, str]) -> str:
-    """Thay thế các biến động dạng {{variable_name}} trong template HTML."""
-    # Làm giàu biến để tương thích chéo giữa otp, otp_code và new_password
+    """Thay thế các chỗ giữ chỗ {{variable_name}} trong một mẫu email HTML.
+
+    Thực hiện làm giàu tương thích chéo để "otp", "otp_code" và
+    "new_password" đều phân giải thành cùng một giá trị bất kể khóa nào
+    mẫu sử dụng. Cũng tiêm nhãn / mô tả vai trò, tên bệnh viện,
+    ngày hiện tại và tên đầy đủ của người dùng làm mặc định.
+
+    Args:
+        html: Chuỗi mẫu HTML thô chứa các điểm đánh dấu {{...}}.
+        variables: Dict các cặp tên biến → giá trị do người gọi cung cấp.
+
+    Trả về:
+        HTML đã được hiển thị với tất cả các chỗ giữ chỗ được nhận dạng đã được thay thế.
+    """
+    # Làm giàu biến để otp / otp_code / new_password có thể thay thế cho nhau
     enriched = dict(variables)
     if "otp" in enriched:
         enriched["otp_code"] = enriched["otp"]
@@ -114,7 +158,27 @@ def send_smtp_email_sync(
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
 ) -> bool:
-    """Gửi email đồng bộ qua máy chủ SMTP Gmail hoặc cấu hình khác trong .env."""
+    """Gửi email đồng bộ qua SMTP.
+
+    Xây dựng một tin nhắn MIME multipart/alternative, tùy chọn thêm người nhận CC/BCC,
+    và kết nối với máy chủ SMTP đã cấu hình (thường hoặc SSL).
+    Hỗ trợ STARTTLS trên cổng 587 và SSL trực tiếp trên cổng 465.
+
+    Args:
+        to_email: Địa chỉ email người nhận chính.
+        to_name: Tên hiển thị cho người nhận chính.
+        subject: Dòng chủ đề email.
+        html_body: Nội dung HTML đã được hiển thị.
+        cc: Địa chỉ CC phân cách bằng dấu phẩy hoặc None.
+        bcc: Địa chỉ BCC phân cách bằng dấu phẩy hoặc None.
+
+    Trả về:
+        True nếu tin nhắn được máy chủ SMTP chấp nhận.
+
+    Ngoại lệ:
+        smtplib.SMTPException (hoặc lớp con): Được ném lại sau khi ghi nhật ký nếu
+            quá trình hội thoại SMTP thất bại.
+    """
     host = settings.SMTP_HOST
     port = int(settings.SMTP_PORT or 587)
     user = settings.SMTP_USERNAME
@@ -174,7 +238,20 @@ async def send_smtp_email(
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
 ) -> bool:
-    """Gửi email bất đồng bộ qua SMTP bằng cách chạy trong threadpool."""
+    """Gửi email không đồng bộ qua SMTP sử dụng nhóm luồng.
+
+    Bao bọc hàm send_smtp_email_sync đồng bộ trong run_in_threadpool để
+    tránh chặn vòng lặp sự kiện không đồng bộ trong quá trình hội thoại SMTP.
+
+    Args:
+        Giống như send_smtp_email_sync.
+
+    Trả về:
+        True nếu tin nhắn được máy chủ SMTP chấp nhận.
+
+    Ngoại lệ:
+        Giống như send_smtp_email_sync.
+    """
     return await run_in_threadpool(
         send_smtp_email_sync, to_email, to_name, subject, html_body, cc, bcc
     )
@@ -188,7 +265,25 @@ def send_brevo_email_sync(
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
 ) -> bool:
-    """Gửi email đồng bộ qua Brevo API."""
+    """Gửi email đồng bộ qua API REST Brevo (Sendinblue).
+
+    POST đến https://api.brevo.com/v3/smtp/email với người gửi, người nhận,
+    chủ đề và nội dung HTML. Danh sách CC/BCC tùy chọn được bao gồm khi được cung cấp.
+
+    Args:
+        to_email: Địa chỉ email người nhận chính.
+        to_name: Tên hiển thị cho người nhận chính.
+        subject: Dòng chủ đề email.
+        html_body: Nội dung HTML đã được hiển thị.
+        cc: Địa chỉ CC phân cách bằng dấu phẩy hoặc None.
+        bcc: Địa chỉ BCC phân cách bằng dấu phẩy hoặc None.
+
+    Trả về:
+        True khi có phản hồi HTTP 2xx.
+
+    Ngoại lệ:
+        requests.HTTPError: Được ném lại sau khi ghi nhật ký nếu cuộc gọi API thất bại.
+    """
     if not settings.BREVO_API_KEY:
         return False
 
@@ -228,12 +323,27 @@ async def send_system_email(
     fallback_subject: str,
     fallback_html: str,
 ) -> bool:
-    """
-    Gửi email hệ thống (Đăng ký, Quên mật khẩu, v.v.):
-    1. Tìm template thích hợp đang được kích hoạt từ cơ sở dữ liệu.
-    2. Nếu có, sử dụng nó; nếu không, fallback về template mặc định.
-    3. Gửi qua Brevo (nếu có API Key) hoặc SMTP (nếu được cấu hình trong .env).
-    4. Tự động lưu lịch sử gửi vào bảng `email_logs`.
+    """Gửi email do hệ thống tạo ra sử dụng các mẫu cơ sở dữ liệu.
+
+    Luồng công việc:
+        1. Tìm nạp mẫu hoạt động gần đây nhất khớp với email_type từ DB.
+        2. Sử dụng subject/html_content của mẫu hoặc dự phòng vào các giá trị
+           fallback_* do người gọi cung cấp.
+        3. Hiển thị các biến mẫu ({{full_name}}, {{otp}}, {{role_label}},
+           v.v.) qua render_template().
+        4. Gửi qua API Brevo (ưu tiên) hoặc SMTP (dự phòng).
+        5. Ghi bản ghi gửi vào bảng email_logs.
+
+    Args:
+        email_type: Khóa tra cứu mẫu (ví dụ: "register", "forgot_password").
+        to_email: Địa chỉ email người nhận chính.
+        to_name: Tên hiển thị cho người nhận.
+        variables: Dict các thay thế biến mẫu.
+        fallback_subject: Dòng chủ đề được sử dụng khi không tìm thấy mẫu DB.
+        fallback_html: Nội dung HTML được sử dụng khi không tìm thấy mẫu DB.
+
+    Trả về:
+        True nếu email được gửi thành công (hoặc bị bỏ qua trong chế độ phát triển).
     """
     # 1. Tìm template đang active trong DB
     query = """

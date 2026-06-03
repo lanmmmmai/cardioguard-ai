@@ -1,3 +1,15 @@
+/**
+ * Mục đích: Trung tâm điều khiển AI dành cho bác sĩ. Cho phép bác sĩ chọn bệnh nhân
+ *           (hoặc xem tất cả) và tương tác với AI qua ChatWindow để phân tích lâm sàng,
+ *           tóm tắt và phát hiện bất thường.
+ * Luồng xử lý: 1. Tải danh sách bệnh nhân khi khởi tạo → 2. Người dùng chọn bệnh nhân từ
+ *             thanh bên → 3. Thông tin bệnh nhân được chọn được truyền làm ngữ cảnh cho
+ *             ChatWindow → 4. Bác sĩ gửi truy vấn (ví dụ: "tóm tắt bệnh nhân nguy cơ cao").
+ * Quan hệ:
+ *   - Component ChatWindow cho hội thoại AI
+ *   - AuthContext cho access token
+ *   - Kiểu Patient từ types.ts
+ */
 import React, { useState, useEffect } from 'react';
 import { Patient } from '../types';
 import { Bot, Users, Activity, FileText } from 'lucide-react';
@@ -5,6 +17,10 @@ import { ChatWindow } from '../components/chat/ChatWindow';
 import { useAuth } from '../auth/AuthContext';
 import { API_URL } from '../config';
 
+/**
+ * Trang chatbot chính cho bác sĩ. Hiển thị thanh bên chọn bệnh nhân và
+ * ChatWindow cho các truy vấn lâm sàng hỗ trợ AI.
+ */
 export const DoctorChatbot: React.FC = () => {
   const { accessToken } = useAuth();
   const [patients, setPatients] = useState<Patient[]>([]);

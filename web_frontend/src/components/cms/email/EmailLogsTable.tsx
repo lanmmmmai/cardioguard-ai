@@ -1,3 +1,9 @@
+/**
+ * Mục đích: Hiển thị nhật ký gửi email đã phân trang với tìm kiếm, lọc trạng thái, gửi lại và xuất CSV.
+ * Luồng xử lý: Tải nhật ký từ /email/logs với tham số truy vấn cho tìm kiếm, trạng thái, offset; hỗ trợ
+ *              gửi lại các email thất bại qua /email/logs/:id/retry; xuất nhật ký đã lọc ra CSV.
+ * Quan hệ: Được sử dụng bởi EmailCmsPage qua tab "logs"; nhận refreshSignal để làm mới từ bên ngoài.
+ */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Download, Loader2, RefreshCw, RotateCcw, Search } from 'lucide-react';
 import { API_URL } from '../../../config';
@@ -30,9 +36,13 @@ interface Log {
 }
 
 interface EmailLogsTableProps {
-  refreshSignal?: number; // increment để trigger refresh từ bên ngoài
+  refreshSignal?: number; // tăng giá trị để kích hoạt làm mới từ bên ngoài
 }
 
+/**
+ * Component EmailLogsTable — lịch sử gửi email có thể tìm kiếm, lọc với chức năng gửi lại
+ * và xuất CSV. Đặt lại phân trang khi thay đổi tìm kiếm hoặc bộ lọc trạng thái.
+ */
 export const EmailLogsTable: React.FC<EmailLogsTableProps> = ({ refreshSignal }) => {
   const { accessToken } = useAuth();
   const [logs, setLogs] = useState<Log[]>([]);
@@ -132,7 +142,7 @@ export const EmailLogsTable: React.FC<EmailLogsTableProps> = ({ refreshSignal })
     <div className="email-logs-container">
       {toast && <div className="cms-toast">{toast}</div>}
 
-      {/* Toolbar */}
+      {/* Thanh công cụ */}
       <div className="email-logs-toolbar">
         <div className="email-logs-filters">
           <label className="email-logs-search-wrap">
@@ -159,7 +169,7 @@ export const EmailLogsTable: React.FC<EmailLogsTableProps> = ({ refreshSignal })
             <RefreshCw size={14} />
           </button>
           <button type="button" className="btn btn-secondary" onClick={handleExport}>
-            <Download size={14} /> Export CSV
+            <Download size={14} /> Xuất CSV
           </button>
         </div>
       </div>
@@ -168,7 +178,7 @@ export const EmailLogsTable: React.FC<EmailLogsTableProps> = ({ refreshSignal })
         <div className="cms-inline-error">{error}</div>
       )}
 
-      {/* Table */}
+      {/* Bảng */}
       <div className="email-logs-table-wrap">
         <table className="email-logs-table">
           <thead>
@@ -246,7 +256,7 @@ export const EmailLogsTable: React.FC<EmailLogsTableProps> = ({ refreshSignal })
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* Phân trang */}
       <div className="cms-pagination">
         <button
           type="button"

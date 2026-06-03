@@ -1,3 +1,10 @@
+/**
+ * Mục đích: Thanh ghi cấu hình module CMS: định nghĩa các module dữ liệu có sẵn (ví dụ: domain_links)
+ *           với nhãn hiển thị, biểu tượng, cột template và cột hiển thị ưu tiên.
+ * Luồng xử lý: Định nghĩa interface CmsModuleConfig và mảng cmsModules tĩnh; xuất bảng tra cứu
+ *              moduleByKey để truy cập nhanh theo khóa module.
+ * Quan hệ: Được sử dụng bởi CmsPage và CsvImportModal để xác định siêu dữ liệu theo module.
+ */
 import { Globe } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 

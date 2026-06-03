@@ -1,3 +1,16 @@
+// Provider quản lý cảnh báo bệnh nhân — tìm nạp, giải quyết, kích hoạt SOS và
+// xử lý cập nhật cảnh báo thời gian thực qua WebSocket.
+// Quy trình làm việc:
+//   1. fetchAlerts lấy danh sách cảnh báo từ máy chủ.
+//   2. resolveAlert đánh dấu cảnh báo đã được giải quyết qua PATCH và cập nhật trạng thái
+//      cục bộ.
+//   3. triggerSosAlert gửi một thông báo SOS mới, chèn kết quả vào
+//      đầu danh sách cục bộ.
+//   4. addOrUpdateRealtimeAlert xử lý các sự kiện WebSocket đến,
+//      chèn hoặc cập nhật cảnh báo tại chỗ.
+// Mối quan hệ:
+//   - Phụ thuộc vào: ApiClient, AppLogger, Alert model.
+//   - Hiển thị activeAlertCount cho hiển thị huy hiệu/thông báo trong giao diện người dùng.
 import 'package:flutter/material.dart';
 import '../core/app_logger.dart';
 import '../core/api_client.dart';
@@ -5,45 +18,51 @@ import '../models/models.dart';
 import '../config/app_config.dart';
 
 class AlertProvider extends ChangeNotifier {
+  // Phiên bản API client dùng chung.
   final ApiClient _apiClient = ApiClient();
 
   bool _isLoading = false;
+
+  // Liệu một yêu cầu mạng có đang được tiến hành hay không.
   bool get isLoading => _isLoading;
 
   List<Alert> _alerts = [];
+
+  // Danh sách đầy đủ các cảnh báo (cảnh báo mới nhất ở đầu sau khi chèn).
   List<Alert> get alerts => _alerts;
 
-  // Real-time unread/unresolved alert count
+  // Số lượng cảnh báo chưa được giải quyết.
   int get activeAlertCount => _alerts.where((a) => !a.isResolved).length;
 
+  // Cập nhật trạng thái tải và thông báo cho listeners.
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
 
-  // Fetch alerts
+  // Tìm nạp danh sách đầy đủ các cảnh báo từ máy chủ và thay thế trạng thái cục bộ.
   Future<void> fetchAlerts() async {
     _setLoading(true);
     try {
       final response = await _apiClient.get(AppConfig.alertsEndpoint);
       if (response.statusCode == 200) {
-        if (response.data is! List) throw Exception("Expected a list from server");
+        if (response.data is! List) throw Exception("Dữ liệu trả về phải là một danh sách");
         final List<dynamic> list = response.data as List<dynamic>;
         _alerts = list.map((item) => Alert.fromJson(item)).toList();
       }
     } catch (e) {
-      AppLogger.log('Fetch alerts error: $e');
+      AppLogger.log('Lỗi tìm nạp cảnh báo: $e');
     } finally {
       _setLoading(false);
     }
   }
 
-  // Resolve alert
+  // Đánh dấu một cảnh báo đã được giải quyết trên máy chủ và cập nhật trạng thái cục bộ.
   Future<bool> resolveAlert(String alertId) async {
     try {
       final response = await _apiClient.patch('/alerts/$alertId/resolve');
       if (response.statusCode == 200) {
-        // Update local list
+        // Cập nhật danh sách cục bộ
         final index = _alerts.indexWhere((a) => a.id == alertId);
         if (index != -1) {
           final oldAlert = _alerts[index];
@@ -63,12 +82,12 @@ class AlertProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      AppLogger.log('Resolve alert error: $e');
+      AppLogger.log('Lỗi giải quyết cảnh báo: $e');
       return false;
     }
   }
 
-  // Trigger SOS alert (Patient)
+  // Gửi một cảnh báo SOS mới cho bệnh nhân hiện tại; chèn kết quả khi thành công.
   Future<bool> triggerSosAlert(String message) async {
     try {
       final response = await _apiClient.post(
@@ -83,12 +102,13 @@ class AlertProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      AppLogger.log('Trigger SOS error: $e');
+      AppLogger.log('Lỗi kích hoạt SOS: $e');
       return false;
     }
   }
 
-  // Update list with a real-time WebSocket alert (Insert or Update if exists)
+  // Xử lý một cảnh báo thời gian thực đến từ WebSocket — chèn mới hoặc
+  // cập nhật cảnh báo hiện có trong danh sách cục bộ.
   void addOrUpdateRealtimeAlert(Map<String, dynamic> alertJson) {
     try {
       final incomingAlert = Alert.fromJson(alertJson);
@@ -100,8 +120,7 @@ class AlertProvider extends ChangeNotifier {
       }
       notifyListeners();
     } catch (e) {
-      AppLogger.log('Error handling realtime alert: $e');
+      AppLogger.log('Lỗi xử lý cảnh báo thời gian thực: $e');
     }
   }
 }
-

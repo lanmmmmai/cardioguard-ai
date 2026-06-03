@@ -1,3 +1,9 @@
+/**
+ * Mục đích: Hộp thoại nhập bản ghi CSV vào một module CMS.
+ * Luồng xử lý: Người dùng kéo thả/chọn file CSV; phân tích và xem trước tối đa 5 dòng; xác thực các cột
+ *              so với template của module; hiển thị lỗi xác thực; gửi qua callback onImport.
+ * Quan hệ: Được sử dụng bởi CmsPage; templateColumns từ cmsConfig định nghĩa tiêu đề cột dự kiến.
+ */
 import React, { useMemo, useState } from 'react';
 import { FileUp, Upload, X } from 'lucide-react';
 
@@ -18,6 +24,10 @@ const parseCsvPreview = (text: string) => {
   return { headers, rows, totalRows: Math.max(0, lines.length - 1) };
 };
 
+/**
+ * Component CsvImportModal — nhập CSV kéo thả với xác thực cột và xem trước.
+ * Vô hiệu hóa nút nhập nếu thiếu cột bắt buộc hoặc có lỗi xác thực.
+ */
 export const CsvImportModal: React.FC<CsvImportModalProps> = ({ moduleLabel, templateColumns, onClose, onImport }) => {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<{ headers: string[]; rows: Array<Record<string, string>>; totalRows: number } | null>(null);
@@ -82,7 +92,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ moduleLabel, tem
         </label>
 
         <div className="cms-template-note">
-          Template columns: <code>{templateColumns.join(',')}</code>
+          Cột template: <code>{templateColumns.join(',')}</code>
         </div>
 
         {errors.length > 0 && (
@@ -113,7 +123,7 @@ export const CsvImportModal: React.FC<CsvImportModalProps> = ({ moduleLabel, tem
 
         {result && (
           <div className={result.errors?.length ? 'cms-inline-error' : 'cms-inline-success'}>
-            Imported: {result.imported}
+            Đã nhập: {result.imported}
             {result.errors?.map((item: any) => (
               <div key={item.row}>Dòng {item.row}: {item.errors.join(', ')}</div>
             ))}

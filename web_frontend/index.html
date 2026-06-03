@@ -1,3 +1,18 @@
+<!--
+  ============================================================================
+  CardioGuard AI – Entry HTML
+  ============================================================================
+  @purpose      SPA entry point that mounts the React root and registers the
+                Service Worker for PWA installability.
+  @workflow     1. Render <div id="root" /> as the React mount target.
+                2. Load /src/main.tsx as the ES module entry.
+                3. On window load, register /sw.js for offline/install support.
+  @relationships
+    - /src/main.tsx       → React root render
+    - /sw.js              → Service Worker for PWA caching
+    - /manifest.json      → Web App Manifest for "Add to Home Screen"
+  ============================================================================
+-->
 <!DOCTYPE html>
 <html lang="vi">
   <head>
@@ -7,6 +22,7 @@
     <meta name="theme-color" content="#0d0e12" />
     <meta name="description" content="CardioGuard AI - Hệ thống giám sát sức khỏe tim mạch thời gian thực. Theo dõi nhịp tim, SpO2, huyết áp và điện tâm đồ ECG trực tuyến." />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />

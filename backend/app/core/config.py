@@ -1,13 +1,43 @@
+"""Mô-đun cấu hình ứng dụng.
+
+MỤC ĐÍCH:
+    Quản lý cấu hình tập trung sử dụng Pydantic Settings.
+    Tải các biến môi trường từ tệp .env và cung cấp
+    truy cập có kiểu dữ liệu cho tất cả cài đặt ứng dụng.
+
+LUỒNG XỬ LÝ:
+    1. Lớp Settings đọc từ các tệp env (.env gốc, backend/.env)
+    2. Xác thực các trường bắt buộc (SECRET_KEY tối thiểu 32 ký tự, không mặc định)
+    3. Xuất thể hiện `settings` singleton dùng chung toàn ứng dụng
+
+QUAN HỆ:
+    - Được sử dụng bởi: tất cả mô-đun backend (database, security, services, API)
+    - Đọc từ: .env và backend/.env
+"""
+
 from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# Thư mục gốc của dự án, tính từ vị trí tệp này đi lên 3 cấp
 BASE_DIR = Path(__file__).resolve().parents[3]
 
 
-
 class Settings(BaseSettings):
+    """Cài đặt ứng dụng được tải từ các biến môi trường.
+
+    Thuộc tính:
+        ENVIRONMENT: Môi trường triển khai (development/production).
+        DATABASE_URL: Chuỗi kết nối PostgreSQL.
+        BREVO_API_KEY: Khóa API Brevo (Sendinblue) cho email giao dịch.
+        SMTP_*: Cấu hình máy chủ SMTP để gửi email.
+        OPENAI_API_KEY: Khóa API OpenAI cho tính năng chatbot AI.
+        IOT_DEVICE_SHARED_TOKEN: Mã bí mật dùng chung để xác thực thiết bị IoT.
+        SECRET_KEY: Mã bí mật ký JWT (tối thiểu 32 ký tự, không được mặc định).
+        ACCESS_TOKEN_EXPIRE_MINUTES: Thời gian sống của token JWT truy cập (phút).
+        EXPOSE_DEV_OTP: Nếu True, trả về OTP trong phản hồi API cho môi trường phát triển.
+    """
     ENVIRONMENT: str = "development"
     DATABASE_URL: str
     NEXT_PUBLIC_SUPABASE_URL: str = ""
@@ -30,8 +60,9 @@ class Settings(BaseSettings):
     @field_validator("SECRET_KEY")
     @classmethod
     def validate_secret_key(cls, value: str) -> str:
+        """Xác thực rằng SECRET_KEY không phải là giá trị yếu hoặc mặc định."""
         if "heart_monitor" in value.lower() or value == "secret_key":
-            raise ValueError("SECRET_KEY must be a strong and non-default value")
+            raise ValueError("SECRET_KEY phải là giá trị mạnh và không được mặc định")
         return value
 
     model_config = SettingsConfigDict(
@@ -40,4 +71,5 @@ class Settings(BaseSettings):
     )
 
 
+# Thể hiện singleton Settings được dùng xuyên suốt ứng dụng
 settings = Settings()

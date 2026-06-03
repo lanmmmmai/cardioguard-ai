@@ -6,14 +6,15 @@
 #include "config.h"
 
 namespace {
-String g_buffer[kOfflineBufferMaxFrames];
-uint16_t g_buffer_head = 0;
-uint16_t g_buffer_count = 0;
-unsigned long g_last_wifi_attempt_ms = 0UL;
-unsigned long g_backoff_until_ms = 0UL;
-uint16_t g_backoff_ms = kBackoffMinMs;
-String g_device_mac;
+String g_buffer[kOfflineBufferMaxFrames];  // Bộ đệm vòng lưu trữ các khung telemetry khi mất kết nối
+uint16_t g_buffer_head = 0;                // Chỉ số đầu của bộ đệm vòng
+uint16_t g_buffer_count = 0;               // Số lượng khung đang có trong bộ đệm
+unsigned long g_last_wifi_attempt_ms = 0UL;// Thời điểm lần cuối thử kết nối WiFi
+unsigned long g_backoff_until_ms = 0UL;    // Thời điểm kết thúc thời gian chờ backoff
+uint16_t g_backoff_ms = kBackoffMinMs;     // Thời gian backoff hiện tại (tăng dần khi lỗi liên tiếp)
+String g_device_mac;                       // Địa chỉ MAC của thiết bị
 
+// Đẩy một khung telemetry vào bộ đệm vòng, trả về true nếu thành công
 bool PushBufferedPayload(const String &payload) {
   if (g_buffer_count < kOfflineBufferMaxFrames) {
     const uint16_t tail = (g_buffer_head + g_buffer_count) % kOfflineBufferMaxFrames;
@@ -28,6 +29,7 @@ bool PushBufferedPayload(const String &payload) {
   return false;
 }
 
+// Lấy một khung telemetry từ bộ đệm vòng, trả về true nếu có dữ liệu
 bool PopBufferedPayload(String &payload) {
   if (g_buffer_count == 0) {
     return false;
@@ -39,6 +41,7 @@ bool PopBufferedPayload(String &payload) {
   return true;
 }
 
+// Gửi một payload HTTP POST đến endpoint telemetry, trả về mã trạng thái HTTP
 int PostPayload(const String &payload) {
   HTTPClient http;
   http.setTimeout(kHttpTimeoutMs);
@@ -54,11 +57,13 @@ int PostPayload(const String &payload) {
   return status_code;
 }
 
+// Kiểm tra xem mã trạng thái HTTP có thể thử lại hay không
 bool IsRetryableStatus(int status_code) {
   return status_code == 429 || status_code == 500 || status_code == 502 || status_code == 503;
 }
-}  // namespace
+}  // Kết thúc namespace ẩn danh
 
+// Khởi tạo bộ gửi telemetry: cấu hình WiFi ở chế độ station và bắt đầu kết nối
 void InitializeTelemetrySender() {
   WiFi.mode(WIFI_STA);
   g_device_mac = WiFi.macAddress();
@@ -66,6 +71,7 @@ void InitializeTelemetrySender() {
   g_last_wifi_attempt_ms = millis();
 }
 
+// Duy trì kết nối WiFi, tự động thử kết nối lại sau mỗi khoảng thời gian
 void MaintainConnectivity() {
   if (WiFi.status() == WL_CONNECTED) {
     return;
@@ -81,6 +87,7 @@ void MaintainConnectivity() {
   WiFi.begin(kWifiSsid, kWifiPassword);
 }
 
+// Kiểm tra xem WiFi đã kết nối hay chưa
 bool IsWifiConnected() {
   if (g_device_mac.length() == 0) {
     g_device_mac = WiFi.macAddress();
@@ -88,10 +95,12 @@ bool IsWifiConnected() {
   return WiFi.status() == WL_CONNECTED;
 }
 
+// Trả về số lượng khung telemetry đang chờ trong bộ đệm
 uint16_t PendingBufferSize() {
   return g_buffer_count;
 }
 
+// Gửi một khung telemetry, xử lý backoff, bộ đệm offline và các lỗi xác thực
 SendResult SendTelemetryFrame(const String &payload) {
   SendResult result{};
   result.sent = false;

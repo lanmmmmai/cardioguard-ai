@@ -1,63 +1,77 @@
 -- =============================================================================
--- CardioGuard AI — Email CMS Migration
--- Chạy script này trong Supabase SQL Editor
+-- CardioGuard AI — Migration cho Email CMS
+-- Chạy tập lệnh này trong Supabase SQL Editor để tạo cấu trúc email
 -- =============================================================================
 
 -- -------------------------------------------------------
--- Bảng 1: email_templates — Lưu mẫu email
+-- Bảng 1: email_templates — Lưu trữ các mẫu email dùng cho gửi thông báo
 -- -------------------------------------------------------
 CREATE TABLE IF NOT EXISTS email_templates (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    -- Tên định danh của mẫu email
     name        TEXT        NOT NULL,
+    -- Tiêu đề email
     subject     TEXT        NOT NULL,
+    -- Nội dung HTML của email
     html_content TEXT       NOT NULL DEFAULT '',
+    -- Nội dung văn bản thuần túy của email dùng cho email client không hỗ trợ HTML
     text_content TEXT       DEFAULT '',
+    -- Loại mẫu email: custom tùy chỉnh hoặc các loại có sẵn
     type        TEXT        NOT NULL DEFAULT 'custom',
-    -- Loại template: otp_register | otp_login | welcome | password_reset |
-    --                alert_critical | appointment_reminder | doctor_assigned |
-    --                health_warning | monthly_report | custom
+    -- Trạng thái kích hoạt của mẫu email, mặc định là TRUE đang hoạt động
     is_active   BOOLEAN     NOT NULL DEFAULT TRUE,
+    -- Thời điểm tạo mẫu email, mặc định là thời gian hiện tại
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Thời điểm cập nhật gần nhất, mặc định là thời gian hiện tại
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Trigger tự động cập nhật updated_at
+-- Hàm trigger tự động cập nhật cột updated_at cho mọi bảng có cột updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
+    -- Gán thời gian hiện tại cho cột updated_at trước khi lưu
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
+-- Tạo trigger kích hoạt trước khi cập nhật bảng email_templates để tự động cập nhật thời gian sửa đổi
 CREATE TRIGGER trg_email_templates_updated_at
     BEFORE UPDATE ON email_templates
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- -------------------------------------------------------
--- Bảng 2: email_logs — Lịch sử gửi email
+-- Bảng 2: email_logs — Lưu trữ lịch sử gửi email
 -- -------------------------------------------------------
 CREATE TABLE IF NOT EXISTS email_logs (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    -- Khóa ngoại tham chiếu đến bảng email_templates, đặt NULL khi template bị xóa
     template_id     UUID        REFERENCES email_templates(id) ON DELETE SET NULL,
+    -- Địa chỉ email người nhận
     receiver_email  TEXT        NOT NULL,
+    -- Tiêu đề email đã gửi
     subject         TEXT        NOT NULL,
+    -- Trạng thái gửi email: pending đang chờ, sent đã gửi, failed thất bại, scheduled đã lên lịch
     status          TEXT        NOT NULL DEFAULT 'pending',
-    -- Status: pending | sent | failed | scheduled
+    -- Thông báo lỗi nếu quá trình gửi thất bại
     error_message   TEXT,
+    -- Thời điểm email được gửi thành công
     sent_at         TIMESTAMPTZ,
-    created_by      TEXT,       -- email của admin đã gửi
+    -- Email của người quản trị đã thực hiện gửi
+    created_by      TEXT,
+    -- Thời điểm tạo bản ghi, mặc định là thời gian hiện tại
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Index để tìm kiếm nhanh
+-- Tạo các chỉ mục để tìm kiếm và lọc nhanh dữ liệu trong bảng email_logs
 CREATE INDEX IF NOT EXISTS idx_email_logs_status       ON email_logs(status);
 CREATE INDEX IF NOT EXISTS idx_email_logs_receiver     ON email_logs(receiver_email);
 CREATE INDEX IF NOT EXISTS idx_email_logs_created_at   ON email_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_email_logs_template_id  ON email_logs(template_id);
 
 -- -------------------------------------------------------
--- Seed: 3 mẫu template mặc định để test
+-- Chèn dữ liệu mẫu: 3 mẫu template mặc định để kiểm thử chức năng email
 -- -------------------------------------------------------
 INSERT INTO email_templates (name, subject, html_content, type, is_active) VALUES
 (
