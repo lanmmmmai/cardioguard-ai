@@ -23,6 +23,7 @@ import { PatientCompleteProfile } from './pages/PatientCompleteProfile';
 import { DoctorCompleteProfile } from './pages/DoctorCompleteProfile';
 import { DoctorPendingVerification, DoctorVerificationRejected } from './pages/DoctorStatusPages';
 import { AdminDoctorVerification } from './components/AdminDoctorVerification';
+import { AdminMedicalRecordsPage, DoctorMedicalRecordsPage, PatientMedicalRecordsPage } from './components/medical-records/MedicalRecordsPages';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { defaultRouteByRole, normalizeRole, UserRole } from './auth/roles';
@@ -35,7 +36,7 @@ import { API_URL, WS_URL } from './config';
 import { Patient, Alert, SensorData } from './types';
 
 const AppContent: React.FC = () => {
-  const { accessToken, isAuthenticated, loading, role, login, requiresPasswordChange } = useAuth();
+  const { accessToken, isAuthenticated, loading, role, login, requiresPasswordChange, user } = useAuth();
   const { path, navigate } = useBrowserPath();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -370,8 +371,6 @@ const AppContent: React.FC = () => {
       case '/doctor/appointments':
       case '/patient/appointments':
         return <Appointments patients={patients} role={routeRole || 'patient'} />;
-      case '/doctor/medical-records':
-        return <FeatureHub key={normalizedPath} type="records" role="doctor" patients={patients} />;
       case '/doctor/prescriptions':
       case '/patient/prescriptions':
         return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/prescriptions" />;
@@ -395,11 +394,20 @@ const AppContent: React.FC = () => {
       case '/patient/dashboard':
         return <PatientHome latestTelemetry={latestTelemetry} alerts={alerts} isConnected={isConnected} />;
       default: {
+        if (normalizedPath.startsWith('/doctor/medical-records')) {
+          return <DoctorMedicalRecordsPage path={normalizedPath} patients={patients.map((patient) => ({ id: patient.id, full_name: patient.full_name }))} navigate={navigate} />;
+        }
+        if (normalizedPath.startsWith('/patient/medical-records')) {
+          return <PatientMedicalRecordsPage path={normalizedPath} navigate={navigate} />;
+        }
+        if (normalizedPath.startsWith('/admin/medical-records')) {
+          return <AdminMedicalRecordsPage path={normalizedPath} patients={patients.map((patient) => ({ id: patient.id, full_name: patient.full_name }))} navigate={navigate} />;
+        }
         const meta = pageTitles[normalizedPath];
         return meta ? <PlaceholderPage title={meta.title} subtitle={meta.subtitle} /> : null;
       }
     }
-  }, [alerts, latestTelemetry, normalizedPath, patients, routeRole, selectedPatientId, showAddPatientModal, doctors, isConnected, navigate, renderPatientList]);
+  }, [alerts, latestTelemetry, normalizedPath, patients, routeRole, selectedPatientId, showAddPatientModal, doctors, isConnected, navigate, renderPatientList, user]);
 
   if (loading) {
     return <div className="route-loading">Đang khôi phục phiên đăng nhập...</div>;

@@ -34,6 +34,7 @@ export const roleMenus: Record<UserRole, RoleMenuItem[]> = {
   admin: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: BarChart3 },
     { label: 'CMS dữ liệu',    path: '/admin/cms',    icon: Database },
+    { label: 'Bệnh án điện tử', path: '/admin/medical-records', icon: FileText },
     { label: 'Quản lý tài khoản', path: '/admin/users', icon: UserCog },
     { label: 'Quản lý bác sĩ', path: '/admin/doctors', icon: Stethoscope },
     { label: 'Xác thực bác sĩ', path: '/admin/doctor-verification', icon: ShieldCheck },
@@ -48,6 +49,7 @@ export const roleMenus: Record<UserRole, RoleMenuItem[]> = {
   doctor: [
     { label: 'Dashboard', path: '/doctor/dashboard', icon: BarChart3 },
     { label: 'AI Command Center', path: '/doctor/ai-assistant', icon: Bot },
+    { label: 'Bệnh án điện tử', path: '/doctor/medical-records', icon: FileText },
     { label: 'Quản lý bệnh nhân', path: '/doctor/patients', icon: Users },
     { label: 'Cảnh báo khẩn cấp', path: '/doctor/alerts', icon: ShieldAlert },
     { label: 'Lịch hẹn khám', path: '/doctor/appointments', icon: CalendarDays },
@@ -59,6 +61,7 @@ export const roleMenus: Record<UserRole, RoleMenuItem[]> = {
   patient: [
     { label: 'Dashboard', path: '/patient/home', icon: Home },
     { label: 'Trợ lý AI', path: '/patient/chatbot', icon: Bot },
+    { label: 'Bệnh án điện tử', path: '/patient/medical-records', icon: FileText },
     { label: 'Chỉ số sức khỏe', path: '/patient/metrics', icon: HeartPulse },
     { label: 'Lịch hẹn của tôi', path: '/patient/appointments', icon: CalendarDays },
     { label: 'Chat với bác sĩ', path: '/patient/chat', icon: MessageCircle },

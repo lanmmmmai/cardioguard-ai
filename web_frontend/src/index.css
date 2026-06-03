@@ -659,6 +659,31 @@ body {
   animation: pulse-halo 2s infinite;
 }
 
+.patient-status.success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.patient-status.purple {
+  background: rgba(124, 58, 237, 0.12);
+  color: #8b5cf6;
+}
+
+.patient-status.warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.patient-status.danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--color-critical);
+}
+
+.patient-status.muted {
+  background: rgba(100, 116, 139, 0.12);
+  color: var(--text-secondary);
+}
+
 /* Form Styles */
 .form-group {
   margin-bottom: 1.25rem;
@@ -4627,5 +4652,4 @@ body {
   animation: shimmer 1.5s infinite;
   border-radius: 8px;
 }
-
 
