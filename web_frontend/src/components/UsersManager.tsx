@@ -185,11 +185,7 @@ export const UsersManager: React.FC = () => {
 
   const handleOpenDeleteConfirm = (userAcc: UserAccount) => {
     if (userAcc.id === user?.id) {
-      setError('Không thể tự vô hiệu hóa tài khoản đang đăng nhập');
-      return;
-    }
-    if ((userAcc.status || '').toLowerCase() === 'inactive') {
-      setError('Tài khoản này đã ở trạng thái tạm khóa');
+      setError('Không thể tự xóa tài khoản đang đăng nhập');
       return;
     }
     setSelectedUser(userAcc);
@@ -644,10 +640,10 @@ export const UsersManager: React.FC = () => {
                             background: 'linear-gradient(135deg, var(--color-critical), #c2003c)'
                           }}
                           onClick={() => handleOpenDeleteConfirm(userAcc)}
-                          disabled={userAcc.id === user?.id || userAcc.status === 'inactive'}
-                          title={userAcc.id === user?.id ? 'Không thể tự vô hiệu hóa tài khoản đang đăng nhập' : undefined}
+                          disabled={userAcc.id === user?.id}
+                          title={userAcc.id === user?.id ? 'Không thể tự xóa tài khoản đang đăng nhập' : undefined}
                         >
-                          <Trash2 size={12} /> {userAcc.status === 'inactive' ? 'Đã khóa' : 'Vô hiệu hóa'}
+                          <Trash2 size={12} /> Xóa
                         </button>
                       </div>
                     </td>
@@ -916,12 +912,12 @@ export const UsersManager: React.FC = () => {
             </div>
 
             <h2 className="auth-title" style={{ marginBottom: '0.75rem', color: 'var(--color-critical)' }}>
-              Xác nhận vô hiệu hóa tài khoản
+              Xác nhận xóa tài khoản
             </h2>
             
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: '2rem' }}>
-              Bạn có chắc chắn muốn vô hiệu hóa tài khoản của <strong>{selectedUser.full_name}</strong> ({selectedUser.email})?
-              Người dùng sẽ không thể đăng nhập, nhưng dữ liệu hồ sơ và lịch sử lâm sàng vẫn được giữ để phục vụ audit.
+              Bạn có chắc chắn muốn xóa tài khoản của <strong>{selectedUser.full_name}</strong> ({selectedUser.email})?
+              Tài khoản sẽ bị xóa khỏi hệ thống và không thể đăng nhập, nhưng dữ liệu hồ sơ lâm sàng được lưu trữ ẩn để phục vụ audit.
             </p>
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
@@ -940,7 +936,7 @@ export const UsersManager: React.FC = () => {
                     <Loader2 className="beat-animated" size={16} /> Đang xử lý...
                   </>
                 ) : (
-                  'Vô hiệu hóa'
+                  'Xóa tài khoản'
                 )}
               </button>
             </div>
