@@ -355,6 +355,22 @@ async def ensure_domain_links_schema() -> None:
         FOR EACH ROW
         EXECUTE FUNCTION update_domain_links_updated_at()
         """,
+        """
+        UPDATE domain_links
+        SET path = '/' || LTRIM(path, '/')
+        WHERE path IS NOT NULL AND BTRIM(path) <> ''
+        """,
+        """
+        UPDATE domain_links
+        SET deleted_at = NOW()
+        WHERE id IN (
+            SELECT id FROM (
+                SELECT id, ROW_NUMBER() OVER (PARTITION BY LOWER(path) ORDER BY updated_at DESC) as rn
+                FROM domain_links
+                WHERE deleted_at IS NULL AND BTRIM(path) <> ''
+            ) t WHERE t.rn > 1
+        )
+        """,
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_links_path_unique ON domain_links (LOWER(path)) WHERE deleted_at IS NULL AND BTRIM(path) <> ''",
         "CREATE INDEX IF NOT EXISTS idx_domain_links_is_active ON domain_links (is_active)",
         "CREATE INDEX IF NOT EXISTS idx_domain_links_deleted_at ON domain_links (deleted_at)",

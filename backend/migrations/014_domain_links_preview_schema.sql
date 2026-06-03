@@ -34,6 +34,22 @@ CREATE TRIGGER trg_domain_links_updated_at
     BEFORE UPDATE ON domain_links
     FOR EACH ROW EXECUTE FUNCTION update_domain_links_updated_at();
 
+-- Normalize all paths: Ensure non-empty paths start with a single slash (resolves '//login' and others to '/login')
+UPDATE domain_links
+SET path = '/' || LTRIM(path, '/')
+WHERE path IS NOT NULL AND BTRIM(path) <> '';
+
+-- Soft-delete older duplicate active domain links to prevent UniqueViolationError on unique index creation
+UPDATE domain_links
+SET deleted_at = NOW()
+WHERE id IN (
+    SELECT id FROM (
+        SELECT id, ROW_NUMBER() OVER (PARTITION BY LOWER(path) ORDER BY updated_at DESC) as rn
+        FROM domain_links
+        WHERE deleted_at IS NULL AND BTRIM(path) <> ''
+    ) t WHERE t.rn > 1
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_links_path_unique
     ON domain_links (LOWER(path))
     WHERE deleted_at IS NULL AND BTRIM(path) <> '';
