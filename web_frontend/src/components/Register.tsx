@@ -3,6 +3,7 @@ import { Activity, ArrowLeft, CheckCircle2, Lock, Mail, ShieldCheck, User, Loade
 import { API_URL } from '../config';
 import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
 import { UserRole } from '../auth/roles';
+import { readJsonResponse } from '../utils/response';
 
 interface RegisterProps {
   role: UserRole;
@@ -102,22 +103,7 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
         }),
       });
 
-      let data;
-
-
-      try {
-
-
-        data = await response.json();
-
-
-      } catch (e) {
-
-
-        throw new Error("Lỗi định dạng phản hồi từ server");
-
-
-      }
+      const data = await readJsonResponse<{ detail?: string; email_sent?: boolean; email?: string }>(response);
 
       if (!response.ok) {
         throw new Error(data.detail || 'Không gửi được OTP. Vui lòng thử lại');

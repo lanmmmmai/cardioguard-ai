@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Activity, Mail, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
 import { API_URL } from '../config';
 import { UserRole } from '../auth/roles';
+import { readJsonResponse } from '../utils/response';
 
 interface ForgotPasswordProps {
   role: UserRole;
@@ -36,22 +37,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ role, onNavigate
         body: JSON.stringify({ email }),
       });
 
-      let data;
-
-
-      try {
-
-
-        data = await response.json();
-
-
-      } catch (e) {
-
-
-        throw new Error("Lỗi định dạng phản hồi từ server");
-
-
-      }
+      const data = await readJsonResponse<{ detail?: string; email_sent?: boolean }>(response);
       if (!response.ok) {
         throw new Error(data.detail || 'Không thể yêu cầu OTP');
       }
@@ -87,22 +73,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ role, onNavigate
         body: JSON.stringify({ email, otp }),
       });
 
-      let data;
-
-
-      try {
-
-
-        data = await response.json();
-
-
-      } catch (e) {
-
-
-        throw new Error("Lỗi định dạng phản hồi từ server");
-
-
-      }
+      const data = await readJsonResponse<{ detail?: string; email_sent?: boolean }>(response);
       if (!response.ok) {
         throw new Error(data.detail || 'Xác minh OTP thất bại');
       }

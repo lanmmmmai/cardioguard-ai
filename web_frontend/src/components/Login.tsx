@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Activity, Mail, Lock, Loader2 } from 'lucide-react';
 import { API_URL } from '../config';
 import { UserRole } from '../auth/roles';
+import { readJsonResponse } from '../utils/response';
 
 interface LoginProps {
   role: UserRole;
@@ -35,25 +36,18 @@ export const Login: React.FC<LoginProps> = ({ role, onLoginSuccess, onNavigateTo
         body: JSON.stringify({ email, password, expected_role: role }),
       });
 
-      let data;
-
-
-      try {
-
-
-        data = await response.json();
-
-
-      } catch (e) {
-
-
-        throw new Error("Lỗi định dạng phản hồi từ server");
-
-
-      }
+      const data = await readJsonResponse<{
+        detail?: string;
+        access_token?: string;
+        user?: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean };
+      }>(response);
 
       if (!response.ok) {
         throw new Error(data.detail || 'Email hoặc mật khẩu không chính xác');
+      }
+
+      if (!data.access_token || !data.user) {
+        throw new Error('Phản hồi đăng nhập không đầy đủ từ server');
       }
 
       onLoginSuccess(data.access_token, data.user);
