@@ -640,7 +640,8 @@ async def get_template(
 
     template = await fetch_template_by_id(template_id)
     if not template:
-        return template
+        raise HTTPException(status_code=404, detail="Template not found")
+    return template
 
 
 @router.post("/templates")
@@ -805,7 +806,7 @@ async def update_template(
             if duplicate.first():
                 raise HTTPException(status_code=409, detail="Không được trùng mã ID Email CMS")
         result = await session.execute(
-            text(f"UPDATE email_templates SET {set_sql} WHERE id = :id::uuid RETURNING id"),
+            text(f"UPDATE email_templates SET {set_sql} WHERE id = CAST(:id AS uuid) RETURNING id"),
             updates,
         )
         row = result.mappings().first()
@@ -837,7 +838,7 @@ async def delete_template(
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            text("DELETE FROM email_templates WHERE id = :id::uuid RETURNING id"),
+            text("DELETE FROM email_templates WHERE id = CAST(:id AS uuid) RETURNING id"),
             {"id": template_id},
         )
         row = result.mappings().first()
@@ -1062,7 +1063,7 @@ async def retry_email(
                 SELECT l.*, t.html_content, t.text_content, t.is_active, t.email_type
                 FROM email_logs l
                 LEFT JOIN email_templates t ON t.id = l.template_id
-                WHERE l.id = :id::uuid
+                WHERE l.id = CAST(:id AS uuid)
             """),
             {"id": log_id},
         )

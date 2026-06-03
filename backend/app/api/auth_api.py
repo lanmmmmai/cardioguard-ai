@@ -806,7 +806,7 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
     user_id = otp_result.metadata.get("user_id")
     if user_id:
         user = await database.fetch_one(
-            "SELECT id, full_name, role FROM users WHERE id = :id::uuid",
+            "SELECT id, full_name, role FROM users WHERE id = CAST(:id AS uuid)",
             {"id": user_id},
         )
     else:
@@ -888,7 +888,7 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
     logger.debug("Entry: change_password(user_id=%s)", current_user["id"])
 
     user = await database.fetch_one(
-        "SELECT password_hash FROM users WHERE id = :id::uuid",
+        "SELECT password_hash FROM users WHERE id = CAST(:id AS uuid)",
         {"id": current_user["id"]}
     )
 
@@ -899,7 +899,7 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
         """
         UPDATE users 
         SET password_hash = :password_hash, must_change_password = FALSE
-        WHERE id = :id::uuid
+        WHERE id = CAST(:id AS uuid)
         """,
         {"password_hash": hash_password(data.new_password), "id": current_user["id"]}
     )

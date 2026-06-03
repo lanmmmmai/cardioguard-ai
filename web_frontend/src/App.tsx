@@ -44,6 +44,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { defaultRouteByRole, normalizeRole, UserRole } from './auth/roles';
 import { AdminLayout, DoctorLayout, PatientLayout } from './layouts/RoleLayout';
 import { AdminDashboard, DoctorDashboard, PatientHome, PlaceholderPage } from './pages/RolePages';
+import { PatientHealthPage } from './pages/PatientHealthPage';
 import { PatientSettingsPage } from './pages/PatientSettingsPage';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useBrowserPath } from './hooks/useBrowserPath';
@@ -142,6 +143,25 @@ const AppContent: React.FC = () => {
   }, [loading, path, role, isAuthenticated, routeRole, requiresPasswordChange, locale]);
 
   const fetchPatients = useCallback(async () => {
+    const isVerifiedDoctor = role === 'doctor' && Boolean(user?.profile_completed && user?.is_verified);
+    const doctorDataRoutes = new Set([
+      '/doctor',
+      '/doctor/dashboard',
+      '/doctor/patients',
+      '/doctor/medical-records',
+      '/doctor/ai-assistant',
+      '/doctor/chatbot',
+      '/doctor/appointments',
+      '/doctor/reports',
+      '/doctor/realtime-monitoring',
+      '/doctor/chat',
+      '/doctor/messages',
+    ]);
+    const canFetchPatients = role === 'admin' || (isVerifiedDoctor && doctorDataRoutes.has(normalizedPath));
+    if (!canFetchPatients) {
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/patients`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
@@ -161,9 +181,14 @@ const AppContent: React.FC = () => {
     } catch (err) {
       console.error('Không thể tìm nạp bệnh nhân:', err);
     }
-  }, [accessToken]);
+  }, [accessToken, role, user, normalizedPath]);
 
   const fetchAlerts = useCallback(async () => {
+    const isVerifiedDoctor = role === 'doctor' && Boolean(user?.profile_completed && user?.is_verified);
+    if (role === 'doctor' && !isVerifiedDoctor) {
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/alerts`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
@@ -183,7 +208,7 @@ const AppContent: React.FC = () => {
     } catch (err) {
       console.error('Không thể tìm nạp cảnh báo:', err);
     }
-  }, [accessToken]);
+  }, [accessToken, role, user]);
 
   const fetchDoctors = useCallback(async () => {
     try {
@@ -209,12 +234,35 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     if (!accessToken) return;
-    fetchPatients();
-    fetchAlerts();
+    const isVerifiedDoctor = role === 'doctor' && Boolean(user?.profile_completed && user?.is_verified);
+    const canFetchAlerts =
+      role !== 'doctor' || isVerifiedDoctor;
+    const doctorDataRoutes = new Set([
+      '/doctor',
+      '/doctor/dashboard',
+      '/doctor/patients',
+      '/doctor/medical-records',
+      '/doctor/ai-assistant',
+      '/doctor/chatbot',
+      '/doctor/appointments',
+      '/doctor/reports',
+      '/doctor/realtime-monitoring',
+      '/doctor/chat',
+      '/doctor/messages',
+    ]);
+    const canFetchPatients =
+      role === 'admin' || (isVerifiedDoctor && doctorDataRoutes.has(normalizedPath));
+
+    if (canFetchAlerts) {
+      fetchAlerts();
+    }
+    if (canFetchPatients) {
+      fetchPatients();
+    }
     if (role === 'admin') {
       fetchDoctors();
     }
-  }, [accessToken, role, fetchPatients, fetchAlerts, fetchDoctors]);
+  }, [accessToken, role, user, fetchPatients, fetchAlerts, fetchDoctors]);
 
   const handleSensorTelemetry = useCallback((data: SensorData) => {
     setLatestTelemetry(data);
@@ -438,6 +486,10 @@ const AppContent: React.FC = () => {
       case '/patient/home':
       case '/patient/dashboard':
         return <PatientHome latestTelemetry={latestTelemetry} alerts={alerts} isConnected={isConnected} />;
+      case '/patient/health':
+      case '/patient/metrics':
+      case '/patient/history':
+        return <PatientHealthPage latestTelemetry={latestTelemetry} alerts={alerts} isConnected={isConnected} navigate={navigate} />;
       default: {
         if (normalizedPath.startsWith('/doctor/medical-records')) {
           return <DoctorMedicalRecordsPage path={normalizedPath} patients={patients.map((patient) => ({ id: patient.id, full_name: patient.full_name }))} navigate={navigate} />;

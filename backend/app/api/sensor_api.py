@@ -139,7 +139,7 @@ async def ensure_patient_access(user: dict[str, Any], patient_id: str) -> None:
             """
             SELECT 1
             FROM doctor_patient
-            WHERE doctor_id = :doctor_id::uuid AND patient_id = :patient_id::uuid
+            WHERE doctor_id = CAST(:doctor_id AS uuid) AND patient_id = CAST(:patient_id AS uuid)
             """,
             {"doctor_id": user["id"], "patient_id": patient_id},
         )
@@ -513,7 +513,7 @@ async def create_iot_telemetry(
             battery = COALESCE(:battery, battery),
             last_seen_at = :last_seen_at,
             updated_at = :updated_at
-        WHERE id = :device_id::uuid
+        WHERE id = CAST(:device_id AS uuid)
         """,
         {
             "status": "online",
@@ -689,7 +689,7 @@ async def rotate_iot_device_token(device_uid: str, request: Request, authorizati
         SET device_token_hash = :device_token_hash,
             token_last_rotated_at = :rotated_at,
             updated_at = :updated_at
-        WHERE id = :device_id::uuid
+        WHERE id = CAST(:device_id AS uuid)
         """,
         {
             "device_token_hash": new_token_hash,
@@ -739,17 +739,17 @@ async def get_sensor_data(
     """
     current_user = await get_user_from_token(authorization)
     where_parts = []
-    values: dict[str, Any] = {"limit": limit, "offset": offset}
+    values: dict[str, Any] = {}
 
     if current_user["role"] == "patient":
-        where_parts.append("patient_id = :current_user_id::uuid")
+        where_parts.append("patient_id = CAST(:current_user_id AS uuid)")
         values["current_user_id"] = current_user["id"]
     elif current_user["role"] == "doctor":
         where_parts.append(
             """
             EXISTS (
                 SELECT 1 FROM doctor_patient dp
-                WHERE dp.doctor_id = :current_user_id::uuid
+                WHERE dp.doctor_id = CAST(:current_user_id AS uuid)
                 AND dp.patient_id = sensor_data.patient_id
             )
             """
@@ -758,7 +758,7 @@ async def get_sensor_data(
 
     if patient_id:
         await ensure_patient_access(current_user, patient_id)
-        where_parts.append("patient_id = :patient_id::uuid")
+        where_parts.append("patient_id = CAST(:patient_id AS uuid)")
         values["patient_id"] = patient_id
 
     where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
@@ -774,7 +774,10 @@ async def get_sensor_data(
     LIMIT :limit OFFSET :offset
     """
 
-    data = await database.fetch_all(query.format(where_sql=where_sql), values)
+    data = await database.fetch_all(
+        query.format(where_sql=where_sql),
+        {**values, "limit": limit, "offset": offset},
+    )
 
     return {
         "items": [row_to_dict(row) for row in data],

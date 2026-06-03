@@ -2,6 +2,12 @@
 
 > Đánh giá ngày: 2026-06-03
 > Ưu tiên: Backend → Frontend → Mobile
+>
+> Ghi chú trạng thái: một số lỗi runtime đã được xử lý trong nhánh hiện tại.
+> Đặc biệt, các API dashboard bệnh nhân (`/api/patients`, `/api/alerts`,
+> `/api/sensor-data`, `/api/sensors/history`) đã chạy ổn định lại; phần
+> Supabase của frontend cũng đã được cấp biến môi trường thật thay vì
+> `example.supabase.co`.
 
 ---
 
@@ -13,6 +19,16 @@
 | Frontend | 4 | 8 | 17 | 8 | 37 |
 | Mobile | 5 | 9 | 10 | 11 | 35 |
 | **Tổng** | **12** | **24** | **39** | **30** | **105** |
+
+## Đã Xử Lý
+
+Các lỗi dưới đây là những mục quan trọng đã được xác minh là đã khắc phục trong
+nhánh hiện tại:
+
+- Backend dashboard không còn trả `500` ở các endpoint bệnh nhân/cảnh báo/cảm biến.
+- Endpoint lịch sử cảm biến `/api/sensors/history` đã trả `200` với CORS đúng.
+- Frontend không còn trỏ vào `https://example.supabase.co` khi build cục bộ.
+- Audit log timezone issue đã được sửa để tránh lỗi ghi `audit_logs`.
 
 ---
 
@@ -216,6 +232,7 @@
 - **File:** `src/lib/supabase.ts:10-12`
 - **Mô tả:** Khi env vars missing, client tạo với `'https://example.supabase.co'` và `'public-anon-key-placeholder'`. Không throw nhưng silent fail.
 - **Fix:** Throw error trong development mode khi env vars missing.
+- **Trạng thái hiện tại:** Đã được cấp `VITE_SUPABASE_URL` và `VITE_SUPABASE_ANON_KEY` trong `.env` và `web_frontend/.env.local`, nên build hiện tại không còn rơi vào placeholder.
 
 ## HIGH
 

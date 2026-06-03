@@ -61,7 +61,7 @@ interface TemplateEditorProps {
  */
 export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClose, onSaved, readOnly = false }) => {
   const { accessToken } = useAuth();
-  const [form, setForm] = useState<Template>({
+  const buildFallbackForm = (): Template => ({
     id: template?.id,
     function_id: template?.function_id,
     cms_email_id: template?.cms_email_id ?? '',
@@ -69,10 +69,14 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
     target_role: template?.target_role ?? 'all',
     name: template?.name ?? '',
     subject: template?.subject ?? '',
-    html_content: template?.id ? '' : DEFAULT_HTML,
+    html_content: template?.html_content ?? DEFAULT_HTML,
     text_content: template?.text_content ?? '',
     variables: template?.variables ?? ['full_name', 'otp'],
     is_active: template?.is_active ?? true,
+  });
+  const [form, setForm] = useState<Template>({
+    ...buildFallbackForm(),
+    html_content: template?.id ? (template?.html_content ?? DEFAULT_HTML) : DEFAULT_HTML,
   });
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -139,14 +143,23 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
           },
         });
 
-        const data = await res.json();
-
         if (!res.ok) {
-          throw new Error(data.detail || 'Không thể tải chi tiết template');
+          const fallbackForm = buildFallbackForm();
+          setForm(fallbackForm);
+          setPreviewHtml(fallbackForm.html_content);
+          return;
+        }
+
+        const data = await res.json();
+        if (!data || typeof data !== 'object') {
+          const fallbackForm = buildFallbackForm();
+          setForm(fallbackForm);
+          setPreviewHtml(fallbackForm.html_content);
+          return;
         }
 
         const nextForm: Template = {
-          id: data.id,
+          id: data.id ?? template.id,
           function_id: data.function_id,
           cms_email_id: data.cms_email_id || '',
           email_type: data.email_type || data.type || SYSTEM_EMAIL_FUNCTIONS[0].email_type,
@@ -175,7 +188,11 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
           });
         }
       } catch (err: any) {
-        setError(err.message || 'Không thể tải template');
+        const fallbackForm = buildFallbackForm();
+        setForm(fallbackForm);
+        setPreviewHtml(fallbackForm.html_content);
+        setError(null);
+        console.warn('Không thể tải chi tiết template, dùng dữ liệu hiện có:', err);
       } finally {
         setIsLoadingTemplate(false);
       }
@@ -250,6 +267,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
     setError(null);
     setIsSaving(true);
     try {
+      const resolvedTemplateId = form.id || template?.id || null;
       let functionId = form.function_id;
       let emailType = form.email_type;
       let cmsEmailId = normalizeCmsEmailId(form.cms_email_id || '');
@@ -279,10 +297,10 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
         cmsEmailId = fnData.cms_email_id;
       }
 
-      const url = template?.id
-        ? `${API_URL}/cms/email-templates/${template.id}`
+      const url = resolvedTemplateId
+        ? `${API_URL}/cms/email-templates/${resolvedTemplateId}`
         : `${API_URL}/cms/email-templates`;
-      const method = template?.id ? 'PUT' : 'POST';
+      const method = resolvedTemplateId ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
         method,

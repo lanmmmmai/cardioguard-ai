@@ -105,7 +105,7 @@ async def ensure_session_owner(session_id: str, user_id: str, role: Optional[str
     query = f"""
     SELECT 1
     FROM {CHAT_SESSIONS_TABLE}
-    WHERE id = :session_id::uuid AND user_id = :user_id::uuid
+    WHERE id = CAST(:session_id AS uuid) AND user_id = CAST(:user_id AS uuid)
     """
     values = {"session_id": session_id, "user_id": user_id}
     if role:
@@ -130,7 +130,7 @@ async def ensure_doctor_patient_access(doctor_id: str, patient_id: str) -> None:
         """
         SELECT 1
         FROM doctor_patient
-        WHERE doctor_id = :doctor_id::uuid AND patient_id = :patient_id::uuid
+        WHERE doctor_id = CAST(:doctor_id AS uuid) AND patient_id = CAST(:patient_id AS uuid)
         """,
         {"doctor_id": doctor_id, "patient_id": patient_id},
     )
@@ -183,12 +183,12 @@ async def send_chat_message(
             "context": json.dumps(request.context_data) if request.context_data else None
         })
         await database.execute(
-            f"UPDATE {CHAT_SESSIONS_TABLE} SET updated_at = NOW() WHERE id = :session_id::uuid",
+            f"UPDATE {CHAT_SESSIONS_TABLE} SET updated_at = NOW() WHERE id = CAST(:session_id AS uuid)",
             {"session_id": session_id},
         )
     
     # Bước 3: Lấy lịch sử để làm ngữ cảnh (lấy 10 tin nhắn mới nhất và đảo ngược về thứ tự ASC)
-    query_history = f"SELECT sender, message FROM {CHAT_MESSAGES_TABLE} WHERE session_id = :session_id::uuid ORDER BY created_at DESC LIMIT 10"
+    query_history = f"SELECT sender, message FROM {CHAT_MESSAGES_TABLE} WHERE session_id = CAST(:session_id AS uuid) ORDER BY created_at DESC LIMIT 10"
     history_res = await database.fetch_all(query=query_history, values={"session_id": session_id})
     history = [{"sender": row["sender"], "message": row["message"]} for row in reversed(history_res)]
 
@@ -205,7 +205,7 @@ async def send_chat_message(
         query_ai_msg = f"INSERT INTO {CHAT_MESSAGES_TABLE} (session_id, sender, message) VALUES (:session_id, 'ai', :message) RETURNING id, created_at"
         ai_msg_id = await database.execute(query=query_ai_msg, values={"session_id": session_id, "message": ai_response_text})
         await database.execute(
-            f"UPDATE {CHAT_SESSIONS_TABLE} SET updated_at = NOW() WHERE id = :session_id::uuid",
+            f"UPDATE {CHAT_SESSIONS_TABLE} SET updated_at = NOW() WHERE id = CAST(:session_id AS uuid)",
             {"session_id": session_id},
         )
     
@@ -261,7 +261,7 @@ async def get_chat_history(
     query = f"""
     SELECT id, sender, message, created_at
     FROM {CHAT_MESSAGES_TABLE}
-    WHERE session_id = :session_id::uuid
+    WHERE session_id = CAST(:session_id AS uuid)
     ORDER BY created_at ASC
     """
     res = await database.fetch_all(query=query, values={"session_id": session_id})
@@ -299,7 +299,7 @@ async def analyze_patient(
     query_sensor = """
     SELECT heart_rate, spo2, systolic_bp, diastolic_bp, ecg_value, created_at
     FROM sensor_data
-    WHERE patient_id = :pid::uuid
+    WHERE patient_id = CAST(:pid AS uuid)
     ORDER BY created_at DESC
     LIMIT 5
     """
@@ -307,7 +307,7 @@ async def analyze_patient(
     sensor_data = [dict(row) for row in sensor_res]
 
     # Lấy 3 cảnh báo gần đây
-    query_alert = "SELECT severity, message, created_at FROM alerts WHERE patient_id = :pid::uuid ORDER BY created_at DESC LIMIT 3"
+    query_alert = "SELECT severity, message, created_at FROM alerts WHERE patient_id = CAST(:pid AS uuid) ORDER BY created_at DESC LIMIT 3"
     alert_res = await database.fetch_all(query=query_alert, values={"pid": patient_id})
     alerts = [dict(row) for row in alert_res]
 
@@ -339,24 +339,24 @@ async def get_recommendations(
     if current_user["role"] == "patient":
         if patient_id and patient_id != current_user["id"]:
             raise HTTPException(status_code=403, detail="Bạn không có quyền xem gợi ý của bệnh nhân khác")
-        query += "AND patient_id = :pid::uuid "
+        query += "AND patient_id = CAST(:pid AS uuid) "
         params["pid"] = current_user["id"]
     elif current_user["role"] == "doctor":
         if patient_id:
             await ensure_doctor_patient_access(current_user["id"], patient_id)
-            query += "AND patient_id = :pid::uuid "
+            query += "AND patient_id = CAST(:pid AS uuid) "
             params["pid"] = patient_id
         else:
             query += """
             AND EXISTS (
                 SELECT 1 FROM doctor_patient dp
-                WHERE dp.doctor_id = :doctor_id::uuid
+                WHERE dp.doctor_id = CAST(:doctor_id AS uuid)
                 AND dp.patient_id = ai_recommendations.patient_id
             )
             """
             params["doctor_id"] = current_user["id"]
     elif patient_id:
-        query += "AND patient_id = :pid::uuid "
+        query += "AND patient_id = CAST(:pid AS uuid) "
         params["pid"] = patient_id
 
     query += "ORDER BY created_at DESC LIMIT 10"

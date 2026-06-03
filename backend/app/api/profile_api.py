@@ -261,8 +261,6 @@ async def update_doctor_profile(payload: DoctorProfileUpdate, authorization: Opt
         "cccd_front_url": payload.cccd_front_url,
         "cccd_back_url": payload.cccd_back_url,
         "avatar_url": payload.avatar_url,
-        "is_verified": False,
-        "status": "pending_verification"
     }
     
     async with database.transaction():

@@ -388,7 +388,7 @@ def send_smtp_email_sync(
     port = int(settings.SMTP_PORT or 587)
     user = settings.SMTP_USERNAME
     password = settings.SMTP_PASSWORD
-    from_email = settings.SMTP_FROM_EMAIL or settings.EMAIL_FROM_EMAIL or "noreply@cardioguard.ai"
+    from_email = settings.SMTP_FROM_EMAIL or settings.EMAIL_FROM_EMAIL or "noreply@giatky.site"
     from_name = settings.SMTP_FROM_NAME or settings.EMAIL_FROM_NAME or "CardioGuard AI"
 
     if not host:
@@ -492,10 +492,9 @@ def send_brevo_email_sync(
         bcc: Địa chỉ BCC phân cách bằng dấu phẩy hoặc None.
 
     Trả về:
-        True khi có phản hồi HTTP 2xx.
-
-    Ngoại lệ:
-        requests.HTTPError: Được ném lại sau khi ghi nhật ký nếu cuộc gọi API thất bại.
+        True khi có phản hồi HTTP 2xx. Nếu Brevo từ chối do auth hoặc gặp lỗi
+        mạng/HTTP, hàm ghi log cảnh báo và trả về False để lớp gọi có thể
+        chuyển sang SMTP dự phòng.
     """
     if not settings.BREVO_API_KEY:
         return False
@@ -520,19 +519,39 @@ def send_brevo_email_sync(
         payload["bcc"] = [{"email": addr.strip()} for addr in bcc.split(",") if addr.strip()]
 
     logger.info("Executing Brevo API POST to=%s", to_email)
-    response = requests.post(
-        "https://api.brevo.com/v3/smtp/email",
-        headers={
-            "accept": "application/json",
-            "api-key": settings.BREVO_API_KEY,
-            "content-type": "application/json",
-        },
-        json=payload,
-        timeout=15,
-    )
-    response.raise_for_status()
-    logger.info("Brevo API email sent successfully to=%s", to_email)
-    return True
+    try:
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "accept": "application/json",
+                "api-key": settings.BREVO_API_KEY,
+                "content-type": "application/json",
+            },
+            json=payload,
+            timeout=15,
+        )
+        response.raise_for_status()
+        logger.info("Brevo API email sent successfully to=%s", to_email)
+        return True
+    except requests.HTTPError as exc:
+        status_code = getattr(exc.response, "status_code", None)
+        body = ""
+        if getattr(exc.response, "text", None):
+            body = exc.response.text[:500]
+        logger.warning(
+            "Brevo API rejected email to=%s status=%s; falling back when possible",
+            to_email,
+            status_code,
+            extra={"brevo_status_code": status_code, "brevo_response": body},
+        )
+        return False
+    except requests.RequestException as exc:
+        logger.warning(
+            "Brevo API request failed for to=%s; falling back when possible: %s",
+            to_email,
+            exc,
+        )
+        return False
 
 
 async def render_and_deliver_email(
@@ -570,8 +589,29 @@ async def render_and_deliver_email(
                 cc,
                 bcc,
             )
-            status = "sent" if email_sent else "failed"
-            sent_at = datetime.now(timezone.utc)
+            if email_sent:
+                status = "sent"
+                sent_at = datetime.now(timezone.utc)
+            elif settings.SMTP_HOST:
+                logger.info(
+                    "Falling back to SMTP for email_type=%s to=%s after Brevo failure",
+                    email_type,
+                    to_email,
+                )
+                email_sent = await send_smtp_email(
+                    to_email,
+                    to_name,
+                    rendered_subject,
+                    rendered_html,
+                    rendered_text,
+                    cc,
+                    bcc,
+                )
+                status = "sent" if email_sent else "failed"
+                sent_at = datetime.now(timezone.utc)
+            else:
+                status = "failed"
+                error_message = "Brevo delivery failed and SMTP fallback is not configured"
         elif settings.SMTP_HOST:
             logger.info("Delivery path: SMTP for email_type=%s to=%s", email_type, to_email)
             email_sent = await send_smtp_email(

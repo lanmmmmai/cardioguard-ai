@@ -60,9 +60,18 @@
     </script>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // Simple Service Worker registration for PWA installability
+      // Chỉ bật Service Worker ở môi trường non-local để tránh can thiệp vào dev server Vite.
+      // Nếu SW cũ đã được cài trên localhost, gỡ nó đi để tránh trả 503 Offline cho route SPA.
       if ('serviceWorker' in navigator) {
+        const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
         window.addEventListener('load', () => {
+          if (isLocalDev) {
+            navigator.serviceWorker.getRegistrations()
+              .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+              .catch((err) => console.log('SW cleanup failed: ', err));
+            return;
+          }
+
           navigator.serviceWorker.register('/sw.js').catch(err => {
             console.log('SW registration failed: ', err);
           });

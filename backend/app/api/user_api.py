@@ -135,7 +135,7 @@ async def fetch_current_user(user_id: str) -> dict[str, Any]:
         f"""
         SELECT {", ".join(select_columns)}
         FROM users
-        WHERE id = :user_id::uuid
+        WHERE id = CAST(:user_id AS uuid)
         """,
         {"user_id": user_id},
     )
@@ -166,7 +166,7 @@ async def fetch_patient_profile(user_id: str) -> Optional[Dict[str, Any]]:
         "medical_history" if "medical_history" in columns else "NULL::text as medical_history",
         "created_at" if "created_at" in columns else "NULL::timestamptz as created_at",
     ]
-    where_sql = "user_id = :user_id::uuid" if "user_id" in columns else "id = :user_id::uuid"
+    where_sql = "user_id = CAST(:user_id AS uuid)" if "user_id" in columns else "id = CAST(:user_id AS uuid)"
     row = await database.fetch_one(
         f"""
         SELECT {", ".join(select_columns)}
@@ -207,7 +207,7 @@ async def update_user_me(payload: UserMeUpdate, request: Request, authorization:
 
     set_sql = ", ".join(f"{key} = :{key}" for key in update_values.keys())
     await database.execute(
-        f"UPDATE users SET {set_sql} WHERE id = :user_id::uuid",
+        f"UPDATE users SET {set_sql} WHERE id = CAST(:user_id AS uuid)",
         {**update_values, "user_id": current_user["id"]},
     )
 
@@ -247,7 +247,7 @@ async def update_user_password(payload: PasswordUpdate, request: Request, author
         allow_must_change_password=True,
     )
     row = await database.fetch_one(
-        "SELECT password_hash FROM users WHERE id = :user_id::uuid",
+        "SELECT password_hash FROM users WHERE id = CAST(:user_id AS uuid)",
         {"user_id": current_user["id"]},
     )
     if not row:
@@ -256,7 +256,7 @@ async def update_user_password(payload: PasswordUpdate, request: Request, author
         raise HTTPException(status_code=403, detail="Current password is incorrect")
 
     await database.execute(
-        "UPDATE users SET password_hash = :password_hash, must_change_password = FALSE WHERE id = :user_id::uuid",
+        "UPDATE users SET password_hash = :password_hash, must_change_password = FALSE WHERE id = CAST(:user_id AS uuid)",
         {"password_hash": hash_password(payload.new_password), "user_id": current_user["id"]},
     )
 
@@ -341,7 +341,7 @@ async def update_patient_me(payload: PatientMeUpdate, request: Request, authoriz
     if existing:
         if values:
             set_sql = ", ".join(f"{key} = :{key}" for key in values.keys())
-            where_sql = "user_id = :user_id::uuid" if "user_id" in columns else "id = :user_id::uuid"
+            where_sql = "user_id = CAST(:user_id AS uuid)" if "user_id" in columns else "id = CAST(:user_id AS uuid)"
             await database.execute(
                 f"UPDATE patients SET {set_sql} WHERE {where_sql}",
                 {**values, "user_id": current_user["id"]},
@@ -463,7 +463,7 @@ async def create_assignment(payload: AssignmentCreate, request: Request, authori
 
     # Xác minh bác sĩ tồn tại và có vai trò bác sĩ
     doctor = await database.fetch_one(
-        "SELECT id FROM users WHERE id = :doctor_id::uuid AND lower(role) = 'doctor'",
+        "SELECT id FROM users WHERE id = CAST(:doctor_id AS uuid) AND lower(role) = 'doctor'",
         {"doctor_id": payload.doctor_id}
     )
     if not doctor:
@@ -471,7 +471,7 @@ async def create_assignment(payload: AssignmentCreate, request: Request, authori
 
     # Xác minh bệnh nhân tồn tại và có vai trò bệnh nhân
     patient = await database.fetch_one(
-        "SELECT id FROM users WHERE id = :patient_id::uuid AND lower(role) = 'patient'",
+        "SELECT id FROM users WHERE id = CAST(:patient_id AS uuid) AND lower(role) = 'patient'",
         {"patient_id": payload.patient_id}
     )
     if not patient:
@@ -479,7 +479,7 @@ async def create_assignment(payload: AssignmentCreate, request: Request, authori
 
     # Kiểm tra nếu đã được phân công
     existing = await database.fetch_one(
-        "SELECT 1 FROM doctor_patient WHERE doctor_id = :doctor_id::uuid AND patient_id = :patient_id::uuid",
+        "SELECT 1 FROM doctor_patient WHERE doctor_id = CAST(:doctor_id AS uuid) AND patient_id = CAST(:patient_id AS uuid)",
         {"doctor_id": payload.doctor_id, "patient_id": payload.patient_id}
     )
     if existing:
@@ -522,7 +522,7 @@ async def delete_assignment(doctor_id: str, patient_id: str, request: Request, a
 
     # Kiểm tra nếu phân công tồn tại
     existing = await database.fetch_one(
-        "SELECT 1 FROM doctor_patient WHERE doctor_id = :doctor_id::uuid AND patient_id = :patient_id::uuid",
+        "SELECT 1 FROM doctor_patient WHERE doctor_id = CAST(:doctor_id AS uuid) AND patient_id = CAST(:patient_id AS uuid)",
         {"doctor_id": doctor_id, "patient_id": patient_id}
     )
     if not existing:
@@ -530,7 +530,7 @@ async def delete_assignment(doctor_id: str, patient_id: str, request: Request, a
 
     # Xóa phân công
     await database.execute(
-        "DELETE FROM doctor_patient WHERE doctor_id = :doctor_id::uuid AND patient_id = :patient_id::uuid",
+        "DELETE FROM doctor_patient WHERE doctor_id = CAST(:doctor_id AS uuid) AND patient_id = CAST(:patient_id AS uuid)",
         {"doctor_id": doctor_id, "patient_id": patient_id}
     )
 
@@ -567,7 +567,7 @@ async def get_my_doctors(authorization: Optional[str] = Header(default=None)):
     SELECT d.id::text as id, d.full_name, d.email
     FROM users d
     JOIN doctor_patient dp ON dp.doctor_id = d.id
-    WHERE dp.patient_id = :patient_id::uuid AND lower(d.role) = 'doctor'
+    WHERE dp.patient_id = CAST(:patient_id AS uuid) AND lower(d.role) = 'doctor'
     """
     return await database.fetch_all(query, {"patient_id": current_user["id"]})
 
@@ -740,7 +740,7 @@ async def update_user(
     user = await require_admin(authorization)
 
     # Kiểm tra người dùng tồn tại
-    check_user = await database.fetch_one("SELECT id, role, full_name FROM users WHERE id = :user_id::uuid", {"user_id": user_id})
+    check_user = await database.fetch_one("SELECT id, role, full_name FROM users WHERE id = CAST(:user_id AS uuid)", {"user_id": user_id})
     if not check_user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
 
@@ -753,7 +753,7 @@ async def update_user(
     if payload.email is not None:
         email = payload.email.lower().strip()
         existing_user = await database.fetch_one(
-            "SELECT id FROM users WHERE email = :email AND id != :user_id::uuid",
+            "SELECT id FROM users WHERE email = :email AND id != CAST(:user_id AS uuid)",
             {"email": email, "user_id": user_id}
         )
         if existing_user:
@@ -786,7 +786,7 @@ async def update_user(
         query = """
         SELECT id::text as id, full_name, email, phone, role, status, created_at
         FROM users
-        WHERE id = :user_id::uuid
+        WHERE id = CAST(:user_id AS uuid)
         """
         row = await database.fetch_one(query, {"user_id": user_id})
         return dict(row)
@@ -794,7 +794,7 @@ async def update_user(
     update_query = f"""
     UPDATE users
     SET {", ".join(update_fields)}
-    WHERE id = :user_id::uuid
+    WHERE id = CAST(:user_id AS uuid)
     RETURNING id::text as id, full_name, email, phone, role, status, created_at
     """
 
@@ -805,7 +805,7 @@ async def update_user(
         target_role = payload.role if payload.role is not None else check_user["role"]
         if target_role == "patient":
             columns = await table_columns("patients")
-            where_sql = "user_id = :user_id::uuid" if "user_id" in columns else "id = :user_id::uuid"
+            where_sql = "user_id = CAST(:user_id AS uuid)" if "user_id" in columns else "id = CAST(:user_id AS uuid)"
 
             # Kiểm tra nếu bản ghi patient tồn tại
             patient_exists = await database.fetch_one(
@@ -888,7 +888,7 @@ async def delete_user(
     user = await require_admin(authorization)
     
     # Check user exists
-    check_user = await database.fetch_one("SELECT id, role, status FROM users WHERE id = :user_id::uuid", {"user_id": user_id})
+    check_user = await database.fetch_one("SELECT id, role, status FROM users WHERE id = CAST(:user_id AS uuid)", {"user_id": user_id})
     if not check_user:
         raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
 
@@ -902,7 +902,7 @@ async def delete_user(
         update_fields.append("updated_at = NOW()")
 
     await database.execute(
-        f"UPDATE users SET {', '.join(update_fields)} WHERE id = :user_id::uuid",
+        f"UPDATE users SET {', '.join(update_fields)} WHERE id = CAST(:user_id AS uuid)",
         {"user_id": user_id},
     )
 
@@ -917,7 +917,7 @@ async def delete_user(
                 doctor_update_fields.append("updated_at = NOW()")
             if doctor_update_fields:
                 await database.execute(
-                    f"UPDATE doctor_profiles SET {', '.join(doctor_update_fields)} WHERE user_id = :user_id::uuid",
+                    f"UPDATE doctor_profiles SET {', '.join(doctor_update_fields)} WHERE user_id = CAST(:user_id AS uuid)",
                     {"user_id": user_id},
                 )
         except HTTPException:
@@ -927,7 +927,7 @@ async def delete_user(
             patient_profile_columns = await table_columns("patient_profiles")
             if "updated_at" in patient_profile_columns:
                 await database.execute(
-                    "UPDATE patient_profiles SET updated_at = NOW() WHERE user_id = :user_id::uuid",
+                    "UPDATE patient_profiles SET updated_at = NOW() WHERE user_id = CAST(:user_id AS uuid)",
                     {"user_id": user_id},
                 )
         except HTTPException:

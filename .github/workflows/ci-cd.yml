@@ -15,6 +15,10 @@ jobs:
   backend-check:
     name: Backend — Lint & Build
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/postgres' }}
+      SECRET_KEY: ${{ secrets.SECRET_KEY || 'ci-secret-key-please-change-this-to-a-real-secret' }}
+      HAS_REAL_DATABASE_CREDENTIALS: ${{ secrets.DATABASE_URL != '' && secrets.SECRET_KEY != '' }}
     defaults:
       run:
         working-directory: backend
@@ -38,6 +42,7 @@ jobs:
         run: python -c "from app.main import app; print('FastAPI app loaded OK')"
 
       - name: Verify migration runner
+        if: ${{ env.HAS_REAL_DATABASE_CREDENTIALS == 'true' }}
         run: python -c "import scripts.run_all_migrations; print('Migration runner OK')"
 
   # ── Frontend Checks ───────────────────────────────────────

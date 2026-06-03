@@ -48,19 +48,19 @@ async def get_alerts(
     Returns:
         Danh sách bản ghi cảnh báo kèm tên bệnh nhân.
     """
-    current_user = await get_user_from_token(authorization)
+    current_user = await get_user_from_token(authorization, allow_uncompleted=True)
     role = current_user["role"]
     where_sql = ""
     values = {}
 
     if role == "patient":
-        where_sql = "WHERE alerts.patient_id = :user_id::uuid"
+        where_sql = "WHERE alerts.patient_id = CAST(:user_id AS uuid)"
         values["user_id"] = current_user["id"]
     elif role == "doctor":
         where_sql = """
         WHERE EXISTS (
             SELECT 1 FROM doctor_patient dp
-            WHERE dp.doctor_id = :user_id::uuid
+            WHERE dp.doctor_id = CAST(:user_id AS uuid)
             AND dp.patient_id = alerts.patient_id
         )
         """
@@ -113,19 +113,19 @@ async def get_alert_stats_last_7_days(
     Returns:
         Danh sách {"label": "DD/MM", "count": int} cho mỗi ngày trong 7 ngày qua.
     """
-    current_user = await get_user_from_token(authorization)
+    current_user = await get_user_from_token(authorization, allow_uncompleted=True)
     role = current_user["role"]
     where_sql = ""
     values = {}
 
     if role == "patient":
-        where_sql = "WHERE alerts.patient_id = :user_id::uuid"
+        where_sql = "WHERE alerts.patient_id = CAST(:user_id AS uuid)"
         values["user_id"] = current_user["id"]
     elif role == "doctor":
         where_sql = """
         WHERE EXISTS (
             SELECT 1 FROM doctor_patient dp
-            WHERE dp.doctor_id = :user_id::uuid
+            WHERE dp.doctor_id = CAST(:user_id AS uuid)
               AND dp.patient_id = alerts.patient_id
         )
         """
@@ -177,12 +177,12 @@ async def resolve_alert(alert_id: str, authorization: Optional[str] = Header(def
         HTTPException 404: Nếu không tìm thấy cảnh báo.
         HTTPException 403: Nếu người dùng thiếu quyền.
     """
-    current_user = await get_user_from_token(authorization)
+    current_user = await get_user_from_token(authorization, allow_uncompleted=True)
     role = current_user["role"]
     
     # Xác minh cảnh báo tồn tại
     alert = await database.fetch_one(
-        "SELECT patient_id::text FROM alerts WHERE id = :alert_id::uuid",
+        "SELECT patient_id::text FROM alerts WHERE id = CAST(:alert_id AS uuid)",
         {"alert_id": alert_id}
     )
     if not alert:
@@ -193,14 +193,14 @@ async def resolve_alert(alert_id: str, authorization: Optional[str] = Header(def
         raise HTTPException(status_code=403, detail="Bạn không có quyền xử lý cảnh báo của bệnh nhân khác")
     elif role == "doctor":
         assigned = await database.fetch_one(
-            "SELECT 1 FROM doctor_patient WHERE doctor_id = :doctor_id::uuid AND patient_id = :patient_id::uuid",
+            "SELECT 1 FROM doctor_patient WHERE doctor_id = CAST(:doctor_id AS uuid) AND patient_id = CAST(:patient_id AS uuid)",
             {"doctor_id": current_user["id"], "patient_id": patient_id}
         )
         if not assigned:
             raise HTTPException(status_code=403, detail="Bác sĩ chưa được phân công quản lý bệnh nhân này")
 
     await database.execute(
-        "UPDATE alerts SET is_resolved = TRUE WHERE id = :alert_id::uuid",
+        "UPDATE alerts SET is_resolved = TRUE WHERE id = CAST(:alert_id AS uuid)",
         {"alert_id": alert_id}
     )
     logger.info("Cảnh báo đã được xử lý: alert_id=%s resolved_by=%s role=%s", alert_id, current_user["id"], role)
@@ -219,7 +219,7 @@ async def resolve_alert(alert_id: str, authorization: Optional[str] = Header(def
             alerts.created_at
         FROM alerts
         JOIN users ON alerts.patient_id::text = users.id::text AND lower(users.role) = 'patient'
-        WHERE alerts.id = :alert_id::uuid
+        WHERE alerts.id = CAST(:alert_id AS uuid)
         """,
         {"alert_id": alert_id}
     )
@@ -256,7 +256,7 @@ async def create_sos_alert(payload: AlertCreate, authorization: Optional[str] = 
     Raises:
         HTTPException 403: Nếu người gọi không phải là bệnh nhân.
     """
-    current_user = await get_user_from_token(authorization)
+    current_user = await get_user_from_token(authorization, allow_uncompleted=True)
     if current_user["role"] != "patient":
         raise HTTPException(status_code=403, detail="Chỉ bệnh nhân mới có thể gửi cảnh báo SOS")
         
@@ -292,7 +292,7 @@ async def create_sos_alert(payload: AlertCreate, authorization: Optional[str] = 
             alerts.created_at
         FROM alerts
         JOIN users ON alerts.patient_id::text = users.id::text AND lower(users.role) = 'patient'
-        WHERE alerts.id = :alert_id::uuid
+        WHERE alerts.id = CAST(:alert_id AS uuid)
         """,
         {"alert_id": alert_id}
     )

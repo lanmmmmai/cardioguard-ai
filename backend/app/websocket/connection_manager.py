@@ -79,7 +79,7 @@ class ConnectionManager:
 
         try:
             rows = await database.fetch_all(
-                "SELECT doctor_id::text FROM doctor_patient WHERE patient_id = :patient_id::uuid",
+                "SELECT doctor_id::text FROM doctor_patient WHERE patient_id = CAST(:patient_id AS uuid)",
                 {"patient_id": patient_id}
             )
             doctors = [row["doctor_id"] for row in rows]

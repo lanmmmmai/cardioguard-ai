@@ -124,7 +124,7 @@ async def websocket_endpoint(websocket: WebSocket):
             """
             SELECT email, role, status
             FROM users
-            WHERE id = :user_id::uuid
+            WHERE id = CAST(:user_id AS uuid)
             """,
             {"user_id": user_id},
         )

@@ -306,7 +306,7 @@ async def verify_otp_token(*, purpose: str, email: str, otp: str) -> OtpVerifica
                     WHEN attempts + 1 >= max_attempts THEN NOW()
                     ELSE consumed_at
                 END
-            WHERE id = :id::uuid
+            WHERE id = CAST(:id AS uuid)
             """,
             {"id": row["id"]},
         )
@@ -316,7 +316,7 @@ async def verify_otp_token(*, purpose: str, email: str, otp: str) -> OtpVerifica
         """
         UPDATE auth_otp_tokens
         SET consumed_at = NOW()
-        WHERE id = :id::uuid
+        WHERE id = CAST(:id AS uuid)
           AND consumed_at IS NULL
         RETURNING metadata::text AS metadata
         """,
@@ -339,6 +339,6 @@ async def consume_otp_token(token_id: str) -> None:
         token_id: UUID của hàng mã thông báo cần sử dụng.
     """
     await database.execute(
-        "UPDATE auth_otp_tokens SET consumed_at = NOW() WHERE id = :id::uuid AND consumed_at IS NULL",
+        "UPDATE auth_otp_tokens SET consumed_at = NOW() WHERE id = CAST(:id AS uuid) AND consumed_at IS NULL",
         {"id": token_id},
     )

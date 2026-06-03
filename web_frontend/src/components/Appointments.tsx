@@ -14,7 +14,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, Calendar, CalendarDays, CheckCircle2, Clock, Plus, RefreshCw, User, XCircle } from 'lucide-react';
-import { API_URL } from '../config';
+import { API_URL, buildApiUrl } from '../config';
 import { useAuth } from '../auth/AuthContext';
 
 interface Patient {
@@ -104,8 +104,14 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
   };
 
   const fetchDoctors = async () => {
+    if (role === 'doctor') {
+      setDoctors([]);
+      return;
+    }
+
     try {
-      const response = await fetch(`${API_URL}/cms/users?filter=role:doctor&limit=100`, {
+      const endpoint = role === 'admin' ? '/admin/doctors?limit=100&offset=0' : '/patients/me/doctors';
+      const response = await fetch(buildApiUrl(endpoint), {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
       let data;
@@ -119,10 +125,11 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
         throw new Error("Lỗi định dạng phản hồi từ server");
 
       }
-      if (response.ok && data.items) {
-        setDoctors(data.items);
+      const items = Array.isArray(data) ? data : data.items || [];
+      if (response.ok && items) {
+        setDoctors(items);
         const docMap: Record<string, string> = {};
-        data.items.forEach((item: any) => {
+        items.forEach((item: any) => {
           docMap[item.id] = item.full_name;
         });
         setDoctorNames(docMap);

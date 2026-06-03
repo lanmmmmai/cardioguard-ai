@@ -31,7 +31,16 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/index.html'))
+      (async () => {
+        try {
+          return await fetch(request);
+        } catch {
+          return (await caches.match('/index.html')) || new Response('Offline', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          });
+        }
+      })()
     );
     return;
   }
@@ -41,6 +50,18 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(request).then((cachedResponse) => cachedResponse || fetch(request))
+    (async () => {
+      const cachedResponse = await caches.match(request);
+      if (cachedResponse) return cachedResponse;
+
+      try {
+        return await fetch(request);
+      } catch {
+        return new Response('', {
+          status: 503,
+          statusText: 'Offline',
+        });
+      }
+    })()
   );
 });

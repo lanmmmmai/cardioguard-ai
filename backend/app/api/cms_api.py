@@ -768,7 +768,7 @@ async def get_cms_record(module: str, record_id: str, authorization: Optional[st
             if not status_row or status_row.get("deleted_at") is not None:
                 raise HTTPException(status_code=404, detail="Record not found")
         result = await session.execute(
-            text(f"SELECT {select_sql} FROM {quote_identifier(table)} WHERE id = :record_id::uuid"),
+            text(f"SELECT {select_sql} FROM {quote_identifier(table)} WHERE id = CAST(:record_id AS uuid)"),
             {"record_id": record_id},
         )
         row = result.mappings().first()
@@ -916,7 +916,7 @@ async def update_cms_record(module: str, record_id: str, payload: dict[str, Any]
                 f"""
                 UPDATE {quote_identifier(table)}
                 SET {", ".join(f"{quote_identifier(key)} = :{key}" for key in values.keys() if key != "record_id")}
-                WHERE id = :record_id::uuid
+                WHERE id = CAST(:record_id AS uuid)
                 """
             ),
             values,
@@ -990,7 +990,7 @@ async def delete_cms_record(module: str, record_id: str, request: Request, autho
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            text(f"DELETE FROM {quote_identifier(table)} WHERE id = :record_id::uuid"),
+            text(f"DELETE FROM {quote_identifier(table)} WHERE id = CAST(:record_id AS uuid)"),
             {"record_id": record_id},
         )
         if result.rowcount == 0:

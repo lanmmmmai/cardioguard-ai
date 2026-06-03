@@ -131,7 +131,7 @@ async def get_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
         dp.verification_note
     FROM users u
     LEFT JOIN doctor_profiles dp ON u.id = dp.user_id
-    WHERE u.role = 'doctor' AND u.id = :doctor_id::uuid
+    WHERE u.role = 'doctor' AND u.id = CAST(:doctor_id AS uuid)
     """
     row = await database.fetch_one(query, {"doctor_id": doctor_id})
     if not row:
@@ -209,14 +209,14 @@ async def update_doctor(doctor_id: str, payload: DoctorUpdate, admin: dict = Dep
     logger.debug("Entry: update_doctor(doctor_id=%s)", doctor_id)
 
     # Kiểm tra bác sĩ tồn tại
-    check_doctor = await database.fetch_one("SELECT id FROM users WHERE role = 'doctor' AND id = :doctor_id::uuid", {"doctor_id": doctor_id})
+    check_doctor = await database.fetch_one("SELECT id FROM users WHERE role = 'doctor' AND id = CAST(:doctor_id AS uuid)", {"doctor_id": doctor_id})
     if not check_doctor:
         raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
 
     # Nếu email thay đổi, kiểm tra xem đã tồn tại chưa
     if payload.email is not None:
         email = payload.email.lower()
-        existing_user = await database.fetch_one("SELECT id FROM users WHERE email = :email AND id != :doctor_id::uuid", {"email": email, "doctor_id": doctor_id})
+        existing_user = await database.fetch_one("SELECT id FROM users WHERE email = :email AND id != CAST(:doctor_id AS uuid)", {"email": email, "doctor_id": doctor_id})
         if existing_user:
             raise HTTPException(status_code=400, detail="Email đã tồn tại trên hệ thống")
 
@@ -251,7 +251,7 @@ async def update_doctor(doctor_id: str, payload: DoctorUpdate, admin: dict = Dep
         query = """
         SELECT id::text as id, full_name, email, phone, specialty, department, status, created_at
         FROM users
-        WHERE id = :doctor_id::uuid
+        WHERE id = CAST(:doctor_id AS uuid)
         """
         row = await database.fetch_one(query, {"doctor_id": doctor_id})
         return dict(row)
@@ -262,7 +262,7 @@ async def update_doctor(doctor_id: str, payload: DoctorUpdate, admin: dict = Dep
     update_query = f"""
     UPDATE users
     SET {", ".join(update_fields)}
-    WHERE role = 'doctor' AND id = :doctor_id::uuid
+    WHERE role = 'doctor' AND id = CAST(:doctor_id AS uuid)
     RETURNING id::text as id, full_name, email, phone, specialty, department, status, created_at
     """
     
@@ -289,12 +289,12 @@ async def delete_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
     Raises:
         HTTPException 404: Nếu không tìm thấy bác sĩ.
     """
-    check_doctor = await database.fetch_one("SELECT id FROM users WHERE role = 'doctor' AND id = :doctor_id::uuid", {"doctor_id": doctor_id})
+    check_doctor = await database.fetch_one("SELECT id FROM users WHERE role = 'doctor' AND id = CAST(:doctor_id AS uuid)", {"doctor_id": doctor_id})
     if not check_doctor:
         raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
 
     logger.info("Admin đã xóa mềm bác sĩ: doctor_id=%s", doctor_id)
-    await database.execute("UPDATE users SET status = 'inactive' WHERE role = 'doctor' AND id = :doctor_id::uuid", {"doctor_id": doctor_id})
+    await database.execute("UPDATE users SET status = 'inactive' WHERE role = 'doctor' AND id = CAST(:doctor_id AS uuid)", {"doctor_id": doctor_id})
     return {
         "message": "Vô hiệu hóa bác sĩ thành công (Soft Delete)",
         "id": doctor_id,
@@ -305,7 +305,7 @@ async def delete_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
 async def verify_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
     async with database.transaction():
         doctor = await database.fetch_one(
-            "SELECT email, full_name FROM users WHERE id = :doctor_id::uuid AND role = 'doctor'",
+            "SELECT email, full_name FROM users WHERE id = CAST(:doctor_id AS uuid) AND role = 'doctor'",
             {"doctor_id": doctor_id},
         )
         if not doctor:
@@ -313,13 +313,13 @@ async def verify_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
 
         await database.execute(
             """UPDATE users SET is_verified = TRUE, status = 'active'
-               WHERE id = :doctor_id::uuid""",
+               WHERE id = CAST(:doctor_id AS uuid)""",
             {"doctor_id": doctor_id},
         )
         await database.execute(
             """UPDATE doctor_profiles SET is_verified = TRUE, status = 'active',
                verified_by = :admin_id, verified_at = NOW()
-               WHERE user_id = :doctor_id::uuid""",
+               WHERE user_id = CAST(:doctor_id AS uuid)""",
             {"doctor_id": doctor_id, "admin_id": admin["id"]},
         )
 
@@ -335,18 +335,18 @@ async def verify_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
 async def reject_doctor(doctor_id: str, action: DoctorVerificationAction, admin: dict = Depends(require_admin)):
     async with database.transaction():
         doctor = await database.fetch_one(
-            "SELECT email, full_name FROM users WHERE id = :doctor_id::uuid AND role = 'doctor'",
+            "SELECT email, full_name FROM users WHERE id = CAST(:doctor_id AS uuid) AND role = 'doctor'",
             {"doctor_id": doctor_id},
         )
         if not doctor:
             raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
 
         await database.execute(
-            "UPDATE users SET is_verified = FALSE, status = 'rejected' WHERE id = :doctor_id::uuid",
+            "UPDATE users SET is_verified = FALSE, status = 'rejected' WHERE id = CAST(:doctor_id AS uuid)",
             {"doctor_id": doctor_id},
         )
         await database.execute(
-            "UPDATE doctor_profiles SET is_verified = FALSE, status = 'rejected', verification_note = :note WHERE user_id = :doctor_id::uuid",
+            "UPDATE doctor_profiles SET is_verified = FALSE, status = 'rejected', verification_note = :note WHERE user_id = CAST(:doctor_id AS uuid)",
             {"doctor_id": doctor_id, "note": action.verification_note},
         )
 
@@ -362,18 +362,18 @@ async def reject_doctor(doctor_id: str, action: DoctorVerificationAction, admin:
 async def request_update_doctor(doctor_id: str, action: DoctorVerificationAction, admin: dict = Depends(require_admin)):
     async with database.transaction():
         doctor = await database.fetch_one(
-            "SELECT email, full_name FROM users WHERE id = :doctor_id::uuid AND role = 'doctor'",
+            "SELECT email, full_name FROM users WHERE id = CAST(:doctor_id AS uuid) AND role = 'doctor'",
             {"doctor_id": doctor_id},
         )
         if not doctor:
             raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
 
         await database.execute(
-            "UPDATE users SET is_verified = FALSE, status = 'need_update' WHERE id = :doctor_id::uuid",
+            "UPDATE users SET is_verified = FALSE, status = 'need_update' WHERE id = CAST(:doctor_id AS uuid)",
             {"doctor_id": doctor_id},
         )
         await database.execute(
-            "UPDATE doctor_profiles SET is_verified = FALSE, status = 'need_update', verification_note = :note WHERE user_id = :doctor_id::uuid",
+            "UPDATE doctor_profiles SET is_verified = FALSE, status = 'need_update', verification_note = :note WHERE user_id = CAST(:doctor_id AS uuid)",
             {"doctor_id": doctor_id, "note": action.verification_note},
         )
 

@@ -66,7 +66,7 @@ async def get_patients(
         Danh sách dict bệnh nhân với id, full_name, age, gender, phone,
         address, medical_history, email, created_at và source.
     """
-    current_user = await get_user_from_token(authorization)
+    current_user = await get_user_from_token(authorization, allow_uncompleted=True)
     role = current_user["role"]
     logger.debug("Entry: get_patients(limit=%d, offset=%d, role=%s, user_id=%s)",
                  limit, offset, role, current_user["id"])
@@ -113,14 +113,14 @@ async def get_patients(
 
     if role == "patient":
         logger.info("Patient filtering: role=patient, self-only for user_id=%s", current_user["id"])
-        where_sql = "WHERE u.id = :user_id::uuid AND lower(u.role) = 'patient'"
+        where_sql = "WHERE u.id = CAST(:user_id AS uuid) AND lower(u.role) = 'patient'"
         values["user_id"] = current_user["id"]
     elif role == "doctor":
         logger.info("Patient filtering: role=doctor, assigned patients only for doctor_id=%s", current_user["id"])
         where_sql = """
         WHERE EXISTS (
             SELECT 1 FROM doctor_patient dp
-            WHERE dp.doctor_id = :doctor_id::uuid
+            WHERE dp.doctor_id = CAST(:doctor_id AS uuid)
               AND dp.patient_id = u.id
         ) AND lower(u.role) = 'patient'
         """

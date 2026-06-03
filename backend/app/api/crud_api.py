@@ -26,6 +26,7 @@ Quan hệ:
 
 import asyncio
 import json
+import re
 import time
 import uuid
 from datetime import date, datetime
@@ -86,6 +87,17 @@ PATIENT_CREATE_BLOCKED_TABLES = {"devices", "medical_records", "prescriptions", 
 PATIENT_UPDATE_BLOCKED_TABLES = {"devices", "medical_records", "prescriptions", "reports"}
 PATIENT_DELETE_BLOCKED_TABLES = {"appointments", "cameras", "devices", "medical_records", "prescriptions", "reports"}
 DOCTOR_DELETE_BLOCKED_TABLES = {"devices", "medical_records", "prescriptions", "reports"}
+
+
+def _filter_query_values(query: str, values: dict[str, Any]) -> dict[str, Any]:
+    """Lọc dict values để chỉ giữ các bind params thực sự có trong query.
+
+    `databases`/SQLAlchemy `text()` sẽ raise nếu values chứa key không có
+    placeholder tương ứng trong SQL string. Hàm này giúp các truy vấn tổng quát
+    an toàn hơn khi một số filter chỉ xuất hiện ở một nhánh.
+    """
+    placeholders = set(re.findall(r":([A-Za-z_][A-Za-z0-9_]*)", query))
+    return {key: value for key, value in values.items() if key in placeholders}
 
 
 def enforce_operation_permission(table: str, role: str, operation: str) -> None:
@@ -275,28 +287,28 @@ def access_filter(table: str, columns: set[str], user: dict[str, str], prefix: s
     clauses = []
     if "patient_id" in columns:
         if role == "patient":
-            clauses.append(f"{col('patient_id')} = :current_user_id::uuid")
+            clauses.append(f"{col('patient_id')} = CAST(:current_user_id AS uuid)")
         elif role == "doctor":
             clauses.append(
                 f"""EXISTS (
                     SELECT 1 FROM doctor_patient dp
-                    WHERE dp.doctor_id = :current_user_id::uuid
+                    WHERE dp.doctor_id = CAST(:current_user_id AS uuid)
                     AND dp.patient_id = {col('patient_id')}
                 )"""
             )
 
     if table == "notifications" and "user_id" in columns:
-        clauses.append(f"{col('user_id')} = :current_user_id::uuid")
+        clauses.append(f"{col('user_id')} = CAST(:current_user_id AS uuid)")
 
     if table == "chat_messages":
         for owner_column in ("sender_id", "recipient_id"):
             if owner_column in columns:
-                clauses.append(f"{col(owner_column)} = :current_user_id::uuid")
+                clauses.append(f"{col(owner_column)} = CAST(:current_user_id AS uuid)")
         if role == "doctor" and "doctor_id" in columns:
-            clauses.append(f"{col('doctor_id')} = :current_user_id::uuid")
+            clauses.append(f"{col('doctor_id')} = CAST(:current_user_id AS uuid)")
 
     if table == "audit_logs" and "user_id" in columns:
-        clauses.append(f"{col('user_id')} = :current_user_id::uuid")
+        clauses.append(f"{col('user_id')} = CAST(:current_user_id AS uuid)")
 
     if not clauses:
         return "1 = 0", {"current_user_id": user_id}
@@ -320,7 +332,7 @@ async def ensure_doctor_patient_access(doctor_id: str, patient_id: Any) -> None:
         """
         SELECT 1
         FROM doctor_patient
-        WHERE doctor_id = :doctor_id::uuid AND patient_id = :patient_id::uuid
+        WHERE doctor_id = CAST(:doctor_id AS uuid) AND patient_id = CAST(:patient_id AS uuid)
         """,
         {"doctor_id": doctor_id, "patient_id": str(patient_id)},
     )
@@ -424,7 +436,7 @@ async def fetch_authorized_row(table: str, record_id: str, columns: set[str], us
         HTTPException 404: Nếu không tìm thấy bản ghi hoặc truy cập bị từ chối.
     """
     access_sql, values = access_filter(table, columns, user)
-    where_sql = f'"id" = :record_id::uuid'
+    where_sql = f'"id" = CAST(:record_id AS uuid)'
     if access_sql:
         where_sql = f"{where_sql} AND {access_sql}"
 
@@ -458,24 +470,26 @@ async def list_records(table: str, authorization: Optional[str], limit: int, off
     if patient_id:
         if "patient_id" not in columns:
             raise HTTPException(status_code=400, detail="This table does not support patient_id filtering")
-        where_parts.append('"patient_id" = :patient_id::uuid')
+        where_parts.append('"patient_id" = CAST(:patient_id AS uuid)')
         values["patient_id"] = patient_id
 
     where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
 
     count_query = f"SELECT COUNT(*)::int AS total FROM {quote_identifier(table)} {where_sql}"
-    total = await database.fetch_val(count_query, values)
+    count_values = _filter_query_values(count_query, values)
+    total = await database.fetch_val(count_query, count_values)
 
     order_column = "created_at" if "created_at" in columns else "updated_at" if "updated_at" in columns else "id"
-    rows = await database.fetch_all(
-        f"""
+    rows_query = f"""
         SELECT *
         FROM {quote_identifier(table)}
         {where_sql}
         ORDER BY {quote_column(order_column, columns)} DESC
         LIMIT :limit OFFSET :offset
-        """,
-        {**values, "limit": limit, "offset": offset},
+        """
+    rows = await database.fetch_all(
+        rows_query,
+        _filter_query_values(rows_query, {**values, "limit": limit, "offset": offset}),
     )
     return {"items": [row_to_dict(row) for row in rows], "total": total, "limit": limit, "offset": offset}
 
@@ -596,7 +610,7 @@ async def update_record(table: str, record_id: str, payload: dict[str, Any], aut
         set_sql = f"{set_sql}, \"updated_at\" = NOW()"
 
     await database.execute(
-        f"UPDATE {quote_identifier(table)} SET {set_sql} WHERE \"id\" = :record_id::uuid",
+        f"UPDATE {quote_identifier(table)} SET {set_sql} WHERE \"id\" = CAST(:record_id AS uuid)",
         {**values, "record_id": record_id},
     )
     updated_row = await fetch_authorized_row(table, record_id, columns, user)
@@ -637,7 +651,7 @@ async def delete_record(table: str, record_id: str, authorization: Optional[str]
     current = await fetch_authorized_row(table, record_id, columns, user)
     await enforce_write_scope(table, columns, user, {}, current)
     await database.execute(
-        f"DELETE FROM {quote_identifier(table)} WHERE \"id\" = :record_id::uuid",
+        f"DELETE FROM {quote_identifier(table)} WHERE \"id\" = CAST(:record_id AS uuid)",
         {"record_id": record_id},
     )
 

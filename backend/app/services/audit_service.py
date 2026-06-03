@@ -177,7 +177,9 @@ async def log_activity(
             "entity_type": entity_type,
             "entity_id": str(entity_id) if entity_id else None,
             "ip_address": ip_address or "-",
-            "created_at": datetime.now(timezone.utc),
+            # Database columns are stored as timestamp without timezone in this deployment,
+            # so persist a UTC-naive value to avoid asyncpg timezone coercion errors.
+            "created_at": datetime.now(timezone.utc).replace(tzinfo=None),
             "details": details,
         }
 
