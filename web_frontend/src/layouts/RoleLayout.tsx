@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, LogOut, Menu, Moon, Sun, MoreHorizontal, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { roleLabel, type UserRole } from '../auth/roles';
+import { type UserRole } from '../auth/roles';
 import { roleMenus } from '../navigation/roleMenus';
 import { API_URL } from '../config';
+import { translateCommonLabel, translateMenuLabel, translateRoleLabel, useLocale } from '../i18n/locale';
 
 interface RoleLayoutProps {
   role: UserRole;
@@ -16,9 +17,9 @@ interface RoleLayoutProps {
 }
 
 const layoutTitle: Record<UserRole, string> = {
-  admin: 'CardioGuard Admin',
-  doctor: 'Doctor Workspace',
-  patient: 'Patient Home',
+  admin: 'layout_admin',
+  doctor: 'layout_doctor',
+  patient: 'layout_patient',
 };
 
 export const RoleLayout: React.FC<RoleLayoutProps> = ({
@@ -31,6 +32,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
   isConnected = false,
 }) => {
   const { user, logout, accessToken } = useAuth();
+  const { locale, setLocale } = useLocale();
   const menuItems = roleMenus[role];
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -71,11 +73,11 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
           </div>
           <div>
             <div className="brand-name">CardioGuard AI</div>
-            <div className="role-brand-subtitle">{layoutTitle[role]}</div>
+            <div className="role-brand-subtitle">{translateCommonLabel(layoutTitle[role], locale)}</div>
           </div>
         </div>
 
-        <nav className="role-menu" aria-label={`Menu ${roleLabel[role]}`}>
+        <nav className="role-menu" aria-label={`${translateCommonLabel('all_features', locale)} ${translateRoleLabel(role, locale)}`}>
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentPath === item.path;
@@ -87,7 +89,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
                 onClick={() => navigate(item.path)}
               >
                 <Icon size={18} />
-                <span>{item.label}</span>
+                <span>{translateMenuLabel(item.label, locale)}</span>
               </button>
             );
           })}
@@ -95,7 +97,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
 
         <button type="button" className="role-menu-item logout" onClick={handleLogout}>
           <LogOut size={18} />
-          <span>Đăng xuất</span>
+          <span>{translateCommonLabel('logout', locale)}</span>
         </button>
       </aside>
 
@@ -104,23 +106,39 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
           <div className="role-header-left">
             <Menu size={20} className="role-mobile-icon" onClick={() => setIsMobileMenuOpen(true)} />
             <div>
-              <div className="role-header-kicker">{roleLabel[role]}</div>
+              <div className="role-header-kicker">{translateRoleLabel(role, locale)}</div>
               <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {layoutTitle[role]}
+                {translateCommonLabel(layoutTitle[role], locale)}
                 <span 
                   className={`connection-status-dot ${isConnected ? 'connected' : 'disconnected'}`} 
-                  title={isConnected ? 'Đang kết nối realtime (Trực tuyến)' : 'Mất kết nối realtime (Ngoại tuyến)'}
+                  title={isConnected ? (locale === 'en' ? 'Realtime connected (online)' : 'Đang kết nối realtime (Trực tuyến)') : (locale === 'en' ? 'Realtime disconnected (offline)' : 'Mất kết nối realtime (Ngoại tuyến)')}
                 />
               </h1>
             </div>
           </div>
 
           <div className="role-header-actions">
+            <div className="locale-switch" role="group" aria-label={translateCommonLabel('language', locale)}>
+              <button
+                type="button"
+                className={locale === 'vi' ? 'active' : ''}
+                onClick={() => setLocale('vi')}
+              >
+                VI
+              </button>
+              <button
+                type="button"
+                className={locale === 'en' ? 'active' : ''}
+                onClick={() => setLocale('en')}
+              >
+                EN
+              </button>
+            </div>
             <button
               type="button"
               onClick={onToggleTheme}
               className="theme-toggle-btn"
-              title={theme === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
+              title={theme === 'dark' ? translateCommonLabel('theme_light', locale) : translateCommonLabel('theme_dark', locale)}
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -138,9 +156,9 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
               )}
               <div className="user-info">
                 <div className="user-name">{user?.full_name || 'Người dùng'}</div>
-                <div className="user-role">{roleLabel[role]}</div>
+                <div className="user-role">{translateRoleLabel(role, locale)}</div>
               </div>
-              <button className="logout-btn" onClick={handleLogout} title="Đăng xuất">
+              <button className="logout-btn" onClick={handleLogout} title={translateCommonLabel('logout', locale)}>
                 <LogOut size={15} />
               </button>
             </div>
@@ -149,7 +167,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
 
         <main className="role-content">{children}</main>
 
-        <nav className="role-mobile-nav" aria-label={`Mobile menu ${roleLabel[role]}`}>
+        <nav className="role-mobile-nav" aria-label={`${translateCommonLabel('all_features', locale)} ${translateRoleLabel(role, locale)}`}>
           {menuItems.slice(0, 4).map((item) => {
             const Icon = item.icon;
             return (
@@ -160,7 +178,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
                 onClick={() => navigate(item.path)}
               >
                 <Icon size={18} />
-                <span>{item.label.split(' ')[0]}</span>
+                <span>{translateMenuLabel(item.label, locale).split(' ')[0]}</span>
               </button>
             );
           })}
@@ -170,10 +188,10 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
             onClick={() => setIsMobileMenuOpen(true)}
             aria-expanded={isMobileMenuOpen}
             aria-controls="mobile-navigation-drawer"
-            aria-label="Mở tất cả menu chức năng"
+            aria-label={translateCommonLabel('all_features', locale)}
           >
             <MoreHorizontal size={18} />
-            <span>Thêm</span>
+            <span>{translateCommonLabel('more', locale)}</span>
           </button>
         </nav>
       </div>
@@ -190,12 +208,12 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
           >
             <div className="mobile-drawer-handle" />
             <div className="mobile-drawer-header">
-              <h2 id="drawer-title" className="mobile-drawer-title">Tất cả chức năng</h2>
+              <h2 id="drawer-title" className="mobile-drawer-title">{translateCommonLabel('all_features', locale)}</h2>
               <button 
                 type="button" 
                 className="mobile-drawer-close-btn" 
                 onClick={() => setIsMobileMenuOpen(false)}
-                aria-label="Đóng menu"
+                aria-label={translateCommonLabel('close_menu', locale)}
               >
                 <X size={16} />
               </button>
@@ -215,7 +233,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
                     }}
                   >
                     <Icon size={20} />
-                    <span>{item.label}</span>
+                    <span>{translateMenuLabel(item.label, locale)}</span>
                   </button>
                 );
               })}
@@ -230,4 +248,3 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
 export const AdminLayout = (props: Omit<RoleLayoutProps, 'role'>) => <RoleLayout {...props} role="admin" />;
 export const DoctorLayout = (props: Omit<RoleLayoutProps, 'role'>) => <RoleLayout {...props} role="doctor" />;
 export const PatientLayout = (props: Omit<RoleLayoutProps, 'role'>) => <RoleLayout {...props} role="patient" />;
-

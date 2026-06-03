@@ -29,14 +29,17 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { defaultRouteByRole, normalizeRole, UserRole } from './auth/roles';
 import { AdminLayout, DoctorLayout, PatientLayout } from './layouts/RoleLayout';
 import { AdminDashboard, DoctorDashboard, PatientHome, PlaceholderPage } from './pages/RolePages';
+import { PatientSettingsPage } from './pages/PatientSettingsPage';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useBrowserPath } from './hooks/useBrowserPath';
-import { pageTitles, privateRouteRole } from './navigation/routeMeta';
+import { privateRouteRole } from './navigation/routeMeta';
 import { API_URL, WS_URL } from './config';
 import { Patient, Alert, SensorData } from './types';
+import { LocaleProvider, getPageMeta, useLocale } from './i18n/locale';
 
 const AppContent: React.FC = () => {
   const { accessToken, isAuthenticated, loading, role, login, requiresPasswordChange, user } = useAuth();
+  const { locale } = useLocale();
   const { path, navigate } = useBrowserPath();
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -97,7 +100,7 @@ const AppContent: React.FC = () => {
 
     if (path === '/' || !routeRole) {
       if (path === '/' || (!authPaths.includes(path) && path !== '/change-password')) {
-        if (!pageTitles[normalizedPath]) {
+        if (!getPageMeta(normalizedPath, locale)) {
           navigate(role ? defaultRouteByRole[role] : getLastLoginRoute(), true);
         }
       }
@@ -117,7 +120,7 @@ const AppContent: React.FC = () => {
         navigate(defaultRouteByRole[role], true);
       }
     }
-  }, [loading, path, role, isAuthenticated, routeRole, requiresPasswordChange]);
+  }, [loading, path, role, isAuthenticated, routeRole, requiresPasswordChange, locale]);
 
   const fetchPatients = useCallback(async () => {
     try {
@@ -346,6 +349,8 @@ const AppContent: React.FC = () => {
         return <AdminDoctorVerification />;
       case '/patient/chatbot':
         return <PatientChatbot />;
+      case '/patient/settings':
+        return <PatientSettingsPage navigate={navigate} />;
       case '/admin/dashboard':
         return <AdminDashboard patients={patients} alerts={alerts} doctors={doctors} />;
       case '/admin/cms':
@@ -380,15 +385,15 @@ const AppContent: React.FC = () => {
         return <Appointments patients={patients} role={routeRole || 'patient'} />;
       case '/doctor/prescriptions':
       case '/patient/prescriptions':
-        return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/prescriptions" />;
+        return <ApiDataPage key={normalizedPath} title={getPageMeta(normalizedPath, locale)?.title || ''} subtitle={getPageMeta(normalizedPath, locale)?.subtitle || ''} endpoint="/prescriptions" />;
       case '/doctor/chat':
       case '/doctor/messages':
       case '/patient/chat':
-        return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/chat-messages" />;
+        return <ApiDataPage key={normalizedPath} title={getPageMeta(normalizedPath, locale)?.title || ''} subtitle={getPageMeta(normalizedPath, locale)?.subtitle || ''} endpoint="/chat-messages" />;
       case '/patient/notifications':
-        return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/notifications" />;
+        return <ApiDataPage key={normalizedPath} title={getPageMeta(normalizedPath, locale)?.title || ''} subtitle={getPageMeta(normalizedPath, locale)?.subtitle || ''} endpoint="/notifications" />;
       case '/admin/system-logs':
-        return <ApiDataPage key={normalizedPath} title={pageTitles[normalizedPath].title} subtitle={pageTitles[normalizedPath].subtitle} endpoint="/audit-logs" />;
+        return <ApiDataPage key={normalizedPath} title={getPageMeta(normalizedPath, locale)?.title || ''} subtitle={getPageMeta(normalizedPath, locale)?.subtitle || ''} endpoint="/audit-logs" />;
       case '/admin/settings':
         return <SystemSettings />;
       case '/admin/profile':
@@ -410,11 +415,11 @@ const AppContent: React.FC = () => {
         if (normalizedPath.startsWith('/admin/medical-records')) {
           return <AdminMedicalRecordsPage path={normalizedPath} patients={patients.map((patient) => ({ id: patient.id, full_name: patient.full_name }))} navigate={navigate} />;
         }
-        const meta = pageTitles[normalizedPath];
+        const meta = getPageMeta(normalizedPath, locale);
         return meta ? <PlaceholderPage title={meta.title} subtitle={meta.subtitle} /> : null;
       }
     }
-  }, [alerts, latestTelemetry, normalizedPath, patients, routeRole, selectedPatientId, showAddPatientModal, doctors, isConnected, navigate, renderPatientList, user]);
+  }, [alerts, latestTelemetry, normalizedPath, patients, routeRole, selectedPatientId, showAddPatientModal, doctors, isConnected, navigate, renderPatientList, user, locale]);
 
   if (loading) {
     return <div className="route-loading">Đang khôi phục phiên đăng nhập...</div>;
@@ -555,9 +560,11 @@ const AppContent: React.FC = () => {
 };
 
 export const App: React.FC = () => (
-  <AuthProvider>
-    <AppContent />
-  </AuthProvider>
+  <LocaleProvider>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  </LocaleProvider>
 );
 
 export default App;

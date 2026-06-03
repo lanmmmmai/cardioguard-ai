@@ -114,8 +114,8 @@ export function injectSeoIntoHtml(html, seo) {
     __SEO_IMAGE_TYPE__: escapeHtml(imageMimeType(seoImage)),
     __SEO_SITE_NAME__: escapeHtml(seo.siteName || DEFAULT_SEO.siteName),
     __SEO_URL__: escapeHtml(seoUrl),
-    __CARDIOGUARD_API_URL__: escapeHtml(getBackendBaseUrl()),
-    __CARDIOGUARD_WS_URL__: escapeHtml(getBackendWsUrl()),
+    __CARDIOGUARD_API_URL_PLACEHOLDER__: escapeHtml(getBackendBaseUrl()),
+    __CARDIOGUARD_WS_URL_PLACEHOLDER__: escapeHtml(getBackendWsUrl()),
   };
 
   return Object.entries(replacements).reduce(
