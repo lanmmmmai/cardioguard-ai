@@ -42,6 +42,10 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
     return `${API_URL}${path}?token=${accessToken}`;
   };
 
+  const confirmLogout = () => {
+    return window.confirm(locale === 'en' ? 'Do you want to log out?' : 'Bạn muốn đăng xuất?');
+  };
+
   // Close mobile drawer when pressing Escape key for accessibility
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -54,6 +58,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
   }, []);
 
   const handleLogout = () => {
+    if (!confirmLogout()) return;
     logout();
     if (role === 'admin') {
       navigate('/login-admin', true);

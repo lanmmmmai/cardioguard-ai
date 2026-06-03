@@ -8,6 +8,12 @@ export const DoctorPendingVerification: React.FC = () => {
   const { logout, refreshUser } = useAuth();
   const { navigate } = useBrowserPath();
 
+  const handleLogout = () => {
+    if (!window.confirm('Bạn muốn đăng xuất?')) return;
+    logout();
+    navigate('/login-doctor', true);
+  };
+
   const handleRefresh = async () => {
     try {
       const freshUser = await refreshUser();
@@ -57,7 +63,7 @@ export const DoctorPendingVerification: React.FC = () => {
           <button 
             type="button" 
             className="btn btn-danger-outline" 
-            onClick={() => { logout(); navigate('/login-doctor', true); }}
+            onClick={handleLogout}
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <LogOut size={16} />
@@ -73,6 +79,12 @@ export const DoctorVerificationRejected: React.FC = () => {
   const { logout } = useAuth();
   const { navigate } = useBrowserPath();
   const [note, setNote] = React.useState<string | null>(null);
+
+  const handleLogout = () => {
+    if (!window.confirm('Bạn muốn đăng xuất?')) return;
+    logout();
+    navigate('/login-doctor', true);
+  };
 
   React.useEffect(() => {
     // Fetch rejection reason from verification-status
@@ -125,7 +137,7 @@ export const DoctorVerificationRejected: React.FC = () => {
           <button 
             type="button" 
             className="btn btn-secondary" 
-            onClick={() => { logout(); navigate('/login-doctor', true); }}
+            onClick={handleLogout}
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <LogOut size={16} />
