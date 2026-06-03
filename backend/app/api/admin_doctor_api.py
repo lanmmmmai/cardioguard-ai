@@ -57,17 +57,23 @@ async def list_doctors(
 ):
     where_clauses = ["u.role = 'doctor'"]
     params = {}
+    logger.debug("Entry: list_doctors(status=%s, limit=%d, offset=%d)", status, limit, offset)
     if status:
         status_clean = status.strip().lower()
         if status_clean == "pending_verification":
+            logger.info("Filter doctors by status=pending_verification")
             where_clauses.append("u.status = 'pending_verification'")
         elif status_clean == "active":
+            logger.info("Filter doctors by status=active (verified)")
             where_clauses.append("u.status = 'active' AND u.is_verified = TRUE")
         elif status_clean == "rejected":
+            logger.info("Filter doctors by status=rejected")
             where_clauses.append("u.status = 'rejected'")
         elif status_clean == "pending_profile":
+            logger.info("Filter doctors by status=pending_profile")
             where_clauses.append("u.status = 'pending_profile'")
         elif status_clean == "need_update":
+            logger.info("Filter doctors by status=need_update")
             where_clauses.append("u.status = 'need_update'")
 
     where_sql = " AND ".join(where_clauses)
@@ -148,7 +154,8 @@ async def create_doctor(payload: DoctorCreate, admin: dict = Depends(require_adm
         HTTPException 500: Nếu thêm vào cơ sở dữ liệu thất bại.
     """
     email = payload.email.lower()
-    
+    logger.debug("Entry: create_doctor(email=%s, full_name=%s)", email, payload.full_name)
+
     # Kiểm tra email đã tồn tại chưa
     check_query = "SELECT id FROM users WHERE email = :email"
     existing_user = await database.fetch_one(check_query, {"email": email})
@@ -199,6 +206,8 @@ async def update_doctor(doctor_id: str, payload: DoctorUpdate, admin: dict = Dep
         HTTPException 400: Nếu email mới đã được sử dụng.
         HTTPException 500: Nếu câu truy vấn cập nhật thất bại.
     """
+    logger.debug("Entry: update_doctor(doctor_id=%s)", doctor_id)
+
     # Kiểm tra bác sĩ tồn tại
     check_doctor = await database.fetch_one("SELECT id FROM users WHERE role = 'doctor' AND id = :doctor_id::uuid", {"doctor_id": doctor_id})
     if not check_doctor:
@@ -238,6 +247,7 @@ async def update_doctor(doctor_id: str, payload: DoctorUpdate, admin: dict = Dep
         values["status"] = payload.status
 
     if not update_fields:
+        logger.debug("No fields to update for doctor_id=%s, returning current data", doctor_id)
         query = """
         SELECT id::text as id, full_name, email, phone, specialty, department, status, created_at
         FROM users
@@ -245,6 +255,9 @@ async def update_doctor(doctor_id: str, payload: DoctorUpdate, admin: dict = Dep
         """
         row = await database.fetch_one(query, {"doctor_id": doctor_id})
         return dict(row)
+
+    logger.debug("Dynamic UPDATE query built for doctor_id=%s with %d fields: %s",
+                 doctor_id, len(update_fields), ", ".join(update_fields))
 
     update_query = f"""
     UPDATE users

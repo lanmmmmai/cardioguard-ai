@@ -5,6 +5,9 @@
 
 #include "config.h"
 
+// Biến theo dõi trạng thái backoff để ghi log khi kết thúc backoff
+static bool g_was_in_backoff = false;
+
 namespace {
 String g_buffer[kOfflineBufferMaxFrames];  // Bộ đệm vòng lưu trữ các khung telemetry khi mất kết nối
 uint16_t g_buffer_head = 0;                // Chỉ số đầu của bộ đệm vòng
@@ -20,6 +23,8 @@ bool PushBufferedPayload(const String &payload) {
     const uint16_t tail = (g_buffer_head + g_buffer_count) % kOfflineBufferMaxFrames;
     g_buffer[tail] = payload;
     g_buffer_count++;
+    Serial.print("[CardioGuard] Buffer push OK, count=");
+    Serial.println(g_buffer_count);
     return true;
   }
 
@@ -34,10 +39,15 @@ bool PopBufferedPayload(String &payload) {
   if (g_buffer_count == 0) {
     return false;
   }
+  const uint16_t count_before = g_buffer_count;
   payload = g_buffer[g_buffer_head];
   g_buffer[g_buffer_head] = "";
   g_buffer_head = (g_buffer_head + 1) % kOfflineBufferMaxFrames;
   g_buffer_count--;
+  Serial.print("[CardioGuard] Buffer pop: count before=");
+  Serial.print(count_before);
+  Serial.print(" after=");
+  Serial.println(g_buffer_count);
   return true;
 }
 

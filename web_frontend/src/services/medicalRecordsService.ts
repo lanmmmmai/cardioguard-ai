@@ -213,9 +213,11 @@ export const medicalRecordsService = {
   },
 
   async updateMedicalRecord(context: ServiceContext, recordId: string, payload: Partial<MedicalRecordFormState>) {
+    console.debug('[updateMedicalRecord] recordId=%s', recordId);
     const client = createSupabaseClient(context.accessToken);
     const current = await this.getMedicalRecordById(context, recordId);
     if (!current || !['draft', 'amended'].includes(String(current.status))) {
+      console.warn('[updateMedicalRecord] cannot edit signed record %s (status=%s)', recordId, current?.status);
       throw new Error('Bệnh án đã ký, cần tạo bản bổ sung/chỉnh sửa thay vì sửa trực tiếp.');
     }
 
@@ -235,12 +237,18 @@ export const medicalRecordsService = {
       updated_at: nowIso(),
     };
 
+    console.info('[updateMedicalRecord] UPDATE medical_records WHERE id = %s', recordId);
     const { data, error } = await client.from('medical_records').update(updatePayload).eq('id', recordId).select('*').single();
-    if (error) throw new Error(error.message || 'Không thể cập nhật bệnh án');
+    if (error) {
+      console.error('[updateMedicalRecord] %s', error.message);
+      throw new Error(error.message || 'Không thể cập nhật bệnh án');
+    }
+    console.info('[updateMedicalRecord] updated id=%s', recordId);
     return parseRecord(data);
   },
 
   async signMedicalRecord(context: ServiceContext, recordId: string) {
+    console.debug('[signMedicalRecord] recordId=%s', recordId);
     const client = createSupabaseClient(context.accessToken);
     let rpcError: any = null;
     let result: any = null;
@@ -251,16 +259,20 @@ export const medicalRecordsService = {
     ];
 
     for (const params of rpcCandidates) {
+      console.info('[signMedicalRecord] RPC sign_medical_record params=%o', params);
       const response = await client.rpc('sign_medical_record', params);
       if (!response.error) {
         result = response.data;
         rpcError = null;
+        console.info('[signMedicalRecord] RPC succeeded with params=%o', params);
         break;
       }
+      console.warn('[signMedicalRecord] RPC failed with params=%o: %s', params, response.error.message);
       rpcError = response.error;
     }
 
     if (rpcError) {
+      console.info('[signMedicalRecord] falling back to direct UPDATE medical_records');
       const fallback = await client
         .from('medical_records')
         .update({
@@ -275,7 +287,10 @@ export const medicalRecordsService = {
         .select('*')
         .single();
 
-      if (fallback.error) throw new Error(fallback.error.message || 'Không thể ký bệnh án');
+      if (fallback.error) {
+        console.error('[signMedicalRecord] fallback also failed: %s', fallback.error.message);
+        throw new Error(fallback.error.message || 'Không thể ký bệnh án');
+      }
       result = fallback.data;
     }
 
@@ -288,12 +303,15 @@ export const medicalRecordsService = {
     });
 
     await this.createPatientNotification(context, signedRecord.patient_id, signedRecord.id);
+    console.info('[signMedicalRecord] signed recordId=%s', recordId);
     return signedRecord;
   },
 
   async createMedicalRecordAmendment(context: ServiceContext, recordId: string, note?: string) {
+    console.debug('[createMedicalRecordAmendment] recordId=%s', recordId);
     const client = createSupabaseClient(context.accessToken);
     const current = await this.getMedicalRecordById(context, recordId);
+    console.info('[createMedicalRecordAmendment] INSERT medical_records (amendment of %s)', recordId);
     const { data, error } = await client.from('medical_records').insert({
       patient_id: current.patient_id,
       doctor_id: current.doctor_id || context.currentUserId || null,
@@ -316,7 +334,11 @@ export const medicalRecordsService = {
       updated_at: nowIso(),
     }).select('*').single();
 
-    if (error) throw new Error(error.message || 'Không thể tạo bản bổ sung');
+    if (error) {
+      console.error('[createMedicalRecordAmendment] %s', error.message);
+      throw new Error(error.message || 'Không thể tạo bản bổ sung');
+    }
+    console.info('[createMedicalRecordAmendment] created amended id=%s from recordId=%s', data.id, recordId);
     await this.logMedicalRecordAction(context, {
       action: 'AMEND',
       recordId,
@@ -326,6 +348,7 @@ export const medicalRecordsService = {
   },
 
   async logMedicalRecordAction(context: ServiceContext, input: { action: string; recordId: string; metadata?: Record<string, any> }) {
+    console.debug('[logMedicalRecordAction] action=%s recordId=%s', input.action, input.recordId);
     const client = createSupabaseClient(context.accessToken);
     const payload = {
       user_id: context.currentUserId || null,
@@ -336,8 +359,10 @@ export const medicalRecordsService = {
       metadata: input.metadata || {},
     };
 
+    console.info('[logMedicalRecordAction] INSERT audit_logs');
     const { error } = await client.from('audit_logs').insert(payload);
     if (error) {
+      console.error('[logMedicalRecordAction] %s', error.message);
       console.warn('Không ghi được audit log medical_records:', error.message);
     }
   },

@@ -75,6 +75,7 @@ class AuthProvider extends ChangeNotifier {
   // Yêu cầu gửi OTP để đăng ký bệnh nhân.
   // Ở chế độ phát triển, ghi lại OTP từ khóa dev_otp trong phản hồi.
   Future<bool> requestRegisterOtp(String email, String fullName) async {
+    AppLogger.log('requestRegisterOtp entered | email=$email fullName=$fullName');
     _setLoading(true);
     _setError(null);
     try {
@@ -93,12 +94,15 @@ class AuthProvider extends ChangeNotifier {
         if (data != null && data['dev_otp'] != null) {
           AppLogger.log('[CHẾ ĐỘ DEV] OTP được tạo: ${data['dev_otp']}');
         }
+        AppLogger.log('requestRegisterOtp success | email=$email');
         return true;
       }
+      AppLogger.log('requestRegisterOtp failed | email=$email status=${response.statusCode}');
       return false;
     } catch (e) {
       _setLoading(false);
       _setError('Không thể gửi mã OTP. Vui lòng thử lại.');
+      AppLogger.log('requestRegisterOtp error | email=$email error=$e');
       return false;
     }
   }
@@ -139,6 +143,7 @@ class AuthProvider extends ChangeNotifier {
   // JWT và hồ sơ người dùng vào bộ nhớ an toàn. Trả về true nếu đăng nhập
   // thành công.
   Future<bool> login(String email, String password) async {
+    AppLogger.log('login entered | email=$email');
     _setLoading(true);
     _setError(null);
     try {
@@ -158,6 +163,7 @@ class AuthProvider extends ChangeNotifier {
         if (token != null && userJson != null) {
           _currentUser = User.fromJson(userJson);
           _isAuthenticated = true;
+          AppLogger.log('login success | email=$email isAuthenticated=$_isAuthenticated');
 
           // Lưu vào bộ nhớ an toàn
           await _secureStorage.saveToken(token);
@@ -174,10 +180,12 @@ class AuthProvider extends ChangeNotifier {
       }
       _setLoading(false);
       _setError('Email hoặc mật khẩu không hợp lệ.');
+      AppLogger.log('login failed | email=$email status=${response.statusCode}');
       return false;
     } catch (e) {
       _setLoading(false);
       _setError('Lỗi kết nối máy chủ. Vui lòng kiểm tra mạng.');
+      AppLogger.log('login error | email=$email error=$e');
       return false;
     }
   }

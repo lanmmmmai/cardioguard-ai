@@ -107,9 +107,11 @@ async def get_patients(
     values = {}
 
     if role == "patient":
+        logger.info("Patient filtering: role=patient, self-only for user_id=%s", current_user["id"])
         where_sql = "WHERE u.id = :user_id::uuid AND lower(u.role) = 'patient'"
         values["user_id"] = current_user["id"]
     elif role == "doctor":
+        logger.info("Patient filtering: role=doctor, assigned patients only for doctor_id=%s", current_user["id"])
         where_sql = """
         WHERE EXISTS (
             SELECT 1 FROM doctor_patient dp
@@ -119,6 +121,7 @@ async def get_patients(
         """
         values["doctor_id"] = current_user["id"]
     else:
+        logger.info("Patient filtering: role=admin, all patients")
         where_sql = "WHERE lower(u.role) = 'patient'"
 
     count_query = f"SELECT COUNT(*)::int AS total FROM users u LEFT JOIN patients p ON {join_on} {where_sql}"
