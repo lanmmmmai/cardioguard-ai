@@ -70,9 +70,9 @@ export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: 
   };
 
   const languageOptions = useMemo(() => ([
-    { value: 'vi' as const, label: 'Tiếng Việt' },
-    { value: 'en' as const, label: 'English' },
-  ]), []);
+    { value: 'vi' as const, label: locale === 'en' ? 'Vietnamese' : 'Tiếng Việt' },
+    { value: 'en' as const, label: locale === 'en' ? 'English' : 'Tiếng Anh' },
+  ]), [locale]);
 
   return (
     <div className="role-page-stack">
@@ -89,7 +89,7 @@ export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: 
             <Languages size={18} />
             <div>
               <h3>{t('language_settings')}</h3>
-              <p>Chọn ngôn ngữ hiển thị cho toàn bộ giao diện.</p>
+              <p>{locale === 'en' ? 'Choose the display language for the entire interface.' : 'Chọn ngôn ngữ hiển thị cho toàn bộ giao diện.'}</p>
             </div>
           </div>
           <div className="settings-segmented-control" role="group" aria-label={t('language_settings')}>
@@ -116,7 +116,7 @@ export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: 
             <Bell size={18} />
             <div>
               <h3>{t('notification_settings')}</h3>
-              <p>Bật hoặc tắt các loại cảnh báo dành cho tài khoản bệnh nhân.</p>
+              <p>{locale === 'en' ? 'Turn patient account alerts on or off.' : 'Bật hoặc tắt các loại cảnh báo dành cho tài khoản bệnh nhân.'}</p>
             </div>
           </div>
           <div className="settings-switch-list">
@@ -152,7 +152,7 @@ export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: 
             <Shield size={18} />
             <div>
               <h3>{t('security')}</h3>
-              <p>Thiết lập quyền riêng tư và thao tác bảo mật tài khoản.</p>
+              <p>{locale === 'en' ? 'Configure privacy and account security actions.' : 'Thiết lập quyền riêng tư và thao tác bảo mật tài khoản.'}</p>
             </div>
           </div>
           <div className="settings-switch-list">
@@ -178,7 +178,7 @@ export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: 
             <Settings size={18} />
             <div>
               <h3>{t('preferences')}</h3>
-              <p>Thông tin tài khoản và trạng thái lưu cấu hình.</p>
+              <p>{locale === 'en' ? 'Account information and saved preference status.' : 'Thông tin tài khoản và trạng thái lưu cấu hình.'}</p>
             </div>
           </div>
           <div className="settings-summary">
@@ -197,7 +197,7 @@ export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: 
             <div>
               <span>Trạng thái</span>
               <strong className="settings-saved-indicator">
-                <CheckCircle2 size={14} /> {savedAt ? `Đã lưu lúc ${savedAt}` : 'Chưa lưu'}
+                <CheckCircle2 size={14} /> {savedAt ? (locale === 'en' ? `Saved at ${savedAt}` : `Đã lưu lúc ${savedAt}`) : (locale === 'en' ? 'Not saved yet' : 'Chưa lưu')}
               </strong>
             </div>
           </div>

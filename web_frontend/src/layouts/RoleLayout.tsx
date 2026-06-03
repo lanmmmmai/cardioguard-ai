@@ -178,7 +178,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
                 onClick={() => navigate(item.path)}
               >
                 <Icon size={18} />
-                <span>{translateMenuLabel(item.label, locale).split(' ')[0]}</span>
+                <span>{translateMenuLabel(item.label, locale)}</span>
               </button>
             );
           })}

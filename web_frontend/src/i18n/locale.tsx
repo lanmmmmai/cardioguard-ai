@@ -178,9 +178,9 @@ const COMMON_LABELS: Record<Locale, Record<string, string>> = {
     change_password: 'Đổi mật khẩu',
     edit_profile: 'Chỉnh sửa hồ sơ',
     close_menu: 'Đóng menu',
-    layout_admin: 'CardioGuard Admin',
-    layout_doctor: 'Doctor Workspace',
-    layout_patient: 'Patient Portal',
+    layout_admin: 'Quản trị CardioGuard',
+    layout_doctor: 'Không gian bác sĩ',
+    layout_patient: 'Trang bệnh nhân',
   },
   en: {
     logout: 'Log out',

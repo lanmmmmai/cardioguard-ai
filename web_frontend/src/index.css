@@ -3360,6 +3360,16 @@ body {
     font-weight: 800;
   }
 
+  .role-mobile-nav-item span {
+    max-width: 72px;
+    line-height: 1.1;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    text-align: center;
+  }
+
   .role-mobile-nav-item.active {
     color: var(--text-primary);
     background: var(--hover-bg-secondary);
