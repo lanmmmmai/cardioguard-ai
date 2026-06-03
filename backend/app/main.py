@@ -205,22 +205,8 @@ async def shutdown():
     logger.info("Application shutdown complete")
 
 app.include_router(realtime_router)
-app.include_router(auth_router)
-app.include_router(user_router)
-app.include_router(patient_router)
-app.include_router(sensor_router)
-app.include_router(alert_router)
-app.include_router(crud_router)
-app.include_router(admin_doctor_router)
-app.include_router(cms_email_router)
-app.include_router(cms_router)
-app.include_router(cms_router, prefix="/api")
-app.include_router(email_router)
-app.include_router(feature_router)
-app.include_router(chat_router, prefix="/api/chat", tags=["Chatbot"])
-app.include_router(profile_router)
 
-# Compatibility aliases for deployments that proxy frontend requests through /api.
+# Đăng ký các router REST API dưới tiền tố /api thống nhất (mỗi router chỉ include 1 lần duy nhất)
 app.include_router(auth_router, prefix="/api")
 app.include_router(user_router, prefix="/api")
 app.include_router(patient_router, prefix="/api")
@@ -228,9 +214,13 @@ app.include_router(sensor_router, prefix="/api")
 app.include_router(alert_router, prefix="/api")
 app.include_router(crud_router, prefix="/api")
 app.include_router(admin_doctor_router, prefix="/api")
+app.include_router(cms_email_router, prefix="/api")
+app.include_router(cms_router, prefix="/api")
 app.include_router(email_router, prefix="/api")
 app.include_router(feature_router, prefix="/api")
+app.include_router(chat_router, prefix="/api/chat", tags=["Chatbot"])
 app.include_router(profile_router, prefix="/api")
+
 
 
 @app.get("/health", tags=["System"])

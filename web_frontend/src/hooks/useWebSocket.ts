@@ -68,6 +68,7 @@ export const useWebSocket = (
     onMessageReceivedRef.current = onMessageReceived;
   }, [onMessageReceived]);
 
+
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
@@ -153,7 +154,7 @@ export const useWebSocket = (
         // Cố gắng kết nối lại với backoff theo cấp số nhân
         reconnectTimeoutRef.current = window.setTimeout(() => {
           reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 1.5, 30000); // Tăng dần độ trễ, tối đa 30s
-          connect();
+          connectRef.current?.();
         }, reconnectDelayRef.current);
       };
 
@@ -168,6 +169,11 @@ export const useWebSocket = (
       console.error('Không thể khởi tạo kết nối WebSocket:', e);
     }
   }, [url, token]);
+
+  const connectRef = useRef<() => void>();
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     if (!token) return;

@@ -8,6 +8,7 @@
  *                Sử dụng passwordPolicy util để kiểm tra độ mạnh mật khẩu.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { SecureImage } from './SecureImage';
 import { 
   AlertTriangle, 
   CheckCircle2, 
@@ -419,11 +420,11 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
     }
   };
 
-  // Resolve media download URL with token
+  // Resolve media download URL (public for avatar, base URL for secure fetch)
   const getMediaUrl = (path?: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    return `${API_URL}${path}?token=${accessToken}`;
+    return `${API_URL}${path}`;
   };
 
   const getAvatarSource = () => {
@@ -930,7 +931,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
                       <span className="doc-title required-field">Ảnh Chứng chỉ y khoa</span>
                       <div className="doc-preview-zone">
                         {doctorForm.license_certificate_url ? (
-                          <img src={getMediaUrl(doctorForm.license_certificate_url)} alt="License Doc" className="doc-preview-img" />
+                          <SecureImage src={getMediaUrl(doctorForm.license_certificate_url)} accessToken={accessToken} alt="License Doc" className="doc-preview-img" />
                         ) : (
                           <div className="doc-placeholder">
                             <FileText size={24} />
@@ -955,7 +956,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
                       <span className="doc-title required-field">CCCD Mặt trước</span>
                       <div className="doc-preview-zone">
                         {doctorForm.cccd_front_url ? (
-                          <img src={getMediaUrl(doctorForm.cccd_front_url)} alt="CCCD Front Doc" className="doc-preview-img" />
+                          <SecureImage src={getMediaUrl(doctorForm.cccd_front_url)} accessToken={accessToken} alt="CCCD Front Doc" className="doc-preview-img" />
                         ) : (
                           <div className="doc-placeholder">
                             <User size={24} />
@@ -980,7 +981,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
                       <span className="doc-title required-field">CCCD Mặt sau</span>
                       <div className="doc-preview-zone">
                         {doctorForm.cccd_back_url ? (
-                          <img src={getMediaUrl(doctorForm.cccd_back_url)} alt="CCCD Back Doc" className="doc-preview-img" />
+                          <SecureImage src={getMediaUrl(doctorForm.cccd_back_url)} accessToken={accessToken} alt="CCCD Back Doc" className="doc-preview-img" />
                         ) : (
                           <div className="doc-placeholder">
                             <User size={24} />

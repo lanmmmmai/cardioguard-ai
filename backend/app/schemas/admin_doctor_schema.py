@@ -129,3 +129,13 @@ class DoctorResponse(BaseModel):
     cccd_back_url: Optional[str] = None
     is_verified: Optional[bool] = None
     verification_note: Optional[str] = None
+
+
+from typing import List
+
+class PaginatedDoctorResponse(BaseModel):
+    """Mô hình phản hồi phân trang cho danh sách bác sĩ."""
+    items: List[DoctorResponse]
+    total: int
+    limit: int
+    offset: int

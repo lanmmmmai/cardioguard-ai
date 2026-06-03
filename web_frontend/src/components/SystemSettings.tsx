@@ -30,8 +30,8 @@ export const SystemSettings: React.FC = () => {
   const [maxSysBp, setMaxSysBp] = useState<number>(140);
   const [maxDiaBp, setMaxDiaBp] = useState<number>(90);
 
-  const [apiUrl, setApiUrl] = useState<string>('https://cardioguard-ai-a26e.onrender.com');
-  const [wsUrl, setWsUrl] = useState<string>('wss://cardioguard-ai-a26e.onrender.com/ws/realtime');
+  const [apiUrl, setApiUrl] = useState<string>('https://cardioguard-ai-backend.onrender.com/api');
+  const [wsUrl, setWsUrl] = useState<string>('wss://cardioguard-ai-backend.onrender.com/ws/realtime');
 
   const [emailAlertEnabled, setEmailAlertEnabled] = useState<boolean>(true);
   const [otpVerifyRequired, setOtpVerifyRequired] = useState<boolean>(true);

@@ -263,7 +263,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
               _isLoadingDoctors
                   ? const LinearProgressIndicator(color: CgColors.primary)
                   : DropdownButtonFormField<String>(
-                      initialValue: _selectedDoctorId,
+                      value: _selectedDoctorId,
                       dropdownColor: cardBg,
                       style: TextStyle(color: textColor, fontSize: 13),
                       decoration: InputDecoration(

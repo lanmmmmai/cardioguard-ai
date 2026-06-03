@@ -24,7 +24,7 @@ from typing import List, Optional
 from app.core.database import database
 from app.core.security import hash_password
 from app.api.auth_api import get_user_from_token
-from app.schemas.admin_doctor_schema import DoctorCreate, DoctorUpdate, DoctorResponse
+from app.schemas.admin_doctor_schema import DoctorCreate, DoctorUpdate, DoctorResponse, PaginatedDoctorResponse
 from app.schemas.profile_schema import DoctorVerificationAction
 from app.services.email_service import send_doctor_status_email
 
@@ -48,7 +48,7 @@ async def require_admin(authorization: Optional[str] = Header(default=None)):
         raise HTTPException(status_code=403, detail="Chỉ admin mới có quyền thực hiện thao tác này")
     return user
 
-@router.get("/doctors", response_model=List[DoctorResponse])
+@router.get("/doctors", response_model=PaginatedDoctorResponse)
 async def list_doctors(
     status: Optional[str] = None,
     limit: int = 50,

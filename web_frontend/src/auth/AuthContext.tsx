@@ -33,7 +33,15 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const storage = window.sessionStorage;
+
+const storageMock = {
+  getItem: (_key: string) => null,
+  setItem: (_key: string, _value: string) => {},
+  removeItem: (_key: string) => {},
+  clear: () => {}
+};
+const storage = typeof window !== 'undefined' ? window.sessionStorage : storageMock;
+
 const TOKEN_KEY = 'access_token';
 const USER_KEY = 'user';
 

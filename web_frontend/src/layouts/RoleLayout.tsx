@@ -58,6 +58,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
   const getMediaUrl = (path?: string | null) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
+    if (path.includes('avatars/')) return `${API_URL}${path}`;
     return `${API_URL}${path}?token=${accessToken}`;
   };
 

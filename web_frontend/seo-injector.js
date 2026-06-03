@@ -11,18 +11,19 @@ export function getPublicSiteUrl() {
 }
 
 export function getBackendBaseUrl() {
-  return (
+  const url = (
     process.env.BACKEND_API_URL ||
     process.env.API_URL ||
-    'https://cardioguard-ai-a26e.onrender.com'
+    'https://cardioguard-ai-backend.onrender.com/api'
   ).replace(/\/$/, '');
+  return url.endsWith('/api') ? url : `${url}/api`;
 }
 
 export function getBackendWsUrl() {
   return (
     process.env.BACKEND_WS_URL ||
     process.env.VITE_WS_URL ||
-    'wss://cardioguard-ai-a26e.onrender.com/ws/realtime'
+    'wss://cardioguard-ai-backend.onrender.com/ws/realtime'
   ).replace(/\/$/, '');
 }
 
@@ -90,7 +91,7 @@ function normalizeSeoPayload(data, fullUrl) {
 export async function getSeoByPath(pagePath, fullUrl) {
   try {
     const params = new URLSearchParams({ path: pagePath });
-    const response = await fetch(`${getBackendBaseUrl()}/api/cms/domain-links/resolve?${params.toString()}`);
+    const response = await fetch(`${getBackendBaseUrl()}/cms/domain-links/resolve?${params.toString()}`);
 
     if (!response.ok) {
       return normalizeSeoPayload(null, fullUrl);

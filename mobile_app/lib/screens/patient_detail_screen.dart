@@ -11,6 +11,7 @@
 // - Sử dụng: fl_chart cho biểu đồ xu hướng, CgCard, CgMetricValue, CgInlineState, CgStatusBadge.
 // - Chứa: AddRecordSheetContent, AddPrescriptionSheetContent.
 import 'package:flutter/material.dart';
+import '../core/app_logger.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -213,11 +214,18 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    final currentUserId = authProvider.currentUser!.id;
+    
+    final currentUser = authProvider.currentUser;
+    if (currentUser == null) {
+      AppLogger.log('[CardioGuard] currentUser is null in _sendChatMessage');
+      return;
+    }
+    
+    final currentUserId = currentUser.id;
     final patientId = widget.patient['id'];
 
     // Bác sĩ hoặc Quản trị viên
-    final doctorId = authProvider.currentUser!.role == 'doctor'
+    final doctorId = currentUser.role == 'doctor'
         ? currentUserId
         : widget.patient['doctor_id'] ?? currentUserId;
     final recipientId = patientId;
@@ -550,7 +558,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                           itemBuilder: (context, index) {
                             final msg = chatProvider.messages[index];
                             final isMe =
-                                msg.senderId == authProvider.currentUser!.id;
+                                msg.senderId == (authProvider.currentUser?.id ?? '');
                             final bubbleColor = isMe
                                 ? const Color(0xFFFF3366)
                                 : (isDark

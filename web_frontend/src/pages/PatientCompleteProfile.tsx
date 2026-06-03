@@ -187,7 +187,7 @@ export const PatientCompleteProfile: React.FC = () => {
   const getAvatarSrc = () => {
     if (!avatarUrl) return '';
     if (avatarUrl.startsWith('http')) return avatarUrl;
-    return `${API_URL}${avatarUrl}?token=${accessToken}`;
+    return `${API_URL}${avatarUrl}`;
   };
 
   return (

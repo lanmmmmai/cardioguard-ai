@@ -60,6 +60,20 @@ def check_rate_limit(ip: str, email: str, endpoint: str, max_requests: int = 5, 
     Ngoại lệ:
         HTTPException: 429 Too Many Requests kèm thông báo thử lại sau.
     """
+    # Inline cleanup when dict size exceeds limit to prevent memory leak
+    if len(_rate_limits) > 5000:
+        now_check = time.time()
+        to_delete = []
+        for k, ts in list(_rate_limits.items()):
+            # Keep timestamps within a safety window of 5 minutes (300s)
+            active_ts = [t for t in ts if now_check - t < 300]
+            if not active_ts:
+                to_delete.append(k)
+            else:
+                _rate_limits[k] = active_ts
+        for k in to_delete:
+            _rate_limits.pop(k, None)
+
     now = time.time()
     key = (ip, email.lower().strip(), endpoint)
     
@@ -81,3 +95,4 @@ def check_rate_limit(ip: str, email: str, endpoint: str, max_requests: int = 5, 
     timestamps.append(now)
     _rate_limits[key] = timestamps
     logger.debug("check_rate_limit: allowed, ip=%s email=%s endpoint=%s count=%d/%d window=%ds", ip, email, endpoint, len(timestamps), max_requests, window_seconds)
+

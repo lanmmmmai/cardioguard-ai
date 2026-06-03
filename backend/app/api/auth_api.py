@@ -220,7 +220,7 @@ async def get_user_from_token(
         f"""
         SELECT {", ".join(select_columns)}
         FROM users
-        WHERE id = :user_id::uuid
+        WHERE id = CAST(:user_id AS uuid)
         """,
         {"user_id": user_id}
     )

@@ -174,9 +174,7 @@ class Appointment {
       title: json['title'] ?? '',
       status: json['status'] ?? 'pending',
       channel: json['channel'] ?? 'offline',
-      scheduledAt: json['scheduled_at'] != null
-          ? DateTime.parse(json['scheduled_at'])
-          : DateTime.now(),
+      scheduledAt: _parseDateTime(json['scheduled_at']),
       notes: json['notes'] ?? '',
     );
   }
@@ -242,9 +240,7 @@ class MedicalRecord {
       diagnosis: json['diagnosis'] ?? '',
       summary: json['summary'] ?? '',
       files: json['files'],
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
-          : DateTime.now(),
+      createdAt: _parseDateTime(json['created_at']),
     );
   }
 
@@ -314,9 +310,7 @@ class Prescription {
       frequency: json['frequency'] ?? '',
       instructions: json['instructions'] ?? '',
       status: json['status'] ?? 'active',
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
-          : DateTime.now(),
+      createdAt: _parseDateTime(json['created_at']),
     );
   }
 
@@ -382,9 +376,7 @@ class ChatMessage {
       recipientId: json['recipient_id'] ?? '',
       message: json['message'] ?? '',
       isRead: json['is_read'] ?? false,
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
-          : DateTime.now(),
+      createdAt: _parseDateTime(json['created_at']),
     );
   }
 
@@ -449,9 +441,7 @@ class Alert {
       message: json['message'] ?? '',
       severity: json['severity'] ?? 'warning',
       isResolved: json['is_resolved'] ?? false,
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
-          : DateTime.now(),
+      createdAt: _parseDateTime(json['created_at']),
     );
   }
 
@@ -466,4 +456,17 @@ class Alert {
         'is_resolved': isResolved,
         'created_at': createdAt.toIso8601String(),
       };
+}
+
+/// Helper an toàn để parse chuỗi thời gian từ JSON mà không gây crash ứng dụng.
+DateTime _parseDateTime(dynamic value) {
+  if (value == null) return DateTime.now();
+  try {
+    if (value is String) {
+      return DateTime.parse(value);
+    }
+    return DateTime.now();
+  } catch (e) {
+    return DateTime.now();
+  }
 }

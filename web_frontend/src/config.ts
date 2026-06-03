@@ -75,12 +75,12 @@ const normalizedBakedApiUrl = isUsableApiUrl(bakedApiUrl) ? bakedApiUrl : undefi
 const normalizedBakedWsUrl = isUsableWsUrl(bakedWsUrl) ? bakedWsUrl : undefined;
 const normalizedSavedApiUrl = isUsableApiUrl(savedApiUrl) ? savedApiUrl : undefined;
 const normalizedSavedWsUrl = isUsableWsUrl(savedWsUrl) ? savedWsUrl : undefined;
-const runtimeDerivedApiUrl = deriveApiUrlFromWsUrl(runtimeWsUrl);
-const bakedDerivedApiUrl = deriveApiUrlFromWsUrl(normalizedBakedWsUrl || normalizedSavedWsUrl);
-const savedDerivedApiUrl = deriveApiUrlFromWsUrl(normalizedSavedWsUrl);
-const runtimeDerivedWsUrl = deriveWsUrlFromApiUrl(runtimeApiUrl);
-const bakedDerivedWsUrl = deriveWsUrlFromApiUrl(normalizedBakedApiUrl || normalizedSavedApiUrl);
-const savedDerivedWsUrl = deriveWsUrlFromApiUrl(normalizedSavedApiUrl);
+const runtimeDerivedApiUrl = isUsableApiUrl(deriveApiUrlFromWsUrl(runtimeWsUrl)) ? deriveApiUrlFromWsUrl(runtimeWsUrl) : undefined;
+const bakedDerivedApiUrl = isUsableApiUrl(deriveApiUrlFromWsUrl(normalizedBakedWsUrl || normalizedSavedWsUrl)) ? deriveApiUrlFromWsUrl(normalizedBakedWsUrl || normalizedSavedWsUrl) : undefined;
+const savedDerivedApiUrl = isUsableApiUrl(deriveApiUrlFromWsUrl(normalizedSavedWsUrl)) ? deriveApiUrlFromWsUrl(normalizedSavedWsUrl) : undefined;
+const runtimeDerivedWsUrl = isUsableWsUrl(deriveWsUrlFromApiUrl(runtimeApiUrl)) ? deriveWsUrlFromApiUrl(runtimeApiUrl) : undefined;
+const bakedDerivedWsUrl = isUsableWsUrl(deriveWsUrlFromApiUrl(normalizedBakedApiUrl || normalizedSavedApiUrl)) ? deriveWsUrlFromApiUrl(normalizedBakedApiUrl || normalizedSavedApiUrl) : undefined;
+const savedDerivedWsUrl = isUsableWsUrl(deriveWsUrlFromApiUrl(normalizedSavedApiUrl)) ? deriveWsUrlFromApiUrl(normalizedSavedApiUrl) : undefined;
 
 /** URL cơ sở của REST API – dự phòng về localhost:8000 */
 export const API_URL =
@@ -90,7 +90,7 @@ export const API_URL =
   normalizedBakedApiUrl ||
   savedDerivedApiUrl ||
   bakedDerivedApiUrl ||
-  (isLocalhost ? 'http://localhost:8000' : 'https://cardioguard-ai-a26e.onrender.com');
+  (isLocalhost ? 'http://localhost:8000/api' : 'https://cardioguard-ai-backend.onrender.com/api');
 
 /** Điểm cuối WebSocket cho dữ liệu telemetry thời gian thực */
 export const WS_URL =
@@ -100,7 +100,7 @@ export const WS_URL =
   normalizedBakedWsUrl ||
   savedDerivedWsUrl ||
   bakedDerivedWsUrl ||
-  (isLocalhost ? 'ws://localhost:8000/ws/realtime' : 'wss://cardioguard-ai-a26e.onrender.com/ws/realtime');
+  (isLocalhost ? 'ws://localhost:8000/ws/realtime' : 'wss://cardioguard-ai-backend.onrender.com/ws/realtime');
 
 export const buildApiUrl = (path: string) => {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
