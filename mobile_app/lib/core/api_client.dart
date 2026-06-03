@@ -1,3 +1,15 @@
+// Trình khách HTTP API (singleton) được xây dựng trên Dio.
+// Quy trình làm việc:
+//   1. Phiên bản singleton được cấu hình với URL cơ sở và thời gian chờ từ
+//      AppConfig. Trên mỗi yêu cầu, một token JWT động được đính kèm
+//      từ SecureStorage.
+//   2. Bộ chặn phản hồi bắt các lỗi 401, xóa phiên,
+//      và gọi onUnauthorized để buộc chuyển hướng đăng xuất.
+//   3. Hiển thị các phương thức đã được định kiểu (get, post, put, patch, delete) bao bọc
+//      các lời gọi Dio và ghi lại lỗi thông qua AppLogger.
+// Mối quan hệ:
+//   - Phụ thuộc vào: AppConfig, SecureStorage, AppLogger
+//   - Được tiêu thụ bởi tất cả các lớp provider để giao tiếp với máy chủ.
 import 'package:flutter/foundation.dart';
 import 'app_logger.dart';
 import 'package:dio/dio.dart';
@@ -5,13 +17,21 @@ import '../config/app_config.dart';
 import 'secure_storage.dart';
 
 class ApiClient {
+  // Phiên bản nội bộ singleton.
   static final ApiClient _instance = ApiClient._internal();
+
+  // Trả về phiên bản singleton ApiClient.
   factory ApiClient() => _instance;
+
+  // Trình khách HTTP Dio bên dưới.
   late final Dio dio;
 
-  // Callback to handle 401 unauthorized session expiration
+  // Callback được gọi khi nhận được phản hồi 401 Unauthorized,
+  // được sử dụng để kích hoạt đăng xuất im lặng từ AuthProvider.
   static VoidCallback? onUnauthorized;
 
+  // Hàm tạo riêng tư cấu hình Dio với các tùy chọn cơ sở, thời gian chờ,
+  // và các bộ chặn JWT/xác thực.
   ApiClient._internal() {
     dio = Dio(
       BaseOptions(
@@ -25,11 +45,11 @@ class ApiClient {
       ),
     );
 
-    // Add JWT Token and Error Interceptors
+    // Bộ chặn: đính kèm JWT khi yêu cầu; xử lý 401 khi có lỗi
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Fetch token dynamically from secure storage
+          // Lấy token động từ bộ nhớ an toàn
           final token = await SecureStorage().getToken();
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
@@ -37,12 +57,12 @@ class ApiClient {
           return handler.next(options);
         },
         onError: (DioException e, handler) async {
-          // Check for 401 Unauthorized
+          // Kiểm tra lỗi 401 Unauthorized
           if (e.response?.statusCode == 401) {
-            AppLogger.log('Session expired (401 Unauthorized)');
-            // Clear credentials in background
+            AppLogger.log('Phiên hết hạn (401 Unauthorized)');
+            // Xóa thông tin xác thực trong nền
             await SecureStorage().clearSession();
-            // Trigger logout redirect if callback registered
+            // Kích hoạt chuyển hướng đăng xuất nếu callback đã được đăng ký
             if (onUnauthorized != null) {
               onUnauthorized!();
             }
@@ -53,7 +73,7 @@ class ApiClient {
     );
   }
 
-  // GET Request
+  // Gửi yêu cầu HTTP GET đến path đã cho.
   Future<Response> get(
     String path, {
     Map<String, dynamic>? queryParameters,
@@ -67,7 +87,7 @@ class ApiClient {
     }
   }
 
-  // POST Request
+  // Gửi yêu cầu HTTP POST đến path đã cho với phần thân data tùy chọn.
   Future<Response> post(
     String path, {
     dynamic data,
@@ -82,7 +102,7 @@ class ApiClient {
     }
   }
 
-  // PUT Request
+  // Gửi yêu cầu HTTP PUT đến path đã cho với phần thân data tùy chọn.
   Future<Response> put(
     String path, {
     dynamic data,
@@ -97,7 +117,7 @@ class ApiClient {
     }
   }
 
-  // PATCH Request
+  // Gửi yêu cầu HTTP PATCH đến path đã cho với phần thân data tùy chọn.
   Future<Response> patch(
     String path, {
     dynamic data,
@@ -112,7 +132,7 @@ class ApiClient {
     }
   }
 
-  // DELETE Request
+  // Gửi yêu cầu HTTP DELETE đến path đã cho với phần thân data tùy chọn.
   Future<Response> delete(
     String path, {
     dynamic data,
@@ -127,7 +147,7 @@ class ApiClient {
     }
   }
 
-  // Clean error logging
+  // Ghi lại thông báo lỗi thân thiện bằng tiếng Việt dựa trên loại DioException.
   void _handleDioError(DioException error) {
     String message = '';
     switch (error.type) {
@@ -156,4 +176,3 @@ class ApiClient {
     AppLogger.log('[Dio API Client Error] $message');
   }
 }
-

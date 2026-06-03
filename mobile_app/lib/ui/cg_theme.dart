@@ -1,6 +1,17 @@
+// Trình xây dựng chủ đề CardioGuard — xây dựng ThemeData cho chế độ sáng hoặc tối.
+// Quy trình làm việc:
+//   1. Xác định tối/sáng từ tham số brightness.
+//   2. Xây dựng ColorScheme sử dụng các token CgColors và tạo ThemeData
+//      cơ sở với Material 3 được bật.
+//   3. Ghi đè các chủ đề văn bản, đầu vào và nút nâng cao với các kiểu tùy chỉnh.
+// Mối quan hệ:
+//   - Phụ thuộc vào các token màu/bán kính từ cg_tokens.dart.
+//   - Được tiêu thụ bởi MaterialApp.theme và MaterialApp.darkTheme trong main.dart.
 import 'package:flutter/material.dart';
 import 'cg_tokens.dart';
 
+// Xây dựng ThemeData tùy chỉnh cho ứng dụng CardioGuard.
+// brightness chọn giữa bảng màu sáng và tối.
 ThemeData buildCgTheme(Brightness brightness) {
   final isDark = brightness == Brightness.dark;
   final base = ThemeData(

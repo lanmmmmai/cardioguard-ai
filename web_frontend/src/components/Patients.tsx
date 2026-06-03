@@ -1,3 +1,10 @@
+/**
+ * @purpose Liệt kê các tài khoản bệnh nhân đã xác thực OTP với tính năng tìm kiếm
+ *           và cung cấp biểu mẫu modal "Thêm bệnh nhân".
+ * @workflow Lọc bệnh nhân theo truy vấn tìm kiếm qua useMemo; modal chuyển đổi
+ *           showAddModal để tạo bản ghi bệnh nhân mới qua POST đến API.
+ * @relationships Component cha: App (nhận danh sách bệnh nhân + callback); Sử dụng: config cho API_URL.
+ */
 import React, { useState, useMemo } from 'react';
 import { Search, X, Loader2 } from 'lucide-react';
 import { API_URL } from '../config';
@@ -12,6 +19,9 @@ interface PatientsProps {
   onViewPatientDetail: (patientId: string) => void;
 }
 
+/**
+ * Component Patients — hiển thị danh sách bệnh nhân có thể tìm kiếm và modal thêm bệnh nhân.
+ */
 export const Patients: React.FC<PatientsProps> = ({ 
   patients, 
   accessToken,
@@ -22,7 +32,6 @@ export const Patients: React.FC<PatientsProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Form state
   const [fullName, setFullName] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('Nam');
@@ -33,7 +42,6 @@ export const Patients: React.FC<PatientsProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filter patients by search query
   const filteredPatients = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return patients.filter(p => 
@@ -85,7 +93,6 @@ export const Patients: React.FC<PatientsProps> = ({
         throw new Error(data.detail || 'Lỗi thêm bệnh nhân mới');
       }
 
-      // Reset form
       setFullName('');
       setAge('');
       setGender('Nam');
@@ -94,7 +101,7 @@ export const Patients: React.FC<PatientsProps> = ({
       setMedicalHistory('');
       
       setShowAddModal(false);
-      onPatientAdded(); // refresh patient list
+      onPatientAdded();
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
     } finally {
@@ -116,7 +123,6 @@ export const Patients: React.FC<PatientsProps> = ({
         </span>
       </div>
 
-      {/* Search Input bar */}
       <div className="panel" style={{ marginBottom: '1.5rem', padding: '12px 20px' }}>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <Search size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
@@ -131,7 +137,6 @@ export const Patients: React.FC<PatientsProps> = ({
         </div>
       </div>
 
-      {/* Patient rows list */}
       <div className="patient-list">
         {filteredPatients.length === 0 ? (
           <div className="panel" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
@@ -167,7 +172,6 @@ export const Patients: React.FC<PatientsProps> = ({
         )}
       </div>
 
-      {/* Add Patient Modal overlay */}
       {showAddModal && (
         <div className="modal-overlay">
           <div className="modal-content panel">

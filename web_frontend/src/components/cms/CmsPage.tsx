@@ -1,3 +1,11 @@
+/**
+ * Mục đích: Trang quản trị CMS chính: điều hướng module, bảng dữ liệu, CRUD bản ghi, nhập/xuất CSV.
+ * Luồng xử lý: Chọn một module CMS từ thanh bên; tải các dòng đã phân trang/sắp xếp/lọc qua cmsApi;
+ *              hỗ trợ CRUD nội tuyến qua các hộp thoại (RecordFormModal, DetailModal, ConfirmDialog, CsvImportModal);
+ *              xuất CSV hoặc tải xuống file template.
+ * Quan hệ: Sử dụng useAuth cho accessToken/role; ủy quyền cho DataTable, RecordFormModal, DetailModal,
+ *          ConfirmDialog, CsvImportModal; được cấu hình bởi định nghĩa module cmsConfig.
+ */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Download, FileDown, FileUp, Plus, RefreshCw, Search } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
@@ -24,6 +32,10 @@ const downloadText = (filename: string, content: string) => {
   URL.revokeObjectURL(url);
 };
 
+/**
+ * Component CmsPage — không gian làm việc CMS đầy đủ với thanh bên module, bảng dữ liệu có sắp xếp,
+ * phân trang và các thao tác CRUD qua hộp thoại. Chỉ dành cho quản trị viên.
+ */
 export const CmsPage: React.FC = () => {
   const { accessToken, role } = useAuth();
   const { navigate } = useBrowserPath();
@@ -183,10 +195,10 @@ export const CmsPage: React.FC = () => {
                 <div className="cms-toolbar-title">
                   <ActiveIcon size={20} />
                   <strong>{config.label}</strong>
-                  <span>{total} records</span>
+                  <span>{total} bản ghi</span>
                 </div>
                 <div className="cms-toolbar-actions">
-                  <button type="button" className="btn btn-primary" onClick={() => setEditing('new')}><Plus size={16} /> Add new</button>
+                  <button type="button" className="btn btn-primary" onClick={() => setEditing('new')}><Plus size={16} /> Thêm mới</button>
                   <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}><FileUp size={16} /> Import CSV</button>
                   <button type="button" className="btn btn-secondary" onClick={exportCsv}><Download size={16} /> Export CSV</button>
                   <button type="button" className="btn btn-secondary" onClick={downloadTemplate}><FileDown size={16} /> Template</button>
@@ -196,9 +208,9 @@ export const CmsPage: React.FC = () => {
               <div className="cms-filters">
                 <label>
                   <Search size={16} />
-                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search..." />
+                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm kiếm..." />
                 </label>
-                <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter: status:online,role:patient" />
+                <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Lọc: status:online,role:patient" />
               </div>
 
               {error && <div className="cms-inline-error">{error}</div>}
@@ -229,7 +241,7 @@ export const CmsPage: React.FC = () => {
 
       {editing && (
         <RecordFormModal
-          title={editing === 'new' ? `Add ${config.label}` : `Edit ${config.label}`}
+          title={editing === 'new' ? `Thêm ${config.label}` : `Sửa ${config.label}`}
           columns={formColumns}
           record={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}

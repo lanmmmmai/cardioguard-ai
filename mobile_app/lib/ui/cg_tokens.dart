@@ -1,5 +1,15 @@
+// Các token thiết kế cho giao diện CardioGuard: màu sắc, khoảng cách và bán kính viền.
+// Quy trình làm việc:
+//   - CgColors định nghĩa bảng màu ngữ nghĩa (primary, critical,
+//     warning, normal và các màu chỉ số sinh tồn cụ thể).
+//   - CgSpacing và CgRadius cung cấp các hằng số bố cục nhất quán được sử dụng
+//     trên tất cả các màn hình và widget.
+// Mối quan hệ:
+//   - Được tiêu thụ bởi cg_theme.dart và tất cả các tệp màn hình/widget để
+//     tạo kiểu hình ảnh nhất quán.
 import 'package:flutter/material.dart';
 
+// Bảng màu ngữ nghĩa được sử dụng trong toàn bộ giao diện CardioGuard.
 class CgColors {
   static const critical = Color(0xFFD92D20);
   static const warning = Color(0xFFF79009);

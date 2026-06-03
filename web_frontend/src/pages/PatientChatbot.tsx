@@ -1,14 +1,30 @@
+/**
+ * Mục đích: Trợ lý sức khỏe AI dành cho bệnh nhân. Cung cấp giao diện hội thoại
+ *           nơi bệnh nhân có thể hỏi về các chỉ số sinh tồn, nhận thông tin sức khỏe
+ *           và theo dõi các chỉ số tim mạch.
+ * Luồng xử lý: 1. Khi khởi tạo, tải lịch sử cảm biến gần đây từ backend →
+ *            2. Truyền dữ liệu đó làm ngữ cảnh vào ChatWindow → 3. Bệnh nhân nhập
+ *            câu hỏi và nhận phản hồi từ AI.
+ * Quan hệ:
+ *   - Component ChatWindow cho hội thoại AI
+ *   - AuthContext cho access token và định danh phiên
+ *   - Điểm cuối lịch sử cảm biến (API_URL/sensors/history)
+ */
 import React, { useEffect, useState } from 'react';
 import { Bot, HeartPulse, ShieldCheck } from 'lucide-react';
 import { ChatWindow } from '../components/chat/ChatWindow';
 import { useAuth } from '../auth/AuthContext';
 import { API_URL } from '../config';
 
+/**
+ * Trang chatbot chính cho bệnh nhân. Tải dữ liệu cảm biến gần đây làm ngữ cảnh
+ * hội thoại và hiển thị ChatWindow cho Q&A về sức khỏe.
+ */
 export const PatientChatbot: React.FC = () => {
   const { accessToken } = useAuth();
   const [contextData, setContextData] = useState<unknown>(null);
 
-  // Fetch recent sensor data to use as context
+  // Tải dữ liệu cảm biến gần đây để sử dụng làm ngữ cảnh
   useEffect(() => {
     const fetchContext = async () => {
       try {
@@ -16,20 +32,16 @@ export const PatientChatbot: React.FC = () => {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
         const data = await res.json();
-        // Just take the latest 5 records for context
+        // Chỉ lấy 5 bản ghi gần nhất làm ngữ cảnh
         if (data.items) {
           setContextData({ recent_sensor_data: data.items.slice(0, 5) });
         }
       } catch (err) {
-        console.error("Failed to fetch context", err);
+        console.error("Không thể tải ngữ cảnh", err);
       }
     };
     fetchContext();
   }, [accessToken]);
-
-  // Hacky way to inject query into ChatWindow
-  // In a real app we'd lift state up, but since ChatWindow manages its own input, we can use a custom event or a ref.
-  // For simplicity here, we'll just show the AIQuickActions visually. (We'll update ChatWindow to accept a prop if needed later).
 
   return (
     <div className="patient-chatbot-page">

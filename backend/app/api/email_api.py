@@ -1,8 +1,26 @@
-# =============================================================================
-# CardioGuard AI — Email CMS API
-# File: backend/app/api/email_api.py
-# Các endpoint quản lý template email và gửi email hệ thống
-# =============================================================================
+"""API Email CMS — Quản lý Mẫu và Gửi Email.
+
+Mục đích:
+    Cung cấp hệ thống quản lý email đầy đủ: CRUD cho các mẫu email,
+    gửi email thủ công qua Brevo/SMTP, theo dõi nhật ký email với khả năng
+    thử lại, xuất CSV nhật ký, nhập người nhận từ CSV và điểm cuối
+    xem trước/kết xuất mẫu.
+
+Luồng xử lý:
+    Các mẫu được lưu trữ trong bảng email_templates với hỗ trợ biến động
+    (ví dụ: {{full_name}}, {{otp}}). Điểm cuối gửi giải quyết một
+    mẫu (hoặc sử dụng nội dung trực tiếp), kết xuất biến, gửi qua
+    API Brevo (dự phòng sang SMTP) và lưu trữ kết quả trong email_logs.
+    Các lần gửi thất bại có thể được thử lại. Tất cả các thao tác đều chỉ dành cho admin.
+
+Quan hệ:
+    - Phụ thuộc vào: auth_api.get_user_from_token để xác thực admin
+    - Phụ thuộc vào: services.email_service để kết xuất mẫu và SMTP
+    - Phụ thuộc vào: services.audit_service để ghi nhật ký hoạt động
+    - Phụ thuộc vào: core.config cho cài đặt Brevo/SMTP
+    - Phụ thuộc vào: core.sqlalchemy_async cho các phiên DB
+    - Bảng: email_templates, email_logs
+"""
 
 import csv
 import io
@@ -77,7 +95,7 @@ SYSTEM_EMAIL_GROUPS = {
 
 
 # -----------------------------------------------------------
-# Schemas
+# Lược đồ (Schemas)
 # -----------------------------------------------------------
 
 class TemplateCreate(BaseModel):
@@ -150,7 +168,7 @@ class PreviewRequest(BaseModel):
 
 
 # -----------------------------------------------------------
-# Helper functions
+# Hàm trợ giúp (Helper functions)
 # -----------------------------------------------------------
 
 async def require_admin(authorization: Optional[str]) -> dict[str, Any]:
@@ -227,7 +245,7 @@ def send_brevo_email(
                 cc=cc,
                 bcc=bcc,
             )
-        logger.info("Email CMS dev send skipped: subject logged suppressed")
+        logger.info("Bỏ qua gửi email CMS dev: subject đã bị ẩn")
         return False
 
     payload: dict[str, Any] = {
@@ -555,7 +573,7 @@ async def ensure_email_function_exists(email_type: str, cms_email_id: Optional[s
 
 
 # -----------------------------------------------------------
-# TEMPLATE ENDPOINTS
+# ĐIỂM CUỐI TEMPLATE (TEMPLATE ENDPOINTS)
 # -----------------------------------------------------------
 
 @router.get("/templates")
@@ -622,8 +640,7 @@ async def get_template(
 
     template = await fetch_template_by_id(template_id)
     if not template:
-        raise HTTPException(status_code=404, detail="Template không tồn tại")
-    return template
+        return template
 
 
 @router.post("/templates")
@@ -788,7 +805,7 @@ async def update_template(
             if duplicate.first():
                 raise HTTPException(status_code=409, detail="Không được trùng mã ID Email CMS")
         result = await session.execute(
-            text(f"UPDATE email_templates SET {set_sql} WHERE id::text = :id RETURNING id"),
+            text(f"UPDATE email_templates SET {set_sql} WHERE id = :id::uuid RETURNING id"),
             updates,
         )
         row = result.mappings().first()
@@ -820,7 +837,7 @@ async def delete_template(
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            text("DELETE FROM email_templates WHERE id::text = :id RETURNING id"),
+            text("DELETE FROM email_templates WHERE id = :id::uuid RETURNING id"),
             {"id": template_id},
         )
         row = result.mappings().first()
@@ -892,7 +909,7 @@ async def activate_template(
 
 
 # -----------------------------------------------------------
-# SEND & PREVIEW ENDPOINTS
+# ĐIỂM CUỐI GỬI & XEM TRƯỚC (SEND & PREVIEW ENDPOINTS)
 # -----------------------------------------------------------
 
 @router.post("/preview")
@@ -980,7 +997,7 @@ async def send_email(
 
 
 # -----------------------------------------------------------
-# LOGS ENDPOINTS
+# ĐIỂM CUỐI NHẬT KÝ (LOGS ENDPOINTS)
 # -----------------------------------------------------------
 
 @router.get("/logs")
@@ -1045,7 +1062,7 @@ async def retry_email(
                 SELECT l.*, t.html_content, t.text_content, t.is_active, t.email_type
                 FROM email_logs l
                 LEFT JOIN email_templates t ON t.id = l.template_id
-                WHERE l.id::text = :id
+                WHERE l.id = :id::uuid
             """),
             {"id": log_id},
         )
@@ -1148,7 +1165,7 @@ async def import_recipients(
     return {
         "valid_count": len(valid),
         "invalid_count": len(invalid),
-        "valid": valid[:50],   # Trả về tối đa 50 để preview
+        "valid": valid[:50],
         "invalid": invalid,
     }
 

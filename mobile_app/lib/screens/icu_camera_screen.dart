@@ -1,3 +1,15 @@
+// Màn hình camera ICU mô phỏng cho mục đích demo.
+// Quy trình làm việc:
+// 1. Bắt đầu bộ điều khiển hoạt ảnh 60 FPS cho chu kỳ thở và cập nhật HUD.
+// 2. Bộ đếm thời gian định kỳ 100 ms giữ cho mã thời gian trên màn hình luôn cập nhật.
+// 3. Cổng nhìn hiển thị hai lớp CustomPainter: một lớp phủ quét CRT
+//    (_CrtOverlayPainter) và giường/bóng ICU (_IcuCameraPainter).
+// 4. Bóng bệnh nhân hiển thị sóng hình sin nâng ngực để mô phỏng nhịp thở.
+// Mối quan hệ:
+// - Màn hình độc lập; không sử dụng providers.
+// - Sử dụng: CgScreenScaffold cho bố cục.
+// - Vẽ: _IcuCameraPainter (giường, bóng, HUD) và
+//           _CrtOverlayPainter (đường quét chuyển động).
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -21,7 +33,7 @@ class _IcuCameraScreenState extends State<IcuCameraScreen>
   @override
   void initState() {
     super.initState();
-    // 60FPS ticker for breathing cycles & blinking dots
+    // Bộ đếm thời gian 60FPS cho chu kỳ thở và các dấu chấm nhấp nháy
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3600),
@@ -30,7 +42,7 @@ class _IcuCameraScreenState extends State<IcuCameraScreen>
       });
     _animationController.forward();
 
-    // Timecode clock timer
+    // Đồng hồ đếm thời gian
     _updateTime();
     _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
       _updateTime();
@@ -99,7 +111,7 @@ class _IcuCameraScreenState extends State<IcuCameraScreen>
       ),
       body: Column(
         children: [
-          // Camera viewport wrapper
+          // Bọc cổng nhìn camera
           Expanded(
             child: Padding(
               padding:
@@ -147,7 +159,7 @@ class _IcuCameraScreenState extends State<IcuCameraScreen>
             ),
           ),
 
-          // Camera details info
+          // Thông tin chi tiết camera
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Container(
@@ -181,7 +193,8 @@ class _IcuCameraScreenState extends State<IcuCameraScreen>
   }
 }
 
-// Custom Painter for ICU Bed & Silhouette
+// Trình vẽ tùy chỉnh cho Giường ICU và Bóng bệnh nhân
+// Vẽ giường ICU, bóng bệnh nhân, hoạt ảnh thở và lớp phủ HUD.
 class _IcuCameraPainter extends CustomPainter {
   final double timestamp;
   final String timeString;
@@ -193,7 +206,7 @@ class _IcuCameraPainter extends CustomPainter {
     final width = size.width;
     final height = size.height;
 
-    // 1. Draw green thermal grid
+    // 1. Vẽ lưới nhiệt màu xanh lá
     final gridPaint = Paint()
       ..color = const Color(0xFF39FF14).withValues(alpha: 0.04)
       ..strokeWidth = 1.0;
@@ -205,7 +218,7 @@ class _IcuCameraPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(width, y), gridPaint);
     }
 
-    // 2. Draw viewfinder corners
+    // 2. Vẽ các góc khung ngắm
     final bracketPaint = Paint()
       ..color = const Color(0xFF39FF14).withValues(alpha: 0.6)
       ..strokeWidth = 1.5
@@ -214,28 +227,28 @@ class _IcuCameraPainter extends CustomPainter {
     const double margin = 20.0;
     const double len = 15.0;
 
-    // Top Left
+    // Góc trên trái
     canvas.drawPath(
         Path()
           ..moveTo(margin + len, margin)
           ..lineTo(margin, margin)
           ..lineTo(margin, margin + len),
         bracketPaint);
-    // Top Right
+    // Góc trên phải
     canvas.drawPath(
         Path()
           ..moveTo(width - margin - len, margin)
           ..lineTo(width - margin, margin)
           ..lineTo(width - margin, margin + len),
         bracketPaint);
-    // Bottom Left
+    // Góc dưới trái
     canvas.drawPath(
         Path()
           ..moveTo(margin + len, height - margin)
           ..lineTo(margin, height - margin)
           ..lineTo(margin, height - margin - len),
         bracketPaint);
-    // Bottom Right
+    // Góc dưới phải
     canvas.drawPath(
         Path()
           ..moveTo(width - margin - len, height - margin)
@@ -243,13 +256,13 @@ class _IcuCameraPainter extends CustomPainter {
           ..lineTo(width - margin, height - margin - len),
         bracketPaint);
 
-    // 3. Draw center crosshair
+    // 3. Vẽ chữ thập trung tâm
     canvas.drawLine(Offset(width / 2 - 10, height / 2),
         Offset(width / 2 + 10, height / 2), bracketPaint);
     canvas.drawLine(Offset(width / 2, height / 2 - 10),
         Offset(width / 2, height / 2 + 10), bracketPaint);
 
-    // 4. Draw Bed & Silhouette
+    // 4. Vẽ Giường và Bóng bệnh nhân
     final bedPaint = Paint()
       ..color = const Color(0xFF39FF14).withValues(alpha: 0.25)
       ..strokeWidth = 1.5
@@ -259,16 +272,16 @@ class _IcuCameraPainter extends CustomPainter {
     final bedX1 = width * 0.15;
     final bedX2 = width * 0.85;
 
-    // Bed base frame & legs
+    // Khung giường cơ bản và chân
     canvas.drawLine(Offset(bedX1, bedY), Offset(bedX2, bedY), bedPaint);
     canvas.drawLine(
         Offset(bedX1 + 30, bedY), Offset(bedX1 + 30, bedY + 45), bedPaint);
     canvas.drawLine(
         Offset(bedX2 - 30, bedY), Offset(bedX2 - 30, bedY + 45), bedPaint);
     canvas.drawLine(Offset(bedX1, bedY), Offset(bedX1 - 12, bedY - 30),
-        bedPaint); // headrest
+        bedPaint); // tựa đầu
 
-    // Chest rise animation expansion (sine wave breathing)
+    // Hoạt ảnh nâng ngực: sóng hình sin thở ở chu kỳ ~4 giây
     final breathTime = timestamp / 4000.0;
     final chestExpansion = 5.0 * math.sin(breathTime * 2 * math.pi);
 
@@ -282,7 +295,7 @@ class _IcuCameraPainter extends CustomPainter {
     final pChestX = pHeadX + 45;
     final pChestY = bedY - 15;
 
-    // Pillow
+    // Gối
     canvas.drawArc(
         Rect.fromCircle(center: Offset(pHeadX - 10, bedY - 8), radius: 10),
         math.pi,
@@ -290,14 +303,14 @@ class _IcuCameraPainter extends CustomPainter {
         false,
         bedPaint);
 
-    // Head
+    // Đầu
     canvas.drawCircle(Offset(pHeadX, pHeadY), 10.0, patientPaint);
 
-    // Neck & Shoulder
+    // Cổ và vai
     canvas.drawLine(Offset(pHeadX + 8, pHeadY + 5),
         Offset(pHeadX + 16, bedY - 8), patientPaint);
 
-    // Chest & body path with breathing
+    // Ngực và cơ thể với nhịp thở
     final bodyPath = Path()
       ..moveTo(pHeadX + 16, bedY - 8)
       ..quadraticBezierTo(
@@ -310,26 +323,26 @@ class _IcuCameraPainter extends CustomPainter {
 
     canvas.drawPath(bodyPath, patientPaint);
 
-    // IV Stand
+    // Giá đỡ IV
     final ivX = pHeadX - 25;
     canvas.drawLine(Offset(ivX, bedY + 30), Offset(ivX, bedY - 90), bedPaint);
     canvas.drawLine(
         Offset(ivX - 10, bedY - 90), Offset(ivX + 10, bedY - 90), bedPaint);
     canvas.drawRect(
-        Rect.fromLTWH(ivX - 8, bedY - 82, 6, 14), bedPaint); // fluid bag
-    // drip wire
+        Rect.fromLTWH(ivX - 8, bedY - 82, 6, 14), bedPaint); // túi dịch
+    // dây nhỏ giọt
     final wirePath = Path()
       ..moveTo(ivX - 5, bedY - 68)
       ..cubicTo(ivX - 5, bedY - 30, pChestX - 10, bedY, pChestX + 5, bedY - 6);
     canvas.drawPath(wirePath, bedPaint);
 
-    // HUD Text Overlay
+    // Lớp phủ văn bản HUD
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
 
-    // REC text (flashing)
+    // Văn bản REC (nhấp nháy)
     final bool isRecFlash = (timestamp ~/ 600) % 2 == 0;
     if (isRecFlash) {
-      // Red dot
+      // Chấm đỏ
       canvas.drawCircle(const Offset(margin + 10, margin + 12), 4.0,
           Paint()..color = const Color(0xFFFF073A));
 
@@ -345,7 +358,7 @@ class _IcuCameraPainter extends CustomPainter {
       textPainter.paint(canvas, const Offset(margin + 20, margin + 6));
     }
 
-    // Camera name
+    // Tên camera
     textPainter.text = const TextSpan(
       text: 'CAM 04 - ICU ROOM',
       style: TextStyle(
@@ -357,7 +370,7 @@ class _IcuCameraPainter extends CustomPainter {
     textPainter.layout();
     textPainter.paint(canvas, const Offset(margin + 10, margin + 26));
 
-    // Connection status
+    // Trạng thái kết nối
     textPainter.text = const TextSpan(
       text: 'CONN: ACTIVE',
       style: TextStyle(
@@ -369,7 +382,7 @@ class _IcuCameraPainter extends CustomPainter {
     textPainter.layout();
     textPainter.paint(canvas, Offset(width - margin - 80, margin + 10));
 
-    // Clock Timecode
+    // Mã thời gian đồng hồ
     textPainter.text = TextSpan(
       text: timeString,
       style: const TextStyle(
@@ -389,7 +402,7 @@ class _IcuCameraPainter extends CustomPainter {
   }
 }
 
-// Custom Painter for CRT Scanline Overlay
+// Vẽ một lớp phủ quét CRT chuyển động để mô phỏng hiệu ứng màn hình cổ điển.
 class _CrtOverlayPainter extends CustomPainter {
   final double timestamp;
 
@@ -400,7 +413,7 @@ class _CrtOverlayPainter extends CustomPainter {
     final width = size.width;
     final height = size.height;
 
-    // Moving scanline
+    // Đường quét chuyển động
     final scanlinePaint = Paint()
       ..color = const Color(0xFF39FF14).withValues(alpha: 0.08)
       ..strokeWidth = 2.0;

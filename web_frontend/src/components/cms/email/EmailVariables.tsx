@@ -1,6 +1,12 @@
+/**
+ * Mục đích: Bảng tham chiếu liệt kê tất cả các biến động template được hỗ trợ với mô tả và sao chép vào clipboard.
+ * Luồng xử lý: Hiển thị lưới các thẻ biến; bấm vào thẻ sẽ sao chép cú pháp (ví dụ: {{full_name}})
+ *              vào clipboard và gọi callback onInsert.
+ * Quan hệ: Được sử dụng bởi EmailCmsPage tab "variables" và bảng điều khiển của TemplateEditor.
+ */
 import React from 'react';
 
-// Danh sách biến động được hỗ trợ (hiển thị reference)
+// Danh sách biến động được hỗ trợ (hiển thị tham chiếu)
 const VARIABLES = [
   { name: 'full_name',        syntax: '{{full_name}}',        desc: 'Họ và tên người nhận' },
   { name: 'otp',              syntax: '{{otp}}',              desc: 'Mã OTP 6 chữ số' },
@@ -17,10 +23,14 @@ const VARIABLES = [
 ];
 
 interface EmailVariablesProps {
-  /** Khi click vào variable, copy vào clipboard */
+  /** Khi bấm vào biến, sao chép vào clipboard */
   onInsert?: (syntax: string) => void;
 }
 
+/**
+ * Component EmailVariables — hiển thị các biến động template được hỗ trợ với chức năng sao chép.
+ * Hiển thị chỉ báo "✓ Đã sao chép!" tạm thời trên thẻ đã sao chép.
+ */
 export const EmailVariables: React.FC<EmailVariablesProps> = ({ onInsert }) => {
   const [copied, setCopied] = React.useState<string | null>(null);
 
@@ -46,7 +56,7 @@ export const EmailVariables: React.FC<EmailVariablesProps> = ({ onInsert }) => {
             type="button"
             className="email-variable-card"
             onClick={() => handleCopy(v.syntax)}
-            title={`Click để sao chép ${v.syntax}`}
+            title={`Bấm để sao chép ${v.syntax}`}
           >
             <div className="email-variable-syntax">
               {copied === v.syntax ? '✓ Đã sao chép!' : v.syntax}

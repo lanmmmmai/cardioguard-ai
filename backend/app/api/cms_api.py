@@ -1,3 +1,30 @@
+"""API Hệ thống Quản lý Nội dung (CMS).
+
+Mục đích:
+    Cung cấp giao diện CRUD chung chỉ dành cho admin để quản lý tất cả các
+    bảng cơ sở dữ liệu thông qua một REST API thống nhất. Hỗ trợ liệt kê với
+    tìm kiếm/lọc/sắp xếp/phân trang, xuất/nhập CSV và các thao tác CRUD ở
+    cấp bản ghi. Các thao tác ghi trên các bảng quan trọng (users, patients,
+    alerts, sensor_data, v.v.) bị chặn để thực thi logic nghiệp vụ thông qua
+    các API chuyên dụng.
+
+Luồng xử lý:
+    Mọi endpoint đều yêu cầu xác thực admin. Cấu hình module (CMS_MODULES)
+    định nghĩa ánh xạ bảng, các cột ẩn/chỉ đọc/bắt buộc, bí danh và danh
+    sách cột CSV. Giới thiệu lược đồ thông qua information_schema
+    xây dựng truy vấn động. Việc ép kiểu cột và xác thực được xử lý
+    bởi cast_value/validate_payload. Ghi nhật ký kiểm toán được thực hiện
+    cho tất cả các thay đổi ngoại trừ trên chính bảng audit_logs (để ngăn
+    đệ quy).
+
+Quan hệ:
+    - Phụ thuộc vào: auth_api.get_user_from_token để xác thực admin
+    - Phụ thuộc vào: services.audit_service để ghi nhật ký hoạt động
+    - Phụ thuộc vào: core.sqlalchemy_async cho các phiên SQLAlchemy bất đồng bộ
+    - Phụ thuộc vào: core.security/password_policy để xử lý mật khẩu
+    - Được sử dụng bởi: Giao diện quản trị để quản lý dữ liệu
+"""
+
 import csv
 import io
 import logging
@@ -99,6 +126,17 @@ DATE_TYPES = {"date", "timestamp", "timestamptz"}
 
 
 def module_config(module: str) -> dict[str, Any]:
+    """Lấy cấu hình module CMS theo tên.
+
+    Args:
+        module: Tên module (ví dụ: 'users', 'devices').
+
+    Returns:
+        Dict cấu hình module với table, hidden, readonly, v.v.
+
+    Raises:
+        HTTPException 404: Nếu module không được định nghĩa.
+    """
     config = CMS_MODULES.get(module.replace("-", "_"))
     if not config:
         raise HTTPException(status_code=404, detail="CMS module not found")
@@ -106,6 +144,17 @@ def module_config(module: str) -> dict[str, Any]:
 
 
 def ensure_module_write_allowed(module: str) -> None:
+    """Chặn ghi CMS trực tiếp trên các module quan trọng.
+
+    Các module này phải sử dụng API chuyên dụng của chúng để đảm bảo
+    logic nghiệp vụ và tính toàn vẹn dữ liệu.
+
+    Args:
+        module: Tên module cần kiểm tra.
+
+    Raises:
+        HTTPException 403: Nếu module nằm trong danh sách bị hạn chế.
+    """
     module = module.replace("-", "_")
     # Các module này phải đi qua domain API để giữ nghiệp vụ và toàn vẹn dữ liệu.
     restricted_modules = {
@@ -169,6 +218,17 @@ def domain_links_default_payload(path: Optional[str], full_url: Optional[str] = 
 
 
 async def require_admin(authorization: Optional[str]) -> dict[str, Any]:
+    """Xác thực người gọi là người dùng admin.
+
+    Args:
+        authorization: Chuỗi token Bearer.
+
+    Returns:
+        Dict người dùng admin đã xác thực.
+
+    Raises:
+        HTTPException 403: Nếu người dùng không phải là admin.
+    """
     user = await get_user_from_token(authorization)
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Only admin can access CMS")
@@ -176,6 +236,19 @@ async def require_admin(authorization: Optional[str]) -> dict[str, Any]:
 
 
 def quote_identifier(value: str) -> str:
+    """Đặt dấu ngoặc kép an toàn cho định danh SQL để ngăn chèn.
+
+    Chỉ cho phép ký tự chữ và số và dấu gạch dưới.
+
+    Args:
+        value: Chuỗi định danh cần đặt dấu ngoặc kép.
+
+    Returns:
+        Định danh được đặt trong dấu ngoặc kép.
+
+    Raises:
+        HTTPException 400: Nếu định danh chứa ký tự không hợp lệ.
+    """
     if not value.replace("_", "").isalnum():
         raise HTTPException(status_code=400, detail=f"Invalid identifier: {value}")
     return f'"{value}"'
@@ -185,6 +258,19 @@ _cms_columns_cache: dict[str, list[dict[str, Any]]] = {}
 
 
 async def get_columns(table: str) -> list[dict[str, Any]]:
+    """Lấy siêu dữ liệu cột cho một bảng thông qua information_schema.
+
+    Kết quả được lưu vào bộ nhớ đệm để giảm tải cơ sở dữ liệu.
+
+    Args:
+        table: Tên bảng.
+
+    Returns:
+        Danh sách dict chứa column_name, udt_name, is_nullable, column_default.
+
+    Raises:
+        HTTPException 500: Nếu không tìm thấy bảng.
+    """
     if table in _cms_columns_cache:
         return _cms_columns_cache[table]
     async with AsyncSessionLocal() as session:
@@ -208,6 +294,15 @@ async def get_columns(table: str) -> list[dict[str, Any]]:
 
 
 def visible_columns(columns: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
+    """Lọc các cột để chỉ hiển thị những cột không bị ẩn.
+
+    Args:
+        columns: Danh sách siêu dữ liệu cột đầy đủ từ get_columns.
+        config: Dict cấu hình module.
+
+    Returns:
+        Danh sách cột đã lọc với name, type, nullable, readonly.
+    """
     hidden = config.get("hidden", set())
     readonly = config.get("readonly", set())
     return [
@@ -223,6 +318,16 @@ def visible_columns(columns: list[dict[str, Any]], config: dict[str, Any]) -> li
 
 
 def to_jsonable(value: Any) -> Any:
+    """Chuyển đổi các kiểu không thể tuần tự hóa thành biểu diễn an toàn JSON.
+
+    Xử lý datetime/date -> chuỗi ISO, UUID -> chuỗi, Decimal -> float.
+
+    Args:
+        value: Bất kỳ giá trị Python nào.
+
+    Returns:
+        Giá trị có thể tuần tự hóa JSON.
+    """
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     if isinstance(value, uuid.UUID):
@@ -233,10 +338,33 @@ def to_jsonable(value: Any) -> Any:
 
 
 def normalize_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Chuyển đổi tất cả giá trị trong một hàng sang kiểu an toàn JSON.
+
+    Args:
+        row: Dict hàng cơ sở dữ liệu thô.
+
+    Returns:
+        Dict với tất cả giá trị được truyền qua to_jsonable.
+    """
     return {key: to_jsonable(value) for key, value in row.items()}
 
 
 def cast_value(value: Any, column: dict[str, Any]) -> Any:
+    """Ép một giá trị thô sang kiểu Python phù hợp cho một cột.
+
+    Xử lý UUID, số nguyên, số thực, boolean, date/timestamp và kiểu văn bản.
+    Chuỗi rỗng được chuyển đổi thành None.
+
+    Args:
+        value: Giá trị đầu vào thô.
+        column: Dict siêu dữ liệu cột với udt_name.
+
+    Returns:
+        Giá trị đã ép kiểu phù hợp để chèn vào cơ sở dữ liệu.
+
+    Raises:
+        ValueError: Nếu ép kiểu boolean thất bại.
+    """
     if value == "":
         return None
     column_type = column["udt_name"]
@@ -261,6 +389,21 @@ def cast_value(value: Any, column: dict[str, Any]) -> Any:
 
 
 def validate_payload(payload: dict[str, Any], columns: list[dict[str, Any]], config: dict[str, Any], partial: bool = False) -> tuple[dict[str, Any], list[str]]:
+    """Xác thực và chuẩn hóa một dict payload để chèn vào cơ sở dữ liệu.
+
+    Giải quyết bí danh, xử lý 'password' ảo -> 'password_hash',
+    thực thi các ràng buộc readonly/hidden/required, ép giá trị sang
+    đúng kiểu và xác thực các trường email/phone/age.
+
+    Args:
+        payload: Dict đầu vào thô.
+        columns: Siêu dữ liệu cột từ get_columns.
+        config: Dict cấu hình module.
+        partial: Nếu True, bỏ qua xác thực trường bắt buộc (cho cập nhật).
+
+    Returns:
+        Tuple gồm (normalized_values, error_messages).
+    """
     column_map = {column["column_name"]: column for column in columns}
     readonly = set(config.get("readonly", set()))
     hidden = set(config.get("hidden", set()))
@@ -312,6 +455,16 @@ def validate_payload(payload: dict[str, Any], columns: list[dict[str, Any]], con
 
 
 def build_search(columns: list[dict[str, Any]], query: Optional[str], params: dict[str, Any]) -> str:
+    """Xây dựng mệnh đề WHERE SQL để tìm kiếm toàn văn trên các cột văn bản.
+
+    Args:
+        columns: Danh sách siêu dữ liệu cột.
+        query: Chuỗi truy vấn tìm kiếm.
+        params: Dict tham số cần thay đổi với giá trị tìm kiếm.
+
+    Returns:
+        Chuỗi mệnh đề WHERE SQL (rỗng nếu không có truy vấn hoặc không có cột nào có thể tìm kiếm).
+    """
     if not query:
         return ""
     searchable = [column["column_name"] for column in columns if column["udt_name"] in TEXT_TYPES]
@@ -322,6 +475,22 @@ def build_search(columns: list[dict[str, Any]], query: Optional[str], params: di
 
 
 def build_filters(filter_value: Optional[str], columns: list[dict[str, Any]], params: dict[str, Any]) -> str:
+    """Phân tích chuỗi bộ lọc được phân tách bằng dấu phẩy thành mệnh đề WHERE SQL.
+
+    Định dạng: "column1:value1,column2:value2". Các giá trị được ép kiểu
+    theo kiểu dữ liệu của cột.
+
+    Args:
+        filter_value: Chuỗi bộ lọc (ví dụ: "status:active,role:doctor").
+        columns: Danh sách siêu dữ liệu cột.
+        params: Dict tham số cần thay đổi với các giá trị bộ lọc.
+
+    Returns:
+        Chuỗi mệnh đề WHERE SQL (rỗng nếu không có bộ lọc).
+
+    Raises:
+        HTTPException 400: Nếu một cột bộ lọc không xác định.
+    """
     if not filter_value:
         return ""
     column_map = {column["column_name"]: column for column in columns}
@@ -455,6 +624,26 @@ async def list_cms_records(
     sort_by: Optional[str] = Query(default=None),
     sort_dir: str = Query(default="desc", pattern="^(asc|desc)$"),
 ):
+    """Liệt kê các bản ghi CMS với tìm kiếm, bộ lọc, sắp xếp và phân trang.
+
+    Giới thiệu lược đồ bảng một cách động, xây dựng truy vấn với
+    tìm kiếm toàn văn tùy chọn và bộ lọc cột, và trả về
+    kết quả được phân trang kèm siêu dữ liệu cột.
+
+    Args:
+        module: Tên module CMS.
+        request: FastAPI Request để trích xuất IP.
+        authorization: Token Bearer.
+        limit: Số bản ghi mỗi trang (1-200).
+        offset: Độ lệch phân trang.
+        q: Truy vấn tìm kiếm toàn văn.
+        filter: Bộ lọc cột (định dạng: "col:val,col2:val2").
+        sort_by: Cột để sắp xếp.
+        sort_dir: Hướng sắp xếp ('asc' hoặc 'desc').
+
+    Returns:
+        Dict chứa items, total, limit, offset và siêu dữ liệu cột.
+    """
     user = await require_admin(authorization)
     config = module_config(module)
     table = config["table"]
@@ -515,6 +704,18 @@ async def export_cms_csv(
     q: Optional[str] = Query(default=None),
     filter: Optional[str] = Query(default=None),
 ):
+    """Xuất các bản ghi CMS ra file CSV (tối đa 200 bản ghi).
+
+    Args:
+        module: Tên module CMS.
+        request: FastAPI Request để trích xuất IP.
+        authorization: Token Bearer.
+        q: Truy vấn tìm kiếm toàn văn.
+        filter: Bộ lọc cột.
+
+    Returns:
+        File CSV dưới dạng phản hồi streaming.
+    """
     user = await require_admin(authorization)
     data = await list_cms_records(module, request, authorization, limit=200, offset=0, q=q, filter=filter, sort_by=None, sort_dir="desc")
     output = io.StringIO()
@@ -538,6 +739,19 @@ async def export_cms_csv(
 
 @router.get("/{module}/{record_id}")
 async def get_cms_record(module: str, record_id: str, authorization: Optional[str] = Header(default=None)):
+    """Lấy một bản ghi CMS duy nhất theo ID của nó.
+
+    Args:
+        module: Tên module CMS.
+        record_id: UUID của bản ghi.
+        authorization: Token Bearer.
+
+    Returns:
+        Bản ghi dưới dạng dict JSON với các giá trị đã chuẩn hóa.
+
+    Raises:
+        HTTPException 404: Nếu không tìm thấy bản ghi.
+    """
     await require_admin(authorization)
     config = module_config(module)
     table = config["table"]
@@ -554,7 +768,7 @@ async def get_cms_record(module: str, record_id: str, authorization: Optional[st
             if not status_row or status_row.get("deleted_at") is not None:
                 raise HTTPException(status_code=404, detail="Record not found")
         result = await session.execute(
-            text(f"SELECT {select_sql} FROM {quote_identifier(table)} WHERE id::text = :record_id"),
+            text(f"SELECT {select_sql} FROM {quote_identifier(table)} WHERE id = :record_id::uuid"),
             {"record_id": record_id},
         )
         row = result.mappings().first()
@@ -565,6 +779,24 @@ async def get_cms_record(module: str, record_id: str, authorization: Optional[st
 
 @router.post("/{module}")
 async def create_cms_record(module: str, payload: dict[str, Any], request: Request, authorization: Optional[str] = Header(default=None)):
+    """Tạo một bản ghi CMS mới.
+
+    Xác thực payload, tự động tạo UUID nếu bảng có cột 'id' và chèn
+    bản ghi. Bị chặn đối với các module bị hạn chế.
+
+    Args:
+        module: Tên module CMS.
+        payload: Dữ liệu bản ghi dưới dạng dict JSON.
+        request: FastAPI Request để trích xuất IP.
+        authorization: Token Bearer.
+
+    Returns:
+        Bản ghi đã tạo (được lấy qua get_cms_record).
+
+    Raises:
+        HTTPException 403: Nếu module bị hạn chế ghi.
+        HTTPException 422: Nếu xác thực thất bại.
+    """
     user = await require_admin(authorization)
     ensure_module_write_allowed(module)
     config = module_config(module)
@@ -622,6 +854,27 @@ async def create_cms_record(module: str, payload: dict[str, Any], request: Reque
 
 @router.put("/{module}/{record_id}")
 async def update_cms_record(module: str, record_id: str, payload: dict[str, Any], request: Request, authorization: Optional[str] = Header(default=None)):
+    """Cập nhật một bản ghi CMS hiện có (cập nhật một phần).
+
+    Xác thực payload với partial=True (các trường bắt buộc là tùy chọn
+    khi cập nhật) và áp dụng các thay đổi. Nếu không có giá trị cập nhật nào,
+    trả về bản ghi hiện tại không thay đổi.
+
+    Args:
+        module: Tên module CMS.
+        record_id: UUID của bản ghi cần cập nhật.
+        payload: Dữ liệu bản ghi một phần dưới dạng dict JSON.
+        request: FastAPI Request để trích xuất IP.
+        authorization: Token Bearer.
+
+    Returns:
+        Bản ghi đã cập nhật.
+
+    Raises:
+        HTTPException 403: Nếu module bị hạn chế ghi.
+        HTTPException 422: Nếu xác thực thất bại.
+        HTTPException 404: Nếu không tìm thấy bản ghi.
+    """
     user = await require_admin(authorization)
     ensure_module_write_allowed(module)
     config = module_config(module)
@@ -663,7 +916,7 @@ async def update_cms_record(module: str, record_id: str, payload: dict[str, Any]
                 f"""
                 UPDATE {quote_identifier(table)}
                 SET {", ".join(f"{quote_identifier(key)} = :{key}" for key in values.keys() if key != "record_id")}
-                WHERE id::text = :record_id
+                WHERE id = :record_id::uuid
                 """
             ),
             values,
@@ -687,6 +940,24 @@ async def update_cms_record(module: str, record_id: str, payload: dict[str, Any]
 
 @router.delete("/{module}/{record_id}")
 async def delete_cms_record(module: str, record_id: str, request: Request, authorization: Optional[str] = Header(default=None)):
+    """Xóa một bản ghi CMS theo ID.
+
+    Xóa vĩnh viễn bản ghi khỏi cơ sở dữ liệu. Bị chặn đối với
+    các module bị hạn chế.
+
+    Args:
+        module: Tên module CMS.
+        record_id: UUID của bản ghi cần xóa.
+        request: FastAPI Request để trích xuất IP.
+        authorization: Token Bearer.
+
+    Returns:
+        Dict xác nhận với deleted=True và ID bản ghi.
+
+    Raises:
+        HTTPException 403: Nếu module bị hạn chế ghi.
+        HTTPException 404: Nếu không tìm thấy bản ghi.
+    """
     user = await require_admin(authorization)
     ensure_module_write_allowed(module)
     config = module_config(module)
@@ -719,7 +990,7 @@ async def delete_cms_record(module: str, record_id: str, request: Request, autho
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(
-            text(f"DELETE FROM {quote_identifier(table)} WHERE id::text = :record_id"),
+            text(f"DELETE FROM {quote_identifier(table)} WHERE id = :record_id::uuid"),
             {"record_id": record_id},
         )
         if result.rowcount == 0:
@@ -741,6 +1012,21 @@ async def delete_cms_record(module: str, record_id: str, request: Request, autho
 
 @router.post("/{module}/import-csv")
 async def import_cms_csv(module: str, request: Request, file: UploadFile = File(...), authorization: Optional[str] = Header(default=None)):
+    """Nhập bản ghi từ file CSV vào một module CMS.
+
+    Phân tích CSV, xác thực từng hàng và chèn chúng trong một giao dịch
+    duy nhất. Nếu bất kỳ hàng nào có lỗi xác thực, toàn bộ quá trình nhập
+    sẽ bị hoàn tác và lỗi được trả về. Bị chặn đối với các module bị hạn chế.
+
+    Args:
+        module: Tên module CMS.
+        request: FastAPI Request để trích xuất IP.
+        file: File CSV đã tải lên.
+        authorization: Token Bearer.
+
+    Returns:
+        Dict chứa số lượng đã nhập và danh sách lỗi.
+    """
     user = await require_admin(authorization)
     ensure_module_write_allowed(module)
     config = module_config(module)

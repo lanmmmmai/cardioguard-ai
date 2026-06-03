@@ -1,3 +1,18 @@
+/**
+ * Tệp: CardioGuard AI – Quản lý Bệnh án Điện tử (EMR) dựa trên vai trò
+ * Mục đích: Hiển thị giao diện danh sách, chi tiết, tạo mới và sửa đổi bệnh án điện tử
+ *           cho các vai trò: Bác sĩ (Doctor), Bệnh nhân (Patient), và Quản trị viên (Admin).
+ * Luồng xử lý: 
+ *   - Bác sĩ: Có quyền xem danh sách bệnh án, tạo mới từ mẫu chuyên khoa, lưu nháp (draft),
+ *             ký xác nhận (sign), và tạo bản bổ sung sửa đổi (amendment).
+ *   - Bệnh nhân: Chỉ xem các bệnh án đã được bác sĩ ký xác nhận (status !== draft).
+ *   - Quản trị viên: Xem toàn bộ danh sách và chi tiết bệnh án dưới quyền đọc (read-only) phục vụ mục đích kiểm toán.
+ * Quan hệ:
+ *   - Tiêu thụ: medicalRecordsService để giao tiếp với backend/Supabase.
+ *   - Sử dụng: MedicalRecordForm để hiển thị form nhập liệu/xem chi tiết,
+ *               MedicalRecordConfirmSignModal để xác nhận ký số.
+ */
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, FileText, Filter, Plus, RefreshCw, Search, Shield, Upload } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';

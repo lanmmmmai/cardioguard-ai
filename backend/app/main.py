@@ -1,3 +1,26 @@
+"""CardioGuard AI — FastAPI application entry point.
+
+Purpose:
+  Initialises and configures the FastAPI ASGI application, registers all
+  route handlers, wires CORS middleware, and manages the database lifecycle
+  (connect / disconnect) on startup / shutdown.
+
+Workflow:
+  1. Configure structured JSON logging.
+  2. Create the FastAPI app instance with metadata.
+  3. Register CORS middleware with an allow-list of origins and a regex.
+  4. Attach event handlers for startup (connect DB, ensure OTP table and
+     performance indexes) and shutdown (disconnect DB).
+  5. Include all API routers (auth, patients, sensors, alerts, realtime,
+     CRUD, CMS, admin/doctor, email, features, chat).
+  6. Expose health-check and root endpoints.
+
+Relationships:
+  - app.core.database  — async DB engine (connect / disconnect).
+  - app.api.*           — per-domain route modules.
+  - app.services.*      — support services (OTP, DB optimisation).
+"""
+
 import json
 import logging
 import sys
@@ -76,6 +99,8 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
+    """Connect to the database, ensure the OTP tracking table and performance
+    indexes exist before accepting traffic."""
     logger.info("Starting CardioGuard AI backend...")
     await connect_db()
     await ensure_otp_table()
@@ -89,6 +114,7 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
+    """Gracefully close the database connection pool during shutdown."""
     logger.info("Shutting down CardioGuard AI backend...")
     await disconnect_db()
     logger.info("Application shutdown complete")
@@ -124,8 +150,16 @@ app.include_router(profile_router, prefix="/api")
 
 @app.get("/health", tags=["System"])
 async def health():
+    """Return the overall health status of the service, including a live
+    database connectivity check via a simple ``SELECT 1`` probe.
+
+    Returns:
+      dict: ``{"status": "healthy", "database": "connected", …}`` when the
+            database responds.  Returns HTTP 500 with equivalent JSON on
+            failure.
+    """
     try:
-        # Kiểm tra kết nối cơ sở dữ liệu thật
+        # Probe the database with a no-op query to verify connectivity
         await database.execute("SELECT 1")
         return {
             "status": "healthy",
@@ -151,6 +185,11 @@ async def health():
 
 @app.get("/")
 def root():
+    """Simple root endpoint returning a static status payload.
+
+    Returns:
+      dict: A fixed message confirming the backend is operational.
+    """
     return {
         "message": "CardioGuard AI Backend is running",
         "status": "running",

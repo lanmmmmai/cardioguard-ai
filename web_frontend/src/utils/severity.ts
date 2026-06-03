@@ -1,7 +1,22 @@
+/**
+ * Tệp: CardioGuard AI – Chuẩn hóa và siêu dữ liệu mức độ nghiêm trọng cảnh báo
+ * Mục đích: Ánh xạ các chuỗi mức độ nghiêm trọng thô từ backend (critical, high,
+ *           warning, medium, low, info, resolved) thành SeverityType đã chuẩn hóa
+ *           và cung cấp siêu dữ liệu hiển thị tương ứng (nhãn, màu sắc, biểu tượng).
+ * Luồng xử lý: normalizeAlertSeverity() thu gọn các cấp độ tương tự (warning/medium,
+ *              low/info) thành các kiểu chuẩn. getSeverityMeta() trả về một
+ *              đối tượng SeverityMeta với các biến màu và biểu tượng Lucide cho UI.
+ * Quan hệ:
+ *   - Được sử dụng bởi: thành phần danh sách/chi tiết cảnh báo, widget dashboard
+ *   - Import biểu tượng lucide-react cho huy hiệu mức độ nghiêm trọng
+ */
+
 import { ShieldAlert, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
 
+/** Các cấp độ nghiêm trọng chuẩn được sử dụng trên toàn bộ UI */
 export type SeverityType = 'critical' | 'high' | 'warning' | 'medium' | 'low' | 'info' | 'resolved';
 
+/** Gói siêu dữ liệu để hiển thị huy hiệu / chỉ báo mức độ nghiêm trọng */
 export interface SeverityMeta {
   key: SeverityType;
   label: string;
@@ -12,6 +27,13 @@ export interface SeverityMeta {
   icon: any;
 }
 
+/**
+ * Chuẩn hóa chuỗi mức độ nghiêm trọng thô thành SeverityType chuẩn.
+ * - warning, medium → 'warning'
+ * - low, info       → 'low'
+ * - resolved        → 'resolved'
+ * - mọi thứ khác   → 'low' (dự phòng an toàn)
+ */
 export const normalizeAlertSeverity = (severity?: string | null): SeverityType => {
   const s = severity?.trim().toLowerCase() || 'info';
   if (s === 'critical') return 'critical';
@@ -22,6 +44,10 @@ export const normalizeAlertSeverity = (severity?: string | null): SeverityType =
   return 'low';
 };
 
+/**
+ * Trả về SeverityMeta đầy đủ (nhãn, biến màu, biểu tượng) cho một chuỗi
+ * mức độ nghiêm trọng nhất định. Dự phòng về siêu dữ liệu 'low' nếu không được công nhận.
+ */
 export const getSeverityMeta = (severity?: string | null): SeverityMeta => {
   const norm = normalizeAlertSeverity(severity);
   switch (norm) {

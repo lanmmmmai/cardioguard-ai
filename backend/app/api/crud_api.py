@@ -1,3 +1,29 @@
+"""API CRUD tổng quát với kiểm soát truy cập dựa trên vai trò.
+
+Mục đích:
+    Cung cấp giao diện CRUD (Tạo, Đọc, Cập nhật, Xóa) tổng quát cho
+    nhiều bảng cơ sở dữ liệu với đăng ký tuyến đường tự động, kiểm soát
+    truy cập dựa trên vai trò (RBAC), phạm vi bảo mật cấp hàng và kích
+    hoạt phát sóng WebSocket khi có thay đổi.
+
+Luồng xử lý:
+    Các tuyến đường bảng được đăng ký tại thời điểm tải module thông qua
+    register_table_routes(). Mỗi thao tác CRUD thực thi: (1) quyền thao tác
+    theo vai trò, (2) bộ lọc truy cập cấp hàng qua access_filter(),
+    (3) thực thi phạm vi ghi qua enforce_write_scope() và (4) ghi nhật ký
+    kiểm toán. Điểm cuối reports/summary cung cấp thống kê báo cáo tổng hợp
+    với lọc dữ liệu dựa trên vai trò.
+
+Quan hệ:
+    - Phụ thuộc vào: auth_api.get_user_from_token để xác thực
+    - Phụ thuộc vào: core.database để truy cập DB
+    - Phụ thuộc vào: services.audit_service để ghi nhật ký hoạt động
+    - Phụ thuộc vào: schemas.crud_schema cho các model request/response
+    - Phụ thuộc vào: websocket.connection_manager để phát sóng thời gian thực
+    - Bảng: appointments, medical_records, prescriptions, devices,
+      notifications, chat_messages, cameras, reports
+"""
+
 import json
 import uuid
 from datetime import date, datetime
@@ -59,6 +85,20 @@ DOCTOR_DELETE_BLOCKED_TABLES = {"devices", "medical_records", "prescriptions", "
 
 
 def enforce_operation_permission(table: str, role: str, operation: str) -> None:
+    """Kiểm tra xem một vai trò có được phép thực hiện thao tác trên một bảng không.
+
+    Admin có toàn quyền truy cập. Bệnh nhân và bác sĩ có các bộ thao tác
+    bị hạn chế trên một số bảng nhất định (ví dụ: bệnh nhân không thể xóa
+    hồ sơ y tế).
+
+    Args:
+        table: Tên bảng mục tiêu.
+        role: Chuỗi vai trò người dùng.
+        operation: Tên thao tác ('create', 'update', 'delete').
+
+    Raises:
+        HTTPException 403: Nếu thao tác không được phép.
+    """
     if role == "admin":
         return
     if role == "patient":
@@ -76,18 +116,51 @@ def enforce_operation_permission(table: str, role: str, operation: str) -> None:
 
 
 def quote_identifier(value: str) -> str:
+    """Đặt dấu ngoặc kép an toàn cho tên bảng SQL, xác thực nó tồn tại trong TABLES.
+
+    Args:
+        value: Chuỗi tên bảng.
+
+    Returns:
+        Tên bảng được đặt trong dấu ngoặc kép.
+
+    Raises:
+        HTTPException 404: Nếu bảng không được đăng ký trong TABLES.
+    """
     if value not in TABLES:
         raise HTTPException(status_code=404, detail="Unknown table")
     return f'"{value}"'
 
 
 def quote_column(value: str, columns: set[str]) -> str:
+    """Đặt dấu ngoặc kép an toàn cho tên cột, xác thực nó tồn tại trong tập cột.
+
+    Args:
+        value: Chuỗi tên cột.
+        columns: Tập hợp các tên cột hợp lệ.
+
+    Returns:
+        Tên cột được đặt trong dấu ngoặc kép.
+
+    Raises:
+        HTTPException 400: Nếu cột không có trong tập hợp hợp lệ.
+    """
     if value not in columns:
         raise HTTPException(status_code=400, detail=f"Unknown column: {value}")
     return f'"{value}"'
 
 
 def to_jsonable(value: Any) -> Any:
+    """Chuyển đổi đệ quy các kiểu không thể tuần tự hóa thành giá trị an toàn JSON.
+
+    Xử lý các kiểu datetime, date, UUID, Decimal, dict và list/tuple.
+
+    Args:
+        value: Bất kỳ giá trị Python nào.
+
+    Returns:
+        Giá trị có thể tuần tự hóa JSON.
+    """
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     if isinstance(value, uuid.UUID):
@@ -102,6 +175,16 @@ def to_jsonable(value: Any) -> Any:
 
 
 def normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Chuẩn hóa một dict payload để chèn vào cơ sở dữ liệu.
+
+    Chuyển đổi UUID thành chuỗi và tuần tự hóa dict/list thành JSON.
+
+    Args:
+        payload: Dict đầu vào thô.
+
+    Returns:
+        Dict đã chuẩn hóa phù hợp cho truy vấn DB.
+    """
     result = {}
     for key, value in payload.items():
         if isinstance(value, uuid.UUID):
@@ -114,6 +197,17 @@ def normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 async def table_columns(table: str) -> set[str]:
+    """Lấy tập hợp tên cột cho một bảng, có bộ nhớ đệm.
+
+    Args:
+        table: Tên bảng.
+
+    Returns:
+        Tập hợp các chuỗi tên cột.
+
+    Raises:
+        HTTPException 500: Nếu bảng không có cột 'id'.
+    """
     if table in _column_cache:
         return _column_cache[table]
 
@@ -134,10 +228,35 @@ async def table_columns(table: str) -> set[str]:
 
 
 def row_to_dict(row: Any) -> dict[str, Any]:
+    """Chuyển đổi một hàng cơ sở dữ liệu thành dict an toàn JSON.
+
+    Args:
+        row: Đối tượng hàng cơ sở dữ liệu (giống dict).
+
+    Returns:
+        Dict với tất cả giá trị được truyền qua to_jsonable.
+    """
     return {key: to_jsonable(row[key]) for key in row.keys()}
 
 
 def access_filter(table: str, columns: set[str], user: dict[str, str], prefix: str = "") -> tuple[str, dict[str, Any]]:
+    """Xây dựng mệnh đề WHERE SQL và tham số cho kiểm soát truy cập cấp hàng.
+
+    Tạo điều kiện phạm vi dựa trên vai trò người dùng:
+    - Admin: không lọc (tất cả hàng đều có thể truy cập).
+    - Bệnh nhân: hàng có patient_id khớp với ID của người dùng.
+    - Bác sĩ: hàng có patient_id được phân công cho bác sĩ.
+    - Xử lý đặc biệt cho: notifications, chat_messages, audit_logs.
+
+    Args:
+        table: Tên bảng mục tiêu.
+        columns: Tập hợp tên cột trong bảng.
+        user: Dict người dùng đã xác thực với role và id.
+        prefix: Tiền tố bí danh bảng tùy chọn cho tham chiếu cột.
+
+    Returns:
+        Tuple gồm (chuỗi mệnh đề WHERE SQL, dict tham số).
+    """
     role = user["role"]
     user_id = user["id"]
     col = lambda name: f"{prefix}{quote_column(name, columns)}"
@@ -148,28 +267,28 @@ def access_filter(table: str, columns: set[str], user: dict[str, str], prefix: s
     clauses = []
     if "patient_id" in columns:
         if role == "patient":
-            clauses.append(f"{col('patient_id')}::text = :current_user_id")
+            clauses.append(f"{col('patient_id')} = :current_user_id::uuid")
         elif role == "doctor":
             clauses.append(
                 f"""EXISTS (
                     SELECT 1 FROM doctor_patient dp
-                    WHERE dp.doctor_id::text = :current_user_id
-                    AND dp.patient_id::text = {col('patient_id')}::text
+                    WHERE dp.doctor_id = :current_user_id::uuid
+                    AND dp.patient_id = {col('patient_id')}
                 )"""
             )
 
     if table == "notifications" and "user_id" in columns:
-        clauses.append(f"{col('user_id')}::text = :current_user_id")
+        clauses.append(f"{col('user_id')} = :current_user_id::uuid")
 
     if table == "chat_messages":
         for owner_column in ("sender_id", "recipient_id"):
             if owner_column in columns:
-                clauses.append(f"{col(owner_column)}::text = :current_user_id")
+                clauses.append(f"{col(owner_column)} = :current_user_id::uuid")
         if role == "doctor" and "doctor_id" in columns:
-            clauses.append(f"{col('doctor_id')}::text = :current_user_id")
+            clauses.append(f"{col('doctor_id')} = :current_user_id::uuid")
 
     if table == "audit_logs" and "user_id" in columns:
-        clauses.append(f"{col('user_id')}::text = :current_user_id")
+        clauses.append(f"{col('user_id')} = :current_user_id::uuid")
 
     if not clauses:
         return "1 = 0", {"current_user_id": user_id}
@@ -178,13 +297,22 @@ def access_filter(table: str, columns: set[str], user: dict[str, str], prefix: s
 
 
 async def ensure_doctor_patient_access(doctor_id: str, patient_id: Any) -> None:
+    """Xác minh một bác sĩ được phân công cho một bệnh nhân cụ thể.
+
+    Args:
+        doctor_id: UUID của bác sĩ.
+        patient_id: UUID của bệnh nhân.
+
+    Raises:
+        HTTPException 403: Nếu patient_id bị thiếu hoặc bác sĩ không được phân công.
+    """
     if not patient_id:
         raise HTTPException(status_code=403, detail="Doctor requests must include an assigned patient_id")
     row = await database.fetch_one(
         """
         SELECT 1
         FROM doctor_patient
-        WHERE doctor_id::text = :doctor_id AND patient_id::text = :patient_id
+        WHERE doctor_id = :doctor_id::uuid AND patient_id = :patient_id::uuid
         """,
         {"doctor_id": doctor_id, "patient_id": str(patient_id)},
     )
@@ -193,6 +321,22 @@ async def ensure_doctor_patient_access(doctor_id: str, patient_id: Any) -> None:
 
 
 async def enforce_write_scope(table: str, columns: set[str], user: dict[str, str], payload: dict[str, Any], current: Optional[dict[str, Any]] = None) -> None:
+    """Đảm bảo người dùng được phép ghi payload đã cho.
+
+    Đối với bác sĩ: xác thực phân công bác sĩ-bệnh nhân khi ghi các trường
+    patient_id. Đối với bệnh nhân: ngăn ghi các cột chủ sở hữu cho người dùng
+    khác và xác thực phân công bác sĩ-bệnh nhân nếu chỉ định doctor_id.
+
+    Args:
+        table: Tên bảng mục tiêu.
+        columns: Tập hợp tên cột trong bảng.
+        user: Dict người dùng đã xác thực.
+        payload: Dữ liệu payload đang được ghi.
+        current: Bản ghi hiện tại tùy chọn cho thao tác cập nhật.
+
+    Raises:
+        HTTPException 403: Nếu phạm vi ghi bị vi phạm.
+    """
     role = user["role"]
     user_id = user["id"]
 
@@ -219,6 +363,20 @@ async def enforce_write_scope(table: str, columns: set[str], user: dict[str, str
 
 
 def apply_write_defaults(table: str, columns: set[str], user: dict[str, str], payload: dict[str, Any]) -> dict[str, Any]:
+    """Áp dụng giá trị mặc định khi tạo bản ghi dựa trên vai trò người dùng.
+
+    Tự động điền id (UUID), doctor_id cho bác sĩ, sender_id/user_id cho
+    bác sĩ/bệnh nhân và patient_id cho bệnh nhân.
+
+    Args:
+        table: Tên bảng mục tiêu.
+        columns: Tập hợp tên cột trong bảng.
+        user: Dict người dùng đã xác thực.
+        payload: Dict payload đầu vào.
+
+    Returns:
+        Dict payload với các giá trị mặc định đã được áp dụng.
+    """
     role = user["role"]
     user_id = user["id"]
     result = dict(payload)
@@ -243,8 +401,22 @@ def apply_write_defaults(table: str, columns: set[str], user: dict[str, str], pa
 
 
 async def fetch_authorized_row(table: str, record_id: str, columns: set[str], user: dict[str, str]) -> dict[str, Any]:
+    """Lấy một hàng duy nhất theo ID với lọc kiểm soát truy cập.
+
+    Args:
+        table: Tên bảng mục tiêu.
+        record_id: UUID của bản ghi.
+        columns: Tập hợp tên cột trong bảng.
+        user: Dict người dùng đã xác thực.
+
+    Returns:
+        Bản ghi dưới dạng dict an toàn JSON.
+
+    Raises:
+        HTTPException 404: Nếu không tìm thấy bản ghi hoặc truy cập bị từ chối.
+    """
     access_sql, values = access_filter(table, columns, user)
-    where_sql = f'"id"::text = :record_id'
+    where_sql = f'"id" = :record_id::uuid'
     if access_sql:
         where_sql = f"{where_sql} AND {access_sql}"
 
@@ -258,6 +430,18 @@ async def fetch_authorized_row(table: str, record_id: str, columns: set[str], us
 
 
 async def list_records(table: str, authorization: Optional[str], limit: int, offset: int, patient_id: Optional[str] = None):
+    """Liệt kê các bản ghi từ một bảng với phạm vi truy cập dựa trên vai trò.
+
+    Args:
+        table: Tên bảng mục tiêu.
+        authorization: Token Bearer.
+        limit: Số bản ghi tối đa để trả về.
+        offset: Độ lệch phân trang.
+        patient_id: UUID bệnh nhân tùy chọn để lọc.
+
+    Returns:
+        Danh sách các dict bản ghi an toàn JSON.
+    """
     user = await get_user_from_token(authorization)
     columns = await table_columns(table)
     access_sql, values = access_filter(table, columns, user)
@@ -266,7 +450,7 @@ async def list_records(table: str, authorization: Optional[str], limit: int, off
     if patient_id:
         if "patient_id" not in columns:
             raise HTTPException(status_code=400, detail="This table does not support patient_id filtering")
-        where_parts.append('"patient_id"::text = :patient_id')
+        where_parts.append('"patient_id" = :patient_id::uuid')
         values["patient_id"] = patient_id
 
     order_column = "created_at" if "created_at" in columns else "updated_at" if "updated_at" in columns else "id"
@@ -285,6 +469,16 @@ async def list_records(table: str, authorization: Optional[str], limit: int, off
 
 
 async def trigger_websocket_broadcast(table: str, record: dict[str, Any]):
+    """Phát sóng thay đổi bản ghi đến các client WebSocket liên quan.
+
+    Hiện tại hỗ trợ: chat_messages, appointments, notifications.
+    Lỗi được ghi nhật ký nhưng không truyền lên để tránh gián đoạn
+    thao tác CRUD chính.
+
+    Args:
+        table: Tên bảng của bản ghi đã thay đổi.
+        record: Dict bản ghi để phát sóng.
+    """
     from app.websocket.connection_manager import manager
     try:
         if table == "chat_messages":
@@ -302,10 +496,25 @@ async def trigger_websocket_broadcast(table: str, record: dict[str, Any]):
             if user_id:
                 await manager.broadcast_notification(str(user_id), record)
     except Exception as e:
-        logger.exception("Error triggering WebSocket broadcast for table=%s", table)
+        logger.exception("Lỗi khi kích hoạt phát sóng WebSocket cho table=%s", table)
 
 
 async def create_record(table: str, payload: dict[str, Any], authorization: Optional[str], request: Optional[Request] = None):
+    """Tạo một bản ghi mới với đầy đủ phân quyền và xác thực.
+
+    Áp dụng quyền thao tác, lọc cột (loại trừ các cột được bảo vệ ghi),
+    giá trị mặc định ghi và thực thi phạm vi ghi. Ghi nhật ký thao tác
+    và kích hoạt phát sóng WebSocket khi thành công.
+
+    Args:
+        table: Tên bảng mục tiêu.
+        payload: Dữ liệu bản ghi.
+        authorization: Token Bearer.
+        request: FastAPI Request để trích xuất IP (tùy chọn).
+
+    Returns:
+        Bản ghi đã tạo dưới dạng dict an toàn JSON.
+    """
     user = await get_user_from_token(authorization)
     enforce_operation_permission(table, user["role"], "create")
     columns = await table_columns(table)
@@ -343,6 +552,22 @@ async def create_record(table: str, payload: dict[str, Any], authorization: Opti
 
 
 async def update_record(table: str, record_id: str, payload: dict[str, Any], authorization: Optional[str], request: Optional[Request] = None):
+    """Cập nhật một bản ghi hiện có với đầy đủ phân quyền và xác thực.
+
+    Lấy bản ghi hiện tại để xác minh quyền truy cập và áp dụng cập nhật
+    một phần (chỉ các trường được cung cấp). Tự động đặt updated_at nếu cột
+    tồn tại. Ghi nhật ký thao tác và kích hoạt phát sóng WebSocket.
+
+    Args:
+        table: Tên bảng mục tiêu.
+        record_id: UUID của bản ghi cần cập nhật.
+        payload: Dữ liệu cập nhật một phần.
+        authorization: Token Bearer.
+        request: FastAPI Request để trích xuất IP (tùy chọn).
+
+    Returns:
+        Bản ghi đã cập nhật dưới dạng dict an toàn JSON.
+    """
     user = await get_user_from_token(authorization)
     enforce_operation_permission(table, user["role"], "update")
     columns = await table_columns(table)
@@ -359,7 +584,7 @@ async def update_record(table: str, record_id: str, payload: dict[str, Any], aut
         set_sql = f"{set_sql}, \"updated_at\" = NOW()"
 
     await database.execute(
-        f"UPDATE {quote_identifier(table)} SET {set_sql} WHERE \"id\"::text = :record_id",
+        f"UPDATE {quote_identifier(table)} SET {set_sql} WHERE \"id\" = :record_id::uuid",
         {**values, "record_id": record_id},
     )
     updated_row = await fetch_authorized_row(table, record_id, columns, user)
@@ -380,13 +605,27 @@ async def update_record(table: str, record_id: str, payload: dict[str, Any], aut
 
 
 async def delete_record(table: str, record_id: str, authorization: Optional[str], request: Optional[Request] = None):
+    """Xóa một bản ghi theo ID với kiểm tra phân quyền.
+
+    Lấy bản ghi để xác minh quyền truy cập và phạm vi ghi trước khi xóa.
+    Ghi nhật ký xóa qua audit_service.
+
+    Args:
+        table: Tên bảng mục tiêu.
+        record_id: UUID của bản ghi cần xóa.
+        authorization: Token Bearer.
+        request: FastAPI Request để trích xuất IP (tùy chọn).
+
+    Returns:
+        Dict xác nhận với deleted=True và ID bản ghi.
+    """
     user = await get_user_from_token(authorization)
     enforce_operation_permission(table, user["role"], "delete")
     columns = await table_columns(table)
     current = await fetch_authorized_row(table, record_id, columns, user)
     await enforce_write_scope(table, columns, user, {}, current)
     await database.execute(
-        f"DELETE FROM {quote_identifier(table)} WHERE \"id\"::text = :record_id",
+        f"DELETE FROM {quote_identifier(table)} WHERE \"id\" = :record_id::uuid",
         {"record_id": record_id},
     )
 
@@ -405,6 +644,17 @@ async def delete_record(table: str, record_id: str, authorization: Optional[str]
 
 
 async def reports_summary_data(authorization: Optional[str]):
+    """Lấy thống kê báo cáo tổng hợp theo loại.
+
+    Admin truy vấn từ một view materialized được tính toán trước để có hiệu suất.
+    Bác sĩ/bệnh nhân truy vấn với lọc phân quyền dựa trên vai trò.
+
+    Args:
+        authorization: Token Bearer.
+
+    Returns:
+        Dict chứa total_reports, danh sách by_type và siêu dữ liệu.
+    """
     user = await get_user_from_token(authorization)
     
     if user["role"] == "admin":
@@ -438,6 +688,17 @@ async def reports_summary_data(authorization: Optional[str]):
 
 
 def register_table_routes(table: str, path: str, create_model: type, update_model: type) -> None:
+    """Đăng ký các tuyến đường GET, POST, GET/:id, PATCH/:id, DELETE/:id cho một bảng.
+
+    Tạo động các hàm endpoint với tham số được chú thích kiểu
+    và đăng ký chúng trên router cấp module.
+
+    Args:
+        table: Tên bảng cơ sở dữ liệu.
+        path: Tiền tố đường dẫn URL cho các tuyến đường.
+        create_model: Lớp model Pydantic cho yêu cầu tạo.
+        update_model: Lớp model Pydantic cho yêu cầu cập nhật.
+    """
     async def list_endpoint(
         authorization: Optional[str] = Header(default=None),
         limit: int = Query(default=100, ge=1, le=500),
@@ -446,7 +707,7 @@ def register_table_routes(table: str, path: str, create_model: type, update_mode
     ):
         return await list_records(table, authorization, limit, offset, patient_id)
 
-    async def create_endpoint(payload: create_model, request: Request, authorization: Optional[str] = Header(default=None)):  # type: ignore[valid-type]
+    async def create_endpoint(payload: create_model, request: Request, authorization: Optional[str] = Header(default=None)):
         return await create_record(table, payload.model_dump(exclude_unset=True), authorization, request)
 
     async def get_endpoint(record_id: str, authorization: Optional[str] = Header(default=None)):
@@ -454,7 +715,7 @@ def register_table_routes(table: str, path: str, create_model: type, update_mode
         user = await get_user_from_token(authorization)
         return await fetch_authorized_row(table, record_id, columns, user)
 
-    async def update_endpoint(record_id: str, payload: update_model, request: Request, authorization: Optional[str] = Header(default=None)):  # type: ignore[valid-type]
+    async def update_endpoint(record_id: str, payload: update_model, request: Request, authorization: Optional[str] = Header(default=None)):
         return await update_record(table, record_id, payload.model_dump(exclude_unset=True), authorization, request)
 
     async def delete_endpoint(record_id: str, request: Request, authorization: Optional[str] = Header(default=None)):
@@ -469,6 +730,14 @@ def register_table_routes(table: str, path: str, create_model: type, update_mode
 
 @router.get("/reports/summary", tags=["reports"])
 async def reports_summary(authorization: Optional[str] = Header(default=None)):
+    """Lấy thống kê báo cáo tổng hợp.
+
+    Args:
+        authorization: Token Bearer.
+
+    Returns:
+        Dict chứa total_reports và phân tích theo report_type.
+    """
     return await reports_summary_data(authorization)
 
 

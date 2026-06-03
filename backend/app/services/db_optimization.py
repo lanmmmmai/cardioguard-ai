@@ -1,3 +1,22 @@
+"""Dịch vụ đồng bộ hóa chỉ mục cơ sở dữ liệu cho CardioGuard.
+
+Mục đích:
+    Đọc một tệp SQL di chuyển (008_optimize_performance_indexes.sql), phân tích ra
+    các câu lệnh CREATE INDEX riêng lẻ và thực thi từng câu lệnh với cơ sở dữ liệu.
+    Điều này đảm bảo tất cả các chỉ mục quan trọng về hiệu suất tồn tại mà không yêu cầu chạy
+    di chuyển đầy đủ.
+
+Luồng công việc:
+    ensure_performance_indexes() định vị tệp SQL tương đối với thư mục gốc của gói
+    phần mềm, chia nội dung trên dấu chấm phẩy, loại bỏ các dòng chú thích và
+    khoảng trắng, sau đó thực thi từng câu lệnh không rỗng một cách tuần tự.
+
+Quan hệ:
+    - app.core.database.database: Được sử dụng để thực thi các câu lệnh SQL thô.
+    - Tệp di chuyển nằm dưới backend/migrations/ và được kiểm soát phiên bản.
+    - Thường được gọi trong khi khởi động ứng dụng hoặc như một phần của tác vụ bảo trì.
+"""
+
 import os
 import json
 import logging
@@ -697,6 +716,18 @@ async def ensure_domain_links_schema() -> None:
 
 
 async def ensure_performance_indexes() -> None:
+    """Đồng bộ hóa các chỉ mục hiệu suất cơ sở dữ liệu từ tệp SQL di chuyển.
+
+    Đọc file di chuyển 008_optimize_performance_indexes.sql, trích xuất mọi
+    câu lệnh không phải chú thích, không trống và thực thi nó. Điều này đảm bảo rằng
+    các chỉ mục được sử dụng bởi các truy vấn tần suất cao (ví dụ: trên sensor_data, alerts và
+    audit_logs) tồn tại ngay cả khi quá trình di chuyển chưa được chạy trong một khung
+    di chuyển truyền thống.
+
+    Ngoại lệ:
+        Không có ngoại lệ nào được truyền lên; các lỗi được ghi nhật ký và hàm
+        trả về một cách im lặng.
+    """
     migration_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
         "migrations",

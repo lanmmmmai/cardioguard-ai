@@ -1,3 +1,15 @@
+/**
+ * @purpose Luồng quên mật khẩu hai bước. Bước 1: người dùng nhập email và
+ *          yêu cầu OTP. Bước 2: người dùng nhập OTP 6 chữ số để xác minh
+ *          danh tính và nhận mật khẩu tạm thời qua email.
+ * @workflow  1. Biểu mẫu Bước 1: POST email đến /auth/forgot-password/request-otp
+ *            → khi thành công chuyển sang Bước 2 → 2. Biểu mẫu Bước 2: POST email +
+ *            OTP đến /auth/forgot-password/verify-otp → khi thành công hiển thị
+ *            thông báo mật khẩu tạm thời → tự động chuyển hướng đến đăng nhập sau 5s.
+ * @relationships
+ *   - App.tsx (khối route cho /forgot-password)
+ *   - Hằng số cấu hình API_URL
+ */
 import React, { useState } from 'react';
 import { Activity, Mail, Loader2, ArrowLeft, KeyRound } from 'lucide-react';
 import { API_URL } from '../config';
@@ -9,6 +21,9 @@ interface ForgotPasswordProps {
   onNavigateToLogin: () => void;
 }
 
+/**
+ * Component quên mật khẩu hai bước. Xử lý yêu cầu OTP và xác minh.
+ */
 export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ role, onNavigateToLogin }) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [email, setEmail] = useState('');

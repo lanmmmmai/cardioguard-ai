@@ -1,3 +1,21 @@
+/**
+ * @purpose Bảng điều khiển giám sát từ xa thời gian thực dành cho bác sĩ. Hiển thị
+ *          các chỉ số sinh tồn trực tiếp (HR, SpO2, HA), dạng sóng ECG, trái tim 3D
+ *          đập, thông tin tóm tắt bệnh nhân, cảnh báo gần đây và các nút điều khiển
+ *          mô phỏng để kiểm thử phát triển.
+ * @workflow  1. Chọn bệnh nhân từ danh sách thả xuống → 2. Nhận dữ liệu cảm biến
+ *            trực tiếp qua WebSocket (được truyền dưới dạng prop latestTelemetry) →
+ *            3. Cập nhật thẻ chỉ số và biểu đồ ECG → 4. Giám sát độ cũ của dữ liệu
+ *            (>30 giây kích hoạt cảnh báo) → 5. Hiển thị cảnh báo gần đây cho bệnh
+ *            nhân đã chọn → 6. Nút mô phỏng (chỉ dành cho môi trường phát triển)
+ *            để kiểm tra đường ống backend.
+ * @relationships
+ *   - Component con ECGChart, BeatingHeart3D
+ *   - AuthContext để lấy mã thông báo
+ *   - severity utility để hiển thị huy hiệu cảnh báo
+ *   - Kiểu Patient, Alert, SensorData
+ *   - App.tsx (khối switch routeContent)
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, Activity, AlertTriangle, User, Play, Radio, Plus, Clock } from 'lucide-react';
 import { ECGChart } from './ECGChart';
@@ -15,6 +33,10 @@ interface DashboardProps {
   isConnected?: boolean;
 }
 
+/**
+ * Bảng điều khiển giám sát thời gian thực dành cho bác sĩ với các chỉ số,
+ * ECG, trái tim 3D, thông tin bệnh nhân, cảnh báo và điều khiển mô phỏng.
+ */
 export const Dashboard: React.FC<DashboardProps> = ({ 
   patients, 
   latestTelemetry, 
@@ -28,7 +50,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [lastTelemetryTime, setLastTelemetryTime] = useState<Date | null>(null);
   const [isStale, setIsStale] = useState(true);
 
-  // Derived UI states for clinical realtime tracking
   const hasTelemetryForSelectedPatient = latestTelemetry?.patient_id === selectedPatientId;
   const isRealtimeActive = hasTelemetryForSelectedPatient && !isStale;
   const metricsSourceLabel = hasTelemetryForSelectedPatient ? 'Cảm biến realtime (WebSocket)' : 'Chờ tín hiệu kết nối từ thiết bị đeo';
@@ -51,7 +72,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return 'Chưa phân loại';
   };
   
-  // Clinical Metric State: Initialize all values as null when there is no telemetry
   const [currentMetrics, setCurrentMetrics] = useState<{
     heartRate: number | null;
     spo2: number | null;
@@ -76,14 +96,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
     updatedAt: null
   });
 
-  // Select the first patient automatically if none selected
   useEffect(() => {
     if (patients.length > 0 && !selectedPatientId) {
       setSelectedPatientId(patients[0].id);
     }
   }, [patients, selectedPatientId]);
 
-  // Reset metrics when changing patient to prevent displaying cross-patient stale data
   useEffect(() => {
     setCurrentMetrics({
       heartRate: null,
@@ -99,7 +117,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setIsStale(true);
   }, [selectedPatientId]);
 
-  // Update current metrics when websocket feeds telemetry for selected patient
   useEffect(() => {
     if (latestTelemetry && latestTelemetry.patient_id === selectedPatientId) {
       setCurrentMetrics({
@@ -117,7 +134,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   }, [latestTelemetry, selectedPatientId]);
 
-  // Telemetry stale state: check if gap exceeds 30 seconds
   const lastTelemetryTimeRef = useRef<Date | null>(null);
   useEffect(() => {
     lastTelemetryTimeRef.current = lastTelemetryTime;
@@ -135,33 +151,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  // Find details of the active patient
   const activePatient = patients.find(p => p.id === selectedPatientId);
 
-  // Filter alerts for the selected patient
   const activePatientAlerts = alerts.filter(a => a.patient_id === selectedPatientId);
 
-  // Generate and send simulated telemetry to test backend and websocket pipeline
   const handleSimulateTelemetry = async (abnormal = false) => {
     if (!selectedPatientId) return;
     setIsSimulating(true);
 
-    // Generate random values
-    let hr = Math.floor(Math.random() * (100 - 60) + 60); // 60 - 100 normal
-    let o2 = Math.floor(Math.random() * (100 - 95) + 95); // 95 - 100 normal
-    let sys = Math.floor(Math.random() * (135 - 110) + 110); // 110 - 135 normal
-    let dia = Math.floor(Math.random() * (85 - 70) + 70); // 70 - 85 normal
-    const ecg = (Math.random() - 0.5) * 0.3; // tiny baseline
+    let hr = Math.floor(Math.random() * (100 - 60) + 60);
+    let o2 = Math.floor(Math.random() * (100 - 95) + 95);
+    let sys = Math.floor(Math.random() * (135 - 110) + 110);
+    let dia = Math.floor(Math.random() * (85 - 70) + 70);
+    const ecg = (Math.random() - 0.5) * 0.3;
 
     if (abnormal) {
-      // Trigger abnormal readings
       const rand = Math.random();
       if (rand < 0.33) {
-        hr = Math.random() > 0.5 ? 135 : 45; // high heart rate / low heart rate
+        hr = Math.random() > 0.5 ? 135 : 45;
       } else if (rand < 0.66) {
-        o2 = Math.floor(Math.random() * (91 - 85) + 85); // low oxygen
+        o2 = Math.floor(Math.random() * (91 - 85) + 85);
       } else {
-        sys = 155; // high blood pressure
+        sys = 155;
         dia = 95;
       }
     }
@@ -184,10 +195,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
       });
 
       if (!response.ok) {
-        console.error('Failed to post simulated sensor data');
+        console.error('Không gửi được dữ liệu cảm biến mô phỏng');
       }
     } catch (err) {
-      console.error('Network error during simulation:', err);
+      console.error('Lỗi mạng khi mô phỏng:', err);
     } finally {
       setTimeout(() => setIsSimulating(false), 300);
     }
@@ -212,7 +223,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div>
-      {/* Header and Controls */}
       <div className="dashboard-header">
         <div>
           <h1 className="page-title">Hệ Thống Giám Sát</h1>
@@ -233,7 +243,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </select>
           </div>
 
-          {/* Connection and Telemetry Status Badges */}
           {!isConnected ? (
             <span className="connection-badge offline">
               ● MẤT KẾT NỐI (Offline)
@@ -254,7 +263,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Realtime Status Strip (Mục 2) */}
       <div className="realtime-status-strip">
         <div className="realtime-status-indicator-wrapper">
           <span className={`realtime-status-indicator ${isRealtimeActive ? 'live' : 'waiting'}`}>
@@ -267,7 +275,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Telemetry Staleness warning overlay banner */}
       {isConnected && isStale && currentMetrics.heartRate !== null && (
         <div className="stale-vitals-banner" style={{ marginBottom: '1.5rem' }}>
           <Clock size={16} />
@@ -275,9 +282,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       )}
 
-      {/* Real-time Metric Cards Grid */}
       <div className="grid-3 vitals-grid">
-        {/* Heart Rate Card */}
         {(() => {
           const hasData = currentMetrics.heartRate !== null;
           const isHigh = hasData && currentMetrics.heartRate! > 120;
@@ -326,7 +331,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           );
         })()}
 
-        {/* SpO2 Card */}
         {(() => {
           const hasData = currentMetrics.spo2 !== null;
           const isCritical = hasData && currentMetrics.spo2! < 92;
@@ -374,7 +378,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           );
         })()}
 
-        {/* Blood Pressure Card */}
         {(() => {
           const hasData = currentMetrics.systolicBp !== null;
           const isHigh = hasData && (currentMetrics.systolicBp! >= 140 || currentMetrics.diastolicBp! >= 90);
@@ -424,9 +427,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         })()}
       </div>
 
-      {/* ECG Graphic and Patient Info Layout */}
       <div className="grid-2-3">
-        {/* ECG Waveform panel with clinical context (Mục 6) */}
         <div className="panel">
           <div className="ecg-panel-header">
             <h3 className="ecg-panel-title">
@@ -452,14 +453,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Right column stacking 3D Heart and Patient Details */}
         <div className="dashboard-side-column">
-          {/* Beating Heart 3D holographic panel */}
           <div className="panel heart-panel-center">
             <BeatingHeart3D heartRate={currentMetrics.heartRate !== null ? currentMetrics.heartRate : 0} />
           </div>
 
-          {/* Patient Details Panel (Mục 10) */}
           <div className="panel patient-summary-panel">
             <h3 className="metric-title patient-summary-title">
               Thông Tin Bệnh Nhân
@@ -500,7 +498,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Warnings & Alerts Grid (Mục 5) */}
       <div className="panel">
         <h3 className="metric-title alert-section-title">
           <AlertTriangle size={16} className="alert-section-icon" /> Cảnh Báo Gần Đây của bệnh nhân
@@ -537,7 +534,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
-      {/* TESTING SIMULATION PLATFORM DRAWER (Mục 7) */}
       {import.meta.env.DEV && (
         <div className="simulation-controls-panel">
           <h4 className="simulation-label">

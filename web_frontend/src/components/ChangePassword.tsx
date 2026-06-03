@@ -1,3 +1,16 @@
+/**
+ * @purpose Biểu mẫu đổi mật khẩu bắt buộc. Hiển thị sau lần đăng nhập đầu tiên hoặc
+ *          khi quản trị viên yêu cầu đặt lại mật khẩu. Xác thực mật khẩu mới theo
+ *          chính sách mật khẩu mạnh trước khi gửi lên máy chủ.
+ * @workflow  1. Người dùng nhập mật khẩu cũ + mới + xác nhận → 2. Xác thực phía máy
+ *            khách (khớp, độ mạnh, không trùng mật khẩu cũ) → 3. POST đến
+ *            /auth/change-password → 4. Khi thành công, gọi onNavigateNext sau một
+ *            hiệu ứng hoạt hình thành công ngắn.
+ * @relationships
+ *   - AuthContext để lấy mã truy cập
+ *   - passwordPolicy utility (isStrongPassword, passwordPolicyMessage)
+ *   - App.tsx (khối route cho /change-password)
+ */
 import React, { useState, useRef, useEffect } from 'react';
 import { Activity, Lock, Loader2, CheckCircle2 } from 'lucide-react';
 import { API_URL } from '../config';
@@ -9,6 +22,9 @@ interface ChangePasswordProps {
   onNavigateNext: (nextRole?: UserRole) => void;
 }
 
+/**
+ * Biểu mẫu đổi mật khẩu với xác thực phía máy khách và gửi lên API.
+ */
 export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }) => {
   const { accessToken, login, refreshUser, role } = useAuth();
   const [oldPassword, setOldPassword] = useState('');

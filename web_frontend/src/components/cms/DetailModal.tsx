@@ -1,8 +1,14 @@
+/**
+ * Mục đích: Hộp thoại xem tất cả các trường của một bản ghi CMS dưới dạng danh sách khóa-giá trị.
+ * Luồng xử lý: Duyệt qua các mục nhập của bản ghi và hiển thị từng cặp khóa-giá trị; đóng khi
+ *              nhấn phím Escape hoặc bấm vào nền phía sau.
+ * Quan hệ: Được sử dụng bởi CmsPage như một chế độ xem chỉ đọc trước khi thực hiện sửa/xóa.
+ */
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
 export const DetailModal: React.FC<{ record: Record<string, any>; onClose: () => void }> = ({ record, onClose }) => {
-  // Accessibility: Dismiss modal on Escape key press
+  // Hỗ trợ tiếp cận: Đóng hộp thoại khi nhấn phím Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -15,7 +21,7 @@ export const DetailModal: React.FC<{ record: Record<string, any>; onClose: () =>
     <div className="modal-overlay" onClick={onClose}>
       <div 
         className="modal-content cms-modal" 
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking modal content
+        onClick={(e) => e.stopPropagation()} // Ngăn đóng khi bấm vào nội dung hộp thoại
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"

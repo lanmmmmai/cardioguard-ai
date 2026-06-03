@@ -1,3 +1,15 @@
+// Bộ kiểm thử tích hợp cho các luồng di động CardioGuard.
+// Quy trình làm việc:
+// 1. Cung cấp createTestableWidget để bọc các màn hình trong vỏ kiểm thử MultiProvider.
+// 2. Định nghĩa các lớp con Fake* cho mỗi provider để kiểm soát trạng thái kiểm thử mà không cần I/O.
+// 3. Thực thi ba kịch bản chính:
+//    - Khóa mật khẩu bắt buộc đổi (tất cả tab ngoại trừ cài đặt bị ẩn).
+//    - Nhấn giữ SOS với bộ đếm ngược và tùy chọn hủy.
+//    - Chế độ xem chia đôi thích ứng trên máy tính bảng với danh sách bệnh nhân + bảng chi tiết.
+// Mối quan hệ:
+// - Giả lập: AuthProvider, PatientProvider, AlertProvider,
+//          AppointmentProvider, ChatProvider.
+// - Kiểm thử: DashboardScreen, PatientsScreen, HeartMonitorAppMainTabs.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -10,7 +22,8 @@ import 'package:heart_monitor_app/screens/dashboard_screen.dart';
 import 'package:heart_monitor_app/screens/patients_screen.dart';
 import 'package:heart_monitor_app/models/models.dart';
 
-// Helper to wrap widgets with multiple providers
+// Bọc widget child trong MediaQuery và MultiProvider để kiểm thử tích hợp.
+// Cung cấp bề mặt 400x800 mặc định trừ khi surfaceSize được chỉ định.
 Widget createTestableWidget({
   required Widget child,
   required AuthProvider authProvider,
@@ -37,7 +50,8 @@ Widget createTestableWidget({
   );
 }
 
-// Concrete Mocks or Subclasses to control provider states during tests
+// Giả lập AuthProvider trả về currentUser và
+// requiresPasswordChange có kiểm soát mà không cần gọi mạng thực.
 class FakeAuthProvider extends AuthProvider {
   User? _fakeUser;
   bool _fakeRequiresPasswordChange = false;
@@ -55,6 +69,7 @@ class FakeAuthProvider extends AuthProvider {
   bool get requiresPasswordChange => _fakeRequiresPasswordChange;
 }
 
+// Giả lập PatientProvider với danh sách bệnh nhân giả và số liệu trực tiếp.
 class FakePatientProvider extends PatientProvider {
   List<Patient> _fakePatients = [];
   final Map<String, dynamic> _fakeMetrics = {
@@ -79,25 +94,26 @@ class FakePatientProvider extends PatientProvider {
 
   @override
   Future<void> fetchPatients() async {
-    // Override to prevent real HTTP calls during tests
+    // Ghi đè để ngăn các lời gọi HTTP thực trong quá trình kiểm thử
   }
 
   @override
   Future<void> fetchMyProfile() async {
-    // Override to prevent real HTTP calls during tests
+    // Ghi đè để ngăn các lời gọi HTTP thực trong quá trình kiểm thử
   }
 
   @override
   Future<void> fetchMedicalRecords(String patientId) async {
-    // Override to prevent real HTTP calls during tests
+    // Ghi đè để ngăn các lời gọi HTTP thực trong quá trình kiểm thử
   }
 
   @override
   Future<void> fetchPrescriptions(String patientId) async {
-    // Override to prevent real HTTP calls during tests
+    // Ghi đè để ngăn các lời gọi HTTP thực trong quá trình kiểm thử
   }
 }
 
+// Giả lập AlertProvider với danh sách cảnh báo có thể kiểm soát.
 class FakeAlertProvider extends AlertProvider {
   List<Alert> _fakeAlerts = [];
 
@@ -110,6 +126,7 @@ class FakeAlertProvider extends AlertProvider {
   List<Alert> get alerts => _fakeAlerts;
 }
 
+// Giả lập AppointmentProvider với danh sách lịch hẹn có thể kiểm soát.
 class FakeAppointmentProvider extends AppointmentProvider {
   List<Appointment> _fakeAppointments = [];
 
@@ -123,10 +140,11 @@ class FakeAppointmentProvider extends AppointmentProvider {
 
   @override
   Future<void> fetchAppointments() async {
-    // Override to prevent real HTTP calls during tests
+    // Ghi đè để ngăn các lời gọi HTTP thực trong quá trình kiểm thử
   }
 }
 
+// Giả lập ChatProvider với các tin nhắn có thể kiểm soát và send/fetch no-op.
 class FakeChatProvider extends ChatProvider {
   List<ChatMessage> _fakeMessages = [];
 
@@ -140,7 +158,7 @@ class FakeChatProvider extends ChatProvider {
 
   @override
   Future<void> fetchChatHistory(String patientId) async {
-    // Override to prevent real HTTP calls during tests
+    // Ghi đè để ngăn các lời gọi HTTP thực trong quá trình kiểm thử
   }
 
   @override
@@ -170,7 +188,7 @@ void main() {
     fakeChat = FakeChatProvider();
   });
 
-  group('Mobiles UI - Advanced Features Test Suite', () {
+  group('Bộ kiểm thử tính năng nâng cao Giao diện Di động', () {
     testWidgets('Kịch bản 1: Mật khẩu bắt buộc đổi (forcePasswordChange) khóa tất cả luồng', (WidgetTester tester) async {
       // Giả lập tài khoản bệnh nhân có cờ bắt buộc đổi mật khẩu
       fakeAuth.setFakeUser(
@@ -245,7 +263,7 @@ void main() {
 
       // Thực hiện nhấn giữ (longPress)
       await tester.longPress(find.text('SOS'));
-      await tester.pump(); // Render immediate activation state showing "3" countdown
+      await tester.pump(); // Render trạng thái kích hoạt ngay lập tức hiển thị "3" đếm ngược
 
       // Kiểm tra trạng thái đếm ngược bắt đầu kích hoạt
       expect(find.text('ĐANG KÍCH HOẠT TRONG 3 S'), findsOneWidget);
@@ -312,7 +330,8 @@ void main() {
   });
 }
 
-// A simple mock of MainTabWrapper in main.dart to simulate navigation routing under test
+// Một giả lập tối thiểu của widget điều hướng tab chính để kiểm thử
+// kịch bản khóa mật khẩu bắt buộc đổi.
 class HeartMonitorAppMainTabs extends StatefulWidget {
   const HeartMonitorAppMainTabs({super.key});
 

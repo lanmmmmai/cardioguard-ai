@@ -1,3 +1,12 @@
+/**
+ * @purpose Hiển thị thông tin chi tiết bệnh nhân, biểu đồ xu hướng dữ liệu cảm biến
+ *          thời gian thực và lịch sử cảnh báo.
+ * @workflow Lấy dữ liệu SensorData thời gian thực qua props, thêm điểm lịch sử theo
+ *           từng bệnh nhân, hiển thị biểu đồ đường SVG nội tuyến cho HR/SpO2 và liệt
+ *           kê cảnh báo đã lọc.
+ * @relationships Component cha: Patients (cung cấp patient + telemetry + alerts qua props);
+ *                Sử dụng: severity utility để định kiểu cảnh báo.
+ */
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, User, Heart, Activity, AlertTriangle, MapPin, Calendar, Clipboard, Mail } from 'lucide-react';
 import { getSeverityMeta } from '../utils/severity';
@@ -16,6 +25,10 @@ interface HistoryPoint {
   timeLabel: string;
 }
 
+/**
+ * Component PatientDetail — hiển thị thông tin hồ sơ, biểu đồ xu hướng SVG trực tiếp
+ * và nhật ký cảnh báo. Đặt lại lịch sử khi thay đổi bệnh nhân để tránh dữ liệu cũ.
+ */
 export const PatientDetail: React.FC<PatientDetailProps> = ({
   patient,
   latestTelemetry,
@@ -24,12 +37,10 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
 }) => {
   const [history, setHistory] = useState<HistoryPoint[]>([]);
 
-  // Clinical Vitals Safety: DO NOT pre-populate with mock telemetry. Reset history on patient change.
   useEffect(() => {
     setHistory([]);
   }, [patient.id]);
 
-  // 2. Append new real-time telemetry if it matches this patient
   useEffect(() => {
     if (latestTelemetry && latestTelemetry.patient_id === patient.id) {
       const now = new Date();
@@ -41,22 +52,19 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
           spo2: latestTelemetry.spo2,
           timeLabel
         }];
-        if (next.length > 12) next.shift(); // keep last 12 points
+        if (next.length > 12) next.shift();
         return next;
       });
     }
   }, [latestTelemetry, patient.id]);
 
-  // Filter alerts specifically for this patient
   const patientAlerts = alerts.filter(a => a.patient_id === patient.id);
 
-  // SVG Chart Dimensions
   const chartWidth = 500;
   const chartHeight = 150;
   const padX = 40;
   const padY = 20;
 
-  // Helper: render single SVG Line Chart
   const renderLineChart = (
     data: number[],
     color: string,
@@ -68,7 +76,6 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
     
     const points = data.map((val, idx) => {
       const x = padX + (idx / (data.length - 1)) * (chartWidth - 2 * padX);
-      // invert Y coordinate for canvas/svg rendering
       const y = chartHeight - padY - ((val - minVal) / range) * (chartHeight - 2 * padY);
       return { x, y, val };
     });
@@ -89,7 +96,6 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
           </linearGradient>
         </defs>
 
-        {/* Grid lines */}
         {[0, 0.5, 1].map((ratio, i) => {
           const y = padY + ratio * (chartHeight - 2 * padY);
           const gridVal = Math.round(maxVal - ratio * range);
@@ -101,13 +107,10 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
           );
         })}
 
-        {/* Area under curve */}
         {areaD && <path d={areaD} fill={`url(#${gradId})`} />}
 
-        {/* Path line */}
         {pathD && <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />}
 
-        {/* Nodes */}
         {points.map((p, idx) => (
           <circle key={idx} cx={p.x} cy={p.y} r="3" fill="var(--bg-secondary)" stroke={color} strokeWidth="1.5" />
         ))}
@@ -117,7 +120,6 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
 
   return (
     <div>
-      {/* Page navigation back header */}
       <div className="page-header" style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button className="btn btn-secondary" onClick={onBackClick} style={{ padding: '8px 12px' }}>
@@ -134,9 +136,7 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
       </div>
 
       <div className="grid-2-3">
-        {/* Left Column: Trend Charts */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Heart Rate history chart */}
           <div className="panel">
             <h3 className="metric-title" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-primary)' }}>
               <Heart size={16} /> Biểu đồ Xu Hướng Nhịp Tim (BPM)
@@ -158,7 +158,6 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
             </div>
           </div>
 
-          {/* SpO2 history chart */}
           <div className="panel">
             <h3 className="metric-title" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-spo2)' }}>
               <Activity size={16} /> Biểu đồ Xu Hướng Nồng Độ Oxy SpO2 (%)
@@ -180,7 +179,6 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
             </div>
           </div>
 
-          {/* Alert History Logs list */}
           <div className="panel">
             <h3 className="metric-title" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <AlertTriangle size={16} style={{ color: 'var(--color-warning)' }} /> Lịch Sử Cảnh Báo Gần Đây
@@ -215,7 +213,6 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Dossier Information Card */}
         <div className="panel" style={{ height: 'fit-content', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '1rem' }}>
             <div className="patient-avatar" style={{ margin: 0, width: '48px', height: '48px', borderRadius: '14px' }}>

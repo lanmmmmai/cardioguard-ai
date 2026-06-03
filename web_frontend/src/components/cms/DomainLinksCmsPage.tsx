@@ -1,3 +1,16 @@
+/**
+ * Tệp: CardioGuard AI – Quản trị Domain Links CMS
+ * Mục đích: Giao diện quản lý các preview link, thông tin SEO, Open Graph (OG tags) và
+ *           ảnh đại diện hiển thị khi chia sẻ liên kết trên các mạng xã hội như Zalo,
+ *           Facebook, Messenger.
+ * Luồng xử lý: 
+ *   - Hiển thị danh sách các domain link cấu hình sẵn từ database.
+ *   - Hỗ trợ thêm mới, sửa đổi thông tin (path, url, title, description, image_url).
+ *   - Cho phép tải ảnh lên máy chủ qua cmsApi để làm ảnh preview.
+ *   - Tích hợp khung preview trực quan (chia sẻ preview) ngay khi đang soạn thảo.
+ * Quan hệ: Sử dụng AuthContext cho token và tích hợp trực tiếp vào CmsPage làm module phụ.
+ */
+
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   CheckCircle2,

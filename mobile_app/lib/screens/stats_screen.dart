@@ -1,3 +1,15 @@
+// Màn hình thống kê hệ thống với thẻ KPI, biểu đồ donut mức độ nghiêm trọng và xu hướng hàng tuần.
+// Quy trình làm việc:
+// 1. Khi khởi tạo, thực hiện các lời gọi API song song đến /patients, /alerts và
+//    điểm cuối thống kê hàng tuần từ AppConfig.
+// 2. Hiển thị 3 thẻ KPI (tổng bệnh nhân, tổng cảnh báo, số lượng nguy kịch).
+// 3. Biểu đồ tròn PieChart hiển thị phân bố mức độ nghiêm trọng của cảnh báo (cao/trung bình/thấp).
+// 4. Biểu đồ đường LineChart hiển thị xu hướng tần suất cảnh báo trong 7 ngày với nhãn ngày trong tuần.
+// 5. Nút làm mới tải lại tất cả dữ liệu qua _loadStatsData.
+// Mối quan hệ:
+// - Sử dụng: ApiClient, AppConfig, CgScreenScaffold, CgInlineState.
+// - Biểu đồ: fl_chart (PieChart, LineChart).
+// - Không có providers — tìm nạp dữ liệu API thô trực tiếp.
 import 'package:flutter/material.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -7,7 +19,9 @@ import '../config/app_config.dart';
 import '../widgets/cg_widgets.dart';
 import '../ui/cg_tokens.dart';
 
+// Màn hình thống kê hệ thống với thẻ KPI, donut mức độ nghiêm trọng và xu hướng đường hàng tuần.
 class StatsScreen extends StatefulWidget {
+  // Liệu màn hình có sử dụng màu chủ đề tối hay không.
   final bool isDarkTheme;
   const StatsScreen({super.key, required this.isDarkTheme});
 
@@ -21,10 +35,13 @@ class _StatsScreenState extends State<StatsScreen> {
   int _criticalCount = 0;
   bool _isLoading = false;
 
-  // Pie chart variables (không dùng fallback giả)
+  // Giá trị cho số lượng cảnh báo mức độ cao (critical/high) trong biểu đồ donut.
   double _highAlertsVal = 0.0;
+  // Giá trị cho số lượng cảnh báo mức độ trung bình (warning) trong biểu đồ donut.
   double _medAlertsVal = 0.0;
+  // Giá trị cho số lượng cảnh báo mức độ thấp (info/low) trong biểu đồ donut.
   double _lowAlertsVal = 0.0;
+  // Các điểm dữ liệu tần suất cảnh báo hàng tuần cho biểu đồ đường (khởi tạo thưa thớt).
   List<FlSpot> _weeklyAlertSpots = const [
     FlSpot(0, 0),
     FlSpot(1, 0),
@@ -34,6 +51,7 @@ class _StatsScreenState extends State<StatsScreen> {
     FlSpot(5, 0),
     FlSpot(6, 0),
   ];
+  // Nhãn cho mỗi ngày trong biểu đồ hàng tuần.
   List<String> _weeklyLabels = const ['-', '-', '-', '-', '-', '-', '-'];
 
   @override
@@ -42,6 +60,7 @@ class _StatsScreenState extends State<StatsScreen> {
     _loadStatsData();
   }
 
+  // Tìm nạp số lượng bệnh nhân, danh sách cảnh báo và thống kê hàng tuần song song từ API.
   void _loadStatsData() async {
     setState(() {
       _isLoading = true;
@@ -62,7 +81,7 @@ class _StatsScreenState extends State<StatsScreen> {
         _totalPatients = patients.length;
         _totalAlerts = alerts.length;
 
-        // Group alerts by severity
+        // Nhóm cảnh báo theo mức độ nghiêm trọng
         int high = 0;
         int med = 0;
         int low = 0;
@@ -105,12 +124,12 @@ class _StatsScreenState extends State<StatsScreen> {
           ];
         }
 
-        // Count critical cases
+        // Đếm số ca nguy kịch
         _criticalCount = high;
         _isLoading = false;
       });
     } catch (e) {
-      AppLogger.log('Stats load error: $e');
+      AppLogger.log('Lỗi tải thống kê: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -152,7 +171,7 @@ class _StatsScreenState extends State<StatsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 children: [
-                  // KPI widgets
+                  // Widget KPI
                   GridView.count(
                     crossAxisCount: 3,
                     shrinkWrap: true,
@@ -189,7 +208,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Donut severity distribution panel
+                  // Bảng phân bố donut mức độ nghiêm trọng
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -255,7 +274,7 @@ class _StatsScreenState extends State<StatsScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        // Legend
+                        // Chú thích
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
@@ -272,7 +291,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Alarms line chart panel
+                  // Bảng biểu đồ đường cảnh báo
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -369,6 +388,7 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
+  // Xây dựng một thẻ tóm tắt KPI hiển thị giá trị số liệu và biểu tượng.
   Widget _buildKpiCard(String label, String value, IconData icon, Color color,
       Color cardBg, Color textColor, Color textMuted) {
     return Container(
@@ -407,6 +427,7 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
+  // Xây dựng một hàng chấm chú thích màu + nhãn cho chú thích biểu đồ donut.
   Widget _buildLegendItem(String label, Color color, Color textMuted) {
     return Row(
       children: [

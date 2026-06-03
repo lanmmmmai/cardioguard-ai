@@ -1,3 +1,28 @@
+"""API Xác thực và Phân quyền.
+
+Mục đích:
+    Xử lý đăng ký người dùng (kèm xác thực OTP qua email), đăng nhập (dựa trên JWT),
+    đăng xuất (thu hồi token), quản lý mật khẩu (quên/đặt lại/thay đổi) và
+    xác thực token. Đóng vai trò là cổng xác thực trung tâm cho tất cả
+    các module API khác.
+
+Luồng xử lý:
+    Đăng ký sử dụng luồng OTP hai bước: request-otp gửi mã đến email của
+    người dùng; register xác thực OTP và tạo tài khoản. Đăng nhập
+    xác thực thông tin đăng nhập và trả về JWT đã ký. Đăng xuất thu hồi JWT
+    bằng cách lưu trữ JTI của nó trong bảng revoked_tokens. Đặt lại mật khẩu
+    sử dụng luồng OTP riêng với tùy chọn tạo mật khẩu ngẫu nhiên.
+    Tất cả các sự kiện xác thực đều được ghi lại qua audit_service.
+
+Quan hệ:
+    - Phụ thuộc vào: core.security để tạo/xác thực JWT và băm
+    - Phụ thuộc vào: core.rate_limit để giới hạn tốc độ các endpoint xác thực
+    - Phụ thuộc vào: services.otp_service cho vòng đời token OTP
+    - Phụ thuộc vào: services.audit_service để ghi nhật ký hoạt động
+    - Phụ thuộc vào: services.email_service để gửi email OTP/mật khẩu
+    - Được sử dụng bởi: Tất cả các module API khác thông qua get_user_from_token
+"""
+
 import asyncio
 import secrets
 import requests
@@ -29,6 +54,17 @@ VALID_ROLES = {"admin", "doctor", "patient"}
 
 
 def normalize_role(role: Optional[str]) -> str:
+    """Xác thực và chuẩn hóa chuỗi vai trò.
+
+    Args:
+        role: Chuỗi vai trò thô (ví dụ: 'Admin', 'DOCTOR').
+
+    Returns:
+        Chuỗi vai trò đã được chuẩn hóa thành chữ thường.
+
+    Raises:
+        HTTPException 403: Nếu vai trò không nằm trong VALID_ROLES.
+    """
     normalized = (role or "").strip().lower()
     if normalized not in VALID_ROLES:
         raise HTTPException(status_code=403, detail="Tài khoản chưa được phân quyền")
@@ -36,6 +72,17 @@ def normalize_role(role: Optional[str]) -> str:
 
 
 def generic_forgot_password_response(email: str) -> dict[str, object]:
+    """Trả về phản hồi chuẩn hóa cho yêu cầu quên mật khẩu.
+
+    Luôn trả về cùng một tin nhắn bất kể email có tồn tại hay không,
+    để ngăn chặn tấn công liệt kê người dùng.
+
+    Args:
+        email: Địa chỉ email do người dùng gửi lên.
+
+    Returns:
+        Dict chứa message, email và cờ email_sent.
+    """
     return {
         "message": "If the email exists, an OTP will be sent.",
         "email": email,
@@ -44,6 +91,17 @@ def generic_forgot_password_response(email: str) -> dict[str, object]:
 
 
 def extract_bearer_token(authorization: Optional[str]) -> str:
+    """Trích xuất chuỗi token JWT từ header Authorization.
+
+    Args:
+        authorization: Giá trị header Authorization thô (ví dụ: 'Bearer <token>').
+
+    Returns:
+        Chuỗi token.
+
+    Raises:
+        HTTPException 401: Nếu header bị thiếu hoặc không phải Bearer token.
+    """
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
     return authorization.split(" ", 1)[1].strip()
@@ -53,6 +111,14 @@ _users_columns_cache: Optional[set[str]] = None
 _users_columns_lock = asyncio.Lock()
 
 async def get_users_columns() -> set[str]:
+    """Lấy tập hợp tên cột cho bảng users.
+
+    Kết quả được lưu vào bộ nhớ đệm toàn cục sau truy vấn đầu tiên để tránh
+    tra cứu information_schema lặp đi lặp lại.
+
+    Returns:
+        Tập hợp các chuỗi tên cột cho bảng public.users.
+    """
     global _users_columns_cache
     if _users_columns_cache is None:
         async with _users_columns_lock:
@@ -76,6 +142,25 @@ async def get_user_from_token(
     allow_uncompleted: bool = False,
     allow_unverified: bool = False,
 ):
+    """Xác thực JWT và trả về người dùng đã xác thực.
+
+    Giải mã token, kiểm tra thu hồi, lấy dữ liệu người dùng với lựa chọn
+    cột động, xác thực trạng thái và tùy chọn kiểm tra cờ must_change_password.
+
+    Args:
+        authorization: Chuỗi token Bearer từ header Authorization.
+        allow_must_change_password: Nếu True, bỏ qua kiểm tra must_change_password
+            (được sử dụng cho chính luồng đổi mật khẩu).
+
+    Returns:
+        Dict với các trường người dùng: id, full_name, email, phone, role,
+        created_at, status, must_change_password.
+
+    Raises:
+        HTTPException 401: Nếu token bị thiếu, không hợp lệ, hết hạn hoặc bị thu hồi.
+        HTTPException 401: Nếu không tìm thấy người dùng.
+        HTTPException 403: Nếu tài khoản không hoạt động hoặc phải đổi mật khẩu.
+    """
     token = extract_bearer_token(authorization)
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -112,7 +197,7 @@ async def get_user_from_token(
         f"""
         SELECT {", ".join(select_columns)}
         FROM users
-        WHERE id::text = :user_id
+        WHERE id = :user_id::uuid
         """,
         {"user_id": user_id}
     )
@@ -165,6 +250,17 @@ from app.services.email_service import send_system_email
 
 
 async def send_forgot_password_otp_email(email: str, full_name: str, otp: str, role: Optional[str] = None) -> bool:
+    """Gửi email OTP đặt lại mật khẩu đến người dùng.
+
+    Args:
+        email: Địa chỉ email người nhận.
+        full_name: Họ và tên người nhận cho lời chào.
+        otp: Mã OTP 6 chữ số.
+        role: Vai trò người dùng cho ngữ cảnh biến template.
+
+    Returns:
+        True nếu email được gửi thành công, False nếu không.
+    """
     return await send_system_email(
         email_type="password_reset",
         to_email=email,
@@ -174,6 +270,17 @@ async def send_forgot_password_otp_email(email: str, full_name: str, otp: str, r
 
 
 async def send_random_password_email(email: str, full_name: str, new_password: str, role: Optional[str] = None) -> bool:
+    """Gửi mật khẩu được tạo ngẫu nhiên đến người dùng qua email.
+
+    Args:
+        email: Địa chỉ email người nhận.
+        full_name: Họ và tên người nhận cho lời chào.
+        new_password: Mật khẩu tạm thời mới được tạo.
+        role: Vai trò người dùng cho ngữ cảnh biến template.
+
+    Returns:
+        True nếu email được gửi thành công, False nếu không.
+    """
     return await send_system_email(
         email_type="password_reset",
         to_email=email,
@@ -183,6 +290,17 @@ async def send_random_password_email(email: str, full_name: str, new_password: s
 
 
 async def send_register_otp_email(email: str, full_name: str, otp: str, role: Optional[str] = "patient") -> bool:
+    """Gửi email OTP đăng ký đến người dùng.
+
+    Args:
+        email: Địa chỉ email người nhận.
+        full_name: Họ và tên người nhận.
+        otp: Mã OTP 6 chữ số để xác thực đăng ký.
+        role: Vai trò người dùng (mặc định là 'patient').
+
+    Returns:
+        True nếu email được gửi thành công, False nếu không.
+    """
     return await send_system_email(
         email_type="otp_register",
         to_email=email,
@@ -194,6 +312,22 @@ async def send_register_otp_email(email: str, full_name: str, otp: str, role: Op
 
 @router.post("/auth/register/request-otp")
 async def request_register_otp(data: RegisterOtpRequest, request: Request):
+    """Bước 1 của đăng ký: yêu cầu mã OTP qua email.
+
+    Giới hạn tốc độ 5 yêu cầu mỗi 60 giây cho mỗi cặp IP/email.
+    Nếu email đã tồn tại, trả về lỗi để ngăn đăng ký trùng lặp.
+
+    Args:
+        data: RegisterOtpRequest với email và full_name.
+        request: FastAPI Request để trích xuất IP.
+
+    Returns:
+        Xác nhận rằng OTP đã được gửi.
+
+    Raises:
+        HTTPException 400: Nếu email đã tồn tại.
+        HTTPException 502: Nếu gửi email thất bại.
+    """
     ip = get_client_ip(request)
     email = data.email.lower()
     check_rate_limit(ip, email, "/auth/register/request-otp", max_requests=5, window_seconds=60)
@@ -229,7 +363,7 @@ async def request_register_otp(data: RegisterOtpRequest, request: Request):
         email_sent = await send_register_otp_email(email, data.full_name, otp, role=reg_role)
     except Exception as exc:
         await invalidate_otp_tokens(purpose=OTP_PURPOSE_REGISTER, email=email)
-        logger.exception("Unable to send registration OTP email")
+        logger.exception("Không thể gửi email OTP đăng ký")
         raise HTTPException(status_code=502, detail="Unable to send OTP email. Please try again later.") from exc
 
     response = {"message": "OTP sent to email", "email": email, "email_sent": email_sent}
@@ -238,6 +372,22 @@ async def request_register_otp(data: RegisterOtpRequest, request: Request):
 
 @router.post("/auth/register")
 async def register(data: RegisterRequest, request: Request):
+    """Bước 2 của đăng ký: xác thực OTP và tạo tài khoản.
+
+    Xác thực OTP, sau đó chèn người dùng trong một giao dịch.
+    Tự động tạo một hàng tương ứng trong bảng patients cho
+    tài khoản bệnh nhân mới để tránh hồ sơ null.
+
+    Args:
+        data: RegisterRequest với email, OTP, full_name và password.
+        request: FastAPI Request để trích xuất IP.
+
+    Returns:
+        Tin nhắn thành công.
+
+    Raises:
+        HTTPException 400: Nếu OTP không hợp lệ/hết hạn hoặc email đã tồn tại.
+    """
     email = data.email.lower()
     otp_result = await verify_otp_token(
         purpose=OTP_PURPOSE_REGISTER,
@@ -340,6 +490,23 @@ async def register(data: RegisterRequest, request: Request):
 
 @router.post("/auth/login")
 async def login(data: LoginRequest, request: Request):
+    """Xác thực người dùng và trả về mã thông báo truy cập JWT.
+
+    Giới hạn tốc độ 5 lần thử mỗi 60 giây. Xác thực sự tồn tại của email,
+    tính đúng đắn của mật khẩu và trạng thái tài khoản. Ghi lại tất cả các
+    lần đăng nhập thất bại và thành công qua audit_service.
+
+    Args:
+        data: LoginRequest với email và password.
+        request: FastAPI Request để trích xuất IP.
+
+    Returns:
+        Dict chứa access_token, token_type và thông tin người dùng.
+
+    Raises:
+        HTTPException 401: Nếu email hoặc mật khẩu không hợp lệ.
+        HTTPException 403: Nếu tài khoản không hoạt động.
+    """
     ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
     check_rate_limit(ip, email, "/auth/login", max_requests=5, window_seconds=60)
@@ -473,6 +640,18 @@ async def login(data: LoginRequest, request: Request):
 
 @router.post("/auth/logout")
 async def logout(authorization: Optional[str] = Header(default=None)):
+    """Đăng xuất bằng cách thu hồi token JWT hiện tại.
+
+    Trích xuất JTI từ token và lưu trữ nó trong bảng revoked_tokens
+    để nó không thể được sử dụng lại. Bỏ qua lỗi một cách im lặng (ví dụ: nếu
+    không có token nào được cung cấp hoặc token đã hết hạn).
+
+    Args:
+        authorization: Token Bearer cần thu hồi.
+
+    Returns:
+        Tin nhắn thành công.
+    """
     if not authorization:
         return {"message": "Logged out successfully"}
     try:
@@ -493,6 +672,19 @@ async def logout(authorization: Optional[str] = Header(default=None)):
 
 @router.post("/auth/forgot-password/request-otp")
 async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Request):
+    """Bước 1 của quên mật khẩu: yêu cầu OTP đặt lại mật khẩu.
+
+    Luôn trả về cùng một phản hồi bất kể email có tồn tại hay không
+    (ngăn chặn liệt kê). Nếu email tồn tại, tạo và gửi OTP.
+    Giới hạn tốc độ 5 yêu cầu mỗi 60 giây.
+
+    Args:
+        data: ForgotPasswordRequest với email.
+        request: FastAPI Request để trích xuất IP.
+
+    Returns:
+        Phản hồi chung cho biết OTP đã được gửi nếu email tồn tại.
+    """
     ip = get_client_ip(request)
     email = data.email.lower()
     check_rate_limit(ip, email, "/auth/forgot-password/request-otp", max_requests=5, window_seconds=60)
@@ -515,7 +707,7 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Requ
     try:
         await send_forgot_password_otp_email(email, user["full_name"], otp, role=user["role"])
     except Exception as exc:
-        logger.exception("Unable to send forgot-password OTP email")
+        logger.exception("Không thể gửi email OTP quên mật khẩu")
         if settings.BREVO_API_KEY:
             await invalidate_otp_tokens(purpose=OTP_PURPOSE_FORGOT_PASSWORD, email=email)
 
@@ -533,6 +725,23 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Requ
 
 @router.post("/auth/forgot-password/verify-otp")
 async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request: Request):
+    """Bước 2 của quên mật khẩu: xác thực OTP và đặt lại mật khẩu.
+
+    Nếu new_password được cung cấp, sử dụng trực tiếp. Nếu không, tạo
+    mật khẩu ngẫu nhiên 16 ký tự và gửi email cho người dùng, đặt
+    cờ must_change_password để buộc thay đổi ở lần đăng nhập tiếp theo.
+
+    Args:
+        data: ForgotPasswordVerifyRequest với email, OTP và tùy chọn
+              new_password.
+        request: FastAPI Request để trích xuất IP.
+
+    Returns:
+        Tin nhắn thành công, tùy chọn kèm trạng thái email_sent.
+
+    Raises:
+        HTTPException 400: Nếu OTP không hợp lệ hoặc hết hạn.
+    """
     ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
     check_rate_limit(ip, email, "/auth/forgot-password/verify-otp", max_requests=5, window_seconds=60)
@@ -551,7 +760,7 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
     user_id = otp_result.metadata.get("user_id")
     if user_id:
         user = await database.fetch_one(
-            "SELECT id, full_name, role FROM users WHERE id::text = :id",
+            "SELECT id, full_name, role FROM users WHERE id = :id::uuid",
             {"id": user_id},
         )
     else:
@@ -607,6 +816,23 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
 
 @router.post("/auth/change-password")
 async def change_password(data: ChangePasswordRequest, request: Request, authorization: Optional[str] = Header(default=None)):
+    """Thay đổi mật khẩu của người dùng đã xác thực.
+
+    Xác thực mật khẩu cũ, cập nhật sang mật khẩu mới, xóa cờ
+    must_change_password và thu hồi token hiện tại để người dùng
+    phải đăng nhập lại với mật khẩu mới.
+
+    Args:
+        data: ChangePasswordRequest với old_password và new_password.
+        request: FastAPI Request để trích xuất IP.
+        authorization: Token Bearer.
+
+    Returns:
+        Tin nhắn thành công.
+
+    Raises:
+        HTTPException 400: Nếu mật khẩu cũ không chính xác.
+    """
     current_user = await get_user_from_token(
         authorization,
         allow_must_change_password=True,
@@ -615,7 +841,7 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
     )
     
     user = await database.fetch_one(
-        "SELECT password_hash FROM users WHERE id::text = :id",
+        "SELECT password_hash FROM users WHERE id = :id::uuid",
         {"id": current_user["id"]}
     )
 
@@ -626,7 +852,7 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
         """
         UPDATE users 
         SET password_hash = :password_hash, must_change_password = FALSE
-        WHERE id::text = :id
+        WHERE id = :id::uuid
         """,
         {"password_hash": hash_password(data.new_password), "id": current_user["id"]}
     )
@@ -675,6 +901,17 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
 
 @router.get("/auth/me")
 async def me(authorization: Optional[str] = Header(default=None)):
+    """Lấy hồ sơ của người dùng đã xác thực hiện tại.
+
+    Sử dụng allow_must_change_password=True để những người dùng cần thay đổi
+    mật khẩu vẫn có thể truy cập endpoint này.
+
+    Args:
+        authorization: Token Bearer.
+
+    Returns:
+        Dict chứa đối tượng người dùng đã xác thực.
+    """
     return {
         "user": await get_user_from_token(
             authorization,

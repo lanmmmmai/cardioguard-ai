@@ -1,3 +1,15 @@
+// Quản lý xem, đặt lịch hẹn và cập nhật trạng thái (Quản lý lịch hẹn).
+// Quy trình làm việc:
+// 1. Khi khởi tạo, tải lịch hẹn, danh sách bệnh nhân và ánh xạ bác sĩ song song.
+// 2. Lịch hẹn được lọc theo vai trò: bệnh nhân chỉ thấy của họ, bác sĩ thấy
+//    bệnh nhân được phân công, quản trị viên thấy tất cả.
+// 3. Mỗi thẻ hiển thị huy hiệu trạng thái, kênh, tiêu đề, ngày giờ, tên bác sĩ/bệnh nhân,
+//    và ghi chú. Các lịch hẹn đã hết hạn đang chờ/đã duyệt được gắn cờ "QUÁ HẠN".
+// 4. Bệnh nhân có thể đặt lịch qua BookAppointmentSheet; bác sĩ/quản trị viên có thể duyệt/từ chối.
+// Mối quan hệ:
+// - Sở hữu: AppointmentProvider, AuthProvider, PatientProvider.
+// - Sử dụng: BookAppointmentSheet, CgScreenScaffold, CgInlineState, CgStatusBadge.
+// - Ánh xạ tên bác sĩ được tìm nạp từ /cms/users qua ApiClient.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
@@ -10,7 +22,9 @@ import '../core/api_client.dart';
 import '../core/app_logger.dart';
 import '../ui/cg_tokens.dart';
 
+// Màn hình xem và quản lý lịch hẹn khám bệnh.
 class AppointmentsScreen extends StatefulWidget {
+  // Liệu màn hình có sử dụng màu chủ đề tối hay không.
   final bool isDarkTheme;
 
   const AppointmentsScreen({super.key, required this.isDarkTheme});
@@ -20,9 +34,13 @@ class AppointmentsScreen extends StatefulWidget {
 }
 
 class _AppointmentsScreenState extends State<AppointmentsScreen> {
+  // Theo dõi các ID lịch hẹn hiện đang được cập nhật (trạng thái tải trên mỗi thẻ).
   final Set<String> _updatingIds = <String>{};
+  // Bộ đệm ánh xạ ID bác sĩ đến tên hiển thị.
   Map<String, String> _doctorNames = {};
+  // Bộ đệm ánh xạ ID bệnh nhân đến tên hiển thị.
   Map<String, String> _patientNames = {};
+  // Liệu ánh xạ tên bác sĩ/bệnh nhân có đang tải hay không.
   bool _isLoadingMappings = true;
 
   @override
@@ -33,6 +51,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     });
   }
 
+  // Tải lịch hẹn, bệnh nhân và ánh xạ tên bác sĩ đồng thời.
   Future<void> _loadData() async {
     final apptProvider = Provider.of<AppointmentProvider>(context, listen: false);
     final patientProvider = Provider.of<PatientProvider>(context, listen: false);
@@ -47,7 +66,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       _fetchDoctorMappings(),
     ]);
 
-    // Construct patient mappings
+    // Xây dựng ánh xạ bệnh nhân
     final pNames = <String, String>{};
     for (final p in patientProvider.patients) {
       pNames[p.id] = p.fullName;
@@ -61,6 +80,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     }
   }
 
+  // Tìm nạp danh sách bác sĩ từ API CMS và lưu trữ tên của họ vào bộ đệm.
   Future<void> _fetchDoctorMappings() async {
     try {
       final client = ApiClient();
@@ -77,10 +97,11 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         });
       }
     } catch (e) {
-      AppLogger.log('Error fetching doctor mappings: $e');
+      AppLogger.log('Lỗi tìm nạp ánh xạ bác sĩ: $e');
     }
   }
 
+  // Định dạng DateTime thành chuỗi HH:mm - dd/MM/yyyy có thể đọc được theo giờ địa phương.
   String _formatDateTime(DateTime dateTime) {
     final local = dateTime.toLocal();
     final hour = local.hour.toString().padLeft(2, '0');
@@ -91,6 +112,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     return '$hour:$minute - $day/$month/$year';
   }
 
+  // Mở bottom sheet để đặt lịch hẹn mới.
   void _showBookAppointmentSheet() {
     showModalBottomSheet(
       context: context,
@@ -115,6 +137,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     });
   }
 
+  // Cập nhật trạng thái của một lịch hẹn và hiển thị snackbar kết quả.
   Future<void> _updateStatus(String appointmentId, String newStatus) async {
     setState(() => _updatingIds.add(appointmentId));
     final apptProvider = Provider.of<AppointmentProvider>(context, listen: false);
@@ -154,7 +177,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     final role = authProvider.currentUser?.role ?? 'patient';
     final currentUserId = authProvider.currentUser?.id;
 
-    // Filter appointments by role
+    // Lọc lịch hẹn theo vai trò
     final rawList = apptProvider.appointments;
     final list = rawList.where((a) {
       if (role == 'patient') {
@@ -162,7 +185,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       } else if (role == 'doctor') {
         return a.doctorId == currentUserId;
       }
-      return true; // Admin views all
+      return true; // Quản trị viên xem tất cả
     }).toList();
 
     return CgScreenScaffold(
@@ -222,7 +245,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                       final isPast = appt.scheduledAt.isBefore(DateTime.now());
                       final status = appt.status.toLowerCase();
 
-                      // Expired handling
+                      // Xử lý hết hạn
                       final bool isExpired = isPast && (status == 'pending' || status == 'approved');
 
                       Color statusColor;
@@ -320,7 +343,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                               ),
                             ],
                             
-                            // Doctor action buttons for pending & non-expired
+                            // Nút hành động của bác sĩ cho các lịch hẹn đang chờ và chưa hết hạn
                             if ((role == 'doctor' || role == 'admin') &&
                                 status == 'pending' &&
                                 !isExpired) ...[

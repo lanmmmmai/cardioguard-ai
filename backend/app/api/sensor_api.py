@@ -1,3 +1,29 @@
+"""API Dữ liệu Cảm biến và Đo xa IoT.
+
+Mục đích:
+    Xử lý việc tiếp nhận dữ liệu cảm biến y tế từ hai nguồn:
+    (1) Nhập thủ công bởi người dùng đã xác thực (bệnh nhân/bác sĩ/admin) qua
+    POST /sensor-data và (2) đo xa thiết bị IoT qua POST /iot/telemetry
+    với xác thực cấp thiết bị. Cả hai đường dẫn đều bao gồm phát hiện
+    giá trị bất thường qua AI và phát sóng WebSocket thời gian thực.
+
+Luồng xử lý:
+    Dữ liệu cảm biến thủ công: người dùng đã xác thực gửi chỉ số → lưu vào
+    sensor_data → detect_abnormal() kiểm tra dấu hiệu sinh tồn → cảnh báo được tạo
+    nếu bất thường → kết quả được phát sóng qua WebSocket.
+    Đo xa IoT: thiết bị xác thực qua MAC và token → trạng thái thiết bị
+    được cập nhật thành online → chỉ số được lưu → cùng luồng phát hiện bất thường
+    và phát sóng. Tất cả các thay đổi đều được ghi nhật ký kiểm toán.
+
+Quan hệ:
+    - Phụ thuộc vào: auth_api.get_user_from_token để xác thực (đường dẫn thủ công)
+    - Phụ thuộc vào: ai.heart_ai.detect_abnormal để phát hiện bất thường
+    - Phụ thuộc vào: websocket.connection_manager để phát sóng thời gian thực
+    - Phụ thuộc vào: services.audit_service để ghi nhật ký hoạt động
+    - Phụ thuộc vào: core.rate_limit để giới hạn tốc độ IoT
+    - Bảng: sensor_data, alerts, devices
+"""
+
 from datetime import date, datetime, timezone
 from decimal import Decimal
 import logging
@@ -19,10 +45,26 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_device_identifier(value: str) -> str:
+    """Chuẩn hóa định danh thiết bị bằng cách loại bỏ dấu phân cách và chuyển sang chữ thường.
+
+    Args:
+        value: Định danh thiết bị thô (ví dụ: địa chỉ MAC có dấu hai chấm).
+
+    Returns:
+        Chuỗi chữ thường đã chuẩn hóa, không có dấu phân cách.
+    """
     return value.strip().lower().replace(":", "").replace("-", "")
 
 
 def to_jsonable(value: Any) -> Any:
+    """Chuyển đổi các kiểu không thể tuần tự hóa thành giá trị an toàn JSON.
+
+    Args:
+        value: Bất kỳ giá trị Python nào.
+
+    Returns:
+        Chuỗi định dạng ISO cho ngày tháng, float cho Decimal hoặc chính giá trị đó.
+    """
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     if isinstance(value, Decimal):
@@ -31,6 +73,14 @@ def to_jsonable(value: Any) -> Any:
 
 
 def row_to_dict(row: Any) -> dict[str, Any]:
+    """Chuyển đổi một hàng cơ sở dữ liệu thành dict an toàn JSON.
+
+    Args:
+        row: Đối tượng hàng cơ sở dữ liệu.
+
+    Returns:
+        Dict với tất cả giá trị được truyền qua to_jsonable.
+    """
     return {key: to_jsonable(row[key]) for key in row.keys()}
 
 
@@ -38,6 +88,13 @@ _devices_columns_cache: Optional[set[str]] = None
 
 
 async def get_devices_table_columns() -> set[str]:
+    """Lấy tập hợp tên cột cho bảng devices.
+
+    Kết quả được lưu vào bộ nhớ đệm toàn cục sau truy vấn đầu tiên.
+
+    Returns:
+        Tập hợp các chuỗi tên cột.
+    """
     global _devices_columns_cache
     if _devices_columns_cache is not None:
         return _devices_columns_cache
@@ -51,6 +108,18 @@ async def get_devices_table_columns() -> set[str]:
     _devices_columns_cache = {row["column_name"] for row in rows}
     return _devices_columns_cache
 async def ensure_patient_access(user: dict[str, Any], patient_id: str) -> None:
+    """Xác minh rằng người dùng có quyền truy cập dữ liệu của bệnh nhân.
+
+    Admin có thể truy cập tất cả bệnh nhân. Bệnh nhân chỉ có thể truy cập
+    dữ liệu của chính họ. Bác sĩ chỉ có thể truy cập bệnh nhân được phân công.
+
+    Args:
+        user: Dict người dùng đã xác thực.
+        patient_id: UUID của bệnh nhân cần truy cập.
+
+    Raises:
+        HTTPException 403: Nếu người dùng không có quyền truy cập.
+    """
     role = user["role"]
     if role == "admin":
         return
@@ -63,7 +132,7 @@ async def ensure_patient_access(user: dict[str, Any], patient_id: str) -> None:
             """
             SELECT 1
             FROM doctor_patient
-            WHERE doctor_id::text = :doctor_id AND patient_id::text = :patient_id
+            WHERE doctor_id = :doctor_id::uuid AND patient_id = :patient_id::uuid
             """,
             {"doctor_id": user["id"], "patient_id": patient_id},
         )
@@ -74,6 +143,22 @@ async def ensure_patient_access(user: dict[str, Any], patient_id: str) -> None:
 
 
 async def ensure_device_access(user: dict[str, Any], device_uid: str) -> dict[str, Any]:
+    """Tra cứu thiết bị theo UID và xác minh người dùng có quyền truy cập.
+
+    Khớp thiết bị theo MAC hoặc tên đã chuẩn hóa. Xác thực quyền truy cập
+    bệnh nhân nếu thiết bị được gán cho một bệnh nhân.
+
+    Args:
+        user: Dict người dùng đã xác thực.
+        device_uid: Chuỗi UID thiết bị (MAC hoặc tên).
+
+    Returns:
+        Dict hàng thiết bị.
+
+    Raises:
+        HTTPException 404: Nếu không tìm thấy thiết bị hoặc không có bệnh nhân.
+        HTTPException 403: Nếu người dùng thiếu quyền truy cập.
+    """
     columns = await get_devices_table_columns()
     device_key = normalize_device_identifier(device_uid)
     uses_device_mac = "device_mac" in columns
@@ -120,6 +205,17 @@ async def ensure_device_access(user: dict[str, Any], device_uid: str) -> dict[st
 
 
 async def get_device_by_mac(device_mac: str) -> dict[str, Any] | None:
+    """Tìm thiết bị theo địa chỉ MAC (hoặc tên nếu thiếu cột device_mac).
+
+    Thích ứng động truy vấn dựa trên lược đồ bảng devices.
+    Trả về các trường đã chọn bao gồm device_token_hash để xác thực.
+
+    Args:
+        device_mac: Địa chỉ MAC thiết bị thô.
+
+    Returns:
+        Dict hàng thiết bị hoặc None nếu không tìm thấy.
+    """
     columns = await get_devices_table_columns()
     device_key = normalize_device_identifier(device_mac)
     uses_device_mac = "device_mac" in columns
@@ -157,6 +253,17 @@ async def get_device_by_mac(device_mac: str) -> dict[str, Any] | None:
 
 
 def verify_iot_device_token(device_row: dict[str, Any], device_token: str) -> bool:
+    """Xác thực token thiết bị IoT với hàm băm đã lưu hoặc token chia sẻ.
+
+    Ưu tiên hàm băm token từng thiết bị; dự phòng sang token chia sẻ toàn cục.
+
+    Args:
+        device_row: Hàng cơ sở dữ liệu thiết bị chứa device_token_hash.
+        device_token: Chuỗi token thô từ tiêu đề X-Device-Token.
+
+    Returns:
+        True nếu token hợp lệ, False nếu không.
+    """
     token_hash = device_row["device_token_hash"]
     if token_hash:
         return verify_password(device_token, token_hash)
@@ -165,12 +272,33 @@ def verify_iot_device_token(device_row: dict[str, Any], device_token: str) -> bo
 
 
 def has_any_iot_token_config(device_row: dict[str, Any]) -> bool:
+    """Kiểm tra xem có bất kỳ cơ chế xác thực token nào được cấu hình không.
+
+    Args:
+        device_row: Hàng cơ sở dữ liệu thiết bị.
+
+    Returns:
+        True nếu có hàm băm từng thiết bị hoặc token chia sẻ được cấu hình.
+    """
     if device_row["device_token_hash"]:
         return True
     return bool(settings.IOT_DEVICE_SHARED_TOKEN.strip())
 
 
 def detect_abnormal_iot(readings: Any) -> list[dict[str, str]]:
+    """Phát hiện dấu hiệu sinh tồn bất thường từ chỉ số đo xa IoT.
+
+    Bọc các chỉ số trong một đối tượng tương thích với
+    detect_abnormal() và lọc bỏ cảnh báo huyết áp
+    nếu thiếu dữ liệu BP.
+
+    Args:
+        readings: Đối tượng chỉ số với heart_rate, spo2,
+            systolic_bp, diastolic_bp, ecg_value.
+
+    Returns:
+        Danh sách các dict cảnh báo (mỗi cảnh báo có alert_type, message, severity).
+    """
     data = type(
         "TelemetryForAI",
         (),
@@ -190,9 +318,23 @@ def detect_abnormal_iot(readings: Any) -> list[dict[str, str]]:
 
 @router.post("/sensor-data")
 async def create_sensor_data(data: SensorDataCreate, request: Request, authorization: Optional[str] = Header(default=None)):
+    """Gửi chỉ số dữ liệu cảm biến thủ công cho một bệnh nhân.
+
+    Xác thực quyền truy cập bệnh nhân, lưu chỉ số, chạy phát hiện bất thường
+    (tạo cảnh báo nếu cần), phát sóng cả dữ liệu cảm biến và cảnh báo
+    qua WebSocket và ghi nhật ký việc gửi.
+
+    Args:
+        data: SensorDataCreate với patient_id và các dấu hiệu sinh tồn.
+        request: FastAPI Request để trích xuất IP.
+        authorization: Token Bearer.
+
+    Returns:
+        Dict chứa xác nhận lưu, cờ is_abnormal và danh sách cảnh báo.
+    """
     current_user = await get_user_from_token(authorization)
     await ensure_patient_access(current_user, data.patient_id)
-    logger.info("Manual sensor data received: patient_id=%s sender_id=%s", data.patient_id, current_user["id"])
+    logger.info("Dữ liệu cảm biến thủ công nhận được: patient_id=%s sender_id=%s", data.patient_id, current_user["id"])
 
     insert_sensor_query = """
     INSERT INTO sensor_data(
@@ -285,7 +427,7 @@ async def create_sensor_data(data: SensorDataCreate, request: Request, authoriza
         })
 
     logger.info(
-        "Manual sensor data stored: patient_id=%s abnormal=%s alert_count=%s",
+        "Dữ liệu cảm biến thủ công đã lưu: patient_id=%s abnormal=%s alert_count=%s",
         data.patient_id,
         bool(alerts),
         len(alerts),
@@ -305,6 +447,31 @@ async def create_iot_telemetry(
     x_device_mac: str = Header(..., alias="X-Device-Mac"),
     x_device_token: str = Header(..., alias="X-Device-Token"),
 ):
+    """Nhận dữ liệu đo xa từ thiết bị y tế IoT.
+
+    Luồng xác thực: tra cứu MAC → xác thực token thiết bị →
+    kiểm tra trạng thái thiết bị. Cập nhật trạng thái thiết bị thành 'online',
+    lưu chỉ số vào sensor_data, chạy phát hiện bất thường, tạo cảnh báo
+    và phát sóng qua WebSocket. Giới hạn tốc độ 60 req/phút.
+
+    Args:
+        data: IotTelemetryPayload với các chỉ số và thông tin thiết bị tùy chọn.
+        request: FastAPI Request để giới hạn tốc độ.
+        x_device_uid: Tiêu đề UID thiết bị IoT.
+        x_device_mac: Tiêu đề địa chỉ MAC thiết bị IoT.
+        x_device_token: Tiêu đề token xác thực thiết bị IoT.
+
+    Returns:
+        Dict chứa xác nhận chấp nhận, patient_id, thông tin thiết bị,
+        và các cảnh báo bất thường.
+
+    Raises:
+        HTTPException 400: Nếu MAC không hợp lệ.
+        HTTPException 404: Nếu thiết bị chưa được ghép đôi hoặc không có bệnh nhân.
+        HTTPException 401: Nếu token thiết bị không hợp lệ.
+        HTTPException 403: Nếu trạng thái thiết bị chặn đo xa.
+        HTTPException 503: Nếu không có cấu hình token.
+    """
     device_key = normalize_device_identifier(x_device_mac)
     if len(device_key) != 12:
         raise HTTPException(status_code=400, detail="Invalid device MAC address")
@@ -330,7 +497,7 @@ async def create_iot_telemetry(
     if not patient_id:
         raise HTTPException(status_code=404, detail="Device does not have assigned patient")
 
-    logger.info("IoT telemetry received: patient_id=%s device_uid=%s", patient_id, x_device_uid)
+    logger.info("Đo xa IoT nhận được: patient_id=%s device_uid=%s", patient_id, x_device_uid)
 
     await database.execute(
         """
@@ -339,7 +506,7 @@ async def create_iot_telemetry(
             battery = COALESCE(:battery, battery),
             last_seen_at = :last_seen_at,
             updated_at = :updated_at
-        WHERE id::text = :device_id
+        WHERE id = :device_id::uuid
         """,
         {
             "status": "online",
@@ -430,7 +597,7 @@ async def create_iot_telemetry(
         )
 
     logger.info(
-        "IoT telemetry stored: patient_id=%s device_uid=%s abnormal=%s alert_count=%s",
+        "Đo xa IoT đã lưu: patient_id=%s device_uid=%s abnormal=%s alert_count=%s",
         patient_id,
         x_device_uid,
         bool(alerts),
@@ -449,6 +616,19 @@ async def create_iot_telemetry(
 
 @router.get("/iot/devices/{device_uid}/status")
 async def get_iot_device_status(device_uid: str, authorization: Optional[str] = Header(default=None)):
+    """Lấy trạng thái hiện tại của thiết bị IoT.
+
+    Args:
+        device_uid: UID thiết bị (MAC hoặc tên).
+        authorization: Token Bearer.
+
+    Returns:
+        Dict chứa trạng thái thiết bị, pin, lần cuối thấy, phần mềm cơ sở, v.v.
+
+    Raises:
+        HTTPException 404: Nếu không tìm thấy thiết bị.
+        HTTPException 403: Nếu người dùng thiếu quyền truy cập.
+    """
     current_user = await get_user_from_token(authorization)
     device_row = await ensure_device_access(current_user, device_uid)
     return {
@@ -467,6 +647,24 @@ async def get_iot_device_status(device_uid: str, authorization: Optional[str] = 
 
 @router.post("/iot/devices/{device_uid}/rotate-token")
 async def rotate_iot_device_token(device_uid: str, request: Request, authorization: Optional[str] = Header(default=None)):
+    """Xoay token xác thực cho thiết bị IoT.
+
+    Tạo token thiết bị ngẫu nhiên mới, lưu hàm băm và trả về
+    token văn bản thuần (chỉ hiển thị một lần). Chỉ admin hoặc bác sĩ.
+
+    Args:
+        device_uid: UID thiết bị (MAC hoặc tên).
+        request: FastAPI Request để trích xuất IP.
+        authorization: Token Bearer.
+
+    Returns:
+        Dict chứa token thiết bị mới và dấu thời gian xoay.
+
+    Raises:
+        HTTPException 403: Nếu người dùng không phải admin hoặc bác sĩ.
+        HTTPException 404: Nếu không tìm thấy thiết bị.
+        HTTPException 409: Nếu cột device_token_hash không tồn tại.
+    """
     current_user = await get_user_from_token(authorization)
     if current_user["role"] not in {"admin", "doctor"}:
         raise HTTPException(status_code=403, detail="Chỉ admin hoặc bác sĩ mới được xoay token thiết bị")
@@ -484,7 +682,7 @@ async def rotate_iot_device_token(device_uid: str, request: Request, authorizati
         SET device_token_hash = :device_token_hash,
             token_last_rotated_at = :rotated_at,
             updated_at = :updated_at
-        WHERE id::text = :device_id
+        WHERE id = :device_id::uuid
         """,
         {
             "device_token_hash": new_token_hash,
@@ -518,20 +716,34 @@ async def get_sensor_data(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
 ):
+    """Lấy dữ liệu cảm biến với phạm vi truy cập dựa trên vai trò.
+
+    Bệnh nhân thấy dữ liệu của chính họ. Bác sĩ thấy dữ liệu cho bệnh nhân
+    được phân công của họ. Tùy chọn lọc theo patient_id.
+
+    Args:
+        authorization: Token Bearer.
+        patient_id: UUID bệnh nhân tùy chọn để lọc.
+        limit: Số bản ghi tối đa (1-500).
+        offset: Độ lệch phân trang.
+
+    Returns:
+        Danh sách dict dữ liệu cảm biến với giá trị an toàn JSON.
+    """
     current_user = await get_user_from_token(authorization)
     where_parts = []
     values: dict[str, Any] = {"limit": limit, "offset": offset}
 
     if current_user["role"] == "patient":
-        where_parts.append("patient_id::text = :current_user_id")
+        where_parts.append("patient_id = :current_user_id::uuid")
         values["current_user_id"] = current_user["id"]
     elif current_user["role"] == "doctor":
         where_parts.append(
             """
             EXISTS (
                 SELECT 1 FROM doctor_patient dp
-                WHERE dp.doctor_id::text = :current_user_id
-                AND dp.patient_id::text = sensor_data.patient_id::text
+                WHERE dp.doctor_id = :current_user_id::uuid
+                AND dp.patient_id = sensor_data.patient_id
             )
             """
         )
@@ -539,7 +751,7 @@ async def get_sensor_data(
 
     if patient_id:
         await ensure_patient_access(current_user, patient_id)
-        where_parts.append("patient_id::text = :patient_id")
+        where_parts.append("patient_id = :patient_id::uuid")
         values["patient_id"] = patient_id
 
     where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
@@ -564,6 +776,19 @@ async def get_sensor_history(
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
+    """Lấy lịch sử dữ liệu cảm biến có phân trang.
+
+    Bao bọc get_sensor_data với định dạng phản hồi phân trang chuẩn hóa.
+
+    Args:
+        authorization: Token Bearer.
+        patient_id: UUID bệnh nhân tùy chọn để lọc.
+        limit: Số bản ghi tối đa (1-100).
+        offset: Độ lệch phân trang.
+
+    Returns:
+        Dict chứa items, limit và offset.
+    """
     items = await get_sensor_data(
         authorization=authorization,
         patient_id=patient_id,

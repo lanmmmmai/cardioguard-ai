@@ -1,3 +1,10 @@
+/**
+ * @purpose Đăng ký bệnh nhân hai bước: bước biểu mẫu sau đó bước xác minh OTP.
+ * @workflow Bước 1 xác thực các trường (họ tên, Gmail, quy tắc mật khẩu) sau đó yêu cầu
+ *           OTP qua /auth/register/request-otp. Bước 2 thu thập OTP 6 chữ số với các ô
+ *           nhập riêng lẻ và gửi đến /auth/register. Khi thành công, điều hướng đến đăng nhập.
+ * @relationships Component cha: App (gọi onRegisterSuccess/onNavigateToLogin); Sử dụng: passwordPolicy util.
+ */
 import React, { useRef, useState, useEffect } from 'react';
 import { Activity, ArrowLeft, CheckCircle2, Lock, Mail, ShieldCheck, User, Loader2, Phone, Stethoscope, Building } from 'lucide-react';
 import { API_URL } from '../config';
@@ -15,6 +22,10 @@ const fullNamePattern = /^[A-Za-zÀ-ỹ]+(?:[ '-][A-Za-zÀ-ỹ]+)+$/;
 
 const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ');
 
+/**
+ * Component Register — đăng ký hai bước với xác minh OTP qua email.
+ * Quản lý trạng thái biểu mẫu và OTP riêng biệt; xử lý nhập OTP từng chữ số với tự động lấy tiêu điểm.
+ */
 export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onNavigateToLogin }) => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');

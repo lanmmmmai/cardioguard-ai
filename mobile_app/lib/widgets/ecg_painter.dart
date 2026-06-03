@@ -1,9 +1,24 @@
+// Trình vẽ CustomPainter tùy chỉnh hiển thị dạng sóng ECG thời gian thực với lưới neon.
+// Quy trình làm việc:
+// 1. Vẽ nền tối/sáng, sau đó các đường lưới nhỏ (10 px) và lớn (50 px)
+//    với tông màu hồng trong suốt.
+// 2. Vẽ đồ thị dataPoints dưới dạng đường liên tục được chia tỷ lệ theo chiều cao canvas.
+// 3. Áp dụng hiệu ứng phát sáng xanh lơ (MaskFilter.blur) phía sau nét ECG chính.
+// 4. Vẽ một chấm trắng dẫn đầu tại điểm dữ liệu mới nhất với quầng sáng phát sáng.
+// Mối quan hệ:
+// - Được sử dụng bởi: DashboardScreen bên trong AnimatedBuilder.
+// - Dữ liệu: nhận một List<double> các biên độ ECG từ bộ đệm số liệu trực tiếp.
+// - Vẽ lại: được kiểm soát bởi shouldRepaint qua so sánh listEquals.
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
+// Vẽ dạng sóng ECG với nền lưới neon và chấm dẫn đầu phát sáng.
 class EcgPainter extends CustomPainter {
+  // Danh sách có thứ tự các giá trị biên độ ECG (chuẩn hóa ~ -1.0 đến 1.0).
   final List<double> dataPoints;
+  // Nhịp tim hiện tại tính bằng BPM (được sử dụng trong so sánh shouldRepaint).
   final double heartRate;
+  // Công tắc chế độ tối/sáng cho màu nền.
   final bool isDarkTheme;
 
   EcgPainter({
@@ -14,7 +29,7 @@ class EcgPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Clear / draw background
+    // Vẽ nền
     final bgPaint = Paint()
       ..color = isDarkTheme ? const Color(0xFF0A0D14) : const Color(0xFFFAFAFA)
       ..style = PaintingStyle.fill;
@@ -24,7 +39,7 @@ class EcgPainter extends CustomPainter {
     final height = size.height;
     final centerY = height / 2;
 
-    // Small grids (every 10px)
+    // Lưới nhỏ (mỗi 10px) — lưới mịn cho thẩm mỹ màn hình y tế
     final gridPaintSmall = Paint()
       ..color = const Color(0xFFFF3366).withValues(alpha: 0.04)
       ..strokeWidth = 0.5
@@ -37,7 +52,7 @@ class EcgPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(width, y), gridPaintSmall);
     }
 
-    // Large grid squares (every 50px)
+    // Ô lưới lớn (mỗi 50px)
     final gridPaintLarge = Paint()
       ..color = const Color(0xFFFF3366).withValues(alpha: 0.12)
       ..strokeWidth = 1.0
@@ -52,7 +67,7 @@ class EcgPainter extends CustomPainter {
 
     if (dataPoints.isEmpty) return;
 
-    // Draw ECG Curve path
+    // Vẽ đường cong ECG
     final step = width / (dataPoints.length - 1);
     final path = Path();
 
@@ -65,7 +80,7 @@ class EcgPainter extends CustomPainter {
       path.lineTo(x, y);
     }
 
-    // Neon Glow background path
+    // Đường nền phát sáng neon
     final glowPaint = Paint()
       ..color = const Color(0xFF00F2FE).withValues(alpha: 0.4)
       ..strokeWidth = 5.0
@@ -76,7 +91,7 @@ class EcgPainter extends CustomPainter {
 
     canvas.drawPath(path, glowPaint);
 
-    // Front crisp ECG path
+    // Đường ECG chính nét căng
     final ecgPaint = Paint()
       ..color = const Color(0xFF00F2FE)
       ..strokeWidth = 2.5
@@ -86,18 +101,18 @@ class EcgPainter extends CustomPainter {
 
     canvas.drawPath(path, ecgPaint);
 
-    // Draw leading sweeping pulse dot
+    // Vẽ chấm xung dẫn đầu
     final lastX = width - 4;
     final lastY = centerY - dataPoints.last * (height * 0.35);
 
-    // Glow dot
+    // Chấm phát sáng
     final dotGlow = Paint()
       ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.8)
       ..style = PaintingStyle.fill
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0);
     canvas.drawCircle(Offset(lastX - 4, lastY), 8.0, dotGlow);
 
-    // Core white dot
+    // Chấm trắng lõi
     final dotPaint = Paint()
       ..color = const Color(0xFFFFFFFF)
       ..style = PaintingStyle.fill;

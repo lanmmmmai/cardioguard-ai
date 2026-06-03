@@ -1,3 +1,12 @@
+/**
+ * @purpose Trang hồ sơ cá nhân để xem/chỉnh sửa thông tin tài khoản người dùng,
+ *          hồ sơ bệnh nhân và đổi mật khẩu.
+ * @workflow Tải /auth/me và /patients/me khi mount; quản lý ba biểu mẫu (tài khoản,
+ *           bệnh nhân, mật khẩu) với xác thực phía máy khách; gửi yêu cầu PUT để
+ *           cập nhật dữ liệu.
+ * @relationships Sử dụng AuthContext để lấy accessToken; Gọi refreshUser sau các thay đổi;
+ *                Sử dụng passwordPolicy util để kiểm tra độ mạnh mật khẩu.
+ */
 import React, { useEffect, useMemo, useState } from 'react';
 import { 
   AlertTriangle, 
@@ -53,6 +62,10 @@ const getErrorMessage = async (response: Response, fallback: string) => {
   }
 };
 
+/**
+ * Component ProfilePage — quản lý thông tin tài khoản, hồ sơ bệnh nhân và biểu mẫu
+ * đổi mật khẩu. Hiển thị có điều kiện phần bệnh nhân chỉ khi role === 'patient'.
+ */
 export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
   const { accessToken, user, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'account' | 'profile' | 'password'>('account');

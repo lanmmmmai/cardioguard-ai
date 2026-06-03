@@ -1,3 +1,23 @@
+"""API Quản lý Cảnh báo.
+
+Mục đích:
+    Xử lý việc tạo, truy xuất và giải quyết các cảnh báo y tế / sự kiện
+    nghiêm trọng. Hỗ trợ cảnh báo SOS từ bệnh nhân, truy vấn cảnh báo dựa
+    trên vai trò và thống kê 7 ngày.
+
+Luồng xử lý:
+    Truy vấn cảnh báo được phân chia theo vai trò: bệnh nhân chỉ thấy cảnh
+    báo của mình, bác sĩ thấy cảnh báo của bệnh nhân được phân công, admin
+    thấy tất cả. Endpoint SOS tạo cảnh báo mức độ nghiêm trọng. Tất cả các
+    thay đổi cảnh báo đều được phát qua WebSocket để cập nhật thời gian thực.
+
+Quan hệ:
+    - Phụ thuộc vào: auth_api.get_user_from_token để xác thực
+    - Phụ thuộc vào: core.database để truy cập DB
+    - Phụ thuộc vào: websocket.connection_manager để phát sóng thời gian thực
+    - Tích hợp với: sensor_api để phát hiện cảnh báo bất thường tự động
+"""
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, Header
@@ -14,20 +34,34 @@ async def get_alerts(
     offset: int = 0,
     authorization: Optional[str] = Header(default=None)
 ):
+    """Truy xuất cảnh báo với phạm vi truy cập dựa trên vai trò.
+
+    Bệnh nhân chỉ thấy cảnh báo của mình. Bác sĩ thấy cảnh báo cho bệnh nhân
+    được phân công cho họ. Admin thấy tất cả cảnh báo. Kết quả được sắp xếp
+    theo thời gian tạo giảm dần.
+
+    Args:
+        limit: Số lượng cảnh báo tối đa trả về (giới hạn 1-500).
+        offset: Số lượng cảnh báo bỏ qua để phân trang.
+        authorization: Token Bearer.
+
+    Returns:
+        Danh sách bản ghi cảnh báo kèm tên bệnh nhân.
+    """
     current_user = await get_user_from_token(authorization)
     role = current_user["role"]
     where_sql = ""
     values = {}
 
     if role == "patient":
-        where_sql = "WHERE alerts.patient_id::text = :user_id"
+        where_sql = "WHERE alerts.patient_id = :user_id::uuid"
         values["user_id"] = current_user["id"]
     elif role == "doctor":
         where_sql = """
         WHERE EXISTS (
             SELECT 1 FROM doctor_patient dp
-            WHERE dp.doctor_id::text = :user_id
-            AND dp.patient_id::text = alerts.patient_id::text
+            WHERE dp.doctor_id = :user_id::uuid
+            AND dp.patient_id = alerts.patient_id
         )
         """
         values["user_id"] = current_user["id"]
@@ -56,7 +90,7 @@ async def get_alerts(
     values["offset"] = offset
 
     alerts = await database.fetch_all(query, values)
-    logger.info("Alerts fetched: role=%s user_id=%s count=%d", role, current_user["id"], len(alerts))
+    logger.info("Đã tìm nạp cảnh báo: role=%s user_id=%s count=%d", role, current_user["id"], len(alerts))
 
     return alerts
 
@@ -65,20 +99,31 @@ async def get_alerts(
 async def get_alert_stats_last_7_days(
     authorization: Optional[str] = Header(default=None),
 ):
+    """Lấy số lượng cảnh báo hàng ngày trong 7 ngày qua.
+
+    Sử dụng generate_series để đảm bảo mỗi ngày đều có mục nhập (kể cả số không).
+    Dữ liệu được phân chia theo vai trò người dùng tương tự GET /alerts.
+
+    Args:
+        authorization: Token Bearer.
+
+    Returns:
+        Danh sách {"label": "DD/MM", "count": int} cho mỗi ngày trong 7 ngày qua.
+    """
     current_user = await get_user_from_token(authorization)
     role = current_user["role"]
     where_sql = ""
     values = {}
 
     if role == "patient":
-        where_sql = "WHERE alerts.patient_id::text = :user_id"
+        where_sql = "WHERE alerts.patient_id = :user_id::uuid"
         values["user_id"] = current_user["id"]
     elif role == "doctor":
         where_sql = """
         WHERE EXISTS (
             SELECT 1 FROM doctor_patient dp
-            WHERE dp.doctor_id::text = :user_id
-              AND dp.patient_id::text = alerts.patient_id::text
+            WHERE dp.doctor_id = :user_id::uuid
+              AND dp.patient_id = alerts.patient_id
         )
         """
         values["user_id"] = current_user["id"]
@@ -112,12 +157,29 @@ from fastapi import HTTPException
 
 @router.patch("/alerts/{alert_id}/resolve")
 async def resolve_alert(alert_id: str, authorization: Optional[str] = Header(default=None)):
+    """Đánh dấu một cảnh báo là đã được xử lý.
+
+    Xác thực rằng người yêu cầu có quyền: bệnh nhân có thể xử lý cảnh báo
+    của chính mình; bác sĩ có thể xử lý cảnh báo cho bệnh nhân được phân công.
+    Sau khi xử lý, phát sóng cảnh báo đã cập nhật qua WebSocket.
+
+    Args:
+        alert_id: UUID của cảnh báo cần xử lý.
+        authorization: Token Bearer.
+
+    Returns:
+        Tin nhắn xác nhận kèm ID cảnh báo.
+
+    Raises:
+        HTTPException 404: Nếu không tìm thấy cảnh báo.
+        HTTPException 403: Nếu người dùng thiếu quyền.
+    """
     current_user = await get_user_from_token(authorization)
     role = current_user["role"]
     
-    # Verify alert exists
+    # Xác minh cảnh báo tồn tại
     alert = await database.fetch_one(
-        "SELECT patient_id::text FROM alerts WHERE id::text = :alert_id",
+        "SELECT patient_id::text FROM alerts WHERE id = :alert_id::uuid",
         {"alert_id": alert_id}
     )
     if not alert:
@@ -128,19 +190,19 @@ async def resolve_alert(alert_id: str, authorization: Optional[str] = Header(def
         raise HTTPException(status_code=403, detail="Bạn không có quyền xử lý cảnh báo của bệnh nhân khác")
     elif role == "doctor":
         assigned = await database.fetch_one(
-            "SELECT 1 FROM doctor_patient WHERE doctor_id::text = :doctor_id AND patient_id::text = :patient_id",
+            "SELECT 1 FROM doctor_patient WHERE doctor_id = :doctor_id::uuid AND patient_id = :patient_id::uuid",
             {"doctor_id": current_user["id"], "patient_id": patient_id}
         )
         if not assigned:
             raise HTTPException(status_code=403, detail="Bác sĩ chưa được phân công quản lý bệnh nhân này")
 
     await database.execute(
-        "UPDATE alerts SET is_resolved = TRUE WHERE id::text = :alert_id",
+        "UPDATE alerts SET is_resolved = TRUE WHERE id = :alert_id::uuid",
         {"alert_id": alert_id}
     )
-    logger.info("Alert resolved: alert_id=%s resolved_by=%s role=%s", alert_id, current_user["id"], role)
+    logger.info("Cảnh báo đã được xử lý: alert_id=%s resolved_by=%s role=%s", alert_id, current_user["id"], role)
     
-    # Fetch complete updated alert to broadcast
+    # Lấy cảnh báo đã cập nhật đầy đủ để phát sóng
     updated_alert = await database.fetch_one(
         """
         SELECT 
@@ -154,7 +216,7 @@ async def resolve_alert(alert_id: str, authorization: Optional[str] = Header(def
             alerts.created_at
         FROM alerts
         JOIN users ON alerts.patient_id::text = users.id::text AND lower(users.role) = 'patient'
-        WHERE alerts.id::text = :alert_id
+        WHERE alerts.id = :alert_id::uuid
         """,
         {"alert_id": alert_id}
     )
@@ -176,6 +238,21 @@ class AlertCreate(BaseModel):
 
 @router.post("/alerts")
 async def create_sos_alert(payload: AlertCreate, authorization: Optional[str] = Header(default=None)):
+    """Tạo cảnh báo SOS (yêu cầu khẩn cấp chỉ dành cho bệnh nhân).
+
+    Tạo UUID, chèn cảnh báo mức độ nghiêm trọng, và phát sóng
+    theo thời gian thực qua WebSocket đến bác sĩ được phân công của bệnh nhân.
+
+    Args:
+        payload: Tin nhắn cảnh báo (mặc định là yêu cầu khẩn cấp).
+        authorization: Token Bearer.
+
+    Returns:
+        Đối tượng cảnh báo đầy đủ vừa được tạo.
+
+    Raises:
+        HTTPException 403: Nếu người gọi không phải là bệnh nhân.
+    """
     current_user = await get_user_from_token(authorization)
     if current_user["role"] != "patient":
         raise HTTPException(status_code=403, detail="Chỉ bệnh nhân mới có thể gửi cảnh báo SOS")
@@ -197,7 +274,7 @@ async def create_sos_alert(payload: AlertCreate, authorization: Optional[str] = 
             "severity": "critical"
         }
     )
-    logger.warning("SOS alert created: alert_id=%s patient_id=%s message=%s", alert_id, current_user["id"], payload.message)
+    logger.warning("Cảnh báo SOS đã được tạo: alert_id=%s patient_id=%s message=%s", alert_id, current_user["id"], payload.message)
     
     updated_alert = await database.fetch_one(
         """
@@ -212,7 +289,7 @@ async def create_sos_alert(payload: AlertCreate, authorization: Optional[str] = 
             alerts.created_at
         FROM alerts
         JOIN users ON alerts.patient_id::text = users.id::text AND lower(users.role) = 'patient'
-        WHERE alerts.id::text = :alert_id
+        WHERE alerts.id = :alert_id::uuid
         """,
         {"alert_id": alert_id}
     )

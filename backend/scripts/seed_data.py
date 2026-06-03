@@ -1,3 +1,28 @@
+"""Trình tạo dữ liệu mẫu cho cơ sở dữ liệu, điền vào các bảng tham chiếu với dữ liệu mẫu.
+
+Mục đích:
+  Chèn các bản ghi mẫu thực tế vào các bảng ``cameras``, ``reports``,
+  ``audit_logs``, ``devices``, ``appointments`` và ``medical_records``.
+  Khám phá tên cột thực tế thông qua ``information_schema`` để
+  duy trì tương thích với các biến thể lược đồ trên các môi trường.
+
+Luồng công việc:
+  1. Kết nối với cơ sở dữ liệu và lấy ID bệnh nhân/bác sĩ/quản trị viên hiện có.
+  2. Nếu không có bản ghi ``patients`` nào tồn tại, tạo các hàng tạm thời từ
+     bảng ``users`` (người dùng có vai trò bệnh nhân) để đáp ứng các ràng buộc khóa ngoại.
+  3. Đối với mỗi bảng mục tiêu (cameras, reports, audit_logs, devices,
+     appointments, medical_records), xem xét tên cột thực tế.
+  4. Nếu bảng trống, xây dựng các câu lệnh INSERT động chỉ đặt các cột
+     thực sự có mặt trong lược đồ.
+  5. Ngắt kết nối sạch sẽ.
+
+Quan hệ:
+  - app.core.database — động cơ cơ sở dữ liệu không đồng bộ.
+  - app.core.config — cài đặt ứng dụng (được sử dụng ngầm cho URL DB).
+  - Được thiết kế để an toàn khi chạy nhiều lần (kiểm tra ``COUNT(*)`` trước khi
+    tạo dữ liệu cho mỗi bảng).
+"""
+
 import asyncio
 import uuid
 import json
@@ -6,6 +31,14 @@ from app.core.config import settings
 from app.core.database import database
 
 async def get_real_columns(table_name: str) -> set:
+    """Truy vấn ``information_schema.columns`` cho bảng đã cho.
+
+    Args:
+        table_name: Tên bảng công khai để xem xét.
+
+    Trả về:
+        Một tập hợp các chuỗi tên cột.
+    """
     rows = await database.fetch_all(
         """
         SELECT column_name 
@@ -17,19 +50,19 @@ async def get_real_columns(table_name: str) -> set:
     return {row["column_name"] for row in rows}
 
 async def main():
+    """Điểm vào: kết nối, tạo dữ liệu cho tất cả các bảng và ngắt kết nối."""
     print("Đang kết nối cơ sở dữ liệu...")
     await database.connect()
     
     try:
-        # Lấy danh sách patients thật
+        # Lấy các bản ghi bệnh nhân hiện có (cần thiết cho tham chiếu FK)
         print("Đang đọc dữ liệu bệnh nhân thật...")
         real_patients = await database.fetch_all("SELECT id FROM patients")
         if not real_patients:
-            # Nếu chưa có patient nào, lấy tạm từ users có vai trò patient
+            # Dự phòng: tạo hàng bệnh nhân tạm thời từ người dùng có vai trò='patient'
             print("Không tìm thấy bản ghi nào trong bảng patients. Đang thử đọc bảng users...")
             users_patients = await database.fetch_all("SELECT id FROM users WHERE lower(role) = 'patient'")
             if users_patients:
-                # Tạo bản ghi patient lâm sàng tạm thời để đảm bảo FK
                 print("Đang tạo bản ghi tạm thời trong bảng patients để đảm bảo khóa ngoại...")
                 for up in users_patients:
                     try:
@@ -41,7 +74,7 @@ async def main():
                         print(f"Bỏ qua lỗi tạo patient: {ex}")
                 real_patients = await database.fetch_all("SELECT id FROM patients")
         
-        # Lấy danh sách doctors thật
+        # Lấy ID bác sĩ và quản trị viên hiện có
         print("Đang đọc dữ liệu bác sĩ thật...")
         real_doctors = await database.fetch_all("SELECT id FROM users WHERE lower(role) = 'doctor'")
         real_admins = await database.fetch_all("SELECT id FROM users WHERE lower(role) = 'admin'")
@@ -58,7 +91,7 @@ async def main():
         print(f"Sử dụng Doctor ID: {target_doctor_id}")
         print(f"Sử dụng Admin/User ID: {target_admin_id}")
 
-        # 1. Bảng cameras
+        # 1. cameras — 2 bản ghi camera mẫu
         cameras_cols = await get_real_columns("cameras")
         if cameras_cols:
             camera_count = await database.fetch_val("SELECT COUNT(*) FROM cameras")
@@ -66,7 +99,6 @@ async def main():
             if camera_count == 0:
                 print("Đang seed dữ liệu cho bảng 'cameras'...")
                 
-                # Tạo bản ghi 1
                 cam_data1 = {}
                 if "id" in cameras_cols: cam_data1["id"] = str(uuid.uuid4())
                 if "camera_name" in cameras_cols: cam_data1["camera_name"] = "Camera Giường Bệnh Nhân 1"
@@ -89,7 +121,6 @@ async def main():
                     cam_data1
                 )
                 
-                # Tạo bản ghi 2
                 cam_data2 = {}
                 if "id" in cameras_cols: cam_data2["id"] = str(uuid.uuid4())
                 if "camera_name" in cameras_cols: cam_data2["camera_name"] = "Camera Giám sát Thân nhiệt 3D"
@@ -113,7 +144,7 @@ async def main():
                 )
                 print("Đã seed thành công 2 camera mẫu!")
 
-        # 2. Bảng reports
+        # 2. reports — 2 báo cáo lâm sàng mẫu
         reports_cols = await get_real_columns("reports")
         if reports_cols:
             report_count = await database.fetch_val("SELECT COUNT(*) FROM reports")
@@ -121,7 +152,6 @@ async def main():
             if report_count == 0:
                 print("Đang seed dữ liệu cho bảng 'reports'...")
                 
-                # Bản ghi 1
                 rep_data1 = {}
                 if "id" in reports_cols: rep_data1["id"] = str(uuid.uuid4())
                 if "title" in reports_cols: rep_data1["title"] = "Báo cáo Đánh giá Chỉ số Nhịp tim & ECG Định kỳ"
@@ -148,7 +178,6 @@ async def main():
                     rep_data1
                 )
                 
-                # Bản ghi 2
                 rep_data2 = {}
                 if "id" in reports_cols: rep_data2["id"] = str(uuid.uuid4())
                 if "title" in reports_cols: rep_data2["title"] = "Báo cáo Phân tích Cảnh báo Huyết áp & SpO2 Tuần 22"
@@ -176,7 +205,7 @@ async def main():
                 )
                 print("Đã seed thành công 2 báo cáo lâm sàng mẫu!")
 
-        # 3. Bảng audit_logs
+        # 3. audit_logs — 2 mục nhật ký kiểm toán bảo mật mẫu
         audit_cols = await get_real_columns("audit_logs")
         if audit_cols:
             log_count = await database.fetch_val("SELECT COUNT(*) FROM audit_logs")
@@ -184,7 +213,6 @@ async def main():
             if log_count == 0:
                 print("Đang seed dữ liệu cho bảng 'audit_logs'...")
                 
-                # Bản ghi 1
                 log_data1 = {}
                 if "id" in audit_cols: log_data1["id"] = str(uuid.uuid4())
                 if "action" in audit_cols: log_data1["action"] = "USER_LOGIN_SUCCESS"
@@ -203,7 +231,6 @@ async def main():
                     log_data1
                 )
                 
-                # Bản ghi 2
                 log_data2 = {}
                 if "id" in audit_cols: log_data2["id"] = str(uuid.uuid4())
                 if "action" in audit_cols: log_data2["action"] = "PATIENT_VERIFICATION_OTP_SENT"
@@ -223,7 +250,7 @@ async def main():
                 )
                 print("Đã seed thành công 2 nhật ký hệ thống mẫu!")
 
-        # 4. Bảng devices
+        # 4. devices — 2 thiết bị đeo IoT mẫu
         devices_cols = await get_real_columns("devices")
         if devices_cols:
             device_count = await database.fetch_val("SELECT COUNT(*) FROM devices")
@@ -231,7 +258,6 @@ async def main():
             if device_count == 0:
                 print("Đang seed dữ liệu cho bảng 'devices'...")
                 
-                # Bản ghi 1
                 dev1 = {}
                 if "id" in devices_cols: dev1["id"] = str(uuid.uuid4())
                 
@@ -257,7 +283,6 @@ async def main():
                 bind_cols1 = ", ".join(f":{k}" for k in dev1.keys())
                 await database.execute(f"INSERT INTO devices ({insert_cols1}) VALUES ({bind_cols1})", dev1)
                 
-                # Bản ghi 2
                 dev2 = {}
                 if "id" in devices_cols: dev2["id"] = str(uuid.uuid4())
                 
@@ -284,7 +309,7 @@ async def main():
                 await database.execute(f"INSERT INTO devices ({insert_cols2}) VALUES ({bind_cols2})", dev2)
                 print("Đã seed thành công 2 thiết bị IoT đeo mẫu!")
 
-        # 5. Bảng appointments
+        # 5. appointments — 1 lịch hẹn mẫu
         app_cols = await get_real_columns("appointments")
         if app_cols:
             app_count = await database.fetch_val("SELECT COUNT(*) FROM appointments")
@@ -321,7 +346,7 @@ async def main():
                 await database.execute(f"INSERT INTO appointments ({insert_cols1}) VALUES ({bind_cols1})", app1)
                 print("Đã seed thành công 1 lịch hẹn mẫu!")
 
-        # 6. Bảng medical_records
+        # 6. medical_records — 1 bệnh án mẫu
         rec_cols = await get_real_columns("medical_records")
         print(f"Cột thực tế của bảng 'medical_records': {rec_cols}")
         if rec_cols:

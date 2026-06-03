@@ -1,3 +1,24 @@
+"""API Quản lý Hồ sơ Bệnh nhân.
+
+Mục đích:
+    Cung cấp các endpoint liệt kê bệnh nhân với phạm vi truy cập dựa trên vai trò.
+    Việc tạo bệnh nhân bị vô hiệu hóa có chủ ý qua API này (phải sử dụng
+    luồng đăng ký OTP trong auth_api).
+
+Luồng xử lý:
+    GET /patients liệt kê tất cả bệnh nhân với phạm vi dựa trên vai trò (bệnh nhân
+    thấy chính họ, bác sĩ thấy bệnh nhân được phân công, admin thấy tất cả).
+    Kết quả thích ứng động với lược đồ bảng patients thông qua
+    giới thiệu information_schema. POST /patients bị chặn với
+    thông báo lỗi mô tả hướng dẫn người dùng đến luồng đăng ký.
+
+Quan hệ:
+    - Phụ thuộc vào: auth_api.get_user_from_token để xác thực
+    - Phụ thuộc vào: user_api.table_columns để giới thiệu lược đồ
+    - Phụ thuộc vào: core.database để truy cập DB
+    - Bảng: users, patients, doctor_patient
+"""
+
 import logging
 from typing import Optional
 from fastapi import APIRouter, Header, HTTPException
@@ -11,6 +32,14 @@ router = APIRouter()
 
 @router.post("/patients")
 async def create_patient(patient: PatientCreate):
+    """Bị chặn — bệnh nhân phải đăng ký qua luồng đăng ký OTP.
+
+    Args:
+        patient: Dữ liệu tạo bệnh nhân bị bỏ qua.
+
+    Raises:
+        HTTPException 403: Luôn luôn, với tin nhắn hướng dẫn đến đăng ký.
+    """
     raise HTTPException(
         status_code=403,
         detail="Bệnh nhân chỉ được tạo bằng đăng ký tài khoản và xác thực OTP qua email"
@@ -18,7 +47,24 @@ async def create_patient(patient: PatientCreate):
 
 
 @router.get("/patients")
-async def get_patients(authorization: Optional[str] = Header(default=None)):
+async def get_patients(
+    limit: int = 50,
+    offset: int = 0,
+    authorization: Optional[str] = Header(default=None)
+):
+    """Liệt kê bệnh nhân với phạm vi truy cập dựa trên vai trò.
+
+    Giới thiệu động lược đồ bảng patients để xây dựng truy vấn
+    SELECT. Bệnh nhân chỉ thấy chính họ; bác sĩ thấy bệnh nhân
+    được phân công của họ; admin thấy tất cả bệnh nhân.
+
+    Args:
+        authorization: Token Bearer.
+
+    Returns:
+        Danh sách dict bệnh nhân với id, full_name, age, gender, phone,
+        address, medical_history, email, created_at và source.
+    """
     current_user = await get_user_from_token(authorization)
     role = current_user["role"]
     
@@ -61,23 +107,25 @@ async def get_patients(authorization: Optional[str] = Header(default=None)):
     values = {}
 
     if role == "patient":
-        where_sql = "WHERE u.id::text = :user_id AND lower(u.role) = 'patient'"
+        where_sql = "WHERE u.id = :user_id::uuid AND lower(u.role) = 'patient'"
         values["user_id"] = current_user["id"]
     elif role == "doctor":
         where_sql = """
         WHERE EXISTS (
             SELECT 1 FROM doctor_patient dp
-            WHERE dp.doctor_id::text = :doctor_id
-              AND dp.patient_id::text = u.id::text
+            WHERE dp.doctor_id = :doctor_id::uuid
+              AND dp.patient_id = u.id
         ) AND lower(u.role) = 'patient'
         """
         values["doctor_id"] = current_user["id"]
-    else:  # Admin
+    else:
         where_sql = "WHERE lower(u.role) = 'patient'"
 
-    query = f"{base_query} {where_sql} ORDER BY u.full_name ASC"
+    values["limit"] = min(limit, 500)
+    values["offset"] = offset
+    query = f"{base_query} {where_sql} ORDER BY u.full_name ASC LIMIT :limit OFFSET :offset"
     rows = await database.fetch_all(query=query, values=values)
-    logger.info("Patients listed: role=%s user_id=%s count=%d", role, current_user["id"], len(rows))
+    logger.info("Danh sách bệnh nhân: role=%s user_id=%s count=%d", role, current_user["id"], len(rows))
 
     return [
         {

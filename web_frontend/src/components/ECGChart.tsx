@@ -1,3 +1,18 @@
+/**
+ * @purpose Dạng sóng ECG thời gian thực được hiển thị trên Canvas HTML5.
+ *          Vẽ nền lưới và đường ECG phát sáng màu neon. Khi có dữ liệu trực tiếp,
+ *          nó hiển thị các giá trị đến; nếu không, nó tạo phức hợp P-Q-R-S-T
+ *          tổng hợp dựa trên heartRate.
+ * @workflow  1. Khởi tạo bộ đệm 300 điểm với giá trị đường cơ sở → 2. Nếu
+ *            liveEcgValue được định nghĩa, dịch chuyển bộ đệm và thêm giá trị mới
+ *            trên mỗi lần thay đổi prop → 3. Nếu không có dữ liệu trực tiếp, mô phỏng
+ *            dạng sóng ECG bằng mô hình chu kỳ tim toán học trong vòng lặp hoạt hình →
+ *            4. Mỗi khung hình hoạt hình: xóa canvas, vẽ đường lưới, vẽ đường ECG với
+ *            hiệu ứng phát sáng neon và hiển thị chấm dẫn đầu.
+ * @relationships
+ *   - Được sử dụng bởi Dashboard.tsx trong bảng ECG
+ *   - Nhận props liveEcgValue tùy chọn và heartRate bắt buộc
+ */
 import React, { useEffect, useRef } from 'react';
 
 interface ECGChartProps {
@@ -5,6 +20,10 @@ interface ECGChartProps {
   heartRate: number;
 }
 
+/**
+ * Dạng sóng ECG dựa trên Canvas. Sử dụng giá trị trực tiếp khi có sẵn, nếu không
+ * thì tạo dạng sóng P-Q-R-S-T tổng hợp chân thực.
+ */
 export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dataPointsRef = useRef<number[]>([]);
@@ -14,7 +33,6 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
   const heartRateRef = useRef(heartRate);
   const liveEcgValueRef = useRef(liveEcgValue);
 
-  // Keep refs in sync with props
   useEffect(() => {
     heartRateRef.current = heartRate;
   }, [heartRate]);
@@ -23,22 +41,17 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
     liveEcgValueRef.current = liveEcgValue;
   }, [liveEcgValue]);
 
-  // Initialize buffer size
   useEffect(() => {
-    // Fill buffer with baseline values
     dataPointsRef.current = Array(300).fill(0);
   }, []);
 
-  // Handle incoming live value
   useEffect(() => {
     if (liveEcgValue !== undefined) {
-      // Shift left and append new value
       dataPointsRef.current.shift();
       dataPointsRef.current.push(liveEcgValue);
     }
   }, [liveEcgValue]);
 
-  // Animation sweep loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -61,44 +74,31 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
       const width = rect.width;
       const height = rect.height;
       const centerY = height / 2;
-      // If we don't have live incoming data, simulate a realistic ECG signal
       if (liveEcgValueRef.current === undefined) {
         if (!lastTimeRef.current) lastTimeRef.current = timestamp;
         const elapsed = timestamp - lastTimeRef.current;
 
-        // Determine cardiac cycle duration based on heartRate (in ms)
-        // e.g. 70 bpm -> 857ms per cycle
         const cycleDuration = (60 / Math.max(heartRateRef.current, 40)) * 1000;
         
-        // Render points in sync with timestamp
-        if (elapsed > 16) { // ~60fps updates
+        if (elapsed > 16) {
           lastTimeRef.current = timestamp;
           
-          // Generate a normal ECG complex (P-Q-R-S-T)
-          const t = (timestamp % cycleDuration) / cycleDuration; // 0 to 1
+          const t = (timestamp % cycleDuration) / cycleDuration;
           let simVal = 0;
 
-          // Simple mathematical model of ECG
           if (t > 0.1 && t < 0.15) {
-            // P wave
             simVal = 0.15 * Math.sin((t - 0.1) * Math.PI / 0.05);
           } else if (t >= 0.18 && t < 0.2) {
-            // Q wave
             simVal = -0.2 * (t - 0.18) / 0.02;
           } else if (t >= 0.2 && t < 0.23) {
-            // R wave (high peak)
             simVal = -0.2 + 1.2 * (t - 0.2) / 0.03;
           } else if (t >= 0.23 && t < 0.26) {
-            // S wave (deep drop)
             simVal = 1.0 - 1.4 * (t - 0.23) / 0.03;
           } else if (t >= 0.26 && t < 0.29) {
-            // S recovery to baseline
             simVal = -0.4 + 0.4 * (t - 0.26) / 0.03;
           } else if (t >= 0.35 && t < 0.45) {
-            // T wave
             simVal = 0.25 * Math.sin((t - 0.35) * Math.PI / 0.1);
           } else {
-            // Baseline noise (tiny random fluctuations for realism)
             simVal = (Math.random() - 0.5) * 0.02;
           }
 
@@ -107,14 +107,11 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
         }
       }
 
-      // Draw Grid System
       ctx.clearRect(0, 0, width, height);
       
-      // Draw grid lines
       ctx.strokeStyle = 'rgba(255, 51, 102, 0.06)';
       ctx.lineWidth = 0.5;
 
-      // Small grids (every 10px)
       for (let x = 0; x < width; x += 10) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
@@ -128,7 +125,6 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
         ctx.stroke();
       }
 
-      // Large grid squares (every 50px)
       ctx.strokeStyle = 'rgba(255, 51, 102, 0.12)';
       ctx.lineWidth = 1;
       for (let x = 0; x < width; x += 50) {
@@ -144,7 +140,6 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
         ctx.stroke();
       }
 
-      // Draw ECG Curve with Neon Glow effect
       ctx.shadowBlur = 10;
       const computedColor = getComputedStyle(document.documentElement).getPropertyValue('--color-spo2').trim() || '#00e5ff';
       ctx.shadowColor = computedColor;
@@ -159,7 +154,6 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
 
       for (let i = 0; i < points.length; i++) {
         const x = i * step;
-        // ECG scale: value multiplied by amp, inverted because canvas Y coordinates start from top
         const y = centerY - points[i] * (height * 0.35);
         if (i === 0) {
           ctx.moveTo(x, y);
@@ -169,10 +163,8 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
       }
       ctx.stroke();
 
-      // Reset shadows for next drawings
       ctx.shadowBlur = 0;
 
-      // Pulse indicator (sweep glowing lead dot)
       if (points.length > 0) {
         const lastX = width;
         const lastY = centerY - points[points.length - 1] * (height * 0.35);

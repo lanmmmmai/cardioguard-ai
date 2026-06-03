@@ -1,3 +1,15 @@
+/**
+ * Mục đích: Các trang dashboard theo vai trò cho Quản trị viên, Bác sĩ và Bệnh nhân.
+ *           Mỗi dashboard hiển thị dữ liệu tổng hợp thực (bệnh nhân, cảnh báo, bác sĩ)
+ *           cùng với thẻ hành động nhanh và tóm tắt trạng thái hệ thống.
+ * Luồng xử lý: Props được truyền từ App.tsx routeContent. Các component tính toán
+ *           bộ đếm thống kê, xây dựng thanh biểu đồ và hiển thị cơ chế nhấn giữ SOS
+ *           cho bệnh nhân.
+ * Quan hệ:
+ *   - App.tsx (khối switch routeContent)
+ *   - AuthContext (cho định danh phiên bệnh nhân)
+ *   - Các interface kiểu Patient, Alert, SensorData
+ */
 import React, { useState, useEffect } from 'react';
 import { Activity, AlertTriangle, BarChart3, CalendarDays, Cpu, HeartPulse, MessageCircle, Pill, ShieldAlert, Stethoscope, Users, Radio, WifiOff } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -35,6 +47,10 @@ interface SensorData {
   alerts: Array<{ alert_type: string; message: string; severity: string }>;
 }
 
+/**
+ * Thẻ thống kê tái sử dụng hiển thị biểu tượng, nhãn/giá trị chỉ số và gợi ý.
+ * Props `tone` tùy chọn áp dụng bổ sung trực quan (ví dụ: 'danger').
+ */
 const Card: React.FC<{ icon: React.ReactNode; label: string; value: string | number; hint: string; tone?: string }> = ({ icon, label, value, hint, tone }) => (
   <div className={`role-stat-card ${tone || ''}`}>
     <div className="role-stat-icon">{icon}</div>
@@ -46,6 +62,10 @@ const Card: React.FC<{ icon: React.ReactNode; label: string; value: string | num
   </div>
 );
 
+/**
+ * Dashboard tổng quan quản trị viên. Hiển thị số lượng bệnh nhân/bác sĩ/thiết bị/IoT,
+ * biểu đồ cột so sánh các chỉ số đó và hoạt động hệ thống gần đây.
+ */
 export const AdminDashboard: React.FC<{ patients: Patient[]; alerts: Alert[]; doctors?: unknown[] }> = ({ patients, alerts, doctors = [] }) => {
   const highAlerts = alerts.filter((alert) => alert.severity === 'high').length;
   const chartValues = [patients.length, alerts.length, highAlerts, doctors.length, 0, 0, 0];
@@ -92,6 +112,11 @@ export const AdminDashboard: React.FC<{ patients: Patient[]; alerts: Alert[]; do
   );
 };
 
+/**
+ * Dashboard tổng quan bác sĩ. Làm nổi bật số lượng bệnh nhân được phân công,
+ * lịch hẹn hôm nay, cảnh báo mức cao chưa xử lý và các thẻ truy cập nhanh
+ * cho hồ sơ bệnh án, đơn thuốc, chat và phân tích AI.
+ */
 export const DoctorDashboard: React.FC<{ patients: Patient[]; alerts: Alert[] }> = ({ patients, alerts }) => (
   <div className="role-page-stack">
     <div className="page-header">
@@ -126,6 +151,11 @@ export const DoctorDashboard: React.FC<{ patients: Patient[]; alerts: Alert[] }>
   </div>
 );
 
+/**
+ * Trang chủ bệnh nhân. Hiển thị các chỉ số sinh tồn thời gian thực (HR, SpO2, BP, ECG)
+ * từ WebSocket telemetry, nút nhấn giữ SOS và danh sách cảnh báo cá nhân.
+ * Hiển thị cảnh báo dữ liệu cũ khi telemetry trễ hơn 30 giây.
+ */
 export const PatientHome: React.FC<{
   latestTelemetry: SensorData | null;
   alerts: Alert[];
@@ -137,7 +167,7 @@ export const PatientHome: React.FC<{
   const [isSendingSos, setIsSendingSos] = useState(false);
   const [showSosConfirm, setShowSosConfirm] = useState(false);
 
-  // SOS Long Press States
+  // Trạng thái nhấn giữ SOS
   const [countdown, setCountdown] = useState(3);
   const [isHolding, setIsHolding] = useState(false);
 
@@ -179,6 +209,10 @@ export const PatientHome: React.FC<{
     updatedAt: null
   });
 
+  /**
+   * Gửi cảnh báo khẩn cấp SOS đến backend. Được gọi sau khi
+   * đếm ngược nhấn giữ xác nhận kết thúc hoặc qua hộp thoại xác nhận.
+   */
   const handleTriggerSos = async () => {
     if (!accessToken) return;
     setIsSendingSos(true);
@@ -216,7 +250,7 @@ export const PatientHome: React.FC<{
   };
 
   useEffect(() => {
-    // Only update if latestTelemetry matches logged in user or we are in patient session
+    // Chỉ cập nhật nếu latestTelemetry khớp với người dùng đã đăng nhập hoặc đang trong phiên bệnh nhân
     if (latestTelemetry && (!user?.id || latestTelemetry.patient_id === user.id)) {
       setCurrentMetrics({
         heartRate: latestTelemetry.heart_rate,
@@ -321,7 +355,7 @@ export const PatientHome: React.FC<{
         </div>
       </div>
 
-      {/* WebSocket Connection / Vitals Stale Status Banner */}
+      {/* Biểu ngữ trạng thái kết nối WebSocket / Cảnh báo dữ liệu sinh tồn cũ */}
       {!isConnected ? (
         <div className="alert-strip danger" style={{ marginBottom: '1.5rem' }}>
           <WifiOff size={16} className="alert-strip-icon pulse-animated" />
@@ -338,7 +372,7 @@ export const PatientHome: React.FC<{
       ) : null}
 
       <div className="role-stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-        {/* Heart Rate Card */}
+        {/* Thẻ Nhịp Tim */}
         {(() => {
           const isCritical = currentMetrics.heartRate !== null && (currentMetrics.heartRate > 120 || currentMetrics.heartRate < 50);
           const hrStatus = currentMetrics.heartRate === null ? 'normal' : isCritical ? 'high' : 'normal';
@@ -372,7 +406,7 @@ export const PatientHome: React.FC<{
           );
         })()}
 
-        {/* SpO2 Card */}
+        {/* Thẻ SpO2 */}
         {(() => {
           const isCritical = currentMetrics.spo2 !== null && currentMetrics.spo2 < 92;
           const o2Status = currentMetrics.spo2 === null ? 'normal' : isCritical ? 'high' : 'normal';
@@ -406,7 +440,7 @@ export const PatientHome: React.FC<{
           );
         })()}
 
-        {/* Huyết áp Card */}
+        {/* Thẻ Huyết áp */}
         {(() => {
           const isCritical = currentMetrics.systolicBp !== null && (currentMetrics.systolicBp > 140 || currentMetrics.diastolicBp! > 90);
           const bpStatus = currentMetrics.systolicBp === null ? 'normal' : isCritical ? 'high' : 'normal';
@@ -440,7 +474,7 @@ export const PatientHome: React.FC<{
           );
         })()}
 
-        {/* ECG Card */}
+        {/* Thẻ ECG */}
         {(() => {
           return (
             <div className="panel metric-card ecg" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px', borderRadius: '16px' }}>
@@ -496,7 +530,7 @@ export const PatientHome: React.FC<{
         </section>
       </div>
 
-      {/* SOS Confirmation Modal */}
+      {/* Hộp thoại xác nhận SOS */}
       {showSosConfirm && (
         <div className="modal-overlay">
           <div className="modal-content panel" style={{ maxWidth: '440px', textAlign: 'center' }}>
@@ -528,6 +562,10 @@ export const PatientHome: React.FC<{
   );
 };
 
+/**
+ * Trang giữ chỗ chung cho các route có tính năng chưa được hỗ trợ
+ * bởi dữ liệu thực. Cung cấp trạng thái trống nhất quán với hướng dẫn ngữ cảnh.
+ */
 export const PlaceholderPage: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
   <div className="role-page-stack">
     <div className="page-header">

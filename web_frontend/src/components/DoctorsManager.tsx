@@ -1,3 +1,15 @@
+/**
+ * @purpose Giao diện CRUD dành cho quản trị viên để quản lý tài khoản bác sĩ. Hỗ trợ
+ *          tìm kiếm, thêm, sửa và xóa thông qua các biểu mẫu modal.
+ * @workflow  1. Tải danh sách bác sĩ khi mount → 2. Người dùng có thể tìm kiếm theo tên,
+ *            email hoặc số điện thoại → 3. Modal "Thêm": điền biểu mẫu → POST đến
+ *            /admin/doctors → 4. Modal "Sửa": cập nhật trường → PUT đến
+ *            /admin/doctors/:id → 5. Xác nhận "Xóa" → DELETE đến /admin/doctors/:id.
+ * @relationships
+ *   - AuthContext để lấy mã truy cập quản trị viên
+ *   - passwordPolicy utility (isStrongPassword)
+ *   - App.tsx (routeContent cho /admin/doctors)
+ */
 import React, { useEffect, useState } from 'react';
 import { Search, X, Loader2, Plus, Edit2, Trash2, Stethoscope, Mail, Phone, Building } from 'lucide-react';
 import { API_URL } from '../config';
@@ -15,6 +27,9 @@ interface Doctor {
   created_at: string | null;
 }
 
+/**
+ * Bảng quản trị dành cho việc quản lý tài khoản bác sĩ: danh sách, tìm kiếm, thêm, sửa, xóa.
+ */
 export const DoctorsManager: React.FC = () => {
   const { accessToken } = useAuth();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -23,13 +38,11 @@ export const DoctorsManager: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
 
-  // Form states
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -301,7 +314,6 @@ export const DoctorsManager: React.FC = () => {
     }
   };
 
-  // Filter doctors based on search query
   const filteredDoctors = doctors.filter((doc) => {
     const term = searchQuery.toLowerCase().trim();
     if (!term) return true;
@@ -336,7 +348,6 @@ export const DoctorsManager: React.FC = () => {
         </button>
       </div>
 
-      {/* Search Bar */}
       <div className="panel" style={{ marginBottom: '1.5rem', padding: '12px 20px' }}>
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
           <Search size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
@@ -351,7 +362,6 @@ export const DoctorsManager: React.FC = () => {
         </div>
       </div>
 
-      {/* List Container */}
       {isLoading ? (
         <div className="panel" style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
           <Loader2 className="beat-animated" size={36} style={{ margin: '0 auto 1rem', color: 'var(--color-primary)' }} />
@@ -462,7 +472,6 @@ export const DoctorsManager: React.FC = () => {
         </div>
       )}
 
-      {/* Add Modal */}
       {showAddModal && (
         <div className="modal-overlay">
           <div className="modal-content panel" style={{ maxWidth: '550px' }}>
@@ -597,7 +606,6 @@ export const DoctorsManager: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Modal */}
       {showEditModal && selectedDoctor && (
         <div className="modal-overlay">
           <div className="modal-content panel" style={{ maxWidth: '550px' }}>
@@ -730,7 +738,6 @@ export const DoctorsManager: React.FC = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {showDeleteConfirm && selectedDoctor && (
         <div className="modal-overlay">
           <div className="modal-content panel" style={{ maxWidth: '450px', textAlign: 'center' }}>

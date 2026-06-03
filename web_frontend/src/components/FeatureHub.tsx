@@ -1,3 +1,17 @@
+/**
+ * @purpose Trung tâm tính năng cho hồ sơ bệnh án, thiết bị IoT và lịch hẹn.
+ *          Hiển thị dữ liệu thực từ backend trong bảng động cùng với các thẻ
+ *          thông tin cụ thể theo mô-đun và tóm tắt trợ lý AI rủi ro.
+ * @workflow  1. Xác định loại mô-đun (records | devices | appointments) và vai
+ *            trò từ props → 2. Tải dữ liệu từ endpoint API tương ứng → 3. Tự động
+ *            phát hiện cột từ khóa của bản ghi → 4. Hiển thị bảng dữ liệu + thẻ
+ *            phần mô-đun + danh sách bệnh nhân + ghi chú trợ lý AI.
+ * @relationships
+ *   - AuthContext để lấy mã truy cập
+ *   - Hằng số cấu hình API_URL
+ *   - Được sử dụng bởi App.tsx routeContent cho /admin/devices, /doctor/medical-records
+ *     và các route tính năng khác
+ */
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CalendarDays, Cpu, FileText, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { API_URL } from '../config';
@@ -59,6 +73,10 @@ const pageMeta = {
   },
 };
 
+/**
+ * Trung tâm tính năng. Hiển thị bảng dữ liệu động và thẻ thông tin cụ thể
+ * theo mô-đun cho loại tính năng và vai trò người dùng đã cho.
+ */
 export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) => {
   const { accessToken } = useAuth();
   const meta = pageMeta[type];
@@ -105,7 +123,6 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
     return keys.filter((key) => key !== 'updated_at').slice(0, 6);
   }, [records]);
 
-  // Helper dịch tiêu đề cột sang tiếng Việt chuyên nghiệp cho lâm sàng/IoT
   const formatHeader = (col: string) => {
     const dict: Record<string, string> = {
       id: 'ID',
@@ -136,11 +153,9 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
     return dict[col] || col.charAt(0).toUpperCase() + col.slice(1).replace(/_/g, ' ');
   };
 
-  // Helper định dạng hiển thị giá trị lâm sàng/IoT thông minh
   const formatValue = (col: string, val: any) => {
     if (val === null || val === undefined) return '-';
     
-    // 1. Định dạng Ngày tháng năm tiếng Việt
     if (col === 'scheduled_at' || col === 'appointment_date' || col === 'last_seen' || col === 'created_at') {
       try {
         return (
@@ -160,7 +175,6 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
       }
     }
     
-    // 2. Huy hiệu Trạng thái sinh động
     if (col === 'status') {
       const statusStr = String(val).toLowerCase();
       if (statusStr === 'online' || statusStr === 'active' || statusStr === 'success' || statusStr === 'confirmed') {
@@ -179,7 +193,6 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
       }
     }
     
-    // 3. Rút ngắn mã UUID phức tạp kèm tooltip
     if (String(val).length > 30 && /^[0-9a-fA-F-]{36}$/.test(String(val))) {
       return (
         <span title={String(val)} className="tabular-nums" style={{ fontFamily: 'monospace', opacity: 0.85, fontSize: '0.82rem', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
@@ -188,18 +201,16 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
       );
     }
     
-    // 4. Pin (Battery level) hiển thị kèm %
     if (col === 'battery_level') {
       const bat = Number(val);
       const color = bat > 50 ? 'var(--color-bp)' : bat > 20 ? '#f59e0b' : 'var(--color-critical)';
       return (
         <span style={{ fontWeight: 700, color, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-          🔋 {bat}%
+          {bat}%
         </span>
       );
     }
 
-    // 5. Định dạng File y tế JSON
     if (col === 'files') {
       try {
         const parsed = typeof val === 'string' ? JSON.parse(val) : val;
@@ -208,14 +219,13 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {parsed.map((f: any, i) => (
                 <a key={i} href={f.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontSize: '0.8rem', textDecoration: 'none', fontWeight: 600 }}>
-                  📄 {f.name || 'Tệp đính kèm'}
+                  {f.name || 'Tệp đính kèm'}
                 </a>
               ))}
             </div>
           );
         }
       } catch {
-        // Fallback
       }
     }
     

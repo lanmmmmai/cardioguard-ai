@@ -1,3 +1,15 @@
+// Màn hình danh sách bệnh nhân với tìm kiếm, chế độ xem chia đôi thích ứng và hộp thoại phân công quản trị viên.
+// Quy trình làm việc:
+// 1. Khi khởi tạo, tìm nạp danh sách bệnh nhân từ PatientProvider.
+// 2. Người dùng có thể tìm kiếm theo tên hoặc tiền sử bệnh lý qua TextField cục bộ.
+// 3. Trên điện thoại: nhấn vào bệnh nhân sẽ chuyển đến PatientDetailScreen.
+//    Trên máy tính bảng (>= 600 dp): ngăn trái hiển thị danh sách, ngăn phải hiển thị chi tiết cạnh nhau.
+// 4. Người dùng quản trị viên thấy nút "Phân công BS" mở _showAssignmentsModal
+//    để quản lý phân công bác sĩ-bệnh nhân qua API CMS quản trị viên.
+// Mối quan hệ:
+// - Sở hữu: PatientProvider, AuthProvider.
+// - Sử dụng: ApiClient, CgScreenScaffold, CgInlineState, PatientDetailScreen.
+// - Hộp thoại quản trị viên tìm nạp phân công và danh sách bác sĩ từ /admin/assignments và /cms/users.
 import 'package:flutter/material.dart';
 import '../core/app_logger.dart';
 import 'package:provider/provider.dart';
@@ -9,7 +21,9 @@ import 'patient_detail_screen.dart';
 import '../widgets/cg_widgets.dart';
 import '../ui/cg_tokens.dart';
 
+// Màn hình liệt kê tất cả bệnh nhân với tìm kiếm, chế độ xem chia đôi thích ứng và phân công quản trị viên.
 class PatientsScreen extends StatefulWidget {
+  // Liệu màn hình có sử dụng màu chủ đề tối hay không.
   final bool isDarkTheme;
   const PatientsScreen({super.key, required this.isDarkTheme});
 
@@ -18,8 +32,11 @@ class PatientsScreen extends StatefulWidget {
 }
 
 class _PatientsScreenState extends State<PatientsScreen> {
+  // Bộ điều khiển cho trường văn bản tìm kiếm bệnh nhân.
   final _searchController = TextEditingController();
+  // Truy vấn tìm kiếm đã được chuyển thành chữ thường được sử dụng để lọc danh sách bệnh nhân cục bộ.
   String _searchQuery = '';
+  // Bệnh nhân hiện được chọn (cho bảng chi tiết chế độ xem chia đôi trên máy tính bảng).
   Map<String, dynamic>? _selectedPatient;
 
   @override
@@ -41,7 +58,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
     super.dispose();
   }
 
-  // Admin Modal: Manage Doctor-Patient Assignments
+  // Mở một bottom-sheet để quản trị viên xem/thêm/xóa phân công bác sĩ-bệnh nhân.
   void _showAssignmentsModal() {
     final client = ApiClient();
     List<dynamic> assignments = [];
@@ -60,7 +77,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            // Initial loader
+            // Trình tải ban đầu
             if (modalLoading) {
               Future.wait([
                 client.get('/admin/assignments'),
@@ -73,7 +90,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                   modalLoading = false;
                 });
               }).catchError((e) {
-                AppLogger.log('Error fetching modal data: $e');
+                AppLogger.log('Lỗi tìm nạp dữ liệu hộp thoại: $e');
                 setModalState(() => modalLoading = false);
               });
             }
@@ -112,7 +129,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                     const Divider(),
                     const SizedBox(height: 8),
 
-                    // Add Assignment Form
+                    // Biểu mẫu thêm phân công
                     const Text('THÊM PHÂN CÔNG MỚI',
                         style: TextStyle(
                             fontSize: 11,
@@ -121,7 +138,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        // Doctor Dropdown
+                        // Dropdown bác sĩ
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             hint: const Text('Bác sĩ',
@@ -142,7 +159,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        // Patient Dropdown
+                        // Dropdown bệnh nhân
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             hint: const Text('Bệnh nhân',
@@ -163,7 +180,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        // Add Button
+                        // Nút thêm
                         IconButton(
                           icon: const Icon(LucideIcons.plusCircle,
                               color: Color(0xFFFF3366)),
@@ -181,10 +198,10 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                         res.statusCode == 201) {
                                       selectedDoctorId = null;
                                       selectedPatientId = null;
-                                      modalLoading = true; // refresh
+                                      modalLoading = true; // làm mới
                                       setModalState(() {});
                                       patientProvider
-                                          .fetchPatients(); // refresh main patients list
+                                          .fetchPatients(); // làm mới danh sách bệnh nhân chính
                                     }
                                   } catch (e) {
                                     if (!context.mounted) return;
@@ -207,7 +224,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                             color: Color(0xFFFF3366))),
                     const SizedBox(height: 10),
 
-                    // Assignments list
+                    // Danh sách phân công
                     Expanded(
                       child: modalLoading
                           ? const Center(child: CircularProgressIndicator())
@@ -261,13 +278,13 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                               try {
                                                 await client.delete(
                                                     '/admin/assignments/${item['doctor_id']}/${item['patient_id']}');
-                                                modalLoading = true; // refresh
+                                                modalLoading = true; // làm mới
                                                 setModalState(() {});
                                                 patientProvider
-                                                    .fetchPatients(); // refresh main patients list
+                                                    .fetchPatients(); // làm mới danh sách bệnh nhân chính
                                               } catch (e) {
                                                 AppLogger.log(
-                                                    'Error deleting assignment: $e');
+                                                    'Lỗi xóa phân công: $e');
                                               }
                                             },
                                           ),
@@ -303,7 +320,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
 
     final role = authProvider.currentUser?.role ?? 'patient';
 
-    // Filter patients based on query
+    // Lọc bệnh nhân dựa trên truy vấn
     final filtered = patientProvider.patients.where((p) {
       final name = p.fullName.toLowerCase();
       final history = p.medicalHistory.toLowerCase();
@@ -335,7 +352,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
 
           final listColumnWidget = Column(
             children: [
-              // Search Bar
+              // Thanh tìm kiếm
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: TextField(
@@ -361,7 +378,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Patients List
+              // Danh sách bệnh nhân
               Expanded(
                 child: patientProvider.isLoading
                     ? const CgInlineState(
@@ -463,13 +480,13 @@ class _PatientsScreenState extends State<PatientsScreen> {
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left Column: List
+                // Cột trái: Danh sách
                 Expanded(
                   flex: 4,
                   child: listColumnWidget,
                 ),
                 VerticalDivider(width: 1, thickness: 0.8, color: borderColor),
-                // Right Column: Detail
+                // Cột phải: Chi tiết
                 Expanded(
                   flex: 6,
                   child: _selectedPatient == null

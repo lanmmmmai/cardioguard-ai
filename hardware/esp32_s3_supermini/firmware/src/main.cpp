@@ -7,11 +7,11 @@
 #include "telemetry_sender.h"
 
 namespace {
-RuntimeState g_state = RuntimeState::boot;
-DemoMode g_mode = kDefaultMode;
-unsigned long g_last_tick_ms = 0UL;
-unsigned long g_sequence = 0UL;
-String g_serial_line;
+RuntimeState g_state = RuntimeState::boot;          // Trạng thái thời gian chạy hiện tại của thiết bị
+DemoMode g_mode = kDefaultMode;                      // Chế độ demo hiện tại, mặc định là normal
+unsigned long g_last_tick_ms = 0UL;                  // Mốc thời gian (ms) lần cuối xử lý telemetry
+unsigned long g_sequence = 0UL;                      // Số thứ tự của khung telemetry hiện tại
+String g_serial_line;                                // Bộ đệm dòng lệnh nhận từ cổng Serial
 
 void PrintTelemetry(const TelemetryFrame &frame) {
   const String json = BuildTelemetryJson(frame);
@@ -83,7 +83,7 @@ void PollSerialCommands() {
     }
   }
 }
-}  // namespace
+}  // Kết thúc namespace ẩn danh
 
 void setup() {
   Serial.begin(115200);

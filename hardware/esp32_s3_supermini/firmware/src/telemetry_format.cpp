@@ -1,6 +1,7 @@
 #include "telemetry_format.h"
 
 namespace {
+// Thêm giá trị số nguyên vào chuỗi JSON, nếu không có giá trị thì thêm null
 void AppendNullableInt(String &json, bool has_value, int value) {
   if (has_value) {
     json += String(value);
@@ -9,6 +10,7 @@ void AppendNullableInt(String &json, bool has_value, int value) {
   }
 }
 
+// Thêm giá trị số thực vào chuỗi JSON với độ chính xác cho trước, nếu không có thì thêm null
 void AppendNullableFloat(String &json, bool has_value, float value, int precision) {
   if (has_value) {
     json += String(value, precision);
@@ -17,6 +19,7 @@ void AppendNullableFloat(String &json, bool has_value, float value, int precisio
   }
 }
 
+// Thoát các ký tự đặc biệt trong chuỗi để đảm bảo JSON hợp lệ
 String EscapeJsonString(const String &input) {
   String output;
   output.reserve(input.length() + 8);
@@ -43,8 +46,9 @@ String EscapeJsonString(const String &input) {
   }
   return output;
 }
-}  // namespace
+}  // Kết thúc namespace ẩn danh
 
+// Xây dựng chuỗi JSON hoàn chỉnh từ cấu trúc TelemetryFrame
 String BuildTelemetryJson(const TelemetryFrame &frame) {
   String json;
   json.reserve(1024);
