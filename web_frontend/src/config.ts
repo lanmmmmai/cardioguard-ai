@@ -11,6 +11,18 @@ const isPlaceholderUrl = (value?: string) => Boolean(value && value.startsWith('
 const isLoopbackUrl = (value?: string) => Boolean(
   value && /^(https?:\/\/|wss?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(value)
 );
+const isRelativeApiPath = (value?: string) => Boolean(value && value.startsWith('/') && !value.startsWith('//'));
+const isUsableApiUrl = (value?: string) => Boolean(
+  value &&
+  !isPlaceholderUrl(value) &&
+  (!isRelativeApiPath(value) || typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+  (!isLoopbackUrl(value) || typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+);
+const isUsableWsUrl = (value?: string) => Boolean(
+  value &&
+  !isPlaceholderUrl(value) &&
+  (!isLoopbackUrl(value) || typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+);
 const deriveApiUrlFromWsUrl = (wsUrl?: string) => {
   if (!wsUrl || isPlaceholderUrl(wsUrl)) return undefined;
   try {
@@ -35,27 +47,33 @@ const isLocalhost = typeof window !== 'undefined'
   && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const bakedApiUrl = import.meta.env.VITE_API_URL;
 const bakedWsUrl = import.meta.env.VITE_WS_URL;
-const normalizedBakedApiUrl = bakedApiUrl && (!isPlaceholderUrl(bakedApiUrl)) && (isLocalhost || !isLoopbackUrl(bakedApiUrl))
-  ? bakedApiUrl
-  : undefined;
-const normalizedBakedWsUrl = bakedWsUrl && (!isPlaceholderUrl(bakedWsUrl)) && (isLocalhost || !isLoopbackUrl(bakedWsUrl))
-  ? bakedWsUrl
-  : undefined;
+const savedApiUrl = typeof window !== 'undefined' ? window.localStorage.getItem('settings_api_url') || undefined : undefined;
+const savedWsUrl = typeof window !== 'undefined' ? window.localStorage.getItem('settings_ws_url') || undefined : undefined;
+const normalizedBakedApiUrl = isUsableApiUrl(bakedApiUrl) ? bakedApiUrl : undefined;
+const normalizedBakedWsUrl = isUsableWsUrl(bakedWsUrl) ? bakedWsUrl : undefined;
+const normalizedSavedApiUrl = isUsableApiUrl(savedApiUrl) ? savedApiUrl : undefined;
+const normalizedSavedWsUrl = isUsableWsUrl(savedWsUrl) ? savedWsUrl : undefined;
 const runtimeDerivedApiUrl = deriveApiUrlFromWsUrl(runtimeWsUrl);
-const bakedDerivedApiUrl = deriveApiUrlFromWsUrl(normalizedBakedWsUrl);
+const bakedDerivedApiUrl = deriveApiUrlFromWsUrl(normalizedBakedWsUrl || normalizedSavedWsUrl);
+const savedDerivedApiUrl = deriveApiUrlFromWsUrl(normalizedSavedWsUrl);
 const runtimeDerivedWsUrl = deriveWsUrlFromApiUrl(runtimeApiUrl);
-const bakedDerivedWsUrl = deriveWsUrlFromApiUrl(normalizedBakedApiUrl);
+const bakedDerivedWsUrl = deriveWsUrlFromApiUrl(normalizedBakedApiUrl || normalizedSavedApiUrl);
+const savedDerivedWsUrl = deriveWsUrlFromApiUrl(normalizedSavedApiUrl);
 
 export const API_URL =
-  (!isPlaceholderUrl(runtimeApiUrl) ? runtimeApiUrl : undefined) ||
-  normalizedBakedApiUrl ||
   runtimeDerivedApiUrl ||
+  (!isPlaceholderUrl(runtimeApiUrl) && isUsableApiUrl(runtimeApiUrl) ? runtimeApiUrl : undefined) ||
+  normalizedSavedApiUrl ||
+  normalizedBakedApiUrl ||
+  savedDerivedApiUrl ||
   bakedDerivedApiUrl ||
-  (isLocalhost ? 'http://localhost:8000' : '/api');
+  (isLocalhost ? 'http://localhost:8000' : 'https://cardioguard-ai-a26e.onrender.com');
 
 export const WS_URL =
-  (!isPlaceholderUrl(runtimeWsUrl) ? runtimeWsUrl : undefined) ||
-  normalizedBakedWsUrl ||
   runtimeDerivedWsUrl ||
+  (!isPlaceholderUrl(runtimeWsUrl) && isUsableWsUrl(runtimeWsUrl) ? runtimeWsUrl : undefined) ||
+  normalizedSavedWsUrl ||
+  normalizedBakedWsUrl ||
+  savedDerivedWsUrl ||
   bakedDerivedWsUrl ||
-  (isLocalhost ? 'ws://localhost:8000/ws/realtime' : '/ws/realtime');
+  (isLocalhost ? 'ws://localhost:8000/ws/realtime' : 'wss://cardioguard-ai-a26e.onrender.com/ws/realtime');

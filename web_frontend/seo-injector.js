@@ -14,7 +14,7 @@ export function getBackendBaseUrl() {
   return (
     process.env.BACKEND_API_URL ||
     process.env.API_URL ||
-    '/api'
+    'https://cardioguard-ai-a26e.onrender.com'
   ).replace(/\/$/, '');
 }
 
@@ -22,7 +22,7 @@ export function getBackendWsUrl() {
   return (
     process.env.BACKEND_WS_URL ||
     process.env.VITE_WS_URL ||
-    '/ws/realtime'
+    'wss://cardioguard-ai-a26e.onrender.com/ws/realtime'
   ).replace(/\/$/, '');
 }
 
