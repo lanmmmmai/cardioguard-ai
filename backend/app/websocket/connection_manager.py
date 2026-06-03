@@ -19,13 +19,19 @@ Quan hệ:
   - FastAPI / Starlette WebSocket — lớp vận chuyển.
 """
 
+import asyncio
 import logging
+import time
 
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 from app.core.database import database
 
 logger = logging.getLogger(__name__)
+
+_DOCTOR_CACHE_TTL = 60  # 60 seconds
+_doctor_cache: dict[str, tuple[list[str], float]] = {}
+_doctor_cache_lock = asyncio.Lock()
 
 class ConnectionManager:
     """Duy trì tập hợp các kết nối WebSocket đang hoạt động và điều phối
@@ -57,7 +63,7 @@ class ConnectionManager:
             logger.info("WebSocket disconnected: user_id=%s role=%s", user_info.get("id"), user_info.get("role"))
 
     async def get_assigned_doctors(self, patient_id: str) -> list[str]:
-        """Tìm nạp ID của các bác sĩ được chỉ định cho bệnh nhân cụ thể.
+        """Tìm nạp ID của các bác sĩ được chỉ định cho bệnh nhân cụ thể (có cache).
 
         Args:
             patient_id: Chuỗi UUID của bệnh nhân.
@@ -65,12 +71,21 @@ class ConnectionManager:
         Trả về:
             Danh sách các chuỗi UUID bác sĩ hoặc danh sách rỗng khi có lỗi.
         """
+        async with _doctor_cache_lock:
+            if patient_id in _doctor_cache:
+                doctors, cached_at = _doctor_cache[patient_id]
+                if time.monotonic() - cached_at < _DOCTOR_CACHE_TTL:
+                    return doctors
+
         try:
             rows = await database.fetch_all(
                 "SELECT doctor_id::text FROM doctor_patient WHERE patient_id = :patient_id::uuid",
                 {"patient_id": patient_id}
             )
-            return [row["doctor_id"] for row in rows]
+            doctors = [row["doctor_id"] for row in rows]
+            async with _doctor_cache_lock:
+                _doctor_cache[patient_id] = (doctors, time.monotonic())
+            return doctors
         except Exception as e:
             logger.exception("Error fetching assigned doctors for patient_id=%s", patient_id)
             return []

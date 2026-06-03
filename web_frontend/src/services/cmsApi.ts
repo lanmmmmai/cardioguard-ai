@@ -70,6 +70,7 @@ const readError = async (response: Response) => {
 /** Trình khách API REST CMS với các chức năng list, get, create, update, remove, import/export */
 export const cmsApi = {
   async list(module: string, query: CmsQuery, token: string): Promise<CmsListResponse> {
+    console.debug('[cmsApi.list] module=%s limit=%d offset=%d', module, query.limit, query.offset);
     const params = new URLSearchParams();
     params.set('limit', String(query.limit));
     params.set('offset', String(query.offset));
@@ -77,11 +78,19 @@ export const cmsApi = {
     if (query.filter) params.set('filter', query.filter);
     if (query.sort_by) params.set('sort_by', query.sort_by);
     if (query.sort_dir) params.set('sort_dir', query.sort_dir);
-    const response = await fetch(`${API_URL}/cms/${module}?${params.toString()}`, {
-      headers: authHeaders(token),
-    });
-    if (!response.ok) throw new Error(await readError(response));
-    return response.json();
+    const listUrl = `${API_URL}/cms/${module}?${params.toString()}`;
+    console.info('[cmsApi.list] GET %s', listUrl);
+    try {
+      const response = await fetch(listUrl, {
+        headers: authHeaders(token),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      console.info('[cmsApi.list] %d OK', response.status);
+      return response.json();
+    } catch (err) {
+      console.error('[cmsApi.list] %s', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
   },
 
   async get(module: string, id: string, token: string) {

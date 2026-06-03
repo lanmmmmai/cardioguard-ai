@@ -21,8 +21,10 @@ Relationships:
   - app.services.*      — support services (OTP, DB optimisation).
 """
 
+import asyncio
 import json
 import logging
+import os
 import sys
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -97,6 +99,59 @@ app.add_middleware(
 )
 
 
+_mv_refresh_task: asyncio.Task[None] | None = None
+
+
+async def _periodic_mv_refresh() -> None:
+    """Periodically refresh reports_summary_mv every 5 minutes."""
+    while True:
+        try:
+            await asyncio.sleep(300)  # 5 minutes
+            await database.execute("SELECT safe_refresh_reports_summary_mv()")
+            logger.info("Materialized view reports_summary_mv refreshed")
+        except Exception:
+            logger.exception("Failed to refresh materialized view")
+
+
+def split_sql_statements(sql: str) -> list[str]:
+    """Split SQL string into separate statements, respecting dollar quotes ($$)."""
+    statements = []
+    current_stmt = []
+    in_dollar_quote = False
+    dollar_quote_tag = ""
+    i = 0
+    n = len(sql)
+    while i < n:
+        char = sql[i]
+        if char == '$':
+            j = i + 1
+            while j < n and (sql[j].isalnum() or sql[j] == '_'):
+                j += 1
+            if j < n and sql[j] == '$':
+                tag = sql[i:j+1]
+                if in_dollar_quote:
+                    if tag == dollar_quote_tag:
+                        in_dollar_quote = False
+                        dollar_quote_tag = ""
+                else:
+                    in_dollar_quote = True
+                    dollar_quote_tag = tag
+                current_stmt.append(tag)
+                i = j + 1
+                continue
+        if char == ';' and not in_dollar_quote:
+            statements.append("".join(current_stmt).strip())
+            current_stmt = []
+        else:
+            current_stmt.append(char)
+        i += 1
+    if current_stmt:
+        remainder = "".join(current_stmt).strip()
+        if remainder:
+            statements.append(remainder)
+    return [s for s in statements if s]
+
+
 @app.on_event("startup")
 async def startup():
     """Connect to the database, ensure the OTP tracking table and performance
@@ -109,6 +164,36 @@ async def startup():
     await ensure_email_cms_schema()
     await ensure_domain_links_schema()
     await ensure_performance_indexes()
+
+    # Schedule deferred MV trigger migration (best-effort)
+    try:
+        migration_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "migrations",
+            "016_optimize_mv_refresh.sql",
+        )
+        if os.path.exists(migration_path):
+            with open(migration_path, "r", encoding="utf-8") as f:
+                sql = f.read()
+            # Clean comments and split statements respecting dollar quotes
+            clean_lines = []
+            for line in sql.split("\n"):
+                stripped = line.strip()
+                if stripped and not stripped.startswith("--"):
+                    clean_lines.append(line)
+            clean_sql = "\n".join(clean_lines)
+            
+            for stmt in split_sql_statements(clean_sql):
+                if stmt.strip():
+                    await database.execute(stmt)
+            logger.info("MV refresh migration applied")
+    except Exception:
+        logger.exception("Failed to apply MV refresh migration")
+
+    # Start periodic refresh background task
+    global _mv_refresh_task
+    _mv_refresh_task = asyncio.create_task(_periodic_mv_refresh())
+
     logger.info("Application startup complete")
 
 

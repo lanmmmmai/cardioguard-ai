@@ -31,12 +31,15 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
         VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8000/ws/realtime}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     image: cardioguard-ai-web:local
     depends_on:
       backend:
         condition: service_healthy
     environment:
       BACKEND_API_URL: ${BACKEND_API_URL:-http://backend:8000}
+      BACKEND_WS_URL: ${BACKEND_WS_URL:-ws://backend:8000/ws/realtime}
       PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-https://giatky.site}
     ports:
       - "5173:8080"

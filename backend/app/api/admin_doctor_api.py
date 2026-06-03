@@ -55,7 +55,27 @@ async def list_doctors(
     offset: int = 0,
     admin: dict = Depends(require_admin)
 ):
-    query = """
+    where_clauses = ["u.role = 'doctor'"]
+    params = {}
+    if status:
+        status_clean = status.strip().lower()
+        if status_clean == "pending_verification":
+            where_clauses.append("u.status = 'pending_verification'")
+        elif status_clean == "active":
+            where_clauses.append("u.status = 'active' AND u.is_verified = TRUE")
+        elif status_clean == "rejected":
+            where_clauses.append("u.status = 'rejected'")
+        elif status_clean == "pending_profile":
+            where_clauses.append("u.status = 'pending_profile'")
+        elif status_clean == "need_update":
+            where_clauses.append("u.status = 'need_update'")
+
+    where_sql = " AND ".join(where_clauses)
+
+    count_query = f"SELECT COUNT(*)::int AS total FROM users u WHERE {where_sql}"
+    total = await database.fetch_val(count_query, params)
+
+    query = f"""
     SELECT 
         u.id::text as id, u.full_name, u.email, u.phone, 
         COALESCE(dp.specialty, u.specialty) as specialty, 
@@ -68,29 +88,15 @@ async def list_doctors(
         dp.verification_note
     FROM users u
     LEFT JOIN doctor_profiles dp ON u.id = dp.user_id
-    WHERE u.role = 'doctor'
+    WHERE {where_sql}
+    ORDER BY u.created_at DESC
+    LIMIT :limit OFFSET :offset
     """
-    params = {}
-    if status:
-        status_clean = status.strip().lower()
-        if status_clean == "pending_verification":
-            query += " AND u.status = 'pending_verification'"
-        elif status_clean == "active":
-            query += " AND u.status = 'active' AND u.is_verified = TRUE"
-        elif status_clean == "rejected":
-            query += " AND u.status = 'rejected'"
-        elif status_clean == "pending_profile":
-            query += " AND u.status = 'pending_profile'"
-        elif status_clean == "need_update":
-            query += " AND u.status = 'need_update'"
-            
-    query += " ORDER BY u.created_at DESC"
-    query += " LIMIT :limit OFFSET :offset"
     params["limit"] = min(limit, 500)
     params["offset"] = offset
 
     rows = await database.fetch_all(query, params)
-    return [dict(row) for row in rows]
+    return {"items": [dict(row) for row in rows], "total": total, "limit": limit, "offset": offset}
 
 @router.get("/doctors/{doctor_id}", response_model=DoctorResponse)
 async def get_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
@@ -284,69 +290,83 @@ async def delete_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
 
 @router.patch("/doctors/{doctor_id}/verify")
 async def verify_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
-    doctor = await database.fetch_one("SELECT email, full_name FROM users WHERE id = :doctor_id::uuid AND role = 'doctor'", {"doctor_id": doctor_id})
-    if not doctor:
-        raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
-        
     async with database.transaction():
+        doctor = await database.fetch_one(
+            "SELECT email, full_name FROM users WHERE id = :doctor_id::uuid AND role = 'doctor'",
+            {"doctor_id": doctor_id},
+        )
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
+
         await database.execute(
-            "UPDATE users SET is_verified = TRUE, status = 'active' WHERE id = :doctor_id::uuid",
-            {"doctor_id": doctor_id}
+            """UPDATE users SET is_verified = TRUE, status = 'active'
+               WHERE id = :doctor_id::uuid""",
+            {"doctor_id": doctor_id},
         )
         await database.execute(
-            "UPDATE doctor_profiles SET is_verified = TRUE, status = 'active', verified_by = :admin_id, verified_at = NOW() WHERE user_id = :doctor_id::uuid",
-            {"doctor_id": doctor_id, "admin_id": admin["id"]}
+            """UPDATE doctor_profiles SET is_verified = TRUE, status = 'active',
+               verified_by = :admin_id, verified_at = NOW()
+               WHERE user_id = :doctor_id::uuid""",
+            {"doctor_id": doctor_id, "admin_id": admin["id"]},
         )
-        
+
     try:
         await send_doctor_status_email(doctor["email"], doctor["full_name"], "active")
     except Exception:
         logger.exception("Failed to send active verification email to doctor")
-        
+
     return {"message": "Xác thực tài khoản bác sĩ thành công"}
+
 
 @router.patch("/doctors/{doctor_id}/reject")
 async def reject_doctor(doctor_id: str, action: DoctorVerificationAction, admin: dict = Depends(require_admin)):
-    doctor = await database.fetch_one("SELECT email, full_name FROM users WHERE id = :doctor_id::uuid AND role = 'doctor'", {"doctor_id": doctor_id})
-    if not doctor:
-        raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
-        
     async with database.transaction():
+        doctor = await database.fetch_one(
+            "SELECT email, full_name FROM users WHERE id = :doctor_id::uuid AND role = 'doctor'",
+            {"doctor_id": doctor_id},
+        )
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
+
         await database.execute(
             "UPDATE users SET is_verified = FALSE, status = 'rejected' WHERE id = :doctor_id::uuid",
-            {"doctor_id": doctor_id}
+            {"doctor_id": doctor_id},
         )
         await database.execute(
             "UPDATE doctor_profiles SET is_verified = FALSE, status = 'rejected', verification_note = :note WHERE user_id = :doctor_id::uuid",
-            {"doctor_id": doctor_id, "note": action.verification_note}
+            {"doctor_id": doctor_id, "note": action.verification_note},
         )
-        
+
     try:
         await send_doctor_status_email(doctor["email"], doctor["full_name"], "rejected", action.verification_note)
     except Exception:
         logger.exception("Failed to send rejected verification email to doctor")
-        
+
     return {"message": "Từ chối xác thực hồ sơ bác sĩ thành công"}
+
 
 @router.patch("/doctors/{doctor_id}/request-update")
 async def request_update_doctor(doctor_id: str, action: DoctorVerificationAction, admin: dict = Depends(require_admin)):
-    doctor = await database.fetch_one("SELECT email, full_name FROM users WHERE id = :doctor_id::uuid AND role = 'doctor'", {"doctor_id": doctor_id})
-    if not doctor:
-        raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
-        
     async with database.transaction():
+        doctor = await database.fetch_one(
+            "SELECT email, full_name FROM users WHERE id = :doctor_id::uuid AND role = 'doctor'",
+            {"doctor_id": doctor_id},
+        )
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Không tìm thấy bác sĩ")
+
         await database.execute(
             "UPDATE users SET is_verified = FALSE, status = 'need_update' WHERE id = :doctor_id::uuid",
-            {"doctor_id": doctor_id}
+            {"doctor_id": doctor_id},
         )
         await database.execute(
             "UPDATE doctor_profiles SET is_verified = FALSE, status = 'need_update', verification_note = :note WHERE user_id = :doctor_id::uuid",
-            {"doctor_id": doctor_id, "note": action.verification_note}
+            {"doctor_id": doctor_id, "note": action.verification_note},
         )
-        
+
     try:
         await send_doctor_status_email(doctor["email"], doctor["full_name"], "need_update", action.verification_note)
     except Exception:
         logger.exception("Failed to send need_update verification email to doctor")
-        
+
     return {"message": "Yêu cầu bổ sung hồ sơ bác sĩ thành công"}

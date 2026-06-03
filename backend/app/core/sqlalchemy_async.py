@@ -39,7 +39,7 @@ def async_database_url() -> str:
 
 
 # Engine bất đồng bộ toàn cục với cấu hình pool tối ưu cho Supabase Pooler
-# pool_size nhỏ + max_overflow vừa phải để tránh vượt giới hạn kết nối Supabase
+# pool_size=3 + max_overflow=5: tối đa 8 kết nối, tránh vượt giới hạn Supabase (~15-30)
 # pool_recycle=3600: xoay vòng kết nối mỗi giờ để tránh timeout từ Supabase pooler
 async_engine = create_async_engine(
     async_database_url(),
@@ -47,8 +47,8 @@ async_engine = create_async_engine(
         "statement_cache_size": 0,
         "command_timeout": 30,
     },
-    pool_size=5,
-    max_overflow=10,
+    pool_size=3,
+    max_overflow=5,
     pool_pre_ping=True,
     pool_recycle=3600,
     pool_timeout=30,

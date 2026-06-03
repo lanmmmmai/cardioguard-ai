@@ -37,6 +37,7 @@ database = Database(
     max_size=5,
     max_queries=50000,
     max_inactive_connection_lifetime=600,
+    command_timeout=30,
 )
 
 

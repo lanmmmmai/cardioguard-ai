@@ -174,17 +174,18 @@ async def send_chat_message(
     else:
         await ensure_session_owner(session_id, user_id, chat_role)
 
-    # Bước 2: Lưu tin nhắn người dùng
-    query_msg = f"INSERT INTO {CHAT_MESSAGES_TABLE} (session_id, sender, message, context) VALUES (:session_id, 'user', :message, :context)"
-    await database.execute(query=query_msg, values={
-        "session_id": session_id,
-        "message": request.message,
-        "context": json.dumps(request.context_data) if request.context_data else None
-    })
-    await database.execute(
-        f"UPDATE {CHAT_SESSIONS_TABLE} SET updated_at = NOW() WHERE id = :session_id::uuid",
-        {"session_id": session_id},
-    )
+    # Bước 2: Lưu tin nhắn người dùng + update session timestamp (batch)
+    async with database.transaction():
+        query_msg = f"INSERT INTO {CHAT_MESSAGES_TABLE} (session_id, sender, message, context) VALUES (:session_id, 'user', :message, :context)"
+        await database.execute(query=query_msg, values={
+            "session_id": session_id,
+            "message": request.message,
+            "context": json.dumps(request.context_data) if request.context_data else None
+        })
+        await database.execute(
+            f"UPDATE {CHAT_SESSIONS_TABLE} SET updated_at = NOW() WHERE id = :session_id::uuid",
+            {"session_id": session_id},
+        )
     
     # Bước 3: Lấy lịch sử để làm ngữ cảnh (lấy 10 tin nhắn mới nhất và đảo ngược về thứ tự ASC)
     query_history = f"SELECT sender, message FROM {CHAT_MESSAGES_TABLE} WHERE session_id = :session_id::uuid ORDER BY created_at DESC LIMIT 10"
@@ -199,13 +200,14 @@ async def send_chat_message(
         chat_history=history[:-1]
     )
 
-    # Bước 5: Lưu phản hồi AI
-    query_ai_msg = f"INSERT INTO {CHAT_MESSAGES_TABLE} (session_id, sender, message) VALUES (:session_id, 'ai', :message) RETURNING id, created_at"
-    ai_msg_id = await database.execute(query=query_ai_msg, values={"session_id": session_id, "message": ai_response_text})
-    await database.execute(
-        f"UPDATE {CHAT_SESSIONS_TABLE} SET updated_at = NOW() WHERE id = :session_id::uuid",
-        {"session_id": session_id},
-    )
+    # Bước 5: Lưu phản hồi AI + update session timestamp (batch)
+    async with database.transaction():
+        query_ai_msg = f"INSERT INTO {CHAT_MESSAGES_TABLE} (session_id, sender, message) VALUES (:session_id, 'ai', :message) RETURNING id, created_at"
+        ai_msg_id = await database.execute(query=query_ai_msg, values={"session_id": session_id, "message": ai_response_text})
+        await database.execute(
+            f"UPDATE {CHAT_SESSIONS_TABLE} SET updated_at = NOW() WHERE id = :session_id::uuid",
+            {"session_id": session_id},
+        )
     
     return {
         "session_id": session_id,

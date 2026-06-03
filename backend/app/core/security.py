@@ -38,10 +38,13 @@ def hash_password(password: str) -> str:
     Trả về:
         Chuỗi mật khẩu đã băm bcrypt (bao gồm muối nhúng).
     """
+    logger.debug("hash_password: entry, password_length=%d", len(password))
     password_bytes = password.encode("utf-8")
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password_bytes, salt)
-    return hashed.decode("utf-8")
+    result = hashed.decode("utf-8")
+    logger.debug("hash_password: exit, hash_length=%d", len(result))
+    return result
 
 
 def verify_password(password: str, hashed_password: str) -> bool:
@@ -57,7 +60,9 @@ def verify_password(password: str, hashed_password: str) -> bool:
     try:
         password_bytes = password.encode("utf-8")
         hashed_bytes = hashed_password.encode("utf-8")
-        return bcrypt.checkpw(password_bytes, hashed_bytes)
+        result = bcrypt.checkpw(password_bytes, hashed_bytes)
+        logger.debug("verify_password: result=%s", result)
+        return result
     except Exception as e:
         logger.exception("Lỗi khi xác minh mật khẩu")
         return False
@@ -72,10 +77,13 @@ def create_access_token(data: dict) -> str:
     Trả về:
         Chuỗi JWT đã mã hóa ký bằng HS256.
     """
+    logger.debug("create_access_token: entry, data_keys=%s", list(data.keys()))
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({
         "exp": expire,
         "jti": str(uuid.uuid4())
     })
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    logger.debug("create_access_token: exit, token_length=%d", len(token))
+    return token

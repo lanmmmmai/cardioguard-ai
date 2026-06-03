@@ -121,13 +121,16 @@ async def get_patients(
     else:
         where_sql = "WHERE lower(u.role) = 'patient'"
 
+    count_query = f"SELECT COUNT(*)::int AS total FROM users u LEFT JOIN patients p ON {join_on} {where_sql}"
+    total = await database.fetch_val(count_query, values)
+
     values["limit"] = min(limit, 500)
     values["offset"] = offset
     query = f"{base_query} {where_sql} ORDER BY u.full_name ASC LIMIT :limit OFFSET :offset"
     rows = await database.fetch_all(query=query, values=values)
     logger.info("Danh sách bệnh nhân: role=%s user_id=%s count=%d", role, current_user["id"], len(rows))
 
-    return [
+    items = [
         {
             "id": row["id"],
             "full_name": row["patient_full_name"] or row["user_full_name"],
@@ -142,3 +145,4 @@ async def get_patients(
         }
         for row in rows
     ]
+    return {"items": items, "total": total, "limit": limit, "offset": offset}

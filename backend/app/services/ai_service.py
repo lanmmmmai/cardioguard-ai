@@ -83,6 +83,7 @@ class AIService:
         Ngoại lệ:
             Không có ngoại lệ nào được truyền lên; tất cả các lỗi đều được bắt và ghi nhật ký.
         """
+        logger.debug("generate_chat_response: entry, role=%s user_message_length=%d", role, len(user_message))
         system_prompt = PATIENT_SYSTEM_PROMPT if role == "patient" else DOCTOR_SYSTEM_PROMPT
         
         # Xây dựng ngữ cảnh
@@ -92,8 +93,10 @@ class AIService:
 
         # Phản hồi mô phỏng nếu không có khóa API hoặc thư viện bị thiếu
         if not HAS_OPENAI or not client:
+            logger.info("generate_chat_response: using mock response (no OpenAI key configured)")
             return AIService._mock_response(role, user_message, context_data)
 
+        logger.info("generate_chat_response: calling OpenAI API")
         try:
             # Định dạng lịch sử cho OpenAI
             # Định dạng lịch sử OpenAI: [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
@@ -117,9 +120,11 @@ class AIService:
                 temperature=0.7,
                 max_tokens=800
             )
-            return response.choices[0].message.content
+            result = response.choices[0].message.content
+            logger.info("generate_chat_response: OpenAI success, response_length=%d", len(result))
+            return result
         except Exception as e:
-            logger.exception("AI response generation failed")
+            logger.exception("generate_chat_response: OpenAI API call failed")
             return "Xin lỗi, hệ thống AI đang bận hoặc gặp sự cố. Vui lòng thử lại sau."
 
     @staticmethod

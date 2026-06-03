@@ -12,6 +12,7 @@
 //      buộc đổi mật khẩu, giúp cấu hình lại bố cục tab một cách động.
 //   - MainTabWrapper nhận callback chuyển đổi chủ đề từ trạng thái cha.
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 
@@ -36,6 +37,7 @@ import 'ui/cg_tokens.dart';
 
 // Điểm vào chính của ứng dụng. Tạo widget HeartMonitorApp gốc.
 void main() {
+  debugPrint('[CardioGuard] App starting...');
   runApp(const HeartMonitorApp());
 }
 
@@ -57,17 +59,33 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
     setState(() {
       _isDarkTheme = !_isDarkTheme;
     });
+    debugPrint('[CardioGuard] Theme toggled: ${_isDarkTheme ? "dark" : "light"}');
   }
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
-        ChangeNotifierProvider(create: (_) => PatientProvider()),
-        ChangeNotifierProvider(create: (_) => AlertProvider()),
-        ChangeNotifierProvider(create: (_) => ChatProvider()),
-        ChangeNotifierProvider(create: (_) => AppointmentProvider()),
+        ChangeNotifierProvider(create: (_) {
+          debugPrint('[CardioGuard] Initializing AuthProvider');
+          return AuthProvider()..init();
+        }),
+        ChangeNotifierProvider(create: (_) {
+          debugPrint('[CardioGuard] Initializing PatientProvider');
+          return PatientProvider();
+        }),
+        ChangeNotifierProvider(create: (_) {
+          debugPrint('[CardioGuard] Initializing AlertProvider');
+          return AlertProvider();
+        }),
+        ChangeNotifierProvider(create: (_) {
+          debugPrint('[CardioGuard] Initializing ChatProvider');
+          return ChatProvider();
+        }),
+        ChangeNotifierProvider(create: (_) {
+          debugPrint('[CardioGuard] Initializing AppointmentProvider');
+          return AppointmentProvider();
+        }),
       ],
       child: MaterialApp(
         title: 'Smart Heart Patient Monitoring',

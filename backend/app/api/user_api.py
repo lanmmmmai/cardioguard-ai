@@ -23,8 +23,10 @@ Quan hệ:
     - Bảng: users, patients, doctor_patient, audit_logs
 """
 
+import asyncio
 import json
 import logging
+import time
 from typing import Any, Optional, Dict
 from datetime import datetime, timezone
 
@@ -41,11 +43,13 @@ from app.schemas.user_schema import PasswordUpdate, PatientMeUpdate, UserMeUpdat
 
 router = APIRouter()
 
-_column_cache: dict[str, set[str]] = {}
+_COLUMN_CACHE_TTL = 3600  # 1 hour
+_column_cache: dict[str, tuple[set[str], float]] = {}
+_column_cache_lock = asyncio.Lock()
 
 
 async def table_columns(table: str) -> set[str]:
-    """Lấy tập hợp tên cột cho một bảng, có bộ nhớ đệm.
+    """Lấy tập hợp tên cột cho một bảng, có bộ nhớ đệm với TTL.
 
     Args:
         table: Tên bảng.
@@ -56,8 +60,11 @@ async def table_columns(table: str) -> set[str]:
     Raises:
         HTTPException 500: Nếu không tìm thấy bảng.
     """
-    if table in _column_cache:
-        return _column_cache[table]
+    async with _column_cache_lock:
+        if table in _column_cache:
+            columns, cached_at = _column_cache[table]
+            if time.monotonic() - cached_at < _COLUMN_CACHE_TTL:
+                return columns
 
     rows = await database.fetch_all(
         """
@@ -70,7 +77,9 @@ async def table_columns(table: str) -> set[str]:
     columns = {row["column_name"] for row in rows}
     if not columns:
         raise HTTPException(status_code=500, detail=f"Table {table} not found")
-    _column_cache[table] = columns
+
+    async with _column_cache_lock:
+        _column_cache[table] = (columns, time.monotonic())
     return columns
 
 
@@ -585,31 +594,38 @@ async def list_users(
     """
     await require_admin(authorization)
 
-    query = """
-    SELECT id::text as id, full_name, email, phone, role, status, created_at
-    FROM users
-    WHERE 1=1 AND (status IS NULL OR status != 'deleted')
-    """
+    where_clauses = ["(status IS NULL OR status != 'deleted')"]
     params = {}
 
     if role:
-        query += " AND role = :role"
+        where_clauses.append("role = :role")
         params["role"] = role.lower()
 
     if status:
-        query += " AND status = :status"
+        where_clauses.append("status = :status")
         params["status"] = status.lower()
 
     if search:
-        query += " AND (lower(full_name) LIKE :search OR lower(email) LIKE :search OR phone LIKE :search)"
+        where_clauses.append("(lower(full_name) LIKE :search OR lower(email) LIKE :search OR phone LIKE :search)")
         params["search"] = f"%{search.lower()}%"
-    query += " ORDER BY created_at DESC NULLS LAST"
-    query += " LIMIT :limit OFFSET :offset"
+
+    where_sql = " AND ".join(where_clauses)
+
+    count_query = f"SELECT COUNT(*)::int AS total FROM users WHERE {where_sql}"
+    total = await database.fetch_val(count_query, params)
+
+    query = f"""
+    SELECT id::text as id, full_name, email, phone, role, status, created_at
+    FROM users
+    WHERE {where_sql}
+    ORDER BY created_at DESC NULLS LAST
+    LIMIT :limit OFFSET :offset
+    """
     params["limit"] = min(limit, 500)
     params["offset"] = offset
 
     rows = await database.fetch_all(query, params)
-    return [row_to_dict(row) for row in rows]
+    return {"items": [row_to_dict(row) for row in rows], "total": total, "limit": limit, "offset": offset}
 
 @router.post("/admin/users")
 async def create_user(

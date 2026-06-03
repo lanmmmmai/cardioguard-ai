@@ -80,3 +80,4 @@ def check_rate_limit(ip: str, email: str, endpoint: str, max_requests: int = 5, 
     # Thêm dấu thời gian hiện tại vào danh sách
     timestamps.append(now)
     _rate_limits[key] = timestamps
+    logger.debug("check_rate_limit: allowed, ip=%s email=%s endpoint=%s count=%d/%d window=%ds", ip, email, endpoint, len(timestamps), max_requests, window_seconds)

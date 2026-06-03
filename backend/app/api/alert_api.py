@@ -69,6 +69,9 @@ async def get_alerts(
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
 
+    count_query = f"SELECT COUNT(*)::int AS total FROM alerts {where_sql}"
+    total = await database.fetch_val(count_query, values)
+
     query = f"""
     SELECT 
         alerts.id,
@@ -92,7 +95,7 @@ async def get_alerts(
     alerts = await database.fetch_all(query, values)
     logger.info("Đã tìm nạp cảnh báo: role=%s user_id=%s count=%d", role, current_user["id"], len(alerts))
 
-    return alerts
+    return {"items": alerts, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/alerts/stats/last-7-days")

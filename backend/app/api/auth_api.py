@@ -27,6 +27,7 @@ import asyncio
 import secrets
 import requests
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Request
@@ -51,6 +52,10 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 VALID_ROLES = {"admin", "doctor", "patient"}
+
+_USER_CACHE_TTL = 30  # 30 seconds - short TTL for auth freshness
+_user_cache: dict[str, tuple[dict, float]] = {}
+_user_cache_lock = asyncio.Lock()
 
 
 def normalize_role(role: Optional[str]) -> str:
@@ -177,6 +182,24 @@ async def get_user_from_token(
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
+    # Check user cache first (skip revoked check for cached non-revoked users)
+    async with _user_cache_lock:
+        if user_id in _user_cache:
+            cached_user, cached_at = _user_cache[user_id]
+            if time.monotonic() - cached_at < _USER_CACHE_TTL:
+                result = dict(cached_user)
+                if result["must_change_password"] and not allow_must_change_password:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Bạn phải đổi mật khẩu trước khi tiếp tục sử dụng hệ thống",
+                    )
+                if not result["profile_completed"] and not allow_uncompleted:
+                    if result["role"] in {"patient", "doctor"}:
+                        raise HTTPException(
+                            status_code=403,
+                            detail="Tài khoản chưa hoàn thiện hồ sơ. Vui lòng hoàn thiện hồ sơ trước khi tiếp tục.",
+                        )
+                return result
 
     user_columns = await get_users_columns()
     select_columns = [
@@ -221,6 +244,10 @@ async def get_user_from_token(
         "is_verified": bool(user["is_verified"]),
         "avatar_url": user["avatar_url"],
     }
+
+    # Cache user for 30s to avoid repeated DB lookups
+    async with _user_cache_lock:
+        _user_cache[user_id] = (result, time.monotonic())
 
     if result["must_change_password"] and not allow_must_change_password:
         raise HTTPException(
@@ -659,12 +686,17 @@ async def logout(authorization: Optional[str] = Header(default=None)):
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         jti = payload.get("jti")
         exp = payload.get("exp")
+        user_id = payload.get("sub")
         if jti and exp:
             expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
             await database.execute(
                 "INSERT INTO revoked_tokens (jti, expires_at) VALUES (:jti, :exp) ON CONFLICT DO NOTHING",
                 {"jti": jti, "exp": expires_at}
             )
+        # Invalidate user cache on logout
+        if user_id:
+            async with _user_cache_lock:
+                _user_cache.pop(user_id, None)
     except Exception:
         pass
     return {"message": "Logged out successfully"}
@@ -856,6 +888,10 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
         """,
         {"password_hash": hash_password(data.new_password), "id": current_user["id"]}
     )
+
+    # Invalidate user cache on password change
+    async with _user_cache_lock:
+        _user_cache.pop(current_user["id"], None)
 
     # Ghi nhận log đổi mật khẩu thành công
     await log_activity(

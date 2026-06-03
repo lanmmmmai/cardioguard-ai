@@ -26,7 +26,9 @@ Quan hệ:
 
 from datetime import date, datetime, timezone
 from decimal import Decimal
+import asyncio
 import logging
+import time
 from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
@@ -42,6 +44,10 @@ import secrets
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+_DEVICES_COLUMN_CACHE_TTL = 3600  # 1 hour
+_devices_columns_cache: Optional[tuple[set[str], float]] = None
+_devices_columns_lock = asyncio.Lock()
 
 
 def normalize_device_identifier(value: str) -> str:
@@ -84,20 +90,19 @@ def row_to_dict(row: Any) -> dict[str, Any]:
     return {key: to_jsonable(row[key]) for key in row.keys()}
 
 
-_devices_columns_cache: Optional[set[str]] = None
-
-
 async def get_devices_table_columns() -> set[str]:
-    """Lấy tập hợp tên cột cho bảng devices.
-
-    Kết quả được lưu vào bộ nhớ đệm toàn cục sau truy vấn đầu tiên.
+    """Lấy tập hợp tên cột cho bảng devices, có bộ nhớ đệm với TTL.
 
     Returns:
         Tập hợp các chuỗi tên cột.
     """
     global _devices_columns_cache
-    if _devices_columns_cache is not None:
-        return _devices_columns_cache
+    async with _devices_columns_lock:
+        if _devices_columns_cache is not None:
+            columns, cached_at = _devices_columns_cache
+            if time.monotonic() - cached_at < _DEVICES_COLUMN_CACHE_TTL:
+                return columns
+
     rows = await database.fetch_all(
         """
         SELECT column_name
@@ -105,8 +110,10 @@ async def get_devices_table_columns() -> set[str]:
         WHERE table_schema = 'public' AND table_name = 'devices'
         """
     )
-    _devices_columns_cache = {row["column_name"] for row in rows}
-    return _devices_columns_cache
+    columns = {row["column_name"] for row in rows}
+    async with _devices_columns_lock:
+        _devices_columns_cache = (columns, time.monotonic())
+    return columns
 async def ensure_patient_access(user: dict[str, Any], patient_id: str) -> None:
     """Xác minh rằng người dùng có quyền truy cập dữ liệu của bệnh nhân.
 
@@ -756,6 +763,9 @@ async def get_sensor_data(
 
     where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
 
+    count_query = f"SELECT COUNT(*)::int AS total FROM sensor_data {where_sql}"
+    total = await database.fetch_val(count_query, values)
+
     query = """
     SELECT id::text as id, patient_id::text as patient_id, heart_rate, spo2, systolic_bp, diastolic_bp, ecg_value, created_at
     FROM sensor_data
@@ -766,7 +776,12 @@ async def get_sensor_data(
 
     data = await database.fetch_all(query.format(where_sql=where_sql), values)
 
-    return [row_to_dict(row) for row in data]
+    return {
+        "items": [row_to_dict(row) for row in data],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/sensors/history")
@@ -787,12 +802,11 @@ async def get_sensor_history(
         offset: Độ lệch phân trang.
 
     Returns:
-        Dict chứa items, limit và offset.
+        Dict chứa items, total, limit và offset.
     """
-    items = await get_sensor_data(
+    return await get_sensor_data(
         authorization=authorization,
         patient_id=patient_id,
         limit=limit,
         offset=offset,
     )
-    return {"items": items, "limit": limit, "offset": offset}

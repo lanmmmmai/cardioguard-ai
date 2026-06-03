@@ -24,7 +24,9 @@ Quan hệ:
       notifications, chat_messages, cameras, reports
 """
 
+import asyncio
 import json
+import time
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
@@ -77,7 +79,9 @@ ALIASES = {
 }
 
 WRITE_PROTECTED_COLUMNS = {"created_at", "updated_at"}
-_column_cache: dict[str, set[str]] = {}
+_COLUMN_CACHE_TTL = 3600  # 1 hour
+_column_cache: dict[str, tuple[set[str], float]] = {}
+_column_cache_lock = asyncio.Lock()
 PATIENT_CREATE_BLOCKED_TABLES = {"devices", "medical_records", "prescriptions", "reports"}
 PATIENT_UPDATE_BLOCKED_TABLES = {"devices", "medical_records", "prescriptions", "reports"}
 PATIENT_DELETE_BLOCKED_TABLES = {"appointments", "cameras", "devices", "medical_records", "prescriptions", "reports"}
@@ -197,7 +201,7 @@ def normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 async def table_columns(table: str) -> set[str]:
-    """Lấy tập hợp tên cột cho một bảng, có bộ nhớ đệm.
+    """Lấy tập hợp tên cột cho một bảng, có bộ nhớ đệm với TTL.
 
     Args:
         table: Tên bảng.
@@ -208,8 +212,11 @@ async def table_columns(table: str) -> set[str]:
     Raises:
         HTTPException 500: Nếu bảng không có cột 'id'.
     """
-    if table in _column_cache:
-        return _column_cache[table]
+    async with _column_cache_lock:
+        if table in _column_cache:
+            columns, cached_at = _column_cache[table]
+            if time.monotonic() - cached_at < _COLUMN_CACHE_TTL:
+                return columns
 
     rows = await database.fetch_all(
         """
@@ -223,7 +230,8 @@ async def table_columns(table: str) -> set[str]:
     if "id" not in columns:
         raise HTTPException(status_code=500, detail=f"Table {table} must have UUID id column")
 
-    _column_cache[table] = columns
+    async with _column_cache_lock:
+        _column_cache[table] = (columns, time.monotonic())
     return columns
 
 
@@ -440,7 +448,7 @@ async def list_records(table: str, authorization: Optional[str], limit: int, off
         patient_id: UUID bệnh nhân tùy chọn để lọc.
 
     Returns:
-        Danh sách các dict bản ghi an toàn JSON.
+        Dict chứa items, total, limit và offset.
     """
     user = await get_user_from_token(authorization)
     columns = await table_columns(table)
@@ -453,8 +461,12 @@ async def list_records(table: str, authorization: Optional[str], limit: int, off
         where_parts.append('"patient_id" = :patient_id::uuid')
         values["patient_id"] = patient_id
 
-    order_column = "created_at" if "created_at" in columns else "updated_at" if "updated_at" in columns else "id"
     where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
+
+    count_query = f"SELECT COUNT(*)::int AS total FROM {quote_identifier(table)} {where_sql}"
+    total = await database.fetch_val(count_query, values)
+
+    order_column = "created_at" if "created_at" in columns else "updated_at" if "updated_at" in columns else "id"
     rows = await database.fetch_all(
         f"""
         SELECT *
@@ -465,7 +477,7 @@ async def list_records(table: str, authorization: Optional[str], limit: int, off
         """,
         {**values, "limit": limit, "offset": offset},
     )
-    return [row_to_dict(row) for row in rows]
+    return {"items": [row_to_dict(row) for row in rows], "total": total, "limit": limit, "offset": offset}
 
 
 async def trigger_websocket_broadcast(table: str, record: dict[str, Any]):

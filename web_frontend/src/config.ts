@@ -22,15 +22,27 @@ const isLoopbackUrl = (value?: string) => Boolean(
   value && /^(https?:\/\/|wss?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(value)
 );
 const isRelativeApiPath = (value?: string) => Boolean(value && value.startsWith('/') && !value.startsWith('//'));
+const isDockerInternalUrl = (value?: string) => {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname;
+    return !hostname.includes('.') && hostname !== 'localhost';
+  } catch {
+    return false;
+  }
+};
 const isUsableApiUrl = (value?: string) => Boolean(
   value &&
   !isPlaceholderUrl(value) &&
+  (typeof window === 'undefined' || !isDockerInternalUrl(value)) &&
   (!isRelativeApiPath(value) || typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
   (!isLoopbackUrl(value) || typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
 );
 const isUsableWsUrl = (value?: string) => Boolean(
   value &&
   !isPlaceholderUrl(value) &&
+  (typeof window === 'undefined' || !isDockerInternalUrl(value)) &&
   (!isLoopbackUrl(value) || typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
 );
 const deriveApiUrlFromWsUrl = (wsUrl?: string) => {
