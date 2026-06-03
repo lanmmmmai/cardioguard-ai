@@ -14,6 +14,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import { EmailVariables } from './EmailVariables';
 import {
   CUSTOM_TEMPLATE_HINTS,
+  type EmailFunctionOption,
   EMAIL_GROUP_LABEL_MAP,
   EMAIL_TARGET_ROLE_LABEL_MAP,
   SYSTEM_EMAIL_FUNCTIONS,
@@ -48,6 +49,10 @@ type CustomFunctionDraft = {
   optional_variables: string[];
 };
 
+type PersistedEmailFunction = EmailFunctionOption & {
+  id: string;
+};
+
 interface TemplateEditorProps {
   template: Template | null;  // null = tạo mới
   onClose: () => void;
@@ -80,7 +85,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
   });
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [customFunctions, setCustomFunctions] = useState<Array<(typeof SYSTEM_EMAIL_FUNCTIONS)[number]>>([]);
+  const [customFunctions, setCustomFunctions] = useState<PersistedEmailFunction[]>([]);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [draftFunction, setDraftFunction] = useState<CustomFunctionDraft>({
     email_type: '',
@@ -291,10 +296,51 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
           body: JSON.stringify(functionPayload),
         });
         const fnData = await fnRes.json();
-        if (!fnRes.ok) throw new Error(fnData.detail || 'Không thể lưu loại template tùy chỉnh');
-        functionId = fnData.id;
-        emailType = fnData.email_type;
-        cmsEmailId = fnData.cms_email_id;
+        if (!fnRes.ok) {
+          if (fnRes.status === 409 && !form.function_id) {
+            try {
+              const lookupRes = await fetch(
+                `${API_URL}/cms/email-functions?q=${encodeURIComponent(functionPayload.email_type)}&is_active=true`,
+                {
+                  headers: { Authorization: `Bearer ${accessToken}` },
+                }
+              );
+              const lookupData = await lookupRes.json();
+              const matchedFunction = (Array.isArray(lookupData.items) ? lookupData.items : [])
+                .find((item: any) =>
+                  item.email_type === functionPayload.email_type ||
+                  item.cms_email_id === functionPayload.cms_email_id
+                );
+              if (matchedFunction?.id) {
+                functionId = matchedFunction.id;
+                emailType = matchedFunction.email_type;
+                cmsEmailId = matchedFunction.cms_email_id;
+                setForm((prev) => ({
+                  ...prev,
+                  function_id: matchedFunction.id,
+                  email_type: matchedFunction.email_type,
+                  cms_email_id: matchedFunction.cms_email_id,
+                }));
+              } else {
+                throw new Error(fnData.detail || 'Loại template tùy chỉnh đã tồn tại');
+              }
+            } catch {
+              throw new Error(fnData.detail || 'Loại template tùy chỉnh đã tồn tại');
+            }
+          } else {
+            throw new Error(fnData.detail || 'Không thể lưu loại template tùy chỉnh');
+          }
+        } else {
+          functionId = fnData.id;
+          emailType = fnData.email_type;
+          cmsEmailId = fnData.cms_email_id;
+          setForm((prev) => ({
+            ...prev,
+            function_id: fnData.id,
+            email_type: fnData.email_type || prev.email_type,
+            cms_email_id: fnData.cms_email_id || prev.cms_email_id,
+          }));
+        }
       }
 
       const url = resolvedTemplateId
