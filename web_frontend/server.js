@@ -3,6 +3,12 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import {
+  buildPublicUrl,
+  getSeoByPath,
+  injectSeoIntoHtml,
+  normalizePagePath,
+} from './seo-injector.js';
 
 // Load environment variables for local testing
 dotenv.config();
@@ -27,8 +33,6 @@ app.use(express.static(DIST_PATH, {
   index: false // Let the wildcard route handle index.html
 }));
 
-const BACKEND_BASE_URL = (process.env.BACKEND_API_URL || process.env.VITE_API_URL || process.env.API_URL || 'http://localhost:8000').replace(/\/$/, '');
-
 // Cache index.html template in production
 let cachedIndexHtml = '';
 try {
@@ -39,51 +43,6 @@ try {
   }
 } catch (err) {
   console.error('Error reading index.html:', err);
-}
-
-function escapeHtml(value = '') {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('"', '&quot;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
-}
-
-async function getSeoByPath(pagePath, fullUrl) {
-  try {
-    const response = await fetch(`${BACKEND_BASE_URL}/api/cms/domain-links/resolve?path=${encodeURIComponent(pagePath)}`);
-    if (!response.ok) {
-      // Fallback
-      return {
-        title: 'CardioGuard AI - Giám sát sức khỏe tim mạch thời gian thực',
-        description: 'CardioGuard AI - Hệ thống giám sát sức khỏe tim mạch thời gian thực. Theo dõi nhịp tim, SpO2, huyết áp và điện tâm đồ thông qua các cảm biến IoT đeo thông minh.',
-        image: 'https://giatky.site/images/preview.jpg'
-      };
-    }
-
-    const data = await response.json();
-    if (!data) {
-      return {
-        title: 'CardioGuard AI - Giám sát sức khỏe tim mạch thời gian thực',
-        description: 'CardioGuard AI - Hệ thống giám sát sức khỏe tim mạch thời gian thực. Theo dõi nhịp tim, SpO2, huyết áp và điện tâm đồ thông qua các cảm biến IoT đeo thông minh.',
-        image: 'https://giatky.site/images/preview.jpg'
-      };
-    }
-
-    return {
-      title: data.title || 'CardioGuard AI - Giám sát sức khỏe tim mạch thời gian thực',
-      description: data.description || 'CardioGuard AI - Hệ thống giám sát sức khỏe tim mạch thời gian thực. Theo dõi nhịp tim, SpO2, huyết áp và điện tâm đồ thông qua các cảm biến IoT đeo thông minh.',
-      image: data.image_url || 'https://giatky.site/images/preview.jpg',
-      url: data.url || fullUrl
-    };
-  } catch (err) {
-    console.error('Backend resolve failed:', err);
-    return {
-      title: 'CardioGuard AI - Giám sát sức khỏe tim mạch thời gian thực',
-      description: 'CardioGuard AI - Hệ thống giám sát sức khỏe tim mạch thời gian thực. Theo dõi nhịp tim, SpO2, huyết áp và điện tâm đồ thông qua các cảm biến IoT đeo thông minh.',
-      image: 'https://giatky.site/images/preview.jpg'
-    };
-  }
 }
 
 app.get('*', async (req, res) => {
@@ -98,33 +57,14 @@ app.get('*', async (req, res) => {
       }
     }
 
-    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-    const host = req.headers.host || req.get('host') || 'giatky.site';
-    
-    // Normalize path to ignore trailing slashes (except root)
-    let pagePath = req.path;
-    if (pagePath.length > 1 && pagePath.endsWith('/')) {
-      pagePath = pagePath.slice(0, -1);
-    }
-
-    let fullUrl = `${proto}://${host}${pagePath}`;
-    
-    // Fallback host mapping for local testing
-    if (host.includes('localhost') || host.includes('127.0.0.1')) {
-      fullUrl = `https://giatky.site${pagePath}`;
-    }
+    const pagePath = normalizePagePath(req.path);
+    const fullUrl = buildPublicUrl(req, pagePath);
 
     const seo = await getSeoByPath(pagePath, fullUrl);
-    const seoUrl = seo.url || fullUrl;
-
-    // Escape dynamic parameters
-    const finalHtml = html
-      .replaceAll('__SEO_TITLE__', escapeHtml(seo.title))
-      .replaceAll('__SEO_DESCRIPTION__', escapeHtml(seo.description))
-      .replaceAll('__SEO_IMAGE__', escapeHtml(seo.image))
-      .replaceAll('__SEO_URL__', escapeHtml(seoUrl));
+    const finalHtml = injectSeoIntoHtml(html, seo);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
     res.send(finalHtml);
   } catch (err) {
     console.error('Request processing failed:', err);

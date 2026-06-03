@@ -111,6 +111,7 @@ Ghi chú:
 
 - `docker-compose.yml` đọc `.env` và `backend/.env` nếu các file này tồn tại.
 - Web trong Docker được build với `VITE_API_URL` và `VITE_WS_URL` từ env. Mặc định là `http://localhost:8000` và `ws://localhost:8000/ws/realtime`.
+- Web container production chạy Node SEO server để inject Open Graph meta từ CMS `domain_links`. Server này dùng `BACKEND_API_URL` để gọi backend nội bộ, mặc định `http://backend:8000`.
 - Không đưa `.env` thật vào image hoặc commit lên git.
 
 ## Backend
@@ -210,6 +211,14 @@ Build production:
 ```bash
 npm run build
 ```
+
+Chạy production server có backend injection SEO:
+
+```bash
+BACKEND_API_URL=http://localhost:8000 PUBLIC_SITE_URL=https://giatky.site npm run start
+```
+
+Server này đọc `dist/index.html`, gọi `/api/cms/domain-links/resolve?path=...`, rồi thay các placeholder `__SEO_*__` bằng dữ liệu DB trước khi trả HTML cho crawler/social preview.
 
 ### Biến môi trường web
 

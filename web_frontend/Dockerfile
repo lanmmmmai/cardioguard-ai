@@ -13,16 +13,21 @@ RUN npm ci
 COPY web_frontend/ ./
 RUN npm run build
 
-FROM nginx:1.27-alpine AS runtime
+FROM node:20-alpine AS runtime
 
-COPY web_frontend/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
+WORKDIR /app
 
-RUN touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/run/nginx.pid /var/cache/nginx /var/log/nginx /etc/nginx/conf.d /usr/share/nginx/html
+ENV NODE_ENV=production
+ENV PORT=8080
 
-USER nginx
+COPY web_frontend/package.json web_frontend/package-lock.json ./
+RUN npm ci --omit=dev
+
+COPY web_frontend/server.js web_frontend/seo-injector.js ./
+COPY --from=build /app/dist ./dist
+
+USER node
 
 EXPOSE 8080
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.js"]
