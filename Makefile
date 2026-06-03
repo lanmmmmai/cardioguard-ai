@@ -14,11 +14,10 @@ SCRIPTS_DIR := $(BACKEND_DIR)/scripts
 MIGRATION_SCRIPT := $(SCRIPTS_DIR)/run_all_migrations.py
 SEED_SCRIPT := $(SCRIPTS_DIR)/seed_data.py
 
-# ── Help ─────────────────────────────────────────────────────
 help: ## Show this help message
-	@echo "CardioGuard AI — Available Commands:"
-	@echo "======================================"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo CardioGuard AI — Available Commands:
+	@echo ======================================
+	@python -c "import re; print('\n'.join([f'  \033[36m{m[0]:<20}\033[0m {m[1]}' for m in sorted([re.match(r'^([a-zA-Z_-]+):.*?## (.*)$$', l).groups() for l in open('Makefile', encoding='utf-8') if re.match(r'^([a-zA-Z_-]+):.*?## (.*)$$', l)])]))"
 
 # ── First-time Setup ─────────────────────────────────────────
 setup: ## First-time project setup (venv, deps, env)
