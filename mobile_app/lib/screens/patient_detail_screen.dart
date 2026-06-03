@@ -82,6 +82,33 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       patientProvider.fetchMedicalRecords(patientId);
       patientProvider.fetchPrescriptions(patientId);
       chatProvider.fetchChatHistory(patientId);
+      
+      patientProvider.fetchSensorHistory(patientId).then((_) {
+        if (!mounted) return;
+        final history = patientProvider.sensorHistory;
+        if (history.isNotEmpty) {
+          setState(() {
+            _hrSpots.clear();
+            _spo2Spots.clear();
+            final reversedHistory = history.reversed.toList();
+            for (int i = 0; i < reversedHistory.length; i++) {
+              final item = reversedHistory[i];
+              final hr = (item['heart_rate'] as num?)?.toDouble() ?? 75.0;
+              final spo2 = (item['spo2'] as num?)?.toDouble() ?? 98.0;
+              _hrSpots.add(FlSpot(i.toDouble(), hr));
+              _spo2Spots.add(FlSpot(i.toDouble(), spo2));
+            }
+            _tickCount = reversedHistory.length;
+            if (reversedHistory.isNotEmpty) {
+              final latest = reversedHistory.last;
+              _currentHr = (latest['heart_rate'] as num?)?.toDouble() ?? 75.0;
+              _currentSpo2 = (latest['spo2'] as num?)?.toDouble() ?? 98.0;
+              _currentSysBp = (latest['systolic_bp'] as num?)?.toDouble() ?? 120.0;
+              _currentDiaBp = (latest['diastolic_bp'] as num?)?.toDouble() ?? 80.0;
+            }
+          });
+        }
+      });
     });
   }
 
@@ -242,25 +269,47 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 children: [
                   // Thông tin bệnh nhân
                   CgCard(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Column(
                       children: [
                         _buildDetailRow(
-                            'Tuổi', '${p['age']} tuổi', textColor, textMuted),
+                          icon: LucideIcons.userCheck,
+                          label: 'Giới tính & Tuổi',
+                          value: '${p['gender']} • ${p['age']} tuổi',
+                          textColor: textColor,
+                          textMuted: textMuted,
+                        ),
                         _buildDetailRow(
-                            'Giới tính', p['gender'], textColor, textMuted),
+                          icon: LucideIcons.mail,
+                          label: 'Email liên hệ',
+                          value: p['email'] ?? p['user']?['email'] ?? 'Chưa cập nhật',
+                          textColor: textColor,
+                          textMuted: textMuted,
+                        ),
                         _buildDetailRow(
-                            'Số điện thoại', p['phone'], textColor, textMuted),
+                          icon: LucideIcons.phone,
+                          label: 'Số điện thoại',
+                          value: p['phone'] ?? 'Chưa cập nhật',
+                          textColor: textColor,
+                          textMuted: textMuted,
+                        ),
                         _buildDetailRow(
-                            'Địa chỉ',
-                            p['address'] ?? 'Chưa cập nhật',
-                            textColor,
-                            textMuted),
+                          icon: LucideIcons.mapPin,
+                          label: 'Địa chỉ',
+                          value: p['address'] ?? 'Chưa cập nhật',
+                          textColor: textColor,
+                          textMuted: textMuted,
+                        ),
                         _buildDetailRow(
-                            'Tiền sử bệnh lý',
-                            p['medical_history'] ?? 'Không có',
-                            textColor,
-                            textMuted),
+                          icon: LucideIcons.fileText,
+                          label: 'Tiền sử bệnh lý',
+                          value: (p['medical_history'] != null && p['medical_history'].toString().trim().isNotEmpty)
+                              ? p['medical_history']
+                              : 'Không có',
+                          textColor: textColor,
+                          textMuted: textMuted,
+                          showDivider: false,
+                        ),
                       ],
                     ),
                   ),
@@ -558,29 +607,57 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     );
   }
 
-  // Xây dựng một hàng nhãn-giá trị được sử dụng trong thẻ thông tin bệnh nhân.
-  Widget _buildDetailRow(
-      String label, String value, Color textColor, Color textMuted) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-              width: 120,
-              child: Text(label,
-                  style: TextStyle(
-                      color: textMuted,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500))),
-          Expanded(
-              child: Text(value,
-                  style: TextStyle(
-                      color: textColor,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold))),
-        ],
-      ),
+  Widget _buildDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color textColor,
+    required Color textMuted,
+    bool showDivider = true,
+  }) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 18, color: CgColors.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      value,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (showDivider)
+          Divider(
+            color: textColor.withValues(alpha: 0.08),
+            height: 1,
+            thickness: 0.8,
+          ),
+      ],
     );
   }
 

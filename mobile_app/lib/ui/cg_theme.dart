@@ -17,6 +17,7 @@ ThemeData buildCgTheme(Brightness brightness) {
   final base = ThemeData(
     useMaterial3: true,
     brightness: brightness,
+    fontFamily: 'Pretendard',
   );
 
   final scheme = isDark

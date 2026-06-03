@@ -109,4 +109,110 @@ class ChatProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // AI Chatbot State
+  List<dynamic> _aiSessions = [];
+  List<dynamic> get aiSessions => _aiSessions;
+
+  List<dynamic> _aiMessages = [];
+  List<dynamic> get aiMessages => _aiMessages;
+
+  String? _currentAiSessionId;
+  String? get currentAiSessionId => _currentAiSessionId;
+
+  // Fetch AI chatbot sessions
+  Future<void> fetchAiSessions(String role) async {
+    _setLoading(true);
+    try {
+      final response = await _apiClient.get(
+        '/api/chat/sessions',
+        queryParameters: {'role': role},
+      );
+      if (response.statusCode == 200) {
+        _aiSessions = response.data as List<dynamic>? ?? [];
+      }
+    } catch (e) {
+      AppLogger.log('Fetch AI sessions error: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Fetch AI chatbot history for a session
+  Future<void> fetchAiChatHistory(String sessionId) async {
+    _setLoading(true);
+    _currentAiSessionId = sessionId;
+    try {
+      final response = await _apiClient.get('/api/chat/history/$sessionId');
+      if (response.statusCode == 200) {
+        _aiMessages = response.data as List<dynamic>? ?? [];
+      }
+    } catch (e) {
+      AppLogger.log('Fetch AI history error: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Send message to AI chatbot
+  Future<bool> sendAiMessage({
+    required String messageText,
+    required String role,
+    Map<String, dynamic>? contextData,
+  }) async {
+    // Optimistically add user message to list
+    final tempUserMsg = {
+      'id': 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      'sender': 'user',
+      'message': messageText,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    };
+    _aiMessages.add(tempUserMsg);
+    notifyListeners();
+
+    try {
+      final response = await _apiClient.post(
+        '/api/chat/send',
+        data: {
+          'message': messageText,
+          'session_id': _currentAiSessionId,
+          'role': role,
+          'context_data': contextData,
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = response.data;
+        _currentAiSessionId = data['session_id']?.toString();
+        
+        // Remove temp message and add real one, plus AI response
+        _aiMessages.remove(tempUserMsg);
+        
+        final userRealMsg = {
+          'id': 'user_${DateTime.now().millisecondsSinceEpoch}',
+          'sender': 'user',
+          'message': messageText,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        };
+        _aiMessages.add(userRealMsg);
+        
+        if (data['ai_message'] != null) {
+          _aiMessages.add(data['ai_message']);
+        }
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      AppLogger.log('Send AI message error: $e');
+      _aiMessages.remove(tempUserMsg);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void clearAiMessages() {
+    _aiMessages = [];
+    _currentAiSessionId = null;
+    notifyListeners();
+  }
 }

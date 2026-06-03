@@ -27,6 +27,7 @@ class User {
 
   // Liệu người dùng có bắt buộc phải thay đổi mật khẩu ở lần đăng nhập tiếp theo hay không.
   final bool mustChangePassword;
+  final String? avatarUrl;
 
   // Tạo một User với tất cả các trường bắt buộc.
   User({
@@ -36,6 +37,7 @@ class User {
     required this.role,
     required this.status,
     required this.mustChangePassword,
+    this.avatarUrl,
   });
 
   // Giải mã một User từ bản đồ JSON được trả về bởi API.
@@ -47,6 +49,7 @@ class User {
       role: json['role'] ?? 'patient',
       status: (json['status'] ?? 'active').toString(),
       mustChangePassword: json['must_change_password'] == true,
+      avatarUrl: json['avatar_url'],
     );
   }
 
@@ -58,6 +61,7 @@ class User {
         'role': role,
         'status': status,
         'must_change_password': mustChangePassword,
+        'avatar_url': avatarUrl,
       };
 }
 
@@ -97,6 +101,7 @@ class Patient {
 
   // Giải mã một Patient từ bản đồ JSON.
   factory Patient.fromJson(Map<String, dynamic> json) {
+    final rawPhone = json['phone']?.toString() ?? '';
     return Patient(
       id: json['id'] ?? '',
       fullName: json['full_name'] ?? '',
@@ -104,7 +109,7 @@ class Patient {
           ? json['age']
           : int.tryParse(json['age']?.toString() ?? '0') ?? 0,
       gender: json['gender'] ?? 'Chưa cập nhật',
-      phone: json['phone'] ?? json['email'] ?? '',
+      phone: (rawPhone.isNotEmpty && !rawPhone.contains('@')) ? rawPhone : 'Chưa cập nhật',
       address: json['address'] ?? 'Chưa cập nhật',
       medicalHistory: json['medical_history'] ?? '',
     );

@@ -1,17 +1,3 @@
-// Màn hình cài đặt tài khoản: chỉnh sửa hồ sơ, chuyển đổi chủ đề, đổi mật khẩu, đăng xuất.
-// Quy trình làm việc:
-// 1. Khi khởi tạo, nếu người dùng hiện tại là bệnh nhân, tìm nạp hồ sơ của họ qua
-//    PatientProvider.fetchMyProfile và điền vào các trường biểu mẫu.
-// 2. Biểu mẫu hồ sơ: tuổi, giới tính, điện thoại, địa chỉ, tiền sử bệnh lý — được lưu qua
-//    PatientProvider.updateMyProfile.
-// 3. Công tắc chủ đề: gọi callback onToggleTheme để chuyển đổi chế độ tối/sáng.
-// 4. Đổi mật khẩu: xác thực chính sách (>= 8 ký tự, chữ hoa, chữ thường, chữ số, ký tự đặc biệt),
-//    gọi /users/me/password qua ApiClient.
-// 5. Đăng xuất: gọi AuthProvider.logout và điều hướng đến /login.
-// Mối quan hệ:
-// - Sở hữu: AuthProvider, PatientProvider, ApiClient.
-// - Callback: onToggleTheme để chuyển đổi chủ đề.
-// - Điều hướng: đến /login (đăng xuất).
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
@@ -20,11 +6,8 @@ import '../providers/patient_provider.dart';
 import '../core/api_client.dart';
 import '../ui/cg_tokens.dart';
 
-// Màn hình cài đặt tài khoản với chỉnh sửa hồ sơ, chuyển đổi chủ đề, đổi mật khẩu và đăng xuất.
 class SettingsScreen extends StatefulWidget {
-  // Liệu màn hình có sử dụng màu chủ đề tối hay không.
   final bool isDarkTheme;
-  // Callback để chuyển đổi giữa chế độ tối và sáng.
   final VoidCallback onToggleTheme;
 
   const SettingsScreen({
@@ -50,16 +33,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _addressController = TextEditingController();
   final _historyController = TextEditingController();
 
-  // Liệu một yêu cầu đổi mật khẩu có đang được tiến hành hay không.
   bool _isChangingPassword = false;
-  // Liệu một yêu cầu lưu hồ sơ có đang được tiến hành hay không.
   bool _isSavingProfile = false;
-  // Thông báo lỗi cho xác thực biểu mẫu hồ sơ/lỗi API.
   String? _profileError;
-  // Thông báo lỗi cho xác thực biểu mẫu đổi mật khẩu/lỗi API.
   String? _passwordError;
 
-  // Xác thực độ mạnh mật khẩu: >= 8 ký tự, chữ hoa, chữ thường, chữ số, ký tự đặc biệt.
   String? _validatePasswordPolicy(String? value) {
     final v = value ?? '';
     if (v.length < 8 || v.length > 72) {
@@ -115,7 +93,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  // Đổi mật khẩu của người dùng hiện tại qua ApiClient.put đến /users/me/password.
   Future<void> _changePassword() async {
     if (!_passwordFormKey.currentState!.validate()) return;
     setState(() {
@@ -157,7 +134,162 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // Lưu hồ sơ bệnh nhân (tuổi, giới tính, điện thoại, địa chỉ, tiền sử) qua PatientProvider.
+  void _showChangePasswordBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: widget.isDarkTheme ? const Color(0xFF11151D) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 20,
+                right: 20,
+                top: 20,
+              ),
+              child: SingleChildScrollView(
+                child: Form(
+                  key: _passwordFormKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Đổi Mật Khẩu Mới',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          IconButton(
+                            icon: const Icon(LucideIcons.x, size: 20),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                      const Divider(),
+                      const SizedBox(height: 10),
+                      if (_passwordError != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: CgColors.critical.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            _passwordError!,
+                            style: const TextStyle(color: CgColors.critical, fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      TextFormField(
+                        controller: _currentPasswordController,
+                        decoration: const InputDecoration(labelText: 'Mật khẩu hiện tại'),
+                        obscureText: true,
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Vui lòng nhập mật khẩu hiện tại'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _newPasswordController,
+                        decoration: const InputDecoration(labelText: 'Mật khẩu mới'),
+                        obscureText: true,
+                        validator: _validatePasswordPolicy,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _confirmPasswordController,
+                        decoration: const InputDecoration(labelText: 'Xác nhận mật khẩu mới'),
+                        obscureText: true,
+                        validator: (v) {
+                          if (v == null || v.isEmpty) {
+                            return 'Vui lòng xác nhận mật khẩu';
+                          }
+                          if (v != _newPasswordController.text) {
+                            return 'Mật khẩu xác nhận không khớp';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: _isChangingPassword
+                              ? null
+                              : () async {
+                                  if (!_passwordFormKey.currentState!.validate()) return;
+                                  setModalState(() {
+                                    _isChangingPassword = true;
+                                    _passwordError = null;
+                                  });
+                                  
+                                  try {
+                                    final client = ApiClient();
+                                    final response = await client.put(
+                                      '/users/me/password',
+                                      data: {
+                                        'current_password': _currentPasswordController.text,
+                                        'new_password': _newPasswordController.text,
+                                        'confirm_password': _confirmPasswordController.text,
+                                      },
+                                    );
+
+                                    if (response.statusCode == 200) {
+                                      _currentPasswordController.clear();
+                                      _newPasswordController.clear();
+                                      _confirmPasswordController.clear();
+                                      if (mounted) {
+                                        Navigator.pop(context);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Đổi mật khẩu thành công!'),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  } catch (e) {
+                                    setModalState(() {
+                                      _passwordError = 'Mật khẩu hiện tại không đúng hoặc yêu cầu không hợp lệ.';
+                                    });
+                                  } finally {
+                                    setModalState(() {
+                                      _isChangingPassword = false;
+                                    });
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: CgColors.primary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: _isChangingPassword
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text('Cập nhật mật khẩu',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _savePatientProfile() async {
     if (!_profileFormKey.currentState!.validate()) return;
     setState(() {
@@ -226,7 +358,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thẻ người dùng
+            // User Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -242,10 +374,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   CircleAvatar(
                     radius: 30,
-                    backgroundColor:
-                        const Color(0xFFFF3366).withValues(alpha: 0.1),
-                    child: const Icon(LucideIcons.user,
-                        color: Color(0xFFFF3366), size: 30),
+                    backgroundColor: Colors.transparent,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF3366), Color(0xFFE11D48)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Center(
+                        child: currentUser.avatarUrl != null && currentUser.avatarUrl!.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(30),
+                                child: Image.network(
+                                  currentUser.avatarUrl!,
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Text(
+                                    currentUser.fullName.isNotEmpty
+                                        ? currentUser.fullName.substring(0, 1).toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                currentUser.fullName.isNotEmpty
+                                    ? currentUser.fullName.substring(0, 1).toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -288,7 +458,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Biểu mẫu chỉnh sửa hồ sơ (chỉ dành cho vai trò bệnh nhân)
+            // Profile Edit Form (only for Patient role)
             if (currentUser.role == 'patient') ...[
               const Text('Hồ sơ cá nhân',
                   style: TextStyle(
@@ -397,7 +567,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 24),
             ],
 
-            // Tùy chọn chủ đề
+            // Theme Options
             const Text('Hệ thống',
                 style: TextStyle(
                     fontSize: 12,
@@ -424,104 +594,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Biểu mẫu đổi mật khẩu
+            // Change Password Button
             const Text('Đổi mật khẩu',
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFFFF3366))),
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.07)
-                      : Colors.black.withValues(alpha: 0.08),
-                ),
-              ),
-              child: Form(
-                key: _passwordFormKey,
-                child: Column(
-                  children: [
-                    if (_passwordError != null) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: CgColors.critical.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          _passwordError!,
-                          style: const TextStyle(
-                              color: CgColors.critical, fontSize: 12),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    TextFormField(
-                      controller: _currentPasswordController,
-                      decoration:
-                          const InputDecoration(labelText: 'Mật khẩu hiện tại'),
-                      obscureText: true,
-                      validator: (v) => (v == null || v.isEmpty)
-                          ? 'Vui lòng nhập mật khẩu hiện tại'
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _newPasswordController,
-                      decoration:
-                          const InputDecoration(labelText: 'Mật khẩu mới'),
-                      obscureText: true,
-                      validator: _validatePasswordPolicy,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _confirmPasswordController,
-                      decoration: const InputDecoration(
-                          labelText: 'Xác nhận mật khẩu mới'),
-                      obscureText: true,
-                      validator: (v) {
-                        if (v == null || v.isEmpty) {
-                          return 'Vui lòng xác nhận mật khẩu';
-                        }
-                        if (v != _newPasswordController.text) {
-                          return 'Mật khẩu xác nhận không khớp';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: _isChangingPassword ? null : _changePassword,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: CgColors.primary,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: _isChangingPassword
-                            ? const CircularProgressIndicator(
-                                color: Colors.white)
-                            : const Text('Cập nhật mật khẩu',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _showChangePasswordBottomSheet,
+                icon: const Icon(LucideIcons.keyRound, color: Colors.white, size: 18),
+                label: const Text('Đổi mật khẩu tài khoản',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CgColors.primary,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
             const SizedBox(height: 32),
 
-            // Nút đăng xuất
+            // Logout Button
             SizedBox(
               width: double.infinity,
               height: 52,

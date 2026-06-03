@@ -18,11 +18,12 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/forgot_password_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/patients_screen.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/appointments_screen.dart';
-import 'screens/icu_camera_screen.dart';
+import 'screens/chat_ai_screen.dart';
 import 'screens/settings_screen.dart';
 
 import 'providers/auth_provider.dart';
@@ -81,6 +82,7 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
           '/splash': (context) => const SplashScreen(),
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
+          '/forgot-password': (context) => const ForgotPasswordScreen(),
           '/dashboard': (context) => MainTabWrapper(
                 isDarkTheme: _isDarkTheme,
                 onToggleTheme: _toggleTheme,
@@ -145,7 +147,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
       tabConfig = [
         {'icon': LucideIcons.lock, 'label': 'Đổi mật khẩu'},
       ];
-    } else if (role == 'admin' || role == 'doctor') {
+    } else if (role == 'admin') {
       screens = [
         DashboardScreen(
           isDarkTheme: widget.isDarkTheme,
@@ -154,7 +156,6 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
         PatientsScreen(isDarkTheme: widget.isDarkTheme),
         AlertsScreen(isDarkTheme: widget.isDarkTheme),
         AppointmentsScreen(isDarkTheme: widget.isDarkTheme),
-        IcuCameraScreen(isDarkTheme: widget.isDarkTheme),
         SettingsScreen(
           isDarkTheme: widget.isDarkTheme,
           onToggleTheme: widget.onToggleTheme,
@@ -165,7 +166,29 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
         {'icon': LucideIcons.users, 'label': 'Bệnh nhân'},
         {'icon': LucideIcons.bell, 'label': 'Cảnh báo'},
         {'icon': LucideIcons.calendar, 'label': 'Lịch hẹn'},
-        {'icon': LucideIcons.video, 'label': 'Phòng ICU'},
+        {'icon': LucideIcons.user, 'label': 'Cá nhân'},
+      ];
+    } else if (role == 'doctor') {
+      screens = [
+        DashboardScreen(
+          isDarkTheme: widget.isDarkTheme,
+          onToggleTheme: widget.onToggleTheme,
+        ),
+        PatientsScreen(isDarkTheme: widget.isDarkTheme),
+        AlertsScreen(isDarkTheme: widget.isDarkTheme),
+        AppointmentsScreen(isDarkTheme: widget.isDarkTheme),
+        ChatAiScreen(isDarkTheme: widget.isDarkTheme),
+        SettingsScreen(
+          isDarkTheme: widget.isDarkTheme,
+          onToggleTheme: widget.onToggleTheme,
+        ),
+      ];
+      tabConfig = [
+        {'icon': LucideIcons.layoutDashboard, 'label': 'Giám sát'},
+        {'icon': LucideIcons.users, 'label': 'Bệnh nhân'},
+        {'icon': LucideIcons.bell, 'label': 'Cảnh báo'},
+        {'icon': LucideIcons.calendar, 'label': 'Lịch hẹn'},
+        {'icon': LucideIcons.bot, 'label': 'Chat AI'},
         {'icon': LucideIcons.user, 'label': 'Cá nhân'},
       ];
     } else {
@@ -177,6 +200,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
         ),
         AlertsScreen(isDarkTheme: widget.isDarkTheme),
         AppointmentsScreen(isDarkTheme: widget.isDarkTheme),
+        ChatAiScreen(isDarkTheme: widget.isDarkTheme),
         SettingsScreen(
           isDarkTheme: widget.isDarkTheme,
           onToggleTheme: widget.onToggleTheme,
@@ -186,6 +210,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
         {'icon': LucideIcons.heart, 'label': 'Chỉ số'},
         {'icon': LucideIcons.bellRing, 'label': 'Cảnh báo'},
         {'icon': LucideIcons.calendar, 'label': 'Lịch hẹn'},
+        {'icon': LucideIcons.bot, 'label': 'Chat AI'},
         {'icon': LucideIcons.user, 'label': 'Cá nhân'},
       ];
     }

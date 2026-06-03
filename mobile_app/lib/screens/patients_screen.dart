@@ -38,6 +38,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
   String _searchQuery = '';
   // Bệnh nhân hiện được chọn (cho bảng chi tiết chế độ xem chia đôi trên máy tính bảng).
   Map<String, dynamic>? _selectedPatient;
+  List<dynamic> _adminAssignments = [];
 
   @override
   void initState() {
@@ -47,9 +48,28 @@ class _PatientsScreenState extends State<PatientsScreen> {
         _searchQuery = _searchController.text.toLowerCase();
       });
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<PatientProvider>(context, listen: false).fetchPatients();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final patientProvider = Provider.of<PatientProvider>(context, listen: false);
+      await patientProvider.fetchPatients();
+      if (authProvider.currentUser?.role == 'admin') {
+        _fetchAdminAssignments();
+      }
     });
+  }
+
+  Future<void> _fetchAdminAssignments() async {
+    try {
+      final client = ApiClient();
+      final response = await client.get('/admin/assignments');
+      if (response.statusCode == 200) {
+        setState(() {
+          _adminAssignments = response.data as List<dynamic>? ?? [];
+        });
+      }
+    } catch (e) {
+      AppLogger.log('Error fetching admin assignments: $e');
+    }
   }
 
   @override
@@ -394,7 +414,12 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                 'Không tìm thấy bệnh nhân phù hợp với điều kiện hiện tại.',
                           )
                         : RefreshIndicator(
-                            onRefresh: patientProvider.fetchPatients,
+                            onRefresh: () async {
+                              await patientProvider.fetchPatients();
+                              if (role == 'admin') {
+                                await _fetchAdminAssignments();
+                              }
+                            },
                             color: CgColors.primary,
                             child: ListView.builder(
                               padding: const EdgeInsets.symmetric(
@@ -407,6 +432,17 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                     : '?';
 
                                 final isSelected = _selectedPatient != null && _selectedPatient!['id'] == p.id;
+
+                                String? doctorName;
+                                if (role == 'admin') {
+                                  final match = _adminAssignments.firstWhere(
+                                    (a) => a['patient_id'] == p.id,
+                                    orElse: () => null,
+                                  );
+                                  if (match != null) {
+                                    doctorName = match['doctor_name'];
+                                  }
+                                }
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 12),
@@ -442,10 +478,54 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                           style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               color: textColor)),
-                                      subtitle: Text(
-                                        '${p.gender} - ${p.age} tuổi\nSĐT: ${p.phone}',
-                                        style:
-                                            TextStyle(color: textMuted, fontSize: 12),
+                                      subtitle: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${p.gender} - ${p.age} tuổi\nSĐT: ${p.phone}',
+                                            style: TextStyle(color: textMuted, fontSize: 12),
+                                          ),
+                                          if (role == 'admin') ...[
+                                            const SizedBox(height: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: doctorName != null
+                                                    ? const Color(0xFF12B76A).withValues(alpha: 0.1)
+                                                    : const Color(0xFFF79009).withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    doctorName != null
+                                                        ? LucideIcons.checkCircle
+                                                        : LucideIcons.alertTriangle,
+                                                    size: 12,
+                                                    color: doctorName != null
+                                                        ? const Color(0xFF12B76A)
+                                                        : const Color(0xFFF79009),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    doctorName != null
+                                                        ? 'BS: $doctorName'
+                                                        : 'Chưa phân công bác sĩ',
+                                                    style: TextStyle(
+                                                      color: doctorName != null
+                                                          ? const Color(0xFF12B76A)
+                                                          : const Color(0xFFF79009),
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
                                       trailing: const Icon(LucideIcons.chevronRight,
                                           color: Color(0xFFFF3366), size: 18),

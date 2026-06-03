@@ -286,12 +286,36 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                                   label: statusText,
                                   color: statusColor,
                                 ),
-                                Text(
-                                  appt.channel.toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    color: appt.channel == 'online' ? Colors.cyan : Colors.amber,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: appt.channel.toLowerCase() == 'online'
+                                        ? const Color(0xFF0891B2).withValues(alpha: 0.1)
+                                        : const Color(0xFFF79009).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        appt.channel.toLowerCase() == 'online' ? LucideIcons.video : LucideIcons.mapPin,
+                                        size: 10,
+                                        color: appt.channel.toLowerCase() == 'online'
+                                            ? const Color(0xFF0891B2)
+                                            : const Color(0xFFF79009),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        appt.channel.toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w900,
+                                          color: appt.channel.toLowerCase() == 'online'
+                                              ? const Color(0xFF0891B2)
+                                              : const Color(0xFFF79009),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -299,19 +323,23 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                             const SizedBox(height: 10),
                             Text(
                               appt.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: textColor,
                                   fontSize: 14),
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 8),
                             Row(
                               children: [
                                 Icon(LucideIcons.calendar, size: 12, color: textMuted),
                                 const SizedBox(width: 6),
-                                Text(
-                                  _formatDateTime(appt.scheduledAt),
-                                  style: TextStyle(color: textMuted, fontSize: 12),
+                                Expanded(
+                                  child: Text(
+                                    _formatDateTime(appt.scheduledAt),
+                                    style: TextStyle(color: textMuted, fontSize: 12),
+                                  ),
                                 ),
                               ],
                             ),
@@ -319,19 +347,23 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                             Row(
                               children: [
                                 Icon(
-                                  role == 'patient' ? LucideIcons.userPlus : LucideIcons.user,
+                                  role == 'patient' ? LucideIcons.userRoundCheck : LucideIcons.user,
                                   size: 12,
                                   color: textMuted,
                                 ),
                                 const SizedBox(width: 6),
-                                Text(
-                                  role == 'patient'
-                                      ? 'Bác sĩ: $doctorName'
-                                      : 'Bệnh nhân: $patientName',
-                                  style: TextStyle(
-                                      color: textColor,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600),
+                                Expanded(
+                                  child: Text(
+                                    role == 'patient'
+                                        ? 'Bác sĩ: $doctorName'
+                                        : 'Bệnh nhân: $patientName',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        color: textColor,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600),
+                                  ),
                                 ),
                               ],
                             ),

@@ -240,4 +240,48 @@ class AuthProvider extends ChangeNotifier {
     _errorMessage = 'Phiên làm việc hết hạn. Vui lòng đăng nhập lại.';
     notifyListeners();
   }
+
+  // Request Forgot Password OTP
+  Future<bool> requestForgotPasswordOtp(String email) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      final response = await _apiClient.post(
+        '/auth/forgot-password/request-otp',
+        data: {'email': email},
+      );
+      _setLoading(false);
+      return response.statusCode == 200;
+    } catch (e) {
+      _setLoading(false);
+      _setError('Không tìm thấy tài khoản hoặc không thể gửi mã OTP.');
+      return false;
+    }
+  }
+
+  // Verify Forgot Password OTP and reset password
+  Future<bool> verifyForgotPasswordOtp({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      final response = await _apiClient.post(
+        '/auth/forgot-password/verify-otp',
+        data: {
+          'email': email,
+          'otp': otp,
+          'new_password': newPassword,
+        },
+      );
+      _setLoading(false);
+      return response.statusCode == 200;
+    } catch (e) {
+      _setLoading(false);
+      _setError('Mã OTP không hợp lệ, đã hết hạn hoặc mật khẩu không đúng chính sách.');
+      return false;
+    }
+  }
 }

@@ -273,4 +273,46 @@ class PatientProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  Future<void> fetchLatestSensorData(String patientId) async {
+    try {
+      final response = await _apiClient.get('/sensor-data', queryParameters: {
+        'patient_id': patientId,
+        'limit': 1,
+      });
+      if (response.statusCode == 200 && response.data is List && response.data.isNotEmpty) {
+        final latest = response.data[0] as Map<String, dynamic>;
+        _liveMetrics = {
+          'heart_rate': latest['heart_rate'] ?? _liveMetrics['heart_rate'] ?? 75,
+          'spo2': latest['spo2'] ?? _liveMetrics['spo2'] ?? 98,
+          'systolic_bp': latest['systolic_bp'] ?? _liveMetrics['systolic_bp'] ?? 120,
+          'diastolic_bp': latest['diastolic_bp'] ?? _liveMetrics['diastolic_bp'] ?? 80,
+          'ecg_value': latest['ecg_value'] is num ? (latest['ecg_value'] as num).toDouble() : 0.0,
+          'is_abnormal': latest['is_abnormal'] ?? false,
+        };
+        notifyListeners();
+      }
+    } catch (e) {
+      AppLogger.log('Fetch latest sensor data error: $e');
+    }
+  }
+
+  List<Map<String, dynamic>> _sensorHistory = [];
+  List<Map<String, dynamic>> get sensorHistory => _sensorHistory;
+
+  Future<void> fetchSensorHistory(String patientId) async {
+    try {
+      final response = await _apiClient.get('/sensor-data', queryParameters: {
+        'patient_id': patientId,
+        'limit': 30,
+      });
+      if (response.statusCode == 200 && response.data is List) {
+        final List<dynamic> list = response.data as List<dynamic>;
+        _sensorHistory = list.map((item) => item as Map<String, dynamic>).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      AppLogger.log('Fetch sensor history error: $e');
+    }
+  }
 }

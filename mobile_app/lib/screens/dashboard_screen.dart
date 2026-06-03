@@ -112,13 +112,18 @@ class _DashboardScreenState extends State<DashboardScreen>
 
       if (authProvider.currentUser?.role == 'patient') {
         _selectedPatientId = authProvider.currentUser?.id;
-        patientProvider.fetchMyProfile();
+        patientProvider.fetchMyProfile().then((_) {
+          if (_selectedPatientId != null) {
+            patientProvider.fetchLatestSensorData(_selectedPatientId!);
+          }
+        });
       } else {
         patientProvider.fetchPatients().then((_) {
           if (patientProvider.patients.isNotEmpty) {
             setState(() {
               _selectedPatientId = patientProvider.patients.first.id;
             });
+            patientProvider.fetchLatestSensorData(_selectedPatientId!);
           }
         });
       }
@@ -431,6 +436,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       _ecgPoints.clear();
                                       _ecgPoints.addAll(List.filled(240, 0.0));
                                     });
+                                    patientProvider.fetchLatestSensorData(id);
                                   }
                                 },
                               ),
@@ -469,44 +475,39 @@ class _DashboardScreenState extends State<DashboardScreen>
             final leftWidgetsList = [
               // System Dashboard Cards (Admin Only)
               if (role == 'admin') ...[
-                GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 2.8,
+                Row(
                   children: [
-                    _buildSummaryCard(
-                        'Bệnh nhân',
-                        '${patientProvider.patients.length}',
-                        LucideIcons.users,
-                        Colors.blue,
-                        cardBg,
-                        textColor,
-                        textMuted,
-                        borderColor),
-                    _buildSummaryCard(
-                        'Cảnh báo hoạt động',
-                        '${alertProvider.activeAlertCount}',
-                        LucideIcons.bell,
-                        Colors.red,
-                        cardBg,
-                        textColor,
-                        textMuted,
-                        borderColor),
+                    Expanded(
+                      child: _buildSummaryCard(
+                          'Bệnh nhân',
+                          '${patientProvider.patients.length}',
+                          LucideIcons.users,
+                          Colors.blue,
+                          cardBg,
+                          textColor,
+                          textMuted,
+                          borderColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildSummaryCard(
+                          'Cảnh báo hoạt động',
+                          '${alertProvider.activeAlertCount}',
+                          LucideIcons.bell,
+                          Colors.red,
+                          cardBg,
+                          textColor,
+                          textMuted,
+                          borderColor),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
               ],
 
               // Vitals Grid
-              GridView.count(
-                crossAxisCount: 1,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                childAspectRatio: isTablet ? 3.0 : 2.8,
+              // Vitals List
+              Column(
                 children: [
                   _buildMetricCard(
                       'NHỊP TIM',
@@ -519,6 +520,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       textColor,
                       textMuted,
                       borderColor),
+                  const SizedBox(height: 12),
                   _buildMetricCard(
                       'NỒNG ĐỘ OXY (SPO2)',
                       '$spo2Val',
@@ -530,6 +532,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       textColor,
                       textMuted,
                       borderColor),
+                  const SizedBox(height: 12),
                   _buildMetricCard(
                       'HUYẾT ÁP (BP)',
                       '$sysBp/$diaBp',
