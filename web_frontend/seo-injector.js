@@ -13,9 +13,16 @@ export function getPublicSiteUrl() {
 export function getBackendBaseUrl() {
   return (
     process.env.BACKEND_API_URL ||
-    process.env.VITE_API_URL ||
     process.env.API_URL ||
-    'http://localhost:8000'
+    '/api'
+  ).replace(/\/$/, '');
+}
+
+export function getBackendWsUrl() {
+  return (
+    process.env.BACKEND_WS_URL ||
+    process.env.VITE_WS_URL ||
+    '/ws/realtime'
   ).replace(/\/$/, '');
 }
 
@@ -107,6 +114,8 @@ export function injectSeoIntoHtml(html, seo) {
     __SEO_IMAGE_TYPE__: escapeHtml(imageMimeType(seoImage)),
     __SEO_SITE_NAME__: escapeHtml(seo.siteName || DEFAULT_SEO.siteName),
     __SEO_URL__: escapeHtml(seoUrl),
+    __CARDIOGUARD_API_URL__: escapeHtml(getBackendBaseUrl()),
+    __CARDIOGUARD_WS_URL__: escapeHtml(getBackendWsUrl()),
   };
 
   return Object.entries(replacements).reduce(
