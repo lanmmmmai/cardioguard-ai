@@ -101,8 +101,12 @@ const parseRecord = (row: any): MedicalRecordRow => ({
 });
 
 const withRows = async (response: { data: any; error: any }, client: ReturnType<typeof createSupabaseClient>) => {
-  if (response.error) throw new Error(response.error.message || 'Không thể lấy dữ liệu bệnh án');
+  if (response.error) {
+    console.error('[withRows] %s', response.error.message || 'Không thể lấy dữ liệu bệnh án');
+    throw new Error(response.error.message || 'Không thể lấy dữ liệu bệnh án');
+  }
   const rows = Array.isArray(response.data) ? response.data.map(parseRecord) : [];
+  console.debug('[withRows] parsed %d rows', rows.length);
   return enrichRecords(client, rows);
 };
 

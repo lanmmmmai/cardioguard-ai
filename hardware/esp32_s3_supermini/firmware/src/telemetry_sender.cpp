@@ -120,11 +120,22 @@ SendResult SendTelemetryFrame(const String &payload) {
   }
 
   if (now < g_backoff_until_ms) {
+    if (!g_was_in_backoff) {
+      Serial.print("[CardioGuard] Backoff in progress, delay=");
+      Serial.print(g_backoff_ms);
+      Serial.println("ms");
+      g_was_in_backoff = true;
+    }
     result.buffer_overwritten = !PushBufferedPayload(payload);
     result.should_backoff = true;
     result.buffered = true;
     result.buffer_size = PendingBufferSize();
     return result;
+  }
+
+  if (g_was_in_backoff) {
+    Serial.println("[CardioGuard] Backoff ended, resuming");
+    g_was_in_backoff = false;
   }
 
   String send_payload = payload;
@@ -152,6 +163,7 @@ SendResult SendTelemetryFrame(const String &payload) {
 
   if (result.status_code == 401 || result.status_code == 403) {
     result.auth_failed = true;
+    Serial.println("[CardioGuard] Auth failure: HTTP " + String(result.status_code));
     if (is_buffered_frame) {
       result.buffer_overwritten = !PushBufferedPayload(send_payload);
     }

@@ -537,6 +537,7 @@ async def login(data: LoginRequest, request: Request):
     ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
     check_rate_limit(ip, email, "/auth/login", max_requests=5, window_seconds=60)
+    logger.debug("Entry: login(email=%s)", email)
 
     user_columns = await get_users_columns()
     select_cols = "id::text as id, full_name, email, password_hash, role"
@@ -697,8 +698,8 @@ async def logout(authorization: Optional[str] = Header(default=None)):
         if user_id:
             async with _user_cache_lock:
                 _user_cache.pop(user_id, None)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Logout: failed to revoke token: %s", exc)
     return {"message": "Logged out successfully"}
 
 

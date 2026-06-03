@@ -110,6 +110,7 @@ class AuthProvider extends ChangeNotifier {
     required String password,
     required String otp,
   }) async {
+    AppLogger.log('registerPatient entered | email=$email');
     _setLoading(true);
     _setError(null);
     try {
@@ -123,10 +124,13 @@ class AuthProvider extends ChangeNotifier {
         },
       );
       _setLoading(false);
-      return response.statusCode == 200 || response.statusCode == 201;
+      final success = response.statusCode == 200 || response.statusCode == 201;
+      AppLogger.log('registerPatient ${success ? "success" : "failed"} | email=$email status=${response.statusCode}');
+      return success;
     } catch (e) {
       _setLoading(false);
       _setError('Mã OTP không đúng hoặc đã hết hạn.');
+      AppLogger.log('registerPatient error | email=$email error=$e');
       return false;
     }
   }
