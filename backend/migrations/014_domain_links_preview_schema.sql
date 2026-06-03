@@ -8,6 +8,9 @@ ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS cache_version INTEGER DEFAULT 1;
 ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 
+-- Drop unique index temporarily to avoid constraint violation during path normalization
+DROP INDEX IF EXISTS idx_domain_links_path_unique;
+
 UPDATE domain_links
 SET path = CASE
     WHEN path IS NOT NULL AND BTRIM(path) <> '' THEN path

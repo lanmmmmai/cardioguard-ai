@@ -258,9 +258,11 @@ async def main() -> int:
         statements = split_sql_statements(sql)
 
         print(f"Tìm thấy {len(statements)} câu lệnh SQL cần thực thi.")
-        async with database.transaction():
+        has_concurrently = any("concurrently" in stmt.lower() for stmt in statements)
+        
+        if has_concurrently:
+            print(f"⚠️ Phát hiện câu lệnh CONCURRENTLY. Thực thi ngoài transaction block...")
             for i, stmt in enumerate(statements, 1):
-                # Ghi nhật ký dòng đầu tiên đã cắt làm chỉ báo tiến trình
                 print(f"👉 [{i}/{len(statements)}] Đang thực thi: {stmt.splitlines()[0][:70]}...")
                 await database.execute(stmt)
 
@@ -275,6 +277,24 @@ async def main() -> int:
                     "applied_at": datetime.now(timezone.utc),
                 },
             )
+        else:
+            async with database.transaction():
+                for i, stmt in enumerate(statements, 1):
+                    # Ghi nhật ký dòng đầu tiên đã cắt làm chỉ báo tiến trình
+                    print(f"👉 [{i}/{len(statements)}] Đang thực thi: {stmt.splitlines()[0][:70]}...")
+                    await database.execute(stmt)
+
+                await database.execute(
+                    """
+                    INSERT INTO schema_migrations(filename, checksum, applied_at)
+                    VALUES (:filename, :checksum, :applied_at)
+                    """,
+                    {
+                        "filename": migration_name,
+                        "checksum": checksum,
+                        "applied_at": datetime.now(timezone.utc),
+                    },
+                )
             
         print("Thực thi migration thành công tốt đẹp!")
         return 0

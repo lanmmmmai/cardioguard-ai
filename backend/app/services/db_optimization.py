@@ -27,6 +27,12 @@ logger = logging.getLogger(__name__)
 
 async def ensure_user_account_timestamps() -> None:
     """Keep account timestamps available and server-driven for admin screens."""
+    existing = await database.fetch_val(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='created_at' AND column_default IS NOT NULL)"
+    )
+    if existing:
+        logger.info("Users account timestamp columns already exist, skipping DDL")
+        return
     logger.info("Synchronizing users account timestamp columns")
     statements = [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()",
@@ -64,6 +70,12 @@ async def ensure_user_account_timestamps() -> None:
 
 async def ensure_profile_schema() -> None:
     """Ensure role profile tables/columns exist before profile update flows run."""
+    existing = await database.fetch_val(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='doctor_profiles')"
+    )
+    if existing:
+        logger.info("Role profile schema already exists, skipping DDL")
+        return
     logger.info("Synchronizing role profile schema")
     try:
         await database.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
@@ -226,6 +238,12 @@ async def ensure_profile_schema() -> None:
 
 async def ensure_email_cms_schema() -> None:
     """Ensure the email CMS schema supports cms_email_id/email_type lookups."""
+    existing = await database.fetch_val(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='cms_email_functions')"
+    )
+    if existing:
+        logger.info("Email CMS schema already exists, skipping DDL")
+        return
     logger.info("Synchronizing email CMS schema")
     try:
         await database.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
@@ -333,6 +351,12 @@ async def ensure_email_cms_schema() -> None:
 
 async def ensure_domain_links_schema() -> None:
     """Ensure domain_links supports preview routing, soft delete and public SEO images."""
+    existing = await database.fetch_val(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='domain_links' AND column_name='path')"
+    )
+    if existing:
+        logger.info("Domain_links schema already exists, skipping DDL")
+        return
     logger.info("Synchronizing domain_links schema")
     try:
         await database.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")

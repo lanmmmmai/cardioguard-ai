@@ -12,7 +12,7 @@ RUN pip install --upgrade pip && \
 
 COPY backend/app ./app
 COPY backend/migrations ./migrations
-COPY backend/scripts/run_migration.py ./scripts/run_migration.py
+COPY backend/scripts ./scripts
 
 RUN adduser --disabled-password --gecos "" appuser && \
     chown -R appuser:appuser /workspace/backend
