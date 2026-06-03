@@ -1,15 +1,20 @@
 import csv
 import io
 import logging
+import os
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from io import BytesIO
+from urllib.parse import urlparse
 from typing import Any, Optional
 
 from fastapi import APIRouter, File, Header, HTTPException, Query, Response, UploadFile, Request
+from fastapi.responses import FileResponse
 
 logger = logging.getLogger(__name__)
 from sqlalchemy import text
+from PIL import Image
 
 from app.api.auth_api import get_user_from_token
 from app.services.audit_service import log_activity
@@ -18,6 +23,17 @@ from app.core.password_policy import validate_password
 from app.core.security import hash_password
 
 router = APIRouter(prefix="/cms", tags=["cms"])
+
+DOMAIN_LINKS_STORAGE_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "storage", "domain-links")
+)
+DOMAIN_LINKS_ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+DOMAIN_LINKS_ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "image/webp"}
+DOMAIN_LINKS_DEFAULT_PREVIEW = {
+    "title": "CardioGuard AI - Giám sát sức khỏe tim mạch thời gian thực",
+    "description": "CardioGuard AI - Hệ thống giám sát sức khỏe tim mạch thời gian thực. Theo dõi nhịp tim, SpO2, huyết áp và điện tâm đồ thông qua các cảm biến IoT đeo thông minh.",
+    "image_url": "https://giatky.site/images/preview.jpg",
+}
 
 CMS_MODULES = {
     "users": {
@@ -68,11 +84,11 @@ CMS_MODULES = {
     "reports": {"table": "reports", "hidden": set(), "readonly": {"id", "created_at", "updated_at"}, "required": set(), "aliases": {}},
     "domain_links": {
         "table": "domain_links",
-        "hidden": set(),
-        "readonly": {"id", "created_at", "updated_at"},
-        "required": {"url"},
+        "hidden": {"deleted_at", "cache_version"},
+        "readonly": {"id", "created_at", "updated_at", "deleted_at", "cache_version"},
+        "required": {"path", "url", "title", "description", "image_url"},
         "aliases": {},
-        "csv_columns": ["url", "domain", "title", "description", "image_url"],
+        "csv_columns": ["path", "url", "domain", "title", "description", "image_url", "is_active"],
     },
 }
 
@@ -83,13 +99,14 @@ DATE_TYPES = {"date", "timestamp", "timestamptz"}
 
 
 def module_config(module: str) -> dict[str, Any]:
-    config = CMS_MODULES.get(module)
+    config = CMS_MODULES.get(module.replace("-", "_"))
     if not config:
         raise HTTPException(status_code=404, detail="CMS module not found")
     return config
 
 
 def ensure_module_write_allowed(module: str) -> None:
+    module = module.replace("-", "_")
     # Các module này phải đi qua domain API để giữ nghiệp vụ và toàn vẹn dữ liệu.
     restricted_modules = {
         "users",
@@ -105,6 +122,50 @@ def ensure_module_write_allowed(module: str) -> None:
             status_code=403,
             detail=f"Module {module} chỉ cho phép ghi qua domain API để đảm bảo nghiệp vụ an toàn.",
         )
+
+
+def ensure_domain_links_storage_dir() -> None:
+    os.makedirs(DOMAIN_LINKS_STORAGE_ROOT, exist_ok=True)
+
+
+def normalize_domain_path(value: Optional[str]) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return "/"
+    if "://" in raw:
+        parsed = urlparse(raw)
+        raw = parsed.path or "/"
+    if not raw.startswith("/"):
+        raw = f"/{raw}"
+    if len(raw) > 1 and raw.endswith("/"):
+        raw = raw.rstrip("/")
+    return raw or "/"
+
+
+def get_request_base_url(request: Request) -> str:
+    return str(request.base_url).rstrip("/")
+
+
+def build_public_domain_link_image_url(request: Request, file_name: str) -> str:
+    return f"{get_request_base_url(request)}/api/cms/domain-links/images/{file_name}"
+
+
+def domain_links_default_payload(path: Optional[str], full_url: Optional[str] = None) -> dict[str, Any]:
+    normalized_path = normalize_domain_path(path)
+    target_url = full_url or f"https://giatky.site{normalized_path}"
+    parsed = urlparse(target_url)
+    return {
+        "id": None,
+        "path": normalized_path,
+        "url": target_url,
+        "domain": parsed.netloc or "giatky.site",
+        "title": DOMAIN_LINKS_DEFAULT_PREVIEW["title"],
+        "description": DOMAIN_LINKS_DEFAULT_PREVIEW["description"],
+        "image_url": DOMAIN_LINKS_DEFAULT_PREVIEW["image_url"],
+        "is_active": True,
+        "cache_version": 1,
+        "resolved_from": "fallback",
+    }
 
 
 async def require_admin(authorization: Optional[str]) -> dict[str, Any]:
@@ -278,6 +339,110 @@ def build_filters(filter_value: Optional[str], columns: list[dict[str, Any]], pa
     return " AND ".join(clauses)
 
 
+async def fetch_domain_link_by_path(path: Optional[str]) -> Optional[dict[str, Any]]:
+    normalized_path = normalize_domain_path(path)
+    full_url = f"https://giatky.site{normalized_path}"
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            text(
+                """
+                SELECT id::text as id, path, url, domain, title, description, image_url, is_active, cache_version, created_at, updated_at
+                FROM domain_links
+                WHERE deleted_at IS NULL
+                  AND is_active = TRUE
+                  AND (
+                        lower(path) = lower(:path)
+                        OR lower(url) = lower(:full_url)
+                        OR lower(url) LIKE lower(:full_url_like)
+                        OR lower(url) LIKE lower(:path_like)
+                  )
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """
+            ),
+            {
+                "path": normalized_path,
+                "full_url": full_url,
+                "full_url_like": f"%{full_url.rstrip('/')}",
+                "path_like": f"%{normalized_path}",
+            },
+        )
+        row = result.mappings().first()
+    return dict(row) if row else None
+
+
+@router.get("/domain-links/resolve")
+async def resolve_domain_link(path: Optional[str] = Query(default="/")):
+    link = await fetch_domain_link_by_path(path)
+    if not link:
+        return domain_links_default_payload(path)
+    resolved = dict(link)
+    resolved["resolved_from"] = "cms"
+    return resolved
+
+
+@router.get("/domain-links/images/{file_name}")
+async def get_domain_link_image(file_name: str):
+    ensure_domain_links_storage_dir()
+    full_path = os.path.abspath(os.path.join(DOMAIN_LINKS_STORAGE_ROOT, file_name))
+    if not full_path.startswith(DOMAIN_LINKS_STORAGE_ROOT):
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    if not os.path.isfile(full_path):
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(full_path)
+
+
+@router.post("/domain-links/upload-image")
+async def upload_domain_link_image(
+    request: Request,
+    file: UploadFile = File(...),
+    authorization: Optional[str] = Header(default=None),
+):
+    await require_admin(authorization)
+    ensure_domain_links_storage_dir()
+
+    filename = file.filename or ""
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in DOMAIN_LINKS_ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Chỉ chấp nhận ảnh PNG, JPG, JPEG hoặc WEBP")
+
+    if file.content_type not in DOMAIN_LINKS_ALLOWED_MIME_TYPES:
+        raise HTTPException(status_code=400, detail="Tệp tải lên phải là ảnh PNG, JPG, JPEG hoặc WEBP")
+
+    content = await file.read()
+    size = len(content)
+    if size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Kích thước ảnh tối đa là 5MB")
+
+    try:
+        image = Image.open(BytesIO(content))
+        image.load()
+        width, height = image.size
+        mime_type = Image.MIME.get(image.format, file.content_type or "application/octet-stream")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Tệp tải lên không phải là ảnh hợp lệ") from exc
+
+    unique_name = f"{uuid.uuid4()}{ext if ext != '.jpeg' else '.jpg'}"
+    full_path = os.path.join(DOMAIN_LINKS_STORAGE_ROOT, unique_name)
+    with open(full_path, "wb") as handle:
+        handle.write(content)
+
+    warning = None
+    if (width, height) != (1200, 630):
+        warning = "Khuyến nghị ảnh 1200x630 để hiển thị preview tối ưu."
+
+    return {
+        "public_url": build_public_domain_link_image_url(request, unique_name),
+        "file_name": unique_name,
+        "storage_path": f"domain-links/{unique_name}",
+        "mime_type": mime_type,
+        "size": size,
+        "width": width,
+        "height": height,
+        "warning": warning,
+    }
+
+
 @router.get("/{module}")
 async def list_cms_records(
     module: str,
@@ -305,6 +470,8 @@ async def list_cms_records(
         )
         if part
     ]
+    if table == "domain_links" and "deleted_at" in {column["column_name"] for column in columns}:
+        where_parts.append("deleted_at IS NULL")
     where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
 
     sort_column = sort_by if sort_by in {column["column_name"] for column in columns} else "created_at" if "created_at" in {column["column_name"] for column in columns} else "id"
@@ -378,6 +545,14 @@ async def get_cms_record(module: str, record_id: str, authorization: Optional[st
     visible = visible_columns(columns, config)
     select_sql = ", ".join(quote_identifier(column["name"]) for column in visible)
     async with AsyncSessionLocal() as session:
+        if table == "domain_links":
+            status_result = await session.execute(
+                text("SELECT deleted_at FROM domain_links WHERE id::text = :record_id"),
+                {"record_id": record_id},
+            )
+            status_row = status_result.mappings().first()
+            if not status_row or status_row.get("deleted_at") is not None:
+                raise HTTPException(status_code=404, detail="Record not found")
         result = await session.execute(
             text(f"SELECT {select_sql} FROM {quote_identifier(table)} WHERE id::text = :record_id"),
             {"record_id": record_id},
@@ -399,6 +574,22 @@ async def create_cms_record(module: str, payload: dict[str, Any], request: Reque
     values, errors = validate_payload(payload, columns, config)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
+    if table == "domain_links":
+        async with AsyncSessionLocal() as session:
+            duplicate = await session.execute(
+                text(
+                    """
+                    SELECT 1
+                    FROM domain_links
+                    WHERE deleted_at IS NULL
+                      AND lower(path) = lower(:path)
+                    LIMIT 1
+                    """
+                ),
+                {"path": values.get("path")},
+            )
+            if duplicate.first():
+                raise HTTPException(status_code=422, detail="Path này đã tồn tại cho một domain link đang hoạt động")
     if "id" in column_names and "id" not in values:
         values["id"] = str(uuid.uuid4())
     if not values:
@@ -443,6 +634,30 @@ async def update_cms_record(module: str, record_id: str, payload: dict[str, Any]
         return await get_cms_record(module, record_id, authorization)
     values["record_id"] = record_id
     async with AsyncSessionLocal() as session:
+        if table == "domain_links":
+            status_result = await session.execute(
+                text("SELECT deleted_at FROM domain_links WHERE id::text = :record_id"),
+                {"record_id": record_id},
+            )
+            status_row = status_result.mappings().first()
+            if not status_row or status_row.get("deleted_at") is not None:
+                raise HTTPException(status_code=404, detail="Record not found")
+            if "path" in values:
+                duplicate = await session.execute(
+                    text(
+                        """
+                        SELECT 1
+                        FROM domain_links
+                        WHERE deleted_at IS NULL
+                          AND lower(path) = lower(:path)
+                          AND id::text <> :record_id
+                        LIMIT 1
+                        """
+                    ),
+                    {"path": values["path"], "record_id": record_id},
+                )
+                if duplicate.first():
+                    raise HTTPException(status_code=422, detail="Path này đã tồn tại cho một domain link đang hoạt động")
         result = await session.execute(
             text(
                 f"""
@@ -476,6 +691,32 @@ async def delete_cms_record(module: str, record_id: str, request: Request, autho
     ensure_module_write_allowed(module)
     config = module_config(module)
     table = config["table"]
+    if table == "domain_links":
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                text(
+                    f"""
+                    UPDATE {quote_identifier(table)}
+                    SET deleted_at = NOW(), is_active = FALSE
+                    WHERE id::text = :record_id
+                    """
+                ),
+                {"record_id": record_id},
+            )
+            if result.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Record not found")
+            await session.commit()
+        if table != "audit_logs":
+            await log_activity(
+                user_id=user["id"],
+                action="CMS_DELETE_RECORD",
+                entity_type=table,
+                entity_id=record_id,
+                ip_address=request.client.host if request.client else "-"
+            )
+        logger.info("CMS delete (soft): module=%s admin_id=%s record_id=%s", module, user["id"], record_id)
+        return {"deleted": True, "id": record_id, "soft_deleted": True}
+
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             text(f"DELETE FROM {quote_identifier(table)} WHERE id::text = :record_id"),

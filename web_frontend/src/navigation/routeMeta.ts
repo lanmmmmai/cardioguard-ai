@@ -9,6 +9,7 @@ export const privateRouteRole = (path: string): UserRole | null => {
 
 export const pageTitles: Record<string, { title: string; subtitle: string }> = {
   "/admin/email": { title: "Email CMS", subtitle: "Quản lý mẫu email, gửi thông báo và theo dõi lịch sử." },
+  "/admin/cms/domain-links": { title: "CMS Domain Links", subtitle: "Quản lý preview link cho Zalo, Messenger, Facebook và OG tags." },
   "/admin/medical-records": { title: "Bệnh án điện tử", subtitle: "Giám sát toàn bộ bệnh án, trạng thái ký xác nhận và audit log." },
   "/admin/patients": { title: "Quản lý bệnh nhân", subtitle: "Hồ sơ y tế, lịch sử khám và thông tin người bệnh." },
   "/patient/chatbot": { title: "Trợ lý AI", subtitle: "Giải đáp, phân tích và theo dõi sức khỏe tim mạch." },

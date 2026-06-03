@@ -2,9 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import ws from 'ws';
 
 // Load environment variables for local testing
 dotenv.config();
@@ -29,23 +27,7 @@ app.use(express.static(DIST_PATH, {
   index: false // Let the wildcard route handle index.html
 }));
 
-// Configure Supabase Client
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://uoquxbpeimkyppqfpgmo.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_CfXFtdXtL9eiiebohBpVyA_T_Pa2jVm';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: {
-    persistSession: false
-  },
-  global: {
-    headers: {
-      'x-client-info': 'cardioguard-seo-server'
-    }
-  },
-  realtime: {
-    transport: ws
-  }
-});
+const BACKEND_BASE_URL = (process.env.BACKEND_API_URL || process.env.VITE_API_URL || process.env.API_URL || 'http://localhost:8000').replace(/\/$/, '');
 
 // Cache index.html template in production
 let cachedIndexHtml = '';
@@ -69,13 +51,8 @@ function escapeHtml(value = '') {
 
 async function getSeoByPath(pagePath, fullUrl) {
   try {
-    const { data, error } = await supabase
-      .from('domain_links')
-      .select('title, description, image_url')
-      .eq('url', fullUrl)
-      .single();
-
-    if (error || !data) {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/cms/domain-links/resolve?path=${encodeURIComponent(pagePath)}`);
+    if (!response.ok) {
       // Fallback
       return {
         title: 'CardioGuard AI - Giám sát sức khỏe tim mạch thời gian thực',
@@ -84,13 +61,23 @@ async function getSeoByPath(pagePath, fullUrl) {
       };
     }
 
+    const data = await response.json();
+    if (!data) {
+      return {
+        title: 'CardioGuard AI - Giám sát sức khỏe tim mạch thời gian thực',
+        description: 'CardioGuard AI - Hệ thống giám sát sức khỏe tim mạch thời gian thực. Theo dõi nhịp tim, SpO2, huyết áp và điện tâm đồ thông qua các cảm biến IoT đeo thông minh.',
+        image: 'https://giatky.site/images/preview.jpg'
+      };
+    }
+
     return {
-      title: data.title,
-      description: data.description,
-      image: data.image_url
+      title: data.title || 'CardioGuard AI - Giám sát sức khỏe tim mạch thời gian thực',
+      description: data.description || 'CardioGuard AI - Hệ thống giám sát sức khỏe tim mạch thời gian thực. Theo dõi nhịp tim, SpO2, huyết áp và điện tâm đồ thông qua các cảm biến IoT đeo thông minh.',
+      image: data.image_url || 'https://giatky.site/images/preview.jpg',
+      url: data.url || fullUrl
     };
   } catch (err) {
-    console.error('Supabase query failed:', err);
+    console.error('Backend resolve failed:', err);
     return {
       title: 'CardioGuard AI - Giám sát sức khỏe tim mạch thời gian thực',
       description: 'CardioGuard AI - Hệ thống giám sát sức khỏe tim mạch thời gian thực. Theo dõi nhịp tim, SpO2, huyết áp và điện tâm đồ thông qua các cảm biến IoT đeo thông minh.',
@@ -128,13 +115,14 @@ app.get('*', async (req, res) => {
     }
 
     const seo = await getSeoByPath(pagePath, fullUrl);
+    const seoUrl = seo.url || fullUrl;
 
     // Escape dynamic parameters
     const finalHtml = html
       .replaceAll('__SEO_TITLE__', escapeHtml(seo.title))
       .replaceAll('__SEO_DESCRIPTION__', escapeHtml(seo.description))
       .replaceAll('__SEO_IMAGE__', escapeHtml(seo.image))
-      .replaceAll('__SEO_URL__', escapeHtml(fullUrl));
+      .replaceAll('__SEO_URL__', escapeHtml(seoUrl));
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(finalHtml);

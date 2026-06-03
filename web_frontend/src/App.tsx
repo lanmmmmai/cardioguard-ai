@@ -343,6 +343,7 @@ const AppContent: React.FC = () => {
       case '/admin/dashboard':
         return <AdminDashboard patients={patients} alerts={alerts} doctors={doctors} />;
       case '/admin/cms':
+      case '/admin/cms/domain-links':
         return <CmsPage />;
       case '/admin/email':
         return <EmailCmsPage />;

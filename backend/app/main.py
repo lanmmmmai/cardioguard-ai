@@ -19,7 +19,7 @@ from app.api.profile_api import router as profile_router
 from app.api.email_api import cms_router as cms_email_router, router as email_router
 from app.api.chat_api import router as chat_router
 from app.services.otp_service import ensure_otp_table
-from app.services.db_optimization import ensure_email_cms_schema, ensure_performance_indexes, ensure_profile_schema, ensure_user_account_timestamps
+from app.services.db_optimization import ensure_domain_links_schema, ensure_email_cms_schema, ensure_performance_indexes, ensure_profile_schema, ensure_user_account_timestamps
 
 
 logging.basicConfig(
@@ -82,6 +82,7 @@ async def startup():
     await ensure_user_account_timestamps()
     await ensure_profile_schema()
     await ensure_email_cms_schema()
+    await ensure_domain_links_schema()
     await ensure_performance_indexes()
     logger.info("Application startup complete")
 
@@ -100,6 +101,7 @@ app.include_router(sensor_router)
 app.include_router(alert_router)
 app.include_router(crud_router)
 app.include_router(cms_router)
+app.include_router(cms_router, prefix="/api")
 app.include_router(admin_doctor_router)
 app.include_router(email_router)
 app.include_router(cms_email_router)

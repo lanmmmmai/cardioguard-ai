@@ -129,4 +129,16 @@ export const cmsApi = {
     if (!response.ok) throw new Error(await readError(response));
     return response.blob();
   },
+
+  async uploadDomainLinkImage(file: File, token: string) {
+    const body = new FormData();
+    body.append('file', file);
+    const response = await fetch(`${API_URL}/cms/domain-links/upload-image`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body,
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    return response.json();
+  },
 };

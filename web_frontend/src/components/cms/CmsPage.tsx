@@ -9,6 +9,8 @@ import { DetailModal } from './DetailModal';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CsvImportModal } from './CsvImportModal';
 import { EmailCmsPage } from './EmailCmsPage';
+import { DomainLinksCmsPage } from './DomainLinksCmsPage';
+import { useBrowserPath } from '../../hooks/useBrowserPath';
 
 const limit = 25;
 
@@ -24,6 +26,7 @@ const downloadText = (filename: string, content: string) => {
 
 export const CmsPage: React.FC = () => {
   const { accessToken, role } = useAuth();
+  const { navigate } = useBrowserPath();
   const [activeModule, setActiveModule] = useState('domain_links');
   const [rows, setRows] = useState<Array<Record<string, any>>>([]);
   const [columns, setColumns] = useState<CmsColumn[]>([]);
@@ -56,7 +59,7 @@ export const CmsPage: React.FC = () => {
   }), [offset, search, filter, sortBy, sortDir]);
 
   const fetchRows = async () => {
-    if (!accessToken || activeModule === 'email_templates') return;
+    if (!accessToken || activeModule === 'email_templates' || activeModule === 'domain_links') return;
     setLoading(true);
     setError(null);
     try {
@@ -153,7 +156,16 @@ export const CmsPage: React.FC = () => {
           {cmsModules.map((module) => {
             const Icon = module.icon;
             return (
-              <button key={module.key} type="button" className={module.key === activeModule ? 'active' : ''} onClick={() => setActiveModule(module.key)}>
+              <button
+                key={module.key}
+                type="button"
+                className={module.key === activeModule ? 'active' : ''}
+                onClick={() => {
+                  setActiveModule(module.key);
+                  if (module.key === 'domain_links') navigate('/admin/cms/domain-links', true);
+                  if (module.key === 'email_templates') navigate('/admin/email', true);
+                }}
+              >
                 <Icon size={16} /> {module.label}
               </button>
             );
@@ -161,7 +173,9 @@ export const CmsPage: React.FC = () => {
         </aside>
 
         <section className="panel cms-workspace">
-          {activeModule === 'email_templates' ? (
+          {activeModule === 'domain_links' ? (
+            <DomainLinksCmsPage />
+          ) : activeModule === 'email_templates' ? (
             <EmailCmsPage embedded={true} />
           ) : (
             <>
