@@ -328,6 +328,12 @@ const AppContent: React.FC = () => {
 
   const routeContent = useMemo(() => {
     switch (normalizedPath) {
+      case '/admin':
+        return <AdminDashboard patients={patients} alerts={alerts} doctors={doctors} />;
+      case '/doctor':
+        return <DoctorDashboard patients={patients} alerts={alerts} />;
+      case '/patient':
+        return <PatientHome latestTelemetry={latestTelemetry} alerts={alerts} isConnected={isConnected} />;
       case '/patient/complete-profile':
         return <PatientCompleteProfile />;
       case '/doctor/complete-profile':

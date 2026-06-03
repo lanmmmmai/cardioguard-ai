@@ -19,15 +19,25 @@ const INDEX_PATH_CANDIDATES = [
 
 let cachedIndexHtml = '';
 
-function readIndexHtml() {
+async function readIndexHtml(origin) {
   if (cachedIndexHtml) return cachedIndexHtml;
 
   const indexPath = INDEX_PATH_CANDIDATES.find((candidate) => fs.existsSync(candidate));
-  if (!indexPath) {
+  if (indexPath) {
+    cachedIndexHtml = fs.readFileSync(indexPath, 'utf8');
+    return cachedIndexHtml;
+  }
+
+  if (!origin) {
     throw new Error('Index HTML not found. Please build frontend first.');
   }
 
-  cachedIndexHtml = fs.readFileSync(indexPath, 'utf8');
+  const response = await fetch(new URL('/index.html', origin));
+  if (!response.ok) {
+    throw new Error(`Unable to load index HTML from ${origin}`);
+  }
+
+  cachedIndexHtml = await response.text();
   return cachedIndexHtml;
 }
 
@@ -41,7 +51,6 @@ export const handler = async (event) => {
   }
 
   try {
-    const html = readIndexHtml();
     const rawPath = event.queryStringParameters?.path || event.path || '/';
     const pagePath = normalizePagePath(rawPath);
     const fullUrl = buildPublicUrl(
@@ -52,6 +61,7 @@ export const handler = async (event) => {
       },
       pagePath
     );
+    const html = await readIndexHtml(new URL(fullUrl).origin);
     const seo = await getSeoByPath(pagePath, fullUrl);
     const finalHtml = injectSeoIntoHtml(html, seo);
 
