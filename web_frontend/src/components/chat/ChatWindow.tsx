@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Loader2, Sparkles } from 'lucide-react';
-import { API_URL } from '../../config';
+import { buildApiUrl } from '../../config';
 import { useAuth } from '../../auth/AuthContext';
 import { MessageBubble, ChatMessage } from './MessageBubble';
 
@@ -42,7 +42,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_URL}/api/chat/send`, {
+      const res = await fetch(buildApiUrl('/api/chat/send'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

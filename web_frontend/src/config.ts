@@ -47,8 +47,8 @@ const isLocalhost = typeof window !== 'undefined'
   && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const bakedApiUrl = import.meta.env.VITE_API_URL;
 const bakedWsUrl = import.meta.env.VITE_WS_URL;
-const savedApiUrl = typeof window !== 'undefined' ? window.localStorage.getItem('settings_api_url') || undefined : undefined;
-const savedWsUrl = typeof window !== 'undefined' ? window.localStorage.getItem('settings_ws_url') || undefined : undefined;
+const savedApiUrl = isLocalhost && typeof window !== 'undefined' ? window.localStorage.getItem('settings_api_url') || undefined : undefined;
+const savedWsUrl = isLocalhost && typeof window !== 'undefined' ? window.localStorage.getItem('settings_ws_url') || undefined : undefined;
 const normalizedBakedApiUrl = isUsableApiUrl(bakedApiUrl) ? bakedApiUrl : undefined;
 const normalizedBakedWsUrl = isUsableWsUrl(bakedWsUrl) ? bakedWsUrl : undefined;
 const normalizedSavedApiUrl = isUsableApiUrl(savedApiUrl) ? savedApiUrl : undefined;
@@ -77,3 +77,18 @@ export const WS_URL =
   savedDerivedWsUrl ||
   bakedDerivedWsUrl ||
   (isLocalhost ? 'ws://localhost:8000/ws/realtime' : 'wss://cardioguard-ai-a26e.onrender.com/ws/realtime');
+
+export const buildApiUrl = (path: string) => {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const base = API_URL.replace(/\/$/, '');
+
+  if (normalizedPath === '/api') {
+    return base;
+  }
+
+  if (normalizedPath.startsWith('/api/') && base.endsWith('/api')) {
+    return `${base}${normalizedPath.slice(4)}`;
+  }
+
+  return `${base}${normalizedPath}`;
+};

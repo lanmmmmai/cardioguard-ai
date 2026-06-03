@@ -109,6 +109,18 @@ app.include_router(feature_router)
 app.include_router(chat_router, prefix="/api/chat", tags=["Chatbot"])
 app.include_router(profile_router)
 
+# Compatibility aliases for deployments that proxy frontend requests through /api.
+app.include_router(auth_router, prefix="/api")
+app.include_router(user_router, prefix="/api")
+app.include_router(patient_router, prefix="/api")
+app.include_router(sensor_router, prefix="/api")
+app.include_router(alert_router, prefix="/api")
+app.include_router(crud_router, prefix="/api")
+app.include_router(admin_doctor_router, prefix="/api")
+app.include_router(email_router, prefix="/api")
+app.include_router(feature_router, prefix="/api")
+app.include_router(profile_router, prefix="/api")
+
 
 @app.get("/health", tags=["System"])
 async def health():
