@@ -69,6 +69,7 @@ const isLocalhost = typeof window !== 'undefined'
   && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const bakedApiUrl = import.meta.env.VITE_API_URL;
 const bakedWsUrl = import.meta.env.VITE_WS_URL;
+const bakedGoogleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const getResolvedApiUrl = (): string => {
   if (runtimeApiUrl && !isPlaceholderUrl(runtimeApiUrl)) return runtimeApiUrl;
   if (runtimeWsUrl && !isPlaceholderUrl(runtimeWsUrl)) {
@@ -118,6 +119,9 @@ export const API_URL = ensureEndsWithApi(getResolvedApiUrl()) as string;
 
 /** Điểm cuối WebSocket cho dữ liệu telemetry thời gian thực */
 export const WS_URL = getResolvedWsUrl() as string;
+
+/** Google OAuth client ID dùng cho Google Sign-In trên web */
+export const GOOGLE_CLIENT_ID = typeof bakedGoogleClientId === 'string' ? bakedGoogleClientId.trim() : '';
 
 export const buildApiUrl = (path: string) => {
   if (path.startsWith('http://') || path.startsWith('https://')) {

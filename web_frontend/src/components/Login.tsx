@@ -12,10 +12,12 @@
  */
 import React, { useState } from 'react';
 import { Activity, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
-import { API_URL } from '../config';
+import { API_URL, GOOGLE_CLIENT_ID } from '../config';
 import { UserRole } from '../auth/roles';
+import { GoogleLoginButton } from './GoogleLoginButton';
 import { LegalFooterLinks } from './LegalFooterLinks';
 import { readJsonResponse } from '../utils/response';
+import { exchangeGoogleIdToken } from '../lib/googleAuth';
 
 interface LoginProps {
   role: UserRole;
@@ -34,6 +36,7 @@ export const Login: React.FC<LoginProps> = ({ role, onLoginSuccess, onNavigateTo
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const showGoogleLogin = role !== 'admin' && Boolean(GOOGLE_CLIENT_ID);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +74,18 @@ export const Login: React.FC<LoginProps> = ({ role, onLoginSuccess, onNavigateTo
       onLoginSuccess(data.access_token, data.user);
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = async (idToken: string) => {
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const data = await exchangeGoogleIdToken(idToken);
+      onLoginSuccess(data.access_token, data.user);
     } finally {
       setIsLoading(false);
     }
@@ -205,6 +220,24 @@ export const Login: React.FC<LoginProps> = ({ role, onLoginSuccess, onNavigateTo
             )}
           </button>
         </form>
+
+        {showGoogleLogin && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              <span style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }} />
+              <span>Hoặc</span>
+              <span style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }} />
+            </div>
+            <GoogleLoginButton
+              clientId={GOOGLE_CLIENT_ID}
+              disabled={isLoading}
+              buttonText="signin_with"
+              caption="Đăng nhập nhanh bằng tài khoản Google"
+              successLabel="Đang xác thực với Google..."
+              onCredential={handleGoogleCredential}
+            />
+          </div>
+        )}
 
         <div className="auth-footer" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {role !== 'admin' && (

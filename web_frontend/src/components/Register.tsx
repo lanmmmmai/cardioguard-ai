@@ -7,17 +7,20 @@
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { Activity, ArrowLeft, CheckCircle2, Lock, Mail, ShieldCheck, User, Loader2, Phone, Stethoscope, Building } from 'lucide-react';
-import { API_URL } from '../config';
+import { API_URL, GOOGLE_CLIENT_ID } from '../config';
 import { isStrongPassword, getPasswordPolicyMessage } from '../utils/passwordPolicy';
 import { UserRole } from '../auth/roles';
 import { useLocale } from '../i18n/locale';
 import { readJsonResponse } from '../utils/response';
 import { LegalFooterLinks } from './LegalFooterLinks';
+import { GoogleLoginButton } from './GoogleLoginButton';
+import { exchangeGoogleIdToken, type GoogleAuthUser } from '../lib/googleAuth';
 
 interface RegisterProps {
   role: UserRole;
   onRegisterSuccess: () => void;
   onNavigateToLogin: () => void;
+  onGoogleAuthSuccess: (token: string, user: GoogleAuthUser) => void;
 }
 
 const fullNamePattern = /^[A-Za-zÀ-ỹ]+(?:[ '-][A-Za-zÀ-ỹ]+)+$/;
@@ -28,7 +31,7 @@ const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ');
  * Component Register — đăng ký hai bước với xác minh OTP qua email.
  * Quản lý trạng thái biểu mẫu và OTP riêng biệt; xử lý nhập OTP từng chữ số với tự động lấy tiêu điểm.
  */
-export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onNavigateToLogin }) => {
+export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onNavigateToLogin, onGoogleAuthSuccess }) => {
   const { locale } = useLocale();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -45,6 +48,7 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
   const [agreed, setAgreed] = useState(false);
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const timerRef = useRef<any>(null);
+  const showGoogleRegister = role === 'patient' && Boolean(GOOGLE_CLIENT_ID);
 
   useEffect(() => {
     return () => {
@@ -137,6 +141,21 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
       );
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = async (idToken: string) => {
+    setError(null);
+    setSuccess(null);
+    setIsLoading(true);
+
+    try {
+      const data = await exchangeGoogleIdToken(idToken);
+      onGoogleAuthSuccess(data.access_token, data.user);
+    } catch (err: any) {
+      setError(err?.message || 'Đăng nhập Google thất bại.');
     } finally {
       setIsLoading(false);
     }
@@ -291,6 +310,24 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
           <ShieldCheck size={18} />
           <span>Bấm Đăng Ký để nhận OTP, sau đó nhập mã trong form xác minh hiện lên.</span>
         </div>
+
+        {showGoogleRegister && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', margin: '1rem 0 1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              <span style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }} />
+              <span>Hoặc</span>
+              <span style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }} />
+            </div>
+            <GoogleLoginButton
+              clientId={GOOGLE_CLIENT_ID}
+              disabled={isLoading}
+              buttonText="signup_with"
+              caption="Đăng ký nhanh bằng tài khoản Google"
+              successLabel="Đang xác thực với Google..."
+              onCredential={handleGoogleCredential}
+            />
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="register-form">
           <div className="form-group">

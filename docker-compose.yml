@@ -33,6 +33,7 @@ services:
         VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8000/ws/realtime}
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
     image: cardioguard-ai-web:local
     depends_on:
       backend:

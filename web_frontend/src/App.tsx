@@ -535,10 +535,10 @@ const AppContent: React.FC = () => {
 
   // Xử lý các trang Register
   if (path === '/register') {
-    return <Register role="patient" onRegisterSuccess={() => navigate('/login', true)} onNavigateToLogin={() => navigate('/login')} />;
+    return <Register role="patient" onRegisterSuccess={() => navigate('/login', true)} onNavigateToLogin={() => navigate('/login')} onGoogleAuthSuccess={handleLoginSuccess} />;
   }
   if (path === '/register-doctor') {
-    return <Register role="doctor" onRegisterSuccess={() => navigate('/login-doctor', true)} onNavigateToLogin={() => navigate('/login-doctor')} />;
+    return <Register role="doctor" onRegisterSuccess={() => navigate('/login-doctor', true)} onNavigateToLogin={() => navigate('/login-doctor')} onGoogleAuthSuccess={handleLoginSuccess} />;
   }
   if (path === '/register-admin') {
     navigate('/login-admin', true);
