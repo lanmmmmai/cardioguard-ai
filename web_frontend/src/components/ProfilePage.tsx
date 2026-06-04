@@ -676,10 +676,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
                       onChange={(e) => setPatientForm(prev => ({ ...prev, blood_type: e.target.value }))}
                     >
                       <option value="">Không rõ</option>
-                      <option value="A">A</option>
-                      <option value="B">B</option>
-                      <option value="O">O</option>
-                      <option value="AB">AB</option>
                       <option value="A+">A+</option>
                       <option value="A-">A-</option>
                       <option value="B+">B+</option>

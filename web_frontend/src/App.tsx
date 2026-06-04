@@ -266,45 +266,51 @@ const AppContent: React.FC = () => {
   }, [accessToken, role, user, fetchPatients, fetchAlerts, fetchDoctors]);
 
   const handleSensorTelemetry = useCallback((data: SensorData) => {
-    setLatestTelemetry(data);
-    if (!data.is_abnormal || data.alerts.length === 0) return;
+    try {
+      if (!data || typeof data !== 'object') return;
+      setLatestTelemetry(data);
+      if (!data.is_abnormal || !Array.isArray(data.alerts) || data.alerts.length === 0) return;
 
-    const firstAlert = data.alerts[0];
-    const matchingPatient = patientsRef.current.find((patient) => patient.id === data.patient_id);
-    const patientName = matchingPatient?.full_name || 'Bệnh nhân';
+      const firstAlert = data.alerts[0];
+      if (!firstAlert) return;
+      const matchingPatient = patientsRef.current.find((patient) => patient.id === data.patient_id);
+      const patientName = matchingPatient?.full_name || 'Bệnh nhân';
 
-    const severity = firstAlert.severity || 'high';
-    const timestamp = new Date().toLocaleTimeString('vi-VN');
+      const severity = firstAlert.severity || 'high';
+      const timestamp = new Date().toLocaleTimeString('vi-VN');
 
-    setActiveBanner({
-      message: firstAlert.message,
-      patientName,
-      patientId: data.patient_id,
-      severity,
-      timestamp
-    });
+      setActiveBanner({
+        message: firstAlert.message,
+        patientName,
+        patientId: data.patient_id,
+        severity,
+        timestamp
+      });
 
-    const isPersistent = ['critical', 'high'].includes(severity.toLowerCase());
-    if (bannerTimeoutRef.current !== null) {
-      window.clearTimeout(bannerTimeoutRef.current);
+      const isPersistent = ['critical', 'high'].includes(severity.toLowerCase());
+      if (bannerTimeoutRef.current !== null) {
+        window.clearTimeout(bannerTimeoutRef.current);
+      }
+      if (!isPersistent) {
+        bannerTimeoutRef.current = window.setTimeout(() => {
+          setActiveBanner((prev) => prev && prev.patientId === data.patient_id && prev.message === firstAlert.message ? null : prev);
+        }, 7000);
+      }
+
+      setAlerts((prev) => [
+        ...data.alerts.map((alert) => ({
+          patient_id: data.patient_id,
+          full_name: patientName,
+          alert_type: alert.alert_type,
+          message: alert.message,
+          severity: alert.severity,
+          created_at: new Date().toISOString(),
+        })),
+        ...prev,
+      ]);
+    } catch (err) {
+      console.error('Lỗi khi xử lý thông tin Sensor Telemetry:', err);
     }
-    if (!isPersistent) {
-      bannerTimeoutRef.current = window.setTimeout(() => {
-        setActiveBanner((prev) => prev && prev.patientId === data.patient_id && prev.message === firstAlert.message ? null : prev);
-      }, 7000);
-    }
-
-    setAlerts((prev) => [
-      ...data.alerts.map((alert) => ({
-        patient_id: data.patient_id,
-        full_name: patientName,
-        alert_type: alert.alert_type,
-        message: alert.message,
-        severity: alert.severity,
-        created_at: new Date().toISOString(),
-      })),
-      ...prev,
-    ]);
   }, []);
 
   /**

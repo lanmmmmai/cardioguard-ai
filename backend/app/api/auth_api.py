@@ -519,6 +519,9 @@ async def register(data: RegisterRequest, request: Request):
         ip_address=request.client.host if request.client else "-"
     )
 
+    # Vô hiệu hóa OTP sau khi đăng ký thành công
+    await invalidate_otp_tokens(purpose=OTP_PURPOSE_REGISTER, email=email)
+
     return {"message": "Register successfully"}
 
 

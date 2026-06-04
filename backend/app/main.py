@@ -201,6 +201,14 @@ async def startup():
 async def shutdown():
     """Gracefully close the database connection pool during shutdown."""
     logger.info("Shutting down CardioGuard AI backend...")
+    global _mv_refresh_task
+    if _mv_refresh_task:
+        logger.info("Cancelling periodic materialized view refresh task...")
+        _mv_refresh_task.cancel()
+        try:
+            await _mv_refresh_task
+        except asyncio.CancelledError:
+            logger.info("Materialized view refresh task cancelled successfully")
     await disconnect_db()
     logger.info("Application shutdown complete")
 

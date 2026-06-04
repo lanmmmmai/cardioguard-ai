@@ -257,6 +257,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                       } else if (status == 'approved') {
                         statusColor = Colors.green;
                         statusText = 'ĐÃ DUYỆT';
+                      } else if (status == 'completed') {
+                        statusColor = Colors.teal;
+                        statusText = 'ĐÃ KHÁM';
                       } else if (status == 'cancelled') {
                         statusColor = Colors.red;
                         statusText = 'ĐÃ HỦY';

@@ -147,11 +147,15 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         _currentDiaBp = (metrics['diastolic_bp'] as num?)?.toDouble() ?? 80.0;
 
         _tickCount++;
-        _hrSpots.removeAt(0);
         _hrSpots.add(FlSpot(_tickCount.toDouble(), _currentHr));
+        if (_hrSpots.length > 30) {
+          _hrSpots.removeAt(0);
+        }
 
-        _spo2Spots.removeAt(0);
         _spo2Spots.add(FlSpot(_tickCount.toDouble(), _currentSpo2));
+        if (_spo2Spots.length > 30) {
+          _spo2Spots.removeAt(0);
+        }
       });
     }
   }

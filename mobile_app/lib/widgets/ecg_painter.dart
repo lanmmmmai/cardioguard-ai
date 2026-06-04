@@ -65,7 +65,7 @@ class EcgPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(width, y), gridPaintLarge);
     }
 
-    if (dataPoints.isEmpty) return;
+    if (dataPoints.length < 2) return;
 
     // Vẽ đường cong ECG
     final step = width / (dataPoints.length - 1);
