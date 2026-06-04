@@ -244,8 +244,8 @@ class TestCreateIotTelemetry(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_mac(self, mock_rate, mock_ip):
         mock_ip.return_value = "127.0.0.1"
         from app.api.sensor_api import create_iot_telemetry, IotTelemetryPayload
-        from app.schemas.sensor_schema import TelemetryReadings
-        readings = TelemetryReadings(heart_rate=72, spo2=98, systolic_bp=None, diastolic_bp=None, ecg_value=0.0)
+        from app.schemas.sensor_schema import IotTelemetryReadings
+        readings = IotTelemetryReadings(heart_rate=72, spo2=98, systolic_bp=None, diastolic_bp=None, ecg_value=0.0)
         data = IotTelemetryPayload(readings=readings)
         with self.assertRaises(HTTPException) as ctx:
             await create_iot_telemetry(
@@ -261,8 +261,8 @@ class TestCreateIotTelemetry(unittest.IsolatedAsyncioTestCase):
         mock_ip.return_value = "127.0.0.1"
         mock_get_device.return_value = None
         from app.api.sensor_api import create_iot_telemetry, IotTelemetryPayload
-        from app.schemas.sensor_schema import TelemetryReadings
-        readings = TelemetryReadings(heart_rate=72, spo2=98, systolic_bp=None, diastolic_bp=None, ecg_value=0.0)
+        from app.schemas.sensor_schema import IotTelemetryReadings
+        readings = IotTelemetryReadings(heart_rate=72, spo2=98, systolic_bp=None, diastolic_bp=None, ecg_value=0.0)
         data = IotTelemetryPayload(readings=readings)
         with self.assertRaises(HTTPException) as ctx:
             await create_iot_telemetry(
@@ -280,8 +280,8 @@ class TestCreateIotTelemetry(unittest.IsolatedAsyncioTestCase):
         mock_get_device.return_value = {"id": "d1", "patient_id": "p1", "status": "online"}
         mock_has_token.return_value = False
         from app.api.sensor_api import create_iot_telemetry, IotTelemetryPayload
-        from app.schemas.sensor_schema import TelemetryReadings
-        data = IotTelemetryPayload(readings=TelemetryReadings(heart_rate=72, spo2=98, systolic_bp=None, diastolic_bp=None, ecg_value=0.0))
+        from app.schemas.sensor_schema import IotTelemetryReadings
+        data = IotTelemetryPayload(readings=IotTelemetryReadings(heart_rate=72, spo2=98, systolic_bp=None, diastolic_bp=None, ecg_value=0.0))
         with self.assertRaises(HTTPException) as ctx:
             await create_iot_telemetry(
                 data, self.mock_request,
