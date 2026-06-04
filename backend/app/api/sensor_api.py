@@ -24,6 +24,7 @@ Quan hệ:
     - Bảng: sensor_data, alerts, devices
 """
 
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal
 import asyncio
@@ -292,6 +293,15 @@ def has_any_iot_token_config(device_row: dict[str, Any]) -> bool:
     return bool(settings.IOT_DEVICE_SHARED_TOKEN.strip())
 
 
+@dataclass
+class TelemetryForAI:
+    heart_rate: float
+    spo2: float
+    systolic_bp: float
+    diastolic_bp: float
+    ecg_value: float
+
+
 def detect_abnormal_iot(readings: Any) -> list[dict[str, str]]:
     """Phát hiện dấu hiệu sinh tồn bất thường từ chỉ số đo xa IoT.
 
@@ -306,17 +316,13 @@ def detect_abnormal_iot(readings: Any) -> list[dict[str, str]]:
     Returns:
         Danh sách các dict cảnh báo (mỗi cảnh báo có alert_type, message, severity).
     """
-    data = type(
-        "TelemetryForAI",
-        (),
-        {
-            "heart_rate": readings.heart_rate,
-            "spo2": readings.spo2,
-            "systolic_bp": readings.systolic_bp if readings.systolic_bp is not None else 0,
-            "diastolic_bp": readings.diastolic_bp if readings.diastolic_bp is not None else 0,
-            "ecg_value": readings.ecg_value,
-        },
-    )()
+    data = TelemetryForAI(
+        heart_rate=readings.heart_rate,
+        spo2=readings.spo2,
+        systolic_bp=readings.systolic_bp if readings.systolic_bp is not None else 0.0,
+        diastolic_bp=readings.diastolic_bp if readings.diastolic_bp is not None else 0.0,
+        ecg_value=readings.ecg_value,
+    )
     alerts = detect_abnormal(data)
     if readings.systolic_bp is None or readings.diastolic_bp is None:
         alerts = [a for a in alerts if a["alert_type"] != "HIGH_BLOOD_PRESSURE"]

@@ -16,6 +16,7 @@ QUAN HỆ:
     - Dữ liệu: từ điển trong bộ nhớ (mất khi khởi động lại máy chủ)
 """
 
+from collections import OrderedDict
 import logging
 import time
 from fastapi import HTTPException, Request
@@ -23,7 +24,23 @@ from fastapi import HTTPException, Request
 logger = logging.getLogger(__name__)
 
 # Bộ nhớ lưu trữ giới hạn tốc độ: { (ip, email, endpoint): [danh_sách_dấu_thời_gian] }
-_rate_limits = {}
+_rate_limits: "OrderedDict[tuple[str, str, str], list[float]]" = OrderedDict()
+_RATE_LIMIT_STORE_MAX_KEYS = 2048
+_RATE_LIMIT_RETENTION_SECONDS = 300
+
+
+def _prune_rate_limits(now: float) -> None:
+    """Dọn các key đã hết hạn và chặn tăng trưởng bộ nhớ vô hạn."""
+    expired_keys = [
+        key
+        for key, timestamps in list(_rate_limits.items())
+        if not [ts for ts in timestamps if now - ts < _RATE_LIMIT_RETENTION_SECONDS]
+    ]
+    for key in expired_keys:
+        _rate_limits.pop(key, None)
+
+    while len(_rate_limits) > _RATE_LIMIT_STORE_MAX_KEYS:
+        _rate_limits.popitem(last=False)
 
 def get_client_ip(request: Request) -> str:
     """Trích xuất địa chỉ IP thực của máy khách từ các header yêu cầu.
@@ -60,28 +77,14 @@ def check_rate_limit(ip: str, email: str, endpoint: str, max_requests: int = 5, 
     Ngoại lệ:
         HTTPException: 429 Too Many Requests kèm thông báo thử lại sau.
     """
-    # Inline cleanup when dict size exceeds limit to prevent memory leak
-    if len(_rate_limits) > 5000:
-        now_check = time.time()
-        to_delete = []
-        for k, ts in list(_rate_limits.items()):
-            # Keep timestamps within a safety window of 5 minutes (300s)
-            active_ts = [t for t in ts if now_check - t < 300]
-            if not active_ts:
-                to_delete.append(k)
-            else:
-                _rate_limits[k] = active_ts
-        for k in to_delete:
-            _rate_limits.pop(k, None)
-
     now = time.time()
     key = (ip, email.lower().strip(), endpoint)
-    
+
     # Lấy danh sách dấu thời gian hiện tại hoặc khởi tạo danh sách rỗng
     timestamps = _rate_limits.get(key, [])
     # Chỉ giữ lại các dấu thời gian còn trong cửa sổ
     timestamps = [t for t in timestamps if now - t < window_seconds]
-    
+
     # Nếu số lượng yêu cầu đã đạt giới hạn, ném lỗi 429
     if len(timestamps) >= max_requests:
         wait_time = int(window_seconds - (now - timestamps[0]))
@@ -90,9 +93,11 @@ def check_rate_limit(ip: str, email: str, endpoint: str, max_requests: int = 5, 
             status_code=429,
             detail=f"Quá nhiều yêu cầu gửi tới {endpoint}. Vui lòng thử lại sau {wait_time} giây."
         )
-    
+
     # Thêm dấu thời gian hiện tại vào danh sách
     timestamps.append(now)
     _rate_limits[key] = timestamps
+    _rate_limits.move_to_end(key)
+    _prune_rate_limits(now)
     logger.debug("check_rate_limit: allowed, ip=%s email=%s endpoint=%s count=%d/%d window=%ds", ip, email, endpoint, len(timestamps), max_requests, window_seconds)
 

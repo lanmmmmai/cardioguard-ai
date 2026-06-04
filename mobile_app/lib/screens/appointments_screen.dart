@@ -20,6 +20,7 @@ import '../widgets/cg_widgets.dart';
 import '../widgets/book_appointment_sheet.dart';
 import '../core/api_client.dart';
 import '../core/app_logger.dart';
+import '../config/app_config.dart';
 import '../ui/cg_tokens.dart';
 
 // Màn hình xem và quản lý lịch hẹn khám bệnh.
@@ -84,7 +85,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   Future<void> _fetchDoctorMappings() async {
     try {
       final client = ApiClient();
-      final response = await client.get('/cms/users',
+      final response = await client.get(AppConfig.cmsUsersEndpoint,
           queryParameters: {'filter': 'role:doctor', 'limit': 100});
       final List<dynamic> items = response.data['items'] ?? [];
       final docNames = <String, String>{};

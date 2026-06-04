@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { API_URL } from '../config';
 import { ShieldCheck, FileText, Search, UserCheck, UserX, AlertTriangle, Eye, X, Mail, Phone, Calendar, MapPin, Award } from 'lucide-react';
+import { SecureImage } from './SecureImage';
 
 interface DoctorData {
   id: string;
@@ -140,7 +141,7 @@ export const AdminDoctorVerification: React.FC = () => {
   const getMediaUrl = (path?: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    return `${API_URL}${path}?token=${accessToken}`;
+    return `${API_URL}${path}`;
   };
 
   const getStatusBadge = (status: string) => {
@@ -295,8 +296,9 @@ export const AdminDoctorVerification: React.FC = () => {
             {/* Doctor Info Grid */}
             <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', alignItems: 'center' }}>
               {selectedDoctor.license_certificate_url ? (
-                <img 
+                <SecureImage
                   src={getMediaUrl(selectedDoctor.license_certificate_url)} 
+                  accessToken={accessToken}
                   alt="Doctor" 
                   style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--color-border)' }} 
                 />
@@ -353,7 +355,12 @@ export const AdminDoctorVerification: React.FC = () => {
                     style={{ height: '90px', borderRadius: '8px', border: '1px solid var(--color-border)', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
                     onClick={() => setPreviewImage(getMediaUrl(selectedDoctor.license_certificate_url))}
                   >
-                    <img src={getMediaUrl(selectedDoctor.license_certificate_url)} alt="License" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <SecureImage
+                      src={getMediaUrl(selectedDoctor.license_certificate_url)}
+                      accessToken={accessToken}
+                      alt="License"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
                   </div>
                 </div>
               ) : (
@@ -371,7 +378,12 @@ export const AdminDoctorVerification: React.FC = () => {
                     style={{ height: '90px', borderRadius: '8px', border: '1px solid var(--color-border)', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
                     onClick={() => setPreviewImage(getMediaUrl(selectedDoctor.cccd_front_url))}
                   >
-                    <img src={getMediaUrl(selectedDoctor.cccd_front_url)} alt="CCCD Front" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <SecureImage
+                      src={getMediaUrl(selectedDoctor.cccd_front_url)}
+                      accessToken={accessToken}
+                      alt="CCCD Front"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
                   </div>
                 </div>
               ) : (
@@ -389,7 +401,12 @@ export const AdminDoctorVerification: React.FC = () => {
                     style={{ height: '90px', borderRadius: '8px', border: '1px solid var(--color-border)', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
                     onClick={() => setPreviewImage(getMediaUrl(selectedDoctor.cccd_back_url))}
                   >
-                    <img src={getMediaUrl(selectedDoctor.cccd_back_url)} alt="CCCD Back" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <SecureImage
+                      src={getMediaUrl(selectedDoctor.cccd_back_url)}
+                      accessToken={accessToken}
+                      alt="CCCD Back"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
                   </div>
                 </div>
               ) : (
@@ -483,8 +500,9 @@ export const AdminDoctorVerification: React.FC = () => {
           >
             <X size={32} />
           </button>
-          <img 
+          <SecureImage
             src={previewImage} 
+            accessToken={accessToken}
             alt="Preview" 
             style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px' }} 
             onClick={(e) => e.stopPropagation()}

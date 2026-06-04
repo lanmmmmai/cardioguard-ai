@@ -393,6 +393,58 @@ class ChatMessage {
       };
 }
 
+// Đại diện cho một phiên hội thoại AI đã lưu.
+class AiChatSession {
+  final String id;
+  final String title;
+  final DateTime createdAt;
+
+  AiChatSession({
+    required this.id,
+    required this.title,
+    required this.createdAt,
+  });
+
+  factory AiChatSession.fromJson(Map<String, dynamic> json) {
+    return AiChatSession(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? 'Cuộc hội thoại y tế',
+      createdAt: _parseDateTime(json['created_at']),
+    );
+  }
+}
+
+// Đại diện cho một tin nhắn AI chatbot trong một session.
+class AiChatMessage {
+  final String id;
+  final String sender;
+  final String message;
+  final DateTime createdAt;
+
+  AiChatMessage({
+    required this.id,
+    required this.sender,
+    required this.message,
+    required this.createdAt,
+  });
+
+  factory AiChatMessage.fromJson(Map<String, dynamic> json) {
+    return AiChatMessage(
+      id: json['id']?.toString() ?? '',
+      sender: json['sender']?.toString() ?? 'ai',
+      message: json['message']?.toString() ?? '',
+      createdAt: _parseDateTime(json['created_at']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'sender': sender,
+        'message': message,
+        'created_at': createdAt.toUtc().toIso8601String(),
+      };
+}
+
 // Đại diện cho một sự kiện cảnh báo sức khỏe được kích hoạt cho bệnh nhân đang theo dõi.
 class Alert {
   // Định danh duy nhất của cảnh báo.

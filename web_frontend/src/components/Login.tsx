@@ -11,7 +11,7 @@
  *   - Hằng số cấu hình API_URL
  */
 import React, { useState } from 'react';
-import { Activity, Mail, Lock, Loader2 } from 'lucide-react';
+import { Activity, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import { API_URL } from '../config';
 import { UserRole } from '../auth/roles';
 import { readJsonResponse } from '../utils/response';
@@ -32,6 +32,7 @@ export const Login: React.FC<LoginProps> = ({ role, onLoginSuccess, onNavigateTo
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,14 +158,33 @@ export const Login: React.FC<LoginProps> = ({ role, onLoginSuccess, onNavigateTo
               />
               <input
                 id="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 className="form-control"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                style={{ paddingLeft: '45px' }}
+                style={{ paddingLeft: '45px', paddingRight: '45px' }}
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '14px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: 0,
+                }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
 

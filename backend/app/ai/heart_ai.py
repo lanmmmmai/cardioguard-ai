@@ -15,6 +15,20 @@ Quan hệ:
     API cảm biến REST) trước khi lưu trữ dữ liệu hoặc phát sóng cảnh báo.
 """
 
+def _get_numeric_value(data, field_name):
+    """Trả về giá trị số của một trường cảm biến hoặc None nếu thiếu/không hợp lệ.
+
+    Args:
+        data: Đối tượng chứa dữ liệu cảm biến.
+        field_name: Tên thuộc tính cần đọc.
+
+    Returns:
+        int | float | None: Giá trị số hợp lệ hoặc None.
+    """
+    value = getattr(data, field_name, None)
+    return value if isinstance(value, (int, float)) else None
+
+
 def detect_abnormal(data):
     """So sánh các chỉ số cảm biến với ngưỡng lâm sàng và trả về các cảnh báo.
 
@@ -29,9 +43,14 @@ def detect_abnormal(data):
         (``"high"`` hoặc ``"medium"``). Rỗng khi tất cả các giá trị đều bình thường.
     """
     alerts = []
+    heart_rate = _get_numeric_value(data, "heart_rate")
+    spo2 = _get_numeric_value(data, "spo2")
+    systolic_bp = _get_numeric_value(data, "systolic_bp")
+    diastolic_bp = _get_numeric_value(data, "diastolic_bp")
+    ecg_value = _get_numeric_value(data, "ecg_value")
 
     # Ngưỡng nhịp nhanh: > 120 bpm
-    if data.heart_rate > 120:
+    if heart_rate is not None and heart_rate > 120:
         alerts.append({
             "alert_type": "HIGH_HEART_RATE",
             "message": "Nhịp tim quá cao",
@@ -39,7 +58,7 @@ def detect_abnormal(data):
         })
 
     # Ngưỡng nhịp chậm: < 50 bpm
-    if data.heart_rate < 50:
+    if heart_rate is not None and heart_rate < 50:
         alerts.append({
             "alert_type": "LOW_HEART_RATE",
             "message": "Nhịp tim quá thấp",
@@ -47,7 +66,7 @@ def detect_abnormal(data):
         })
 
     # Ngưỡng thiếu oxy máu: SpO2 < 92 %
-    if data.spo2 < 92:
+    if spo2 is not None and spo2 < 92:
         alerts.append({
             "alert_type": "LOW_SPO2",
             "message": "Nồng độ SpO2 thấp",
@@ -55,7 +74,12 @@ def detect_abnormal(data):
         })
 
     # Ngưỡng tăng huyết áp: tâm thu > 140 hoặc tâm trương > 90 mmHg
-    if data.systolic_bp > 140 or data.diastolic_bp > 90:
+    if (
+        systolic_bp is not None
+        and systolic_bp > 140
+        or diastolic_bp is not None
+        and diastolic_bp > 90
+    ):
         alerts.append({
             "alert_type": "HIGH_BLOOD_PRESSURE",
             "message": "Huyết áp cao",
@@ -63,7 +87,7 @@ def detect_abnormal(data):
         })
 
     # Ngưỡng biên độ ECG: giá trị tuyệt đối mV > 0.8
-    if data.ecg_value > 0.8 or data.ecg_value < -0.8:
+    if ecg_value is not None and (ecg_value > 0.8 or ecg_value < -0.8):
         alerts.append({
             "alert_type": "ABNORMAL_ECG",
             "message": "Tín hiệu ECG bất thường",

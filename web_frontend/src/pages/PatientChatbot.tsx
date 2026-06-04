@@ -15,6 +15,7 @@ import { Bot, HeartPulse, ShieldCheck } from 'lucide-react';
 import { ChatWindow } from '../components/chat/ChatWindow';
 import { useAuth } from '../auth/AuthContext';
 import { API_URL } from '../config';
+import { readJsonResponse } from '../utils/response';
 
 /**
  * Trang chatbot chính cho bệnh nhân. Tải dữ liệu cảm biến gần đây làm ngữ cảnh
@@ -23,21 +24,30 @@ import { API_URL } from '../config';
 export const PatientChatbot: React.FC = () => {
   const { accessToken } = useAuth();
   const [contextData, setContextData] = useState<unknown>(null);
+  const [contextError, setContextError] = useState<string | null>(null);
+  const [loadingContext, setLoadingContext] = useState(true);
 
   // Tải dữ liệu cảm biến gần đây để sử dụng làm ngữ cảnh
   useEffect(() => {
     const fetchContext = async () => {
+      setLoadingContext(true);
+      setContextError(null);
       try {
         const res = await fetch(`${API_URL}/sensors/history`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
-        const data = await res.json();
+        if (!res.ok) {
+          throw new Error('Không thể tải ngữ cảnh sức khỏe gần đây');
+        }
+        const data = await readJsonResponse<any>(res);
         // Chỉ lấy 5 bản ghi gần nhất làm ngữ cảnh
         if (data.items) {
           setContextData({ recent_sensor_data: data.items.slice(0, 5) });
         }
-      } catch (err) {
-        console.error("Không thể tải ngữ cảnh", err);
+      } catch (err: any) {
+        setContextError(err.message || 'Không thể tải ngữ cảnh sức khỏe gần đây');
+      } finally {
+        setLoadingContext(false);
       }
     };
     fetchContext();
@@ -56,6 +66,12 @@ export const PatientChatbot: React.FC = () => {
       <div className="chatbot-layout">
         <div className="chatbot-main-col">
           <div className="panel chat-panel">
+            {contextError && (
+              <div className="form-error mb-3">
+                {contextError} <button type="button" className="btn-link" onClick={() => window.location.reload()}>Thử lại</button>
+              </div>
+            )}
+            {loadingContext && <div className="text-sm text-muted mb-3">Đang đồng bộ dữ liệu sức khỏe gần đây...</div>}
             <ChatWindow 
               role="patient" 
               contextData={contextData} 

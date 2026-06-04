@@ -24,6 +24,7 @@ Quan hệ:
 """
 
 import asyncio
+from collections import OrderedDict
 import secrets
 import requests
 import logging
@@ -55,7 +56,9 @@ logger = logging.getLogger(__name__)
 VALID_ROLES = {"admin", "doctor", "patient"}
 
 _USER_CACHE_TTL = 30  # 30 seconds - short TTL for auth freshness
-_user_cache: dict[str, tuple[dict, float]] = {}
+_USER_CACHE_MAX_SIZE = 1024
+_USERS_COLUMNS_CACHE_TTL = 300
+_user_cache: "OrderedDict[str, tuple[dict, float]]" = OrderedDict()
 _user_cache_lock = asyncio.Lock()
 
 
@@ -113,8 +116,22 @@ def extract_bearer_token(authorization: Optional[str]) -> str:
     return authorization.split(" ", 1)[1].strip()
 
 
-_users_columns_cache: Optional[set[str]] = None
+_users_columns_cache: Optional[tuple[set[str], float]] = None
 _users_columns_lock = asyncio.Lock()
+
+
+def _purge_expired_user_cache(now: float) -> None:
+    """Xóa cache auth đã hết hạn và chặn tăng trưởng bộ nhớ vô hạn."""
+    expired_user_ids = [
+        user_id
+        for user_id, (_, cached_at) in list(_user_cache.items())
+        if now - cached_at >= _USER_CACHE_TTL
+    ]
+    for user_id in expired_user_ids:
+        _user_cache.pop(user_id, None)
+
+    while len(_user_cache) > _USER_CACHE_MAX_SIZE:
+        _user_cache.popitem(last=False)
 
 async def get_users_columns() -> set[str]:
     """Lấy tập hợp tên cột cho bảng users.
@@ -126,9 +143,15 @@ async def get_users_columns() -> set[str]:
         Tập hợp các chuỗi tên cột cho bảng public.users.
     """
     global _users_columns_cache
-    if _users_columns_cache is None:
+    cached = _users_columns_cache
+    if cached is not None and time.monotonic() - cached[1] < _USERS_COLUMNS_CACHE_TTL:
+        return cached[0]
+    if _users_columns_cache is None or time.monotonic() - _users_columns_cache[1] >= _USERS_COLUMNS_CACHE_TTL:
         async with _users_columns_lock:
-            if _users_columns_cache is None:
+            cached = _users_columns_cache
+            if cached is not None and time.monotonic() - cached[1] < _USERS_COLUMNS_CACHE_TTL:
+                return cached[0]
+            if _users_columns_cache is None or time.monotonic() - _users_columns_cache[1] >= _USERS_COLUMNS_CACHE_TTL:
                 columns = await database.fetch_all(
                     """
                     SELECT column_name
@@ -136,8 +159,8 @@ async def get_users_columns() -> set[str]:
                     WHERE table_schema = 'public' AND table_name = 'users'
                     """
                 )
-                _users_columns_cache = {column["column_name"] for column in columns}
-    return _users_columns_cache
+                _users_columns_cache = ({column["column_name"] for column in columns}, time.monotonic())
+    return _users_columns_cache[0]
 
 
 
@@ -185,9 +208,11 @@ async def get_user_from_token(
 
     # Check user cache first (skip revoked check for cached non-revoked users)
     async with _user_cache_lock:
-        if user_id in _user_cache:
-            cached_user, cached_at = _user_cache[user_id]
+        cache_entry = _user_cache.get(user_id)
+        if cache_entry:
+            cached_user, cached_at = cache_entry
             if time.monotonic() - cached_at < _USER_CACHE_TTL:
+                _user_cache.move_to_end(user_id)
                 result = dict(cached_user)
                 if result["must_change_password"] and not allow_must_change_password:
                     raise HTTPException(
@@ -248,7 +273,10 @@ async def get_user_from_token(
 
     # Cache user for 30s to avoid repeated DB lookups
     async with _user_cache_lock:
+        _purge_expired_user_cache(time.monotonic())
         _user_cache[user_id] = (result, time.monotonic())
+        _user_cache.move_to_end(user_id)
+        _purge_expired_user_cache(time.monotonic())
 
     if result["must_change_password"] and not allow_must_change_password:
         raise HTTPException(
@@ -837,9 +865,11 @@ async def google_login(data: GoogleLoginRequest, request: Request):
                 ip_address=ip_addr,
                 details={"method": "google"}
             )
-        except Exception as exc:
+        except HTTPException:
+            raise
+        except Exception:
             logger.exception("Google automatic registration failed unexpectedly for email=%s", email)
-            raise HTTPException(status_code=500, detail=f"Lỗi đăng ký tự động: {str(exc)}")
+            raise HTTPException(status_code=500, detail="Không thể đăng ký tự động bằng Google. Vui lòng thử lại sau.")
 
         db_role = role
 

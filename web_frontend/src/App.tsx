@@ -28,6 +28,7 @@ import { Appointments } from './components/Appointments';
 import { ApiDataPage } from './components/ApiDataPage';
 import { ProfilePage } from './components/ProfilePage';
 import { CmsPage } from './components/cms/CmsPage';
+import { logger } from './utils/logger';
 import { EmailCmsPage } from './components/cms/EmailCmsPage';
 import { PatientChatbot } from './pages/PatientChatbot';
 import { DoctorChatbot } from './pages/DoctorChatbot';
@@ -93,7 +94,6 @@ const AppContent: React.FC = () => {
     severity: string;
     timestamp: string;
   } | null>(null);
-  const [showAddPatientModal, setShowAddPatientModal] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
   const getLastLoginRoute = (): string => {
@@ -172,15 +172,15 @@ const AppContent: React.FC = () => {
           const data = await response.json();
           const items = Array.isArray(data) ? data : (data.items || []);
           setPatients(items);
-          console.info('Đã tìm nạp bệnh nhân:', items.length, 'bản ghi');
+          logger.info('Đã tìm nạp bệnh nhân:', items.length, 'bản ghi');
         } catch(e) {
-          console.error("Định dạng JSON không hợp lệ");
+          logger.error("Định dạng JSON không hợp lệ");
         }
       } else {
-        console.warn('Tìm nạp bệnh nhân thất bại:', response.status);
+        logger.warn('Tìm nạp bệnh nhân thất bại:', response.status);
       }
     } catch (err) {
-      console.error('Không thể tìm nạp bệnh nhân:', err);
+      logger.error('Không thể tìm nạp bệnh nhân:', err);
     }
   }, [accessToken, role, user, normalizedPath]);
 
@@ -199,15 +199,15 @@ const AppContent: React.FC = () => {
           const data = await response.json();
           const items = Array.isArray(data) ? data : (data.items || []);
           setAlerts(items);
-          console.info('Đã tìm nạp cảnh báo:', items.length, 'bản ghi');
+          logger.info('Đã tìm nạp cảnh báo:', items.length, 'bản ghi');
         } catch(e) {
-          console.error("Định dạng JSON không hợp lệ");
+          logger.error("Định dạng JSON không hợp lệ");
         }
       } else {
-        console.warn('Tìm nạp cảnh báo thất bại:', response.status);
+        logger.warn('Tìm nạp cảnh báo thất bại:', response.status);
       }
     } catch (err) {
-      console.error('Không thể tìm nạp cảnh báo:', err);
+      logger.error('Không thể tìm nạp cảnh báo:', err);
     }
   }, [accessToken, role, user]);
 
@@ -221,15 +221,15 @@ const AppContent: React.FC = () => {
           const data = await response.json();
           const items = Array.isArray(data) ? data : (data.items || []);
           setDoctors(items);
-          console.info('Đã tìm nạp bác sĩ:', items.length, 'bản ghi');
+          logger.info('Đã tìm nạp bác sĩ:', items.length, 'bản ghi');
         } catch(e) {
-          console.error("Định dạng JSON không hợp lệ");
+          logger.error("Định dạng JSON không hợp lệ");
         }
       } else {
-        console.warn('Tìm nạp bác sĩ thất bại:', response.status);
+        logger.warn('Tìm nạp bác sĩ thất bại:', response.status);
       }
     } catch (err) {
-      console.error('Không thể tìm nạp bác sĩ:', err);
+      logger.error('Không thể tìm nạp bác sĩ:', err);
     }
   }, [accessToken]);
 
@@ -309,9 +309,9 @@ const AppContent: React.FC = () => {
         ...prev,
       ]);
     } catch (err) {
-      console.error('Lỗi khi xử lý thông tin Sensor Telemetry:', err);
+      logger.error('Lỗi khi xử lý thông tin Sensor Telemetry:', err);
     }
-  }, []);
+  }, [patientsRef]);
 
   /**
    * Phân phối các thông báo WebSocket đến: SensorData thô, tải trọng
@@ -367,7 +367,7 @@ const AppContent: React.FC = () => {
   const { isConnected } = useWebSocket(WS_URL, accessToken ? handleRealtimeMessage : undefined, accessToken);
 
   useEffect(() => {
-    console.info('Kết nối WebSocket:', isConnected ? 'đã kết nối' : 'đã ngắt kết nối');
+    logger.info('Kết nối WebSocket:', isConnected ? 'đã kết nối' : 'đã ngắt kết nối');
   }, [isConnected]);
 
   /**
@@ -382,7 +382,7 @@ const AppContent: React.FC = () => {
     }
 
     const normalizedUser = login(token, { ...userData, role: userRole });
-    console.info('Đăng nhập thành công: vai_trò=%s tên=%s', normalizedUser.role, normalizedUser.full_name);
+    logger.info('Đăng nhập thành công: vai_trò=%s tên=%s', normalizedUser.role, normalizedUser.full_name);
     if (normalizedUser.must_change_password) {
       navigate('/change-password', true);
     } else {
@@ -408,14 +408,10 @@ const AppContent: React.FC = () => {
     return (
       <Patients
         patients={patients}
-        accessToken={accessToken}
-        onPatientAdded={fetchPatients}
-        showAddModal={showAddPatientModal}
-        setShowAddModal={setShowAddPatientModal}
         onViewPatientDetail={setSelectedPatientId}
       />
     );
-  }, [selectedPatientId, patients, latestTelemetry, alerts, accessToken, fetchPatients, showAddPatientModal]);
+  }, [selectedPatientId, patients, latestTelemetry, alerts, accessToken, fetchPatients]);
 
   const routeContent = useMemo(() => {
     switch (normalizedPath) {
@@ -511,7 +507,7 @@ const AppContent: React.FC = () => {
         return meta ? <PlaceholderPage title={meta.title} subtitle={meta.subtitle} /> : null;
       }
     }
-  }, [alerts, latestTelemetry, normalizedPath, patients, routeRole, selectedPatientId, showAddPatientModal, doctors, isConnected, navigate, renderPatientList, user, locale]);
+  }, [alerts, latestTelemetry, normalizedPath, patients, routeRole, selectedPatientId, doctors, isConnected, navigate, renderPatientList, locale]);
 
   if (loading) {
     return <div className="route-loading">Đang khôi phục phiên đăng nhập...</div>;

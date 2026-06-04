@@ -17,6 +17,7 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 import '../providers/patient_provider.dart';
 import '../providers/auth_provider.dart';
 import '../core/api_client.dart';
+import '../config/app_config.dart';
 import 'patient_detail_screen.dart';
 import '../widgets/cg_widgets.dart';
 import '../ui/cg_tokens.dart';
@@ -61,7 +62,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
   Future<void> _fetchAdminAssignments() async {
     try {
       final client = ApiClient();
-      final response = await client.get('/admin/assignments');
+      final response = await client.get(AppConfig.assignmentsEndpoint);
       if (response.statusCode == 200) {
         setState(() {
           _adminAssignments = response.data as List<dynamic>? ?? [];
@@ -84,6 +85,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
     List<dynamic> assignments = [];
     List<dynamic> doctors = [];
     bool modalLoading = true;
+    bool hasLoadedModalData = false;
     String? selectedDoctorId;
     String? selectedPatientId;
 
@@ -98,15 +100,17 @@ class _PatientsScreenState extends State<PatientsScreen> {
         return StatefulBuilder(
           builder: (context, setModalState) {
             // Trình tải ban đầu
-            if (modalLoading) {
+            if (!hasLoadedModalData) {
+              hasLoadedModalData = true;
               Future.wait([
-                client.get('/admin/assignments'),
-                client.get('/cms/users',
+                client.get(AppConfig.assignmentsEndpoint),
+                client.get(AppConfig.cmsUsersEndpoint,
                     queryParameters: {'filter': 'role:doctor', 'limit': 100})
               ]).then((responses) {
                 setModalState(() {
-                  assignments = responses[0].data;
-                  doctors = responses[1].data['items'] ?? [];
+                  assignments = responses[0].data as List<dynamic>? ?? [];
+                  final doctorsPayload = responses[1].data as Map<String, dynamic>? ?? {};
+                  doctors = doctorsPayload['items'] as List<dynamic>? ?? [];
                   modalLoading = false;
                 });
               }).catchError((e) {
@@ -154,7 +158,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                         style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFFFF3366))),
+                            color: CgColors.accent)),
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -163,7 +167,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                           child: DropdownButtonFormField<String>(
                             hint: const Text('Bác sĩ',
                                 style: TextStyle(fontSize: 12)),
-                            value: selectedDoctorId,
+                            initialValue: selectedDoctorId,
                             dropdownColor: widget.isDarkTheme
                                 ? const Color(0xFF11151D)
                                 : Colors.white,
@@ -184,7 +188,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                           child: DropdownButtonFormField<String>(
                             hint: const Text('Bệnh nhân',
                                 style: TextStyle(fontSize: 12)),
-                            value: selectedPatientId,
+                            initialValue: selectedPatientId,
                             dropdownColor: widget.isDarkTheme
                                 ? const Color(0xFF11151D)
                                 : Colors.white,
@@ -203,14 +207,14 @@ class _PatientsScreenState extends State<PatientsScreen> {
                         // Nút thêm
                         IconButton(
                           icon: const Icon(LucideIcons.plusCircle,
-                              color: Color(0xFFFF3366)),
+                              color: CgColors.accent),
                           onPressed: (selectedDoctorId == null ||
                                   selectedPatientId == null)
                               ? null
                               : () async {
                                   try {
                                     final res = await client
-                                        .post('/admin/assignments', data: {
+                                        .post(AppConfig.assignmentsEndpoint, data: {
                                       'doctor_id': selectedDoctorId,
                                       'patient_id': selectedPatientId,
                                     });
@@ -219,6 +223,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                       selectedDoctorId = null;
                                       selectedPatientId = null;
                                       modalLoading = true; // làm mới
+                                      hasLoadedModalData = false;
                                       setModalState(() {});
                                       patientProvider
                                           .fetchPatients(); // làm mới danh sách bệnh nhân chính
@@ -241,7 +246,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                         style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFFFF3366))),
+                            color: CgColors.accent)),
                     const SizedBox(height: 10),
 
                     // Danh sách phân công
@@ -297,8 +302,9 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                             onPressed: () async {
                                               try {
                                                 await client.delete(
-                                                    '/admin/assignments/${item['doctor_id']}/${item['patient_id']}');
+                                                    '${AppConfig.assignmentsEndpoint}/${item['doctor_id']}/${item['patient_id']}');
                                                 modalLoading = true; // làm mới
+                                                hasLoadedModalData = false;
                                                 setModalState(() {});
                                                 patientProvider
                                                     .fetchPatients(); // làm mới danh sách bệnh nhân chính
@@ -391,7 +397,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: Color(0xFFFF3366)),
+                      borderSide: const BorderSide(color: CgColors.accent),
                     ),
                   ),
                 ),
@@ -448,12 +454,12 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                   margin: const EdgeInsets.only(bottom: 12),
                                   decoration: BoxDecoration(
                                     color: isSelected && isTablet
-                                        ? const Color(0xFFFF3366).withValues(alpha: 0.08)
+                                        ? CgColors.accent.withValues(alpha: 0.08)
                                         : cardBg,
                                     borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
                                       color: isSelected && isTablet
-                                          ? const Color(0xFFFF3366)
+                                          ? CgColors.accent
                                           : borderColor,
                                     ),
                                   ),
@@ -528,7 +534,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                                         ],
                                       ),
                                       trailing: const Icon(LucideIcons.chevronRight,
-                                          color: Color(0xFFFF3366), size: 18),
+                                          color: CgColors.accent, size: 18),
                                       onTap: () {
                                         if (isTablet) {
                                           setState(() {

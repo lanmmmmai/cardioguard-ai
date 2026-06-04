@@ -13,14 +13,39 @@ Repository: `https://github.com/lanmmmmai/cardioguard-ai.git`
 Backend được deploy trên Render tại:
 `https://cardioguard-ai-backend.onrender.com`
 
-### 1.2 Cấu hình Render
+### 1.2 Cấu hình Render (Docker)
+
+Backend được deploy qua Docker trên Render. Cấu hình trong `render.yaml`:
+
+```yaml
+runtime: docker
+service:
+  - name: cardioguard-backend
+    type: web
+    runtime: docker
+    repo: https://github.com/lanmmmmai/cardioguard-ai
+    dockerfilePath: ./backend/Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # set manually in Render dashboard
+      - key: SECRET_KEY
+        sync: false
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 1440
+      - key: FRONTEND_ORIGINS
+        value: https://giatky.site
+      - key: EXPOSE_DEV_OTP
+        value: false
+```
 
 | Setting | Giá trị |
 |---------|---------|
-| Runtime | Python 3 |
-| Build Command | `pip install -r backend/requirements.txt` |
-| Start Command | `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
+| Runtime | Docker |
+| Dockerfile | `backend/Dockerfile` |
+| Port | `8000` |
 | Health Check Path | `/health` |
+
+> **Important:** `DATABASE_URL` và `SECRET_KEY` phải được set thủ công trong Render Dashboard (marked `sync: false`).
 
 ### 1.3 Biến môi trường Render
 
@@ -28,19 +53,21 @@ Backend được deploy trên Render tại:
 |------|---------|---------|
 | `DATABASE_URL` | ✅ | Supabase PostgreSQL (async) |
 | `SECRET_KEY` | ✅ | Tối thiểu 32 ký tự |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | ❌ | Mặc định 60 |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | ❌ | Mặc định 1440 (Render) / 60 (dev) |
+| `FRONTEND_ORIGINS` | ✅ | Domain cho CORS (VD: `https://giatky.site`) |
 | `OPENAI_API_KEY` | ❌ | Nếu cần AI chatbot |
 | `BREVO_API_KEY` | ❌ | Nếu cần email |
 | `SMTP_*` | ❌ | Fallback email |
-| `CORS_ORIGINS` | ❌ | Domain được phép CORS |
 
 ### 1.4 Deploy
 
 Render auto-deploy từ branch `main`. Để trigger deploy thủ công:
 
 1. Push code lên `main`
-2. Render tự động build và deploy
+2. Render tự động build Docker image và deploy
 3. Kiểm tra tại `https://cardioguard-ai-backend.onrender.com/health`
+
+Cấu hình deploy đầy đủ trong file [`render.yaml`](../render.yaml).
 
 ---
 
@@ -64,6 +91,8 @@ Biến môi trường Vercel:
 |------|---------|
 | `VITE_API_URL` | `https://cardioguard-ai-backend.onrender.com` |
 | `VITE_WS_URL` | `wss://cardioguard-ai-backend.onrender.com/ws/realtime` |
+| `VITE_SUPABASE_URL` | `https://your-project.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | `your-anon-key` |
 
 ### 2.2 Deploy bằng Docker (Production)
 
@@ -137,7 +166,7 @@ Backend có healthcheck:
 ```yaml
 healthcheck:
   test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-  interval: 10s
+  interval: 30s
   timeout: 5s
   retries: 5
   start_period: 10s
@@ -146,11 +175,11 @@ healthcheck:
 ### 3.3 Khởi động
 
 ```bash
-# Production mode
-docker compose -f docker-compose.prod.yml up -d
-
 # Development mode
 docker compose up --build
+
+# Production mode (with env file)
+docker compose up -d
 ```
 
 ---
@@ -237,8 +266,10 @@ SMTP_PORT=
 SMTP_USERNAME=
 SMTP_PASSWORD=
 SMTP_FROM_EMAIL=
-CORS_ORIGINS=https://giatky.site
+FRONTEND_ORIGINS=https://giatky.site
 ```
+
+> Render dùng biến `FRONTEND_ORIGINS`, không phải `CORS_ORIGINS`.
 
 ### 6.2 Lưu ý bảo mật
 

@@ -22,6 +22,9 @@ class ChatAiScreen extends StatefulWidget {
 class _ChatAiScreenState extends State<ChatAiScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  ChatProvider? _chatProvider;
+  int _lastAiMessageCount = 0;
+  String? _lastSessionId;
 
   @override
   void initState() {
@@ -29,6 +32,8 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      _chatProvider = chatProvider;
+      _chatProvider?.addListener(_handleChatProviderChange);
       final role = authProvider.currentUser?.role ?? 'patient';
       chatProvider.fetchAiSessions(role);
     });
@@ -36,9 +41,22 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
 
   @override
   void dispose() {
+    _chatProvider?.removeListener(_handleChatProviderChange);
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleChatProviderChange() {
+    final chatProvider = _chatProvider;
+    if (chatProvider == null) return;
+    final messageCount = chatProvider.aiMessages.length;
+    final sessionId = chatProvider.currentAiSessionId;
+    if (messageCount != _lastAiMessageCount || sessionId != _lastSessionId) {
+      _lastAiMessageCount = messageCount;
+      _lastSessionId = sessionId;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    }
   }
 
   void _scrollToBottom() {
@@ -99,15 +117,12 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
     final role = authProvider.currentUser?.role ?? 'patient';
 
     final textTheme = Theme.of(context).textTheme;
-    final primaryColor = Theme.of(context).primaryColor;
     final cardBg = isDark ? const Color(0xFF11151D) : Colors.white;
     final textColor = isDark ? Colors.white : Colors.black;
     final subtitleColor = isDark ? Colors.white70 : Colors.black54;
 
     if (chatProvider.currentAiSessionId != null) {
       // Chat detail view
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-
       return Scaffold(
         appBar: AppBar(
           leading: IconButton(
@@ -226,9 +241,9 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
                             }
 
                             final msg = chatProvider.aiMessages[index];
-                            final isUser = msg['sender'] == 'user';
-                            final text = msg['message'] ?? '';
-                            final time = _formatTime(msg['created_at']);
+                            final isUser = msg.sender == 'user';
+                            final text = msg.message;
+                            final time = _formatTime(msg.createdAt.toIso8601String());
 
                             return Align(
                               alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -472,9 +487,9 @@ class _ChatAiScreenState extends State<ChatAiScreen> {
                           itemCount: chatProvider.aiSessions.length,
                           itemBuilder: (context, index) {
                             final session = chatProvider.aiSessions[index];
-                            final sessionId = session['id']?.toString() ?? '';
-                            final title = session['title'] ?? 'Cuộc hội thoại y tế';
-                            final time = _formatTime(session['created_at']);
+                            final sessionId = session.id;
+                            final title = session.title;
+                            final time = _formatTime(session.createdAt.toIso8601String());
 
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 8.0),

@@ -15,6 +15,8 @@
 //   - Hiển thị currentUser, isAuthenticated, requiresPasswordChange
 //     cho lớp giao diện người dùng và cấu hình tab trong MainTabWrapper.
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:flutter/scheduler.dart';
 import '../core/app_logger.dart';
 import '../core/api_client.dart';
 import '../core/secure_storage.dart';
@@ -55,9 +57,9 @@ class AuthProvider extends ChangeNotifier {
   // Khởi tạo provider: đăng ký callback 401 unauthorized để
   // phiên được xóa im lặng khi máy chủ từ chối token.
   void init() {
-    ApiClient.onUnauthorized = () {
+    _apiClient.setOnUnauthorized(() {
       _logoutSilent();
-    };
+    });
   }
 
   // Cập nhật trạng thái tải và thông báo cho listeners.
@@ -203,7 +205,7 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     try {
       final response = await _apiClient.post(
-        '/auth/google-login',
+        AppConfig.googleLoginEndpoint,
         data: {
           'email': email,
           'full_name': fullName,
@@ -281,7 +283,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       WebSocketService.disconnect();
       try {
-        await _apiClient.post('/auth/logout');
+        await _apiClient.post(AppConfig.logoutEndpoint);
       } catch (e) {
         AppLogger.log('Đăng xuất máy chủ thất bại: $e');
       }
@@ -299,11 +301,14 @@ class AuthProvider extends ChangeNotifier {
   // Đăng xuất im lặng được kích hoạt bởi phản hồi 401 Unauthorized từ API.
   // Xóa trạng thái phiên mà không gọi điểm cuối đăng xuất máy chủ.
   void _logoutSilent() {
-    WebSocketService.disconnect();
-    _currentUser = null;
-    _isAuthenticated = false;
-    _errorMessage = 'Phiên làm việc hết hạn. Vui lòng đăng nhập lại.';
-    notifyListeners();
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      WebSocketService.disconnect();
+      unawaited(_secureStorage.clearSession());
+      _currentUser = null;
+      _isAuthenticated = false;
+      _errorMessage = 'Phiên làm việc hết hạn. Vui lòng đăng nhập lại.';
+      notifyListeners();
+    });
   }
 
   // Request Forgot Password OTP
@@ -312,7 +317,7 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     try {
       final response = await _apiClient.post(
-        '/auth/forgot-password/request-otp',
+        AppConfig.forgotPasswordRequestOtpEndpoint,
         data: {'email': email},
       );
       _setLoading(false);
@@ -334,7 +339,7 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     try {
       final response = await _apiClient.post(
-        '/auth/forgot-password/verify-otp',
+        AppConfig.forgotPasswordVerifyOtpEndpoint,
         data: {
           'email': email,
           'otp': otp,

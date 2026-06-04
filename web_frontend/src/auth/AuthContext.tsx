@@ -45,15 +45,13 @@ const storage = typeof window !== 'undefined' ? window.sessionStorage : storageM
 const TOKEN_KEY = 'access_token';
 const USER_KEY = 'user';
 
-/** Mã hóa Base64 một giá trị có thể tuần tự hóa JSON cho sessionStorage */
-const encryptData = (data: any): string => {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-};
+/** Tuần tự hóa dữ liệu người dùng tối thiểu để lưu phiên trong sessionStorage */
+const serializeStoredUser = (data: unknown): string => JSON.stringify(data);
 
-/** Giải mã chuỗi mã hóa Base64 trở về giá trị gốc */
-const decryptData = (ciphertext: string): any => {
+/** Giải tuần tự dữ liệu người dùng đã lưu từ sessionStorage */
+const deserializeStoredUser = (value: string): any => {
   try {
-    return JSON.parse(decodeURIComponent(escape(atob(ciphertext))));
+    return JSON.parse(value);
   } catch {
     return null;
   }
@@ -98,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<AuthUser | null>(() => {
     try {
       const stored = storage.getItem(USER_KEY);
-      return stored ? normalizeUser(decryptData(stored)) : null;
+      return stored ? normalizeUser(deserializeStoredUser(stored)) : null;
     } catch {
       storage.removeItem(USER_KEY);
       return null;
@@ -109,12 +107,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   /** Xóa tất cả trạng thái xác thực, thông báo cho server và chuyển hướng đến trang đăng nhập */
   const logout = () => {
-    console.info('Đăng xuất xác thực: người_dùng=%s', user?.email);
     if (accessToken) {
       fetch(`${API_URL}/auth/logout`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${accessToken}` },
-      }).catch((e) => console.error('Lỗi API đăng xuất:', e));
+      }).catch(() => undefined);
     }
     storage.removeItem(USER_KEY);
     storage.removeItem(TOKEN_KEY);
@@ -131,8 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Tài khoản chưa được phân quyền');
     }
 
-    console.info('Đăng nhập xác thực: email=%s vai_trò=%s', normalizedUser.email, normalizedUser.role);
-    storage.setItem(USER_KEY, encryptData(normalizedUser));
+    storage.setItem(USER_KEY, serializeStoredUser(normalizedUser));
     storage.setItem(TOKEN_KEY, token);
     storage.setItem('last_role', normalizedUser.role);
     setAccessToken(token);
@@ -159,7 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Tài khoản chưa được phân quyền');
     }
 
-    storage.setItem(USER_KEY, encryptData(normalizedUser));
+    storage.setItem(USER_KEY, serializeStoredUser(normalizedUser));
     storage.setItem('last_role', normalizedUser.role);
     setUser(normalizedUser);
     return normalizedUser;
@@ -176,9 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       try {
         await refreshUser();
-        console.info('Phiên đã khôi phục: người_dùng=%s vai_trò=%s', user?.email, user?.role);
       } catch (err: any) {
-        console.warn('Khôi phục phiên thất bại:', err.message);
         logout();
         setAuthError(err.message || 'Không thể khôi phục phiên đăng nhập');
       } finally {
@@ -200,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     login,
     logout,
     refreshUser,
-  }), [accessToken, user, loading, authError]);
+  }), [accessToken, user, loading, authError, refreshUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

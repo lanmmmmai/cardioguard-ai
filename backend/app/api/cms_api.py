@@ -29,6 +29,7 @@ import csv
 import io
 import logging
 import os
+import time
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
@@ -254,7 +255,8 @@ def quote_identifier(value: str) -> str:
     return f'"{value}"'
 
 
-_cms_columns_cache: dict[str, list[dict[str, Any]]] = {}
+_CMS_COLUMNS_CACHE_TTL = 300
+_cms_columns_cache: dict[str, tuple[list[dict[str, Any]], float]] = {}
 
 
 async def get_columns(table: str) -> list[dict[str, Any]]:
@@ -271,8 +273,9 @@ async def get_columns(table: str) -> list[dict[str, Any]]:
     Raises:
         HTTPException 500: Nếu không tìm thấy bảng.
     """
-    if table in _cms_columns_cache:
-        return _cms_columns_cache[table]
+    cached = _cms_columns_cache.get(table)
+    if cached and time.monotonic() - cached[1] < _CMS_COLUMNS_CACHE_TTL:
+        return cached[0]
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             text(
@@ -289,7 +292,7 @@ async def get_columns(table: str) -> list[dict[str, Any]]:
     if not rows:
         raise HTTPException(status_code=500, detail=f"Table {table} not found")
     cols = [dict(row) for row in rows]
-    _cms_columns_cache[table] = cols
+    _cms_columns_cache[table] = (cols, time.monotonic())
     return cols
 
 

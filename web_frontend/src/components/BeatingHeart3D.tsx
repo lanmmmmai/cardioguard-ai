@@ -32,6 +32,11 @@ export const BeatingHeart3D: React.FC<BeatingHeart3DProps> = ({ heartRate }) => 
   const animationFrameIdRef = useRef<number | null>(null);
   const angleRef = useRef<number>(0);
   const pointsRef = useRef<Point3D[]>([]);
+  const heartRateRef = useRef<number>(heartRate);
+
+  useEffect(() => {
+    heartRateRef.current = heartRate;
+  }, [heartRate]);
 
   useEffect(() => {
     const points: Point3D[] = [];
@@ -101,7 +106,7 @@ export const BeatingHeart3D: React.FC<BeatingHeart3DProps> = ({ heartRate }) => 
 
       ctx.clearRect(0, 0, width, height);
 
-      const cycleDuration = (60 / Math.max(heartRate, 40)) * 1000;
+      const cycleDuration = (60 / Math.max(heartRateRef.current, 40)) * 1000;
       const t = (timestamp % cycleDuration) / cycleDuration;
       let pulse = 0;
 
@@ -175,7 +180,7 @@ export const BeatingHeart3D: React.FC<BeatingHeart3DProps> = ({ heartRate }) => 
         cancelAnimationFrame(animationFrameIdRef.current);
       }
     };
-  }, [heartRate]);
+  }, []);
 
   return (
     <div className="heart-3d-container">

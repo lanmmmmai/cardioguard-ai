@@ -105,6 +105,7 @@ docker compose exec backend python -c "from app.core.database import database; i
 | 403 | Forbidden | Không đủ quyền | Kiểm tra role |
 | 422 | Validation Error | Request body sai format | Kiểm tra schema |
 | 429 | Rate Limited | Gửi quá nhiều request | Chờ 60s |
+| 404 | Not Found | API endpoint sai prefix (thiếu `/api`) | Kiểm tra URL endpoint |
 
 ### 3.2 OTP không gửi được
 
@@ -143,9 +144,24 @@ docker compose exec backend python -c "from app.core.database import database; i
 
 **Fix phổ biến:**
 - Nếu chạy backend ở local: dùng `ws://localhost:8000/ws/realtime`
-- Nếu chạy Docker: Web tự động dùng `ws://backend:8000/ws/realtime` qua nginx proxy
+- Nếu chạy Docker: Web dùng `ws://backend:8000/ws/realtime` qua Express server
 
-### 4.3 SEO injector không hoạt động
+### 4.3 Supabase client lỗi
+
+**Triệu chứng:** Console browser báo `Supabase client not initialized` hoặc auth không hoạt động
+
+**Nguyên nhân:** Thiếu `VITE_SUPABASE_URL` hoặc `VITE_SUPABASE_ANON_KEY` trong env
+
+**Fix:**
+```bash
+# Thêm vào web_frontend/.env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+> Nếu dùng Docker, thêm 2 biến này vào `docker-compose.yml` dưới `web.build.args`.
+
+### 4.4 SEO injector không hoạt động
 
 **Triệu chứng:** Social preview không hiển thị đúng
 

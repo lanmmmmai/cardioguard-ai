@@ -379,7 +379,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFFF3366), Color(0xFFE11D48)],
+                          colors: [CgColors.accent, Color(0xFFE11D48)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
@@ -438,13 +438,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color:
-                                const Color(0xFFFF3366).withValues(alpha: 0.1),
+                                CgColors.accent.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             currentUser.role.toUpperCase(),
                             style: const TextStyle(
-                              color: Color(0xFFFF3366),
+                              color: CgColors.accent,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
@@ -464,7 +464,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFFFF3366))),
+                      color: CgColors.accent)),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(16),
@@ -506,12 +506,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             : null,
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _genderController,
-                        decoration:
-                            const InputDecoration(labelText: 'Giới tính'),
+                      DropdownButtonFormField<String>(
+                        value: ['Nam', 'Nữ', 'Khác'].contains(_genderController.text) ? _genderController.text : null,
+                        decoration: const InputDecoration(labelText: 'Giới tính'),
+                        items: ['Nam', 'Nữ', 'Khác']
+                            .map((label) => DropdownMenuItem(
+                                  value: label,
+                                  child: Text(label),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            _genderController.text = value;
+                          }
+                        },
                         validator: (v) => (v == null || v.isEmpty)
-                            ? 'Vui lòng nhập giới tính'
+                            ? 'Vui lòng chọn giới tính'
                             : null,
                       ),
                       const SizedBox(height: 12),
@@ -572,7 +582,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFFF3366))),
+                    color: CgColors.accent)),
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
@@ -588,7 +598,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: const Text('Chế độ tối (Dark Mode)',
                     style: TextStyle(fontWeight: FontWeight.w600)),
                 value: widget.isDarkTheme,
-                activeThumbColor: const Color(0xFFFF3366),
+                activeThumbColor: CgColors.accent,
                 onChanged: (_) => widget.onToggleTheme(),
               ),
             ),
@@ -599,7 +609,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFFF3366))),
+                    color: CgColors.accent)),
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
@@ -625,7 +635,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFFF3366))),
+                    color: CgColors.accent)),
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
@@ -640,7 +650,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 children: [
                   ListTile(
-                    leading: const Icon(LucideIcons.shieldCheck, color: Color(0xFFFF3366), size: 20),
+                    leading: const Icon(LucideIcons.shieldCheck, color: CgColors.accent, size: 20),
                     title: const Text('Chính sách bảo mật', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                     trailing: const Icon(Icons.chevron_right, size: 20),
                     onTap: () => Navigator.pushNamed(context, '/privacy'),
@@ -650,7 +660,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: isDark ? Colors.white10 : Colors.black12,
                   ),
                   ListTile(
-                    leading: const Icon(LucideIcons.fileText, color: Color(0xFFFF3366), size: 20),
+                    leading: const Icon(LucideIcons.fileText, color: CgColors.accent, size: 20),
                     title: const Text('Điều khoản dịch vụ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                     trailing: const Icon(Icons.chevron_right, size: 20),
                     onTap: () => Navigator.pushNamed(context, '/terms'),
@@ -660,7 +670,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     color: isDark ? Colors.white10 : Colors.black12,
                   ),
                   ListTile(
-                    leading: const Icon(LucideIcons.trash2, color: Color(0xFFFF3366), size: 20),
+                    leading: const Icon(LucideIcons.trash2, color: CgColors.accent, size: 20),
                     title: const Text('Yêu cầu xóa dữ liệu', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                     trailing: const Icon(Icons.chevron_right, size: 20),
                     onTap: () => Navigator.pushNamed(context, '/data-deletion'),
@@ -682,12 +692,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         context, '/login', (route) => false);
                   }
                 },
-                icon: const Icon(LucideIcons.logOut, color: Color(0xFFFF3366)),
+                icon: const Icon(LucideIcons.logOut, color: CgColors.accent),
                 label: const Text('Đăng xuất tài khoản',
                     style: TextStyle(
-                        color: Color(0xFFFF3366), fontWeight: FontWeight.bold)),
+                        color: CgColors.accent, fontWeight: FontWeight.bold)),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFFF3366)),
+                  side: const BorderSide(color: CgColors.accent),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),

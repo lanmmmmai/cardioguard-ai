@@ -9,15 +9,16 @@
 // Mối quan hệ:
 // - Sử dụng: ApiClient, AppConfig, CgScreenScaffold, CgInlineState.
 // - Biểu đồ: fl_chart (PieChart, LineChart).
-// - Không có providers — tìm nạp dữ liệu API thô trực tiếp.
+// - Sử dụng các Providers để quản lý trạng thái dữ liệu.
 import 'package:flutter/material.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../core/api_client.dart';
+import 'package:provider/provider.dart';
 import '../core/app_logger.dart';
-import '../config/app_config.dart';
 import '../widgets/cg_widgets.dart';
 import '../ui/cg_tokens.dart';
+import '../providers/patient_provider.dart';
+import '../providers/alert_provider.dart';
 
 // Màn hình thống kê hệ thống với thẻ KPI, donut mức độ nghiêm trọng và xu hướng đường hàng tuần.
 class StatsScreen extends StatefulWidget {
@@ -60,35 +61,33 @@ class _StatsScreenState extends State<StatsScreen> {
     _loadStatsData();
   }
 
-  // Tìm nạp số lượng bệnh nhân, danh sách cảnh báo và thống kê hàng tuần song song từ API.
+  // Tìm nạp số lượng bệnh nhân, danh sách cảnh báo và thống kê hàng tuần song song từ API thông qua providers.
   void _loadStatsData() async {
     setState(() {
       _isLoading = true;
     });
     try {
-      final client = ApiClient();
-      final responses = await Future.wait([
-        client.get('/patients'),
-        client.get('/alerts'),
-        client.get(AppConfig.alertsWeeklyStatsEndpoint),
+      final patientProvider = Provider.of<PatientProvider>(context, listen: false);
+      final alertProvider = Provider.of<AlertProvider>(context, listen: false);
+
+      await Future.wait([
+        patientProvider.fetchPatients(),
+        alertProvider.fetchAlerts(),
+        alertProvider.fetchWeeklyStats(),
       ]);
-      final patients = (responses[0].data as List<dynamic>? ?? const []);
-      final alerts = (responses[1].data as List<dynamic>? ?? const []);
-      final weeklyStats = (responses[2].data as List<dynamic>? ?? const []);
 
       if (!mounted) return;
       setState(() {
-        _totalPatients = patients.length;
-        _totalAlerts = alerts.length;
+        _totalPatients = patientProvider.patients.length;
+        _totalAlerts = alertProvider.alerts.length;
 
         // Nhóm cảnh báo theo mức độ nghiêm trọng
         int high = 0;
         int med = 0;
         int low = 0;
 
-        for (final a in alerts) {
-          final row = a as Map<String, dynamic>? ?? const {};
-          final severity = (row['severity'] as String? ?? '').toLowerCase();
+        for (final a in alertProvider.alerts) {
+          final severity = a.severity.toLowerCase();
           if (severity == 'high' || severity == 'critical') {
             high++;
           } else if (severity == 'medium' || severity == 'warning') {
@@ -101,6 +100,8 @@ class _StatsScreenState extends State<StatsScreen> {
         _highAlertsVal = high.toDouble();
         _medAlertsVal = med.toDouble();
         _lowAlertsVal = low.toDouble();
+        
+        final weeklyStats = alertProvider.weeklyStats;
         if (weeklyStats.isNotEmpty) {
           _weeklyLabels = weeklyStats
               .map((e) =>
@@ -237,7 +238,7 @@ class _StatsScreenState extends State<StatsScreen> {
                               centerSpaceRadius: 40,
                               sections: [
                                 PieChartSectionData(
-                                  color: const Color(0xFFFF3366),
+                                  color: CgColors.accent,
                                   value: _highAlertsVal,
                                   title: 'Nguy kịch',
                                   radius: 30,
@@ -248,7 +249,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                   ),
                                 ),
                                 PieChartSectionData(
-                                  color: const Color(0xFFFFB606),
+                                  color: CgColors.warning,
                                   value: _medAlertsVal,
                                   title: 'Cảnh báo',
                                   radius: 30,
@@ -259,7 +260,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                   ),
                                 ),
                                 PieChartSectionData(
-                                  color: const Color(0xFF39FF14),
+                                  color: CgColors.normal,
                                   value: _lowAlertsVal,
                                   title: 'Ổn định',
                                   radius: 30,
@@ -279,11 +280,11 @@ class _StatsScreenState extends State<StatsScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
                             _buildLegendItem(
-                                'Cao', const Color(0xFFFF3366), textMuted),
+                                'Cao', CgColors.accent, textMuted),
                             _buildLegendItem('Trung bình',
-                                const Color(0xFFFFB606), textMuted),
+                                CgColors.warning, textMuted),
                             _buildLegendItem(
-                                'Thấp', const Color(0xFF39FF14), textMuted),
+                                'Thấp', CgColors.normal, textMuted),
                           ],
                         ),
                       ],
@@ -365,12 +366,12 @@ class _StatsScreenState extends State<StatsScreen> {
                                 LineChartBarData(
                                   spots: _weeklyAlertSpots,
                                   isCurved: true,
-                                  color: const Color(0xFFFF3366),
+                                  color: CgColors.accent,
                                   barWidth: 3,
                                   dotData: const FlDotData(show: true),
                                   belowBarData: BarAreaData(
                                     show: true,
-                                    color: const Color(0xFFFF3366)
+                                    color: CgColors.accent
                                         .withValues(alpha: 0.1),
                                   ),
                                 ),

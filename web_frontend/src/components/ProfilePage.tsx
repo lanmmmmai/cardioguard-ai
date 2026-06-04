@@ -28,7 +28,8 @@ import { API_URL } from '../config';
 import { useAuth } from '../auth/AuthContext';
 import { roleLabel, type UserRole } from '../auth/roles';
 import { getRequestErrorMessage } from '../utils/apiErrors';
-import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
+import { isStrongPassword, getPasswordPolicyMessage } from '../utils/passwordPolicy';
+import { useLocale } from '../i18n/locale';
 
 interface ProfilePageProps {
   role: UserRole;
@@ -69,6 +70,7 @@ const getErrorMessage = async (response: Response, fallback: string) => {
  */
 export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
   const { accessToken, user, refreshUser } = useAuth();
+  const { locale } = useLocale();
   const [activeTab, setActiveTab] = useState<'account' | 'profile' | 'password'>('account');
   
   // Loading states
@@ -206,7 +208,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
         }
       }
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Lỗi kết nối khi tải hồ sơ'));
+      setError(getRequestErrorMessage(err, 'Lỗi kết nối khi tải hồ sơ', locale));
     } finally {
       setLoading(false);
     }
@@ -274,7 +276,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       }
       setTimeout(() => setSuccess(null), 4000);
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Lỗi tải tài liệu lên.'));
+      setError(getRequestErrorMessage(err, 'Lỗi tải tài liệu lên.', locale));
     } finally {
       setUploading(false);
     }
@@ -312,7 +314,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       setSuccess('Cập nhật thông tin tài khoản thành công.');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Không cập nhật được tài khoản'));
+      setError(getRequestErrorMessage(err, 'Không cập nhật được tài khoản', locale));
     } finally {
       setSaving(false);
     }
@@ -344,7 +346,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       setSuccess('Cập nhật hồ sơ bệnh nhân thành công.');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Lỗi cập nhật hồ sơ bệnh nhân'));
+      setError(getRequestErrorMessage(err, 'Lỗi cập nhật hồ sơ bệnh nhân', locale));
     } finally {
       setSaving(false);
     }
@@ -384,7 +386,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       setSuccess('Gửi hồ sơ cập nhật thành công! Trạng thái tài khoản đổi về Chờ duyệt.');
       setTimeout(() => setSuccess(null), 4000);
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Lỗi cập nhật hồ sơ bác sĩ'));
+      setError(getRequestErrorMessage(err, 'Lỗi cập nhật hồ sơ bác sĩ', locale));
     } finally {
       setSaving(false);
     }
@@ -394,7 +396,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passwordForm.current_password) return setError('Vui lòng nhập mật khẩu hiện tại.');
-    if (!isStrongPassword(passwordForm.new_password)) return setError(passwordPolicyMessage);
+    if (!isStrongPassword(passwordForm.new_password)) return setError(getPasswordPolicyMessage(locale));
     if (passwordForm.new_password !== passwordForm.confirm_password) return setError('Xác nhận mật khẩu không khớp.');
 
     setSaving(true);
@@ -414,7 +416,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       setSuccess('Đổi mật khẩu đăng nhập thành công.');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Lỗi đổi mật khẩu'));
+      setError(getRequestErrorMessage(err, 'Lỗi đổi mật khẩu', locale));
     } finally {
       setSaving(false);
     }

@@ -8,8 +8,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Activity, ArrowLeft, CheckCircle2, Lock, Mail, ShieldCheck, User, Loader2, Phone, Stethoscope, Building } from 'lucide-react';
 import { API_URL } from '../config';
-import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
+import { isStrongPassword, getPasswordPolicyMessage } from '../utils/passwordPolicy';
 import { UserRole } from '../auth/roles';
+import { useLocale } from '../i18n/locale';
 import { readJsonResponse } from '../utils/response';
 
 interface RegisterProps {
@@ -27,6 +28,7 @@ const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ');
  * Quản lý trạng thái biểu mẫu và OTP riêng biệt; xử lý nhập OTP từng chữ số với tự động lấy tiêu điểm.
  */
 export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onNavigateToLogin }) => {
+  const { locale } = useLocale();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -79,7 +81,7 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
     }
 
     if (!isStrongPassword(password)) {
-      return passwordPolicyMessage;
+      return getPasswordPolicyMessage(locale);
     }
 
     if (password !== confirmPassword) {

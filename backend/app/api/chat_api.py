@@ -36,6 +36,20 @@ VALID_CHAT_ROLES = {"patient", "doctor"}
 CHAT_SESSIONS_TABLE = "chat_sessions"
 CHAT_MESSAGES_TABLE = "chatbot_messages"
 
+
+def chat_table_name(table: str) -> str:
+    """Xác thực tên bảng trò chuyện nội bộ trước khi nội suy vào SQL."""
+    if table not in {CHAT_SESSIONS_TABLE, CHAT_MESSAGES_TABLE}:
+        raise RuntimeError(f"Unexpected chat table: {table}")
+    return table
+
+
+def to_utc_isoformat(value: datetime) -> str:
+    """Chuẩn hóa datetime DB sang ISO UTC an toàn."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc).isoformat()
+    return value.astimezone(timezone.utc).isoformat()
+
 class ChatMessageRequest(BaseModel):
     message: str = Field(..., max_length=4000)
     session_id: Optional[str] = None
@@ -104,7 +118,7 @@ async def ensure_session_owner(session_id: str, user_id: str, role: Optional[str
     """
     query = f"""
     SELECT 1
-    FROM {CHAT_SESSIONS_TABLE}
+    FROM {chat_table_name(CHAT_SESSIONS_TABLE)}
     WHERE id = CAST(:session_id AS uuid) AND user_id = CAST(:user_id AS uuid)
     """
     values = {"session_id": session_id, "user_id": user_id}
@@ -168,27 +182,31 @@ async def send_chat_message(
     # Bước 1: Tạo hoặc lấy phiên
     if not session_id:
         title = request.message[:30] + "..." if len(request.message) > 30 else request.message
-        query = f"INSERT INTO {CHAT_SESSIONS_TABLE} (user_id, role, title) VALUES (:user_id, :role, :title) RETURNING id"
-        session_id = await database.execute(query=query, values={"user_id": user_id, "role": chat_role, "title": title})
-        session_id = str(session_id)
+        row = await database.fetch_one(
+            query=f"INSERT INTO {chat_table_name(CHAT_SESSIONS_TABLE)} (user_id, role, title) VALUES (:user_id, :role, :title) RETURNING id",
+            values={"user_id": user_id, "role": chat_role, "title": title},
+        )
+        if not row:
+            raise HTTPException(status_code=500, detail="Unable to create chat session")
+        session_id = str(row["id"])
     else:
         await ensure_session_owner(session_id, user_id, chat_role)
 
     # Bước 2: Lưu tin nhắn người dùng + update session timestamp (batch)
     async with database.transaction():
-        query_msg = f"INSERT INTO {CHAT_MESSAGES_TABLE} (session_id, sender, message, context) VALUES (:session_id, 'user', :message, :context)"
+        query_msg = f"INSERT INTO {chat_table_name(CHAT_MESSAGES_TABLE)} (session_id, sender, message, context) VALUES (:session_id, 'user', :message, :context)"
         await database.execute(query=query_msg, values={
             "session_id": session_id,
             "message": request.message,
             "context": json.dumps(request.context_data) if request.context_data else None
         })
         await database.execute(
-            f"UPDATE {CHAT_SESSIONS_TABLE} SET updated_at = NOW() WHERE id = CAST(:session_id AS uuid)",
+            f"UPDATE {chat_table_name(CHAT_SESSIONS_TABLE)} SET updated_at = NOW() WHERE id = CAST(:session_id AS uuid)",
             {"session_id": session_id},
         )
     
     # Bước 3: Lấy lịch sử để làm ngữ cảnh (lấy 10 tin nhắn mới nhất và đảo ngược về thứ tự ASC)
-    query_history = f"SELECT sender, message FROM {CHAT_MESSAGES_TABLE} WHERE session_id = CAST(:session_id AS uuid) ORDER BY created_at DESC LIMIT 10"
+    query_history = f"SELECT sender, message FROM {chat_table_name(CHAT_MESSAGES_TABLE)} WHERE session_id = CAST(:session_id AS uuid) ORDER BY created_at DESC LIMIT 10"
     history_res = await database.fetch_all(query=query_history, values={"session_id": session_id})
     history = [{"sender": row["sender"], "message": row["message"]} for row in reversed(history_res)]
 
@@ -202,20 +220,22 @@ async def send_chat_message(
 
     # Bước 5: Lưu phản hồi AI + update session timestamp (batch)
     async with database.transaction():
-        query_ai_msg = f"INSERT INTO {CHAT_MESSAGES_TABLE} (session_id, sender, message) VALUES (:session_id, 'ai', :message) RETURNING id, created_at"
-        ai_msg_id = await database.execute(query=query_ai_msg, values={"session_id": session_id, "message": ai_response_text})
+        query_ai_msg = f"INSERT INTO {chat_table_name(CHAT_MESSAGES_TABLE)} (session_id, sender, message) VALUES (:session_id, 'ai', :message) RETURNING id, created_at"
+        ai_message_row = await database.fetch_one(query=query_ai_msg, values={"session_id": session_id, "message": ai_response_text})
         await database.execute(
-            f"UPDATE {CHAT_SESSIONS_TABLE} SET updated_at = NOW() WHERE id = CAST(:session_id AS uuid)",
+            f"UPDATE {chat_table_name(CHAT_SESSIONS_TABLE)} SET updated_at = NOW() WHERE id = CAST(:session_id AS uuid)",
             {"session_id": session_id},
         )
+    if not ai_message_row:
+        raise HTTPException(status_code=500, detail="Unable to persist AI response")
     
     return {
         "session_id": session_id,
         "ai_message": {
-            "id": str(ai_msg_id),
+            "id": str(ai_message_row["id"]),
             "sender": "ai",
             "message": ai_response_text,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "created_at": to_utc_isoformat(ai_message_row["created_at"]),
         }
     }
 
@@ -236,7 +256,7 @@ async def get_chat_sessions(
     current_user = await get_user_from_token(authorization)
     role = normalize_chat_role(role)
     enforce_chat_role(current_user, role)
-    query = f"SELECT id, title, created_at FROM {CHAT_SESSIONS_TABLE} WHERE user_id = :user_id AND role = :role ORDER BY updated_at DESC LIMIT 20"
+    query = f"SELECT id, title, created_at FROM {chat_table_name(CHAT_SESSIONS_TABLE)} WHERE user_id = :user_id AND role = :role ORDER BY updated_at DESC LIMIT 20"
     res = await database.fetch_all(query=query, values={"user_id": current_user["id"], "role": role})
     return [ChatSessionResponse(id=str(row["id"]), title=row["title"], created_at=row["created_at"]) for row in res]
 
@@ -260,7 +280,7 @@ async def get_chat_history(
     await ensure_session_owner(session_id, current_user["id"])
     query = f"""
     SELECT id, sender, message, created_at
-    FROM {CHAT_MESSAGES_TABLE}
+    FROM {chat_table_name(CHAT_MESSAGES_TABLE)}
     WHERE session_id = CAST(:session_id AS uuid)
     ORDER BY created_at ASC
     """

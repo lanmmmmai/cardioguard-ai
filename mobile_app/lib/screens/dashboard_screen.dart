@@ -28,6 +28,7 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 import '../providers/auth_provider.dart';
 import '../providers/patient_provider.dart';
 import '../providers/alert_provider.dart';
+import 'stats_screen.dart';
 import '../services/websocket_service.dart';
 import '../widgets/ecg_painter.dart';
 import '../widgets/heart_3d_painter.dart';
@@ -91,6 +92,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void initState() {
     super.initState();
+    _cachedPatientProvider = Provider.of<PatientProvider>(context, listen: false);
     _heartPoints = Heart3dPainter.generateHeartPoints();
 
     // 60FPS animation ticker for heart rotation and beat pulse
@@ -421,7 +423,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 value: _selectedPatientId,
                                 dropdownColor: cardBg,
                                 style: const TextStyle(
-                                    color: Color(0xFFFF3366),
+                                    color: CgColors.accent,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14),
                                 underline: const SizedBox(),
@@ -450,6 +452,26 @@ class _DashboardScreenState extends State<DashboardScreen>
                             maxLines: 1,
                           ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => StatsScreen(isDarkTheme: widget.isDarkTheme),
+                        ),
+                      );
+                    },
+                    icon: const Icon(
+                      LucideIcons.barChart2,
+                      color: Color(0xFF00F2FE),
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: cardBg,
+                      shape: const CircleBorder(),
+                      side: BorderSide(color: borderColor),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -685,7 +707,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       patientProvider.triggerSimulation(
                                           _selectedPatientId!, true),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFF3366),
+                                backgroundColor: CgColors.accent,
                                 shape: RoundedRectangleBorder(
                                     borderRadius:
                                         BorderRadius.circular(12)),
@@ -803,7 +825,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       child: Text(
                         'TRỰC QUAN TIM PHỔI (${hrVal.toInt()} BPM)',
                         style: const TextStyle(
-                            color: Color(0xFFFF3366),
+                            color: CgColors.accent,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 1),

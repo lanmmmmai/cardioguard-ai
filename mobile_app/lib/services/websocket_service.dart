@@ -10,6 +10,7 @@
 //     lịch hẹn và cập nhật trò chuyện.
 //   - Phụ thuộc vào: SecureStorage, AppConfig, AppLogger.
 import 'dart:convert';
+import 'dart:async';
 import '../core/app_logger.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
@@ -17,67 +18,66 @@ import '../core/secure_storage.dart';
 import '../config/app_config.dart';
 
 class WebSocketService {
-  // URL máy chủ WebSocket (dẫn xuất từ AppConfig.wsUrl hoặc được ghi đè).
-  static String wsUrl = AppConfig.wsUrl;
+  static final WebSocketService _instance = WebSocketService._internal();
 
-  // Phiên bản WebSocketChannel đang hoạt động, hoặc null nếu chưa kết nối.
-  static WebSocketChannel? _channel;
+  factory WebSocketService() => _instance;
 
-  // Liệu socket có đang kết nối hay không.
-  static bool _isConnected = false;
+  WebSocketService._internal();
 
-  // Cờ được đặt thành true khi disconnect được gọi chủ ý để bỏ qua
-  // tự động kết nối lại.
-  static bool _isIntentionalDisconnect = false;
+  String _wsUrl = AppConfig.wsUrl;
+  WebSocketChannel? _channel;
+  bool _isConnected = false;
+  bool _isConnecting = false;
+  bool _isIntentionalDisconnect = false;
+  bool _reconnectScheduled = false;
+  final List<Function(Map<String, dynamic>)> _listeners = [];
+  int _reconnectAttempts = 0;
 
-  // Các callback listener đã đăng ký nhận các thông điệp JSON đã phân tích.
-  static final List<Function(Map<String, dynamic>)> _listeners = [];
+  static Future<void> connect() => _instance._connect();
+  static void disconnect() => _instance._disconnect();
+  static void addListener(Function(Map<String, dynamic>) callback) =>
+      _instance._addListener(callback);
+  static void removeListener(Function(Map<String, dynamic>) callback) =>
+      _instance._removeListener(callback);
+  static void setWsUrl(String url) => _instance._wsUrl = url;
 
-  // Số lần thử kết nối lại kể từ lần kết nối thành công cuối cùng.
-  static int _reconnectAttempts = 0;
-
-  // Ghi đè URL WebSocket mặc định tại thời gian chạy (ví dụ cho thử nghiệm).
-  static void setWsUrl(String url) {
-    wsUrl = url;
-  }
-
-  // Đăng ký một callback để nhận tất cả các thông điệp WebSocket đến.
-  static void addListener(Function(Map<String, dynamic>) callback) {
+  void _addListener(Function(Map<String, dynamic>) callback) {
     if (!_listeners.contains(callback)) {
       _listeners.add(callback);
     }
   }
 
-  // Hủy đăng ký một callback đã được thêm trước đó.
-  static void removeListener(Function(Map<String, dynamic>) callback) {
+  void _removeListener(Function(Map<String, dynamic>) callback) {
     _listeners.remove(callback);
   }
 
-  // Mở một kết nối WebSocket đến máy chủ và xác thực với JWT.
-  // Nếu đã kết nối, đây là một no-op. Khi mất kết nối hoặc lỗi,
-  // _handleDisconnect được gọi để lên lịch thử lại.
-  static Future<void> connect() async {
-    if (_isConnected) return;
+  Future<void> _connect() async {
+    if (_isConnected || _isConnecting) return;
+    _isConnecting = true;
     _isIntentionalDisconnect = false;
+    _reconnectScheduled = false;
 
     try {
       final token = await SecureStorage().getToken();
       if (token == null || token.isEmpty) {
         AppLogger.log('Bỏ qua kết nối WebSocket: thiếu token xác thực');
+        _isConnecting = false;
         return;
       }
-      final uri = Uri.parse(wsUrl);
+      final uri = Uri.parse(_wsUrl);
 
       _channel = IOWebSocketChannel.connect(uri);
       _isConnected = true;
+      _isConnecting = false;
       _reconnectAttempts = 0;
-      AppLogger.log('Kết nối WebSocket đến $wsUrl');
+      AppLogger.log('Kết nối WebSocket đến $_wsUrl');
       _channel!.sink.add(json.encode({"type": "auth", "token": token}));
 
       _channel!.stream.listen(
         (message) {
           try {
-            final Map<String, dynamic> data = json.decode(message);
+            final Map<String, dynamic> data = json.decode(message as String) as Map<String, dynamic>;
+            _reconnectScheduled = false;
             for (var listener in List.from(_listeners)) {
               listener(data);
             }
@@ -100,6 +100,7 @@ class WebSocketService {
         },
       );
     } catch (e) {
+      _isConnecting = false;
       AppLogger.log('Kết nối WebSocket thất bại: $e');
       _handleDisconnect();
     }
@@ -107,14 +108,19 @@ class WebSocketService {
 
   // Xử lý mất kết nối bằng cách xóa trạng thái và lên lịch kết nối lại
   // với back-off theo cấp số nhân trừ khi ngắt kết nối là chủ ý.
-  static void _handleDisconnect() {
+  void _handleDisconnect() {
     _isConnected = false;
+    _isConnecting = false;
     _channel = null;
     
     if (_isIntentionalDisconnect) {
       AppLogger.log('WebSocket ngắt kết nối chủ ý, bỏ qua tự động kết nối lại.');
       return;
     }
+    if (_reconnectScheduled) {
+      return;
+    }
+    _reconnectScheduled = true;
     
     // Back-off theo cấp số nhân: 3, 6, 12, 24, 48, 60 (tối đa) giây
     int delaySeconds = 3 * (1 << _reconnectAttempts);
@@ -122,16 +128,19 @@ class WebSocketService {
     _reconnectAttempts++;
     
     Future.delayed(Duration(seconds: delaySeconds), () async {
+      _reconnectScheduled = false;
       if (!_isConnected && !_isIntentionalDisconnect) {
         AppLogger.log('Đang thử kết nối lại WebSocket (Lần thử $_reconnectAttempts)...');
-        await connect();
+        await _connect();
       }
     });
   }
 
   // Đóng WebSocket chủ ý và ngăn tự động kết nối lại.
-  static void disconnect() {
+  void _disconnect() {
     _isIntentionalDisconnect = true;
+    _reconnectScheduled = false;
+    _isConnecting = false;
     _channel?.sink.close();
     _isConnected = false;
     _channel = null;

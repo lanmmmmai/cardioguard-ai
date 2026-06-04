@@ -14,38 +14,8 @@ import React, { useState, useEffect } from 'react';
 import { Activity, AlertTriangle, BarChart3, CalendarDays, Cpu, HeartPulse, MessageCircle, Pill, ShieldAlert, Stethoscope, Users, Radio, WifiOff } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { API_URL } from '../config';
-
-interface Patient {
-  id: string;
-  full_name: string;
-  age: number;
-  gender: string;
-  phone: string;
-  address: string;
-  medical_history: string;
-}
-
-interface Alert {
-  id?: string;
-  patient_id: string;
-  full_name?: string;
-  alert_type: string;
-  message: string;
-  severity: string;
-  is_resolved?: boolean;
-  created_at?: string;
-}
-
-interface SensorData {
-  patient_id: string;
-  heart_rate: number;
-  spo2: number;
-  systolic_bp: number;
-  diastolic_bp: number;
-  ecg_value: number;
-  is_abnormal: boolean;
-  alerts: Array<{ alert_type: string; message: string; severity: string }>;
-}
+import { Alert, Patient, SensorData } from '../types';
+import { readJsonResponse } from '../utils/response';
 
 /**
  * Thẻ thống kê tái sử dụng hiển thị biểu tượng, nhãn/giá trị chỉ số và gợi ý.
@@ -162,6 +132,7 @@ export const PatientHome: React.FC<{
   isConnected?: boolean;
 }> = ({ latestTelemetry, alerts, isConnected = false }) => {
   const { accessToken, user } = useAuth();
+  const accessTokenRef = React.useRef(accessToken);
   const [lastTelemetryTime, setLastTelemetryTime] = useState<Date | null>(null);
   const [isStale, setIsStale] = useState(true);
   const [isSendingSos, setIsSendingSos] = useState(false);
@@ -170,6 +141,10 @@ export const PatientHome: React.FC<{
   // Trạng thái nhấn giữ SOS
   const [countdown, setCountdown] = useState(3);
   const [isHolding, setIsHolding] = useState(false);
+
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
 
   useEffect(() => {
     let interval: any = null;
@@ -214,14 +189,15 @@ export const PatientHome: React.FC<{
    * đếm ngược nhấn giữ xác nhận kết thúc hoặc qua hộp thoại xác nhận.
    */
   const handleTriggerSos = async () => {
-    if (!accessToken) return;
+    const token = accessTokenRef.current;
+    if (!token) return;
     setIsSendingSos(true);
     try {
       const response = await fetch(`${API_URL}/alerts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ message: 'Bệnh nhân yêu cầu hỗ trợ khẩn cấp (SOS)' })
       });
@@ -229,17 +205,7 @@ export const PatientHome: React.FC<{
         alert('Cảnh báo SOS khẩn cấp đã được phát đi thành công tới hệ thống và các bác sĩ phụ trách!');
         setShowSosConfirm(false);
       } else {
-        let data;
-
-        try {
-
-          data = await response.json();
-
-        } catch (e) {
-
-          throw new Error("Lỗi định dạng phản hồi từ server");
-
-        }
+        const data = await readJsonResponse<{ detail?: string }>(response);
         alert(data.detail || 'Lỗi gửi yêu cầu SOS khẩn cấp');
       }
     } catch (err) {

@@ -11,6 +11,7 @@
 // - Vẽ lại: được kiểm soát bởi shouldRepaint qua so sánh listEquals.
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import '../ui/cg_tokens.dart';
 
 // Vẽ dạng sóng ECG với nền lưới neon và chấm dẫn đầu phát sáng.
 class EcgPainter extends CustomPainter {
@@ -41,7 +42,7 @@ class EcgPainter extends CustomPainter {
 
     // Lưới nhỏ (mỗi 10px) — lưới mịn cho thẩm mỹ màn hình y tế
     final gridPaintSmall = Paint()
-      ..color = const Color(0xFFFF3366).withValues(alpha: 0.04)
+      ..color = CgColors.accent.withValues(alpha: 0.04)
       ..strokeWidth = 0.5
       ..style = PaintingStyle.stroke;
 
@@ -54,7 +55,7 @@ class EcgPainter extends CustomPainter {
 
     // Ô lưới lớn (mỗi 50px)
     final gridPaintLarge = Paint()
-      ..color = const Color(0xFFFF3366).withValues(alpha: 0.12)
+      ..color = CgColors.accent.withValues(alpha: 0.12)
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
 

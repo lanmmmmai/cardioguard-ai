@@ -23,12 +23,28 @@ class ApiClient {
   // Trả về phiên bản singleton ApiClient.
   factory ApiClient() => _instance;
 
+  // Chuẩn hóa phản hồi danh sách từ backend.
+  // Hỗ trợ cả dạng mảng trực tiếp lẫn envelope phân trang { items, total, ... }.
+  static List<dynamic> extractListData(dynamic data) {
+    if (data is List<dynamic>) {
+      return data;
+    }
+    if (data is Map<String, dynamic>) {
+      final items = data['items'];
+      if (items is List<dynamic>) {
+        return items;
+      }
+    }
+    throw Exception(
+        'Dữ liệu trả về phải là một danh sách hoặc chứa trường items');
+  }
+
   // Trình khách HTTP Dio bên dưới.
   late final Dio dio;
 
   // Callback được gọi khi nhận được phản hồi 401 Unauthorized,
   // được sử dụng để kích hoạt đăng xuất im lặng từ AuthProvider.
-  static VoidCallback? onUnauthorized;
+  VoidCallback? _onUnauthorized;
 
   // Hàm tạo riêng tư cấu hình Dio với các tùy chọn cơ sở, thời gian chờ,
   // và các bộ chặn JWT/xác thực.
@@ -36,8 +52,10 @@ class ApiClient {
     dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,
-        connectTimeout: const Duration(milliseconds: AppConfig.connectTimeoutMs),
-        receiveTimeout: const Duration(milliseconds: AppConfig.receiveTimeoutMs),
+        connectTimeout:
+            const Duration(milliseconds: AppConfig.connectTimeoutMs),
+        receiveTimeout:
+            const Duration(milliseconds: AppConfig.receiveTimeoutMs),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -63,14 +81,18 @@ class ApiClient {
             // Xóa thông tin xác thực trong nền
             await SecureStorage().clearSession();
             // Kích hoạt chuyển hướng đăng xuất nếu callback đã được đăng ký
-            if (onUnauthorized != null) {
-              onUnauthorized!();
+            if (_onUnauthorized != null) {
+              _onUnauthorized!();
             }
           }
           return handler.next(e);
         },
       ),
     );
+  }
+
+  void setOnUnauthorized(VoidCallback? callback) {
+    _onUnauthorized = callback;
   }
 
   // Gửi yêu cầu HTTP GET đến path đã cho.
@@ -80,7 +102,8 @@ class ApiClient {
     Options? options,
   }) async {
     try {
-      return await dio.get(path, queryParameters: queryParameters, options: options);
+      return await dio.get(path,
+          queryParameters: queryParameters, options: options);
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;
@@ -95,7 +118,8 @@ class ApiClient {
     Options? options,
   }) async {
     try {
-      return await dio.post(path, data: data, queryParameters: queryParameters, options: options);
+      return await dio.post(path,
+          data: data, queryParameters: queryParameters, options: options);
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;
@@ -110,7 +134,8 @@ class ApiClient {
     Options? options,
   }) async {
     try {
-      return await dio.put(path, data: data, queryParameters: queryParameters, options: options);
+      return await dio.put(path,
+          data: data, queryParameters: queryParameters, options: options);
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;
@@ -125,7 +150,8 @@ class ApiClient {
     Options? options,
   }) async {
     try {
-      return await dio.patch(path, data: data, queryParameters: queryParameters, options: options);
+      return await dio.patch(path,
+          data: data, queryParameters: queryParameters, options: options);
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;
@@ -140,7 +166,8 @@ class ApiClient {
     Options? options,
   }) async {
     try {
-      return await dio.delete(path, data: data, queryParameters: queryParameters, options: options);
+      return await dio.delete(path,
+          data: data, queryParameters: queryParameters, options: options);
     } on DioException catch (e) {
       _handleDioError(e);
       rethrow;
@@ -161,7 +188,8 @@ class ApiClient {
         message = 'Nhận dữ liệu hết hạn (Receive Timeout).';
         break;
       case DioExceptionType.badResponse:
-        message = 'Máy chủ phản hồi lỗi: ${error.response?.statusCode} - ${error.response?.data}';
+        message =
+            'Máy chủ phản hồi lỗi: ${error.response?.statusCode} - ${error.response?.data}';
         break;
       case DioExceptionType.cancel:
         message = 'Yêu cầu bị hủy (Request cancelled).';

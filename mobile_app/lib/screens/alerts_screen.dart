@@ -165,7 +165,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                         child: SizedBox(
                           height: 34,
                           child: DropdownButtonFormField<String>(
-                            value: _severityFilter,
+                            initialValue: _severityFilter,
                             dropdownColor: cardBg,
                             style: TextStyle(color: textColor, fontSize: 12),
                             decoration: InputDecoration(
@@ -178,7 +178,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                                 borderSide:
-                                    const BorderSide(color: Color(0xFFFF3366)),
+                                    const BorderSide(color: CgColors.accent),
                               ),
                             ),
                             items: const [
@@ -238,7 +238,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                       )
                     : RefreshIndicator(
                         onRefresh: alertProvider.fetchAlerts,
-                        color: const Color(0xFFFF3366),
+                        color: CgColors.accent,
                         child: ListView.builder(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),

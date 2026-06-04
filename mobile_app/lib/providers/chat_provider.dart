@@ -12,6 +12,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_logger.dart';
 import '../core/api_client.dart';
+import '../config/app_config.dart';
 import '../models/models.dart';
 
 class ChatProvider extends ChangeNotifier {
@@ -43,8 +44,7 @@ class ChatProvider extends ChangeNotifier {
         queryParameters: {'patient_id': patientId},
       );
       if (response.statusCode == 200) {
-        if (response.data is! List) throw Exception("Dữ liệu trả về phải là một danh sách");
-        final List<dynamic> list = response.data as List<dynamic>;
+        final List<dynamic> list = ApiClient.extractListData(response.data);
         _messages = list.map((item) => ChatMessage.fromJson(item)).toList();
         // Sắp xếp cũ nhất trước cho luồng trò chuyện
         _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
@@ -111,11 +111,11 @@ class ChatProvider extends ChangeNotifier {
   }
 
   // AI Chatbot State
-  List<dynamic> _aiSessions = [];
-  List<dynamic> get aiSessions => _aiSessions;
+  List<AiChatSession> _aiSessions = [];
+  List<AiChatSession> get aiSessions => _aiSessions;
 
-  List<dynamic> _aiMessages = [];
-  List<dynamic> get aiMessages => _aiMessages;
+  List<AiChatMessage> _aiMessages = [];
+  List<AiChatMessage> get aiMessages => _aiMessages;
 
   String? _currentAiSessionId;
   String? get currentAiSessionId => _currentAiSessionId;
@@ -125,11 +125,14 @@ class ChatProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       final response = await _apiClient.get(
-        '/api/chat/sessions',
+        AppConfig.chatSessionsEndpoint,
         queryParameters: {'role': role},
       );
       if (response.statusCode == 200) {
-        _aiSessions = response.data as List<dynamic>? ?? [];
+        _aiSessions = ApiClient.extractListData(response.data)
+            .whereType<Map<String, dynamic>>()
+            .map(AiChatSession.fromJson)
+            .toList();
       }
     } catch (e) {
       AppLogger.log('Fetch AI sessions error: $e');
@@ -143,9 +146,14 @@ class ChatProvider extends ChangeNotifier {
     _setLoading(true);
     _currentAiSessionId = sessionId;
     try {
-      final response = await _apiClient.get('/api/chat/history/$sessionId');
+      final response = await _apiClient.get(
+        '${AppConfig.chatHistoryEndpoint}/$sessionId',
+      );
       if (response.statusCode == 200) {
-        _aiMessages = response.data as List<dynamic>? ?? [];
+        _aiMessages = ApiClient.extractListData(response.data)
+            .whereType<Map<String, dynamic>>()
+            .map(AiChatMessage.fromJson)
+            .toList();
       }
     } catch (e) {
       AppLogger.log('Fetch AI history error: $e');
@@ -161,18 +169,18 @@ class ChatProvider extends ChangeNotifier {
     Map<String, dynamic>? contextData,
   }) async {
     // Optimistically add user message to list
-    final tempUserMsg = {
-      'id': 'temp_${DateTime.now().millisecondsSinceEpoch}',
-      'sender': 'user',
-      'message': messageText,
-      'created_at': DateTime.now().toUtc().toIso8601String(),
-    };
+    final tempUserMsg = AiChatMessage(
+      id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      sender: 'user',
+      message: messageText,
+      createdAt: DateTime.now().toUtc(),
+    );
     _aiMessages.add(tempUserMsg);
     notifyListeners();
 
     try {
       final response = await _apiClient.post(
-        '/api/chat/send',
+        AppConfig.chatSendEndpoint,
         data: {
           'message': messageText,
           'session_id': _currentAiSessionId,
@@ -181,22 +189,23 @@ class ChatProvider extends ChangeNotifier {
         },
       );
       if (response.statusCode == 200) {
-        final data = response.data;
+        final data = response.data as Map<String, dynamic>;
         _currentAiSessionId = data['session_id']?.toString();
-        
+
         // Remove temp message and add real one, plus AI response
-        _aiMessages.remove(tempUserMsg);
-        
-        final userRealMsg = {
-          'id': 'user_${DateTime.now().millisecondsSinceEpoch}',
-          'sender': 'user',
-          'message': messageText,
-          'created_at': DateTime.now().toUtc().toIso8601String(),
-        };
+        _aiMessages.removeWhere((msg) => msg.id == tempUserMsg.id);
+
+        final userRealMsg = AiChatMessage(
+          id: 'user_${DateTime.now().millisecondsSinceEpoch}',
+          sender: 'user',
+          message: messageText,
+          createdAt: DateTime.now().toUtc(),
+        );
         _aiMessages.add(userRealMsg);
-        
-        if (data['ai_message'] != null) {
-          _aiMessages.add(data['ai_message']);
+
+        final aiMessage = data['ai_message'];
+        if (aiMessage is Map<String, dynamic>) {
+          _aiMessages.add(AiChatMessage.fromJson(aiMessage));
         }
         notifyListeners();
         return true;
@@ -204,7 +213,7 @@ class ChatProvider extends ChangeNotifier {
       return false;
     } catch (e) {
       AppLogger.log('Send AI message error: $e');
-      _aiMessages.remove(tempUserMsg);
+      _aiMessages.removeWhere((msg) => msg.id == tempUserMsg.id);
       notifyListeners();
       return false;
     }

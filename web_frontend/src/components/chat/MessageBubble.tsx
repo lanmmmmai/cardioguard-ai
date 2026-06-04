@@ -6,6 +6,7 @@
  */
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { Bot, User } from 'lucide-react';
 
@@ -20,6 +21,19 @@ export interface ChatMessage {
 interface MessageBubbleProps {
   msg: ChatMessage;
 }
+
+const safeUrlTransform = (url: string) => {
+  const normalized = url.trim().toLowerCase();
+  if (
+    normalized.startsWith('http://') ||
+    normalized.startsWith('https://') ||
+    normalized.startsWith('mailto:') ||
+    normalized.startsWith('tel:')
+  ) {
+    return url;
+  }
+  return '#';
+};
 
 /**
  * Component MessageBubble — hiển thị markdown cho tin nhắn AI, văn bản thuần cho tin nhắn người dùng,
@@ -36,7 +50,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ msg }) => {
       <div className="chat-message-bubble">
         {isAI ? (
           <div className="markdown-body">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeSanitize]}
+              urlTransform={safeUrlTransform}
+            >
               {msg.message}
             </ReactMarkdown>
             {msg.isStreaming && <span className="typing-cursor"></span>}

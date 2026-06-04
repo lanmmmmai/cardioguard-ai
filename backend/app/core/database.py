@@ -60,3 +60,4 @@ async def disconnect_db():
         logger.info("Ngắt kết nối cơ sở dữ liệu thành công")
     except Exception as e:
         logger.exception("Lỗi khi ngắt kết nối cơ sở dữ liệu")
+        raise

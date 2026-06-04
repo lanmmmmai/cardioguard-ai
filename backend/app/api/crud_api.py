@@ -770,6 +770,9 @@ async def reports_summary(authorization: Optional[str] = Header(default=None)):
 for table_name, config in TABLES.items():
     register_table_routes(table_name, config["path"], config["create"], config["update"])
 
+# Alias routes are registered explicitly so legacy clients that still use
+# short resource names keep working. Both canonical and alias paths map to
+# the same handlers and should be documented together in API references.
 for alias, table_name in ALIASES.items():
     config = TABLES[table_name]
     register_table_routes(table_name, f"/{alias}", config["create"], config["update"])

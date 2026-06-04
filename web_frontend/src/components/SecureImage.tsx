@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+// CardioGuard AI — tải media riêng tư qua Authorization header an toàn.
+import React, { useEffect, useState, useRef } from 'react';
 
 interface SecureImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src: string;
@@ -17,39 +18,62 @@ export const SecureImage: React.FC<SecureImageProps> = ({ src, accessToken, ...p
   const [objectUrl, setObjectUrl] = useState<string>('');
   const [error, setError] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     if (!src) {
       setObjectUrl('');
+      setError(false);
       setLoading(false);
-      return;
+      return () => undefined;
     }
 
-    // Nếu là URL tuyệt đối hoặc là data URI, có thể hiển thị trực tiếp
-    if (src.startsWith('http') || src.startsWith('data:')) {
+    if (src.startsWith('data:')) {
       setObjectUrl(src);
+      setError(false);
       setLoading(false);
-      return;
+      return () => undefined;
     }
 
-    let isMounted = true;
     setLoading(true);
     setError(false);
 
+    const shouldUseAuthenticatedFetch = Boolean(accessToken);
     const headers: HeadersInit = {};
-    if (accessToken) {
+    if (shouldUseAuthenticatedFetch && accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
 
-    fetch(src, { headers })
+    const loadImage = shouldUseAuthenticatedFetch
+      ? fetch(src, { headers })
+      : Promise.resolve(new Response(null, { status: 204 }));
+
+    loadImage
       .then((res) => {
+        if (!shouldUseAuthenticatedFetch) {
+          if (isMounted) {
+            setObjectUrl(src);
+            setLoading(false);
+          }
+          return null;
+        }
         if (!res.ok) throw new Error('Không thể tải hình ảnh bảo mật');
         return res.blob();
       })
       .then((blob) => {
+        if (!blob) {
+          return;
+        }
         if (isMounted) {
-          const url = URL.createObjectURL(blob);
-          setObjectUrl(url);
+          // Thu hồi URL cũ trước khi gán URL mới
+          if (objectUrlRef.current) {
+            URL.revokeObjectURL(objectUrlRef.current);
+          }
+          const generatedObjectUrl = URL.createObjectURL(blob);
+          objectUrlRef.current = generatedObjectUrl;
+          setObjectUrl(generatedObjectUrl);
           setLoading(false);
         }
       })
@@ -63,8 +87,9 @@ export const SecureImage: React.FC<SecureImageProps> = ({ src, accessToken, ...p
 
     return () => {
       isMounted = false;
-      if (objectUrl && !src.startsWith('http') && !src.startsWith('data:')) {
-        URL.revokeObjectURL(objectUrl);
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
       }
     };
   }, [src, accessToken]);
