@@ -24,12 +24,12 @@ export const UserDataDeletionPage: React.FC<UserDataDeletionPageProps> = ({ onBa
       <div className="page-header">
         <div>
           <h1 className="page-title">
-            {isVi ? 'Hướng dẫn xóa dữ liệu người dùng' : 'User Data Deletion Guide'}
+            {isVi ? 'Hướng dẫn xóa dữ liệu' : 'User Data Deletion Guide'}
           </h1>
           <p className="page-subtitle">
             {isVi 
-              ? 'Quy trình và các bước yêu cầu xóa tài khoản & thông tin cá nhân liên kết Facebook' 
-              : 'Steps to request deletion of your account and Facebook-associated personal data'}
+              ? 'Quy trình tiếp nhận yêu cầu xóa tài khoản và dữ liệu cá nhân CardioGuard AI'
+              : 'How CardioGuard AI handles account and personal data deletion requests'}
           </p>
         </div>
       </div>
@@ -45,22 +45,22 @@ export const UserDataDeletionPage: React.FC<UserDataDeletionPageProps> = ({ onBa
             </div>
             <div className="alert-strip-desc">
               {isVi 
-                ? 'CardioGuard AI luôn tuân thủ nghiêm ngặt các chính sách bảo mật thông tin người dùng. Khi bạn yêu cầu xóa dữ liệu, tất cả hồ sơ sinh hoạt, lịch sử chỉ số sinh hiệu và thông tin tài khoản Facebook sẽ được loại bỏ vĩnh viễn khỏi hệ thống.'
-                : 'CardioGuard AI strictly complies with user data privacy policies. Upon request, all activity records, vital sign history, and Facebook login credentials will be permanently erased from our system.'}
+                ? 'CardioGuard AI luôn tuân thủ nghiêm ngặt các chính sách bảo mật thông tin người dùng. Khi bạn yêu cầu xóa dữ liệu, hệ thống sẽ xử lý theo quy trình tiếp nhận, xác minh danh tính và vô hiệu hóa hoặc xóa các dữ liệu liên quan trong phạm vi áp dụng.'
+                : 'CardioGuard AI strictly follows user data privacy policies. When you request deletion, the system handles it through a request, identity verification, and deletion or deactivation of applicable data in scope.'}
             </div>
           </div>
         </div>
 
-        {/* Method 1: Self-Service Deletion via App */}
+        {/* Method 1: In-app request guide */}
         <section className="panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <h3 className="metric-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-primary)' }}>
             <Trash2 size={18} />
-            {isVi ? 'Cách 1: Yêu cầu xóa trực tiếp trên ứng dụng' : 'Method 1: Request Deletion Directly via App'}
+            {isVi ? 'Cách 1: Gửi yêu cầu từ trong ứng dụng' : 'Method 1: Submit a request from the app'}
           </h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
             {isVi 
-              ? 'Người dùng có thể chủ động yêu cầu xóa tài khoản và dữ liệu cá nhân đã đăng nhập bằng Facebook theo các bước sau:'
-              : 'Users can proactively request to delete their account and personal data logged in with Facebook by following these steps:'}
+              ? 'Người dùng có thể mở mục Hướng dẫn xóa dữ liệu trong phần Cài đặt để xem và gửi yêu cầu theo các bước sau:'
+              : 'Users can open the Data Deletion Guide from Settings to review and submit a request using the following steps:'}
           </p>
           <div className="activity-list" style={{ marginTop: '0.5rem' }}>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
@@ -75,18 +75,18 @@ export const UserDataDeletionPage: React.FC<UserDataDeletionPageProps> = ({ onBa
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', borderTop: '1px solid var(--glass-border)', paddingTop: '0.8rem' }}>
               <span className="patient-status muted" style={{ minWidth: '24px', textAlign: 'center', padding: '2px 6px', borderRadius: '50%' }}>2</span>
               <div>
-                <strong>{isVi ? 'Vào Hồ sơ cá nhân' : 'Go to Personal Profile'}</strong>
+                <strong>{isVi ? 'Mở Cài đặt cá nhân' : 'Open Settings'}</strong>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  {isVi ? 'Nhấp chọn biểu tượng avatar hoặc mục Hồ sơ cá nhân trên thanh điều hướng.' : 'Click on your avatar or the Profile section in the navigation.'}
+                  {isVi ? 'Chọn mục Hướng dẫn xóa dữ liệu hoặc Quy định & Pháp lý trong trang Cài đặt.' : 'Choose the Data Deletion Guide or Legal section in Settings.'}
                 </p>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', borderTop: '1px solid var(--glass-border)', paddingTop: '0.8rem' }}>
               <span className="patient-status muted" style={{ minWidth: '24px', textAlign: 'center', padding: '2px 6px', borderRadius: '50%' }}>3</span>
               <div>
-                <strong>{isVi ? 'Chọn Yêu cầu xóa tài khoản / dữ liệu cá nhân' : 'Select Request to delete account / personal data'}</strong>
+                <strong>{isVi ? 'Gửi yêu cầu qua email hỗ trợ' : 'Submit a request via support email'}</strong>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  {isVi ? 'Xác nhận lại yêu cầu để hệ thống ghi nhận lịch trình xóa tự động.' : 'Confirm your request to initiate the automated deletion scheduler.'}
+                  {isVi ? 'Cung cấp họ tên, email đăng nhập và nội dung yêu cầu để bộ phận hỗ trợ xử lý.' : 'Provide your full name, login email, and request details so support can process it.'}
                 </p>
               </div>
             </div>
@@ -101,8 +101,8 @@ export const UserDataDeletionPage: React.FC<UserDataDeletionPageProps> = ({ onBa
           </h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
             {isVi 
-              ? 'Hoặc bạn có thể liên hệ trực tiếp với bộ phận chăm sóc khách hàng của CardioGuard AI để yêu cầu hỗ trợ xóa thủ công:'
-              : 'Alternatively, you can contact CardioGuard AI customer support directly to request manual deletion:'}
+              ? 'Hoặc bạn có thể liên hệ trực tiếp với bộ phận chăm sóc khách hàng của CardioGuard AI để yêu cầu hỗ trợ xóa dữ liệu thủ công:'
+              : 'Alternatively, you can contact CardioGuard AI customer support directly to request manual data deletion:'}
           </p>
 
           <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
@@ -129,7 +129,7 @@ export const UserDataDeletionPage: React.FC<UserDataDeletionPageProps> = ({ onBa
                 <strong>{isVi ? 'Email đăng nhập' : 'Login email'}</strong>
               </li>
               <li>
-                <strong>{isVi ? 'Nền tảng đăng nhập:' : 'Login platform:'}</strong> Facebook
+                <strong>{isVi ? 'Nền tảng đăng nhập:' : 'Login platform:'}</strong> {isVi ? 'Ứng dụng / website CardioGuard AI' : 'CardioGuard AI app / website'}
               </li>
               <li>
                 <strong>{isVi ? 'Lý do yêu cầu xóa dữ liệu' : 'Reason for deletion request'}</strong> ({isVi ? 'nếu có' : 'optional'})
@@ -146,8 +146,8 @@ export const UserDataDeletionPage: React.FC<UserDataDeletionPageProps> = ({ onBa
           </h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, margin: 0 }}>
             {isVi 
-              ? 'CardioGuard AI sẽ tiếp nhận và xử lý yêu cầu xóa dữ liệu của bạn trong vòng từ 7 đến 30 ngày làm việc kể từ thời điểm gửi yêu cầu hợp lệ.'
-              : 'CardioGuard AI will receive and process your data deletion request within 7 to 30 working days from the time a valid request is submitted.'}
+              ? 'CardioGuard AI sẽ tiếp nhận, xác minh và phản hồi yêu cầu của bạn theo quy trình nội bộ. Thời gian xử lý phụ thuộc vào mức độ xác minh và phạm vi dữ liệu cần áp dụng.'
+              : 'CardioGuard AI will receive, verify, and respond to your request according to the internal process. Processing time depends on verification requirements and the scope of data affected.'}
           </p>
         </section>
 

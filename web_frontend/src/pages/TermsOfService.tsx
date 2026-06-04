@@ -34,8 +34,8 @@ export const TermsOfService: React.FC = () => {
             </div>
             <div className="alert-strip-desc">
               {isVi 
-                ? 'CardioGuard AI chỉ hỗ trợ theo dõi và đưa ra cảnh báo sức khỏe tim mạch mang tính tham khảo. Ứng dụng này không thay thế cho các kết luận chẩn đoán hoặc các phác đồ điều trị trực tiếp từ các bác sĩ chuyên khoa phụ trách.'
-                : 'CardioGuard AI only supports cardiovascular health monitoring and outputs reference warnings. This application does not replace clinical diagnoses or direct treatment protocols from your managing healthcare provider.'}
+                ? 'CardioGuard AI chỉ hỗ trợ theo dõi và đưa ra cảnh báo sức khỏe tim mạch mang tính tham khảo. Ứng dụng này không thay thế cho chẩn đoán, chỉ định điều trị hoặc quyết định lâm sàng của bác sĩ phụ trách.'
+                : 'CardioGuard AI only supports cardiovascular health monitoring and reference alerts. This application does not replace diagnoses, treatment instructions, or clinical decisions made by your healthcare provider.'}
             </div>
           </div>
         </div>
@@ -47,8 +47,8 @@ export const TermsOfService: React.FC = () => {
           </h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>
             {isVi 
-              ? 'Bằng cách đăng ký tài khoản và sử dụng nền tảng của chúng tôi, bạn cam kết cung cấp thông tin cá nhân và thông tin y tế chính xác để đảm bảo các cảnh báo sức khỏe hoạt động chính xác nhất.'
-              : 'By registering and using our platform, you commit to providing accurate personal and medical details to ensure optimal vital alerts performance.'}
+              ? 'Bằng cách đăng ký tài khoản và sử dụng nền tảng của chúng tôi, bạn cam kết cung cấp thông tin cá nhân và thông tin y tế chính xác để hệ thống hoạt động đúng mục đích.'
+              : 'By registering and using our platform, you commit to providing accurate personal and medical details so the system can operate as intended.'}
           </p>
         </section>
 

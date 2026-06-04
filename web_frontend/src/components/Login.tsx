@@ -14,6 +14,7 @@ import React, { useState } from 'react';
 import { Activity, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import { API_URL } from '../config';
 import { UserRole } from '../auth/roles';
+import { LegalFooterLinks } from './LegalFooterLinks';
 import { readJsonResponse } from '../utils/response';
 
 interface LoginProps {
@@ -223,13 +224,7 @@ export const Login: React.FC<LoginProps> = ({ role, onLoginSuccess, onNavigateTo
       </div>
       </div>
       <footer style={{ marginTop: '2rem', padding: '1rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '15px' }}>
-          <a href="/privacy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }} onClick={(e) => { e.preventDefault(); window.history.pushState(null, "", "/privacy"); window.dispatchEvent(new PopStateEvent('popstate')); }}>Chính sách bảo mật</a>
-          <span>•</span>
-          <a href="/terms" style={{ color: 'var(--text-muted)', textDecoration: 'none' }} onClick={(e) => { e.preventDefault(); window.history.pushState(null, "", "/terms"); window.dispatchEvent(new PopStateEvent('popstate')); }}>Điều khoản dịch vụ</a>
-          <span>•</span>
-          <a href="/data-deletion" style={{ color: 'var(--text-muted)', textDecoration: 'none' }} onClick={(e) => { e.preventDefault(); window.history.pushState(null, "", "/data-deletion"); window.dispatchEvent(new PopStateEvent('popstate')); }}>Yêu cầu xóa dữ liệu</a>
-        </div>
+        <LegalFooterLinks />
         <div>© 2026 CardioGuard AI. All rights reserved.</div>
       </footer>
     </div>

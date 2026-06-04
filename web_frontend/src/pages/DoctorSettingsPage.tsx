@@ -174,7 +174,7 @@ export const DoctorSettingsPage: React.FC<{ navigate: (path: string, replace?: b
               onClick={() => navigate('/doctor/delete-data')}
               style={{ justifyContent: 'space-between', padding: '12px 16px', borderRadius: '12px', fontSize: '0.85rem' }}
             >
-              <span>{isVi ? 'Hướng dẫn xóa dữ liệu người dùng' : 'User Data Deletion Guide'}</span>
+              <span>{isVi ? 'Hướng dẫn xóa dữ liệu' : 'Data Deletion Guide'}</span>
               <ArrowRight size={16} style={{ color: 'var(--color-primary)' }} />
             </button>
           </div>

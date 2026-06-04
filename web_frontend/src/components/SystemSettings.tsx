@@ -407,7 +407,7 @@ export const SystemSettings: React.FC<{ navigate?: (path: string) => void }> = (
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                Xem quy trình và hướng dẫn chi tiết yêu cầu xóa tài khoản và dữ liệu cá nhân liên kết Facebook.
+                Xem quy trình và hướng dẫn chi tiết yêu cầu xóa tài khoản và dữ liệu cá nhân CardioGuard AI.
               </span>
               <button 
                 type="button" 
@@ -415,7 +415,7 @@ export const SystemSettings: React.FC<{ navigate?: (path: string) => void }> = (
                 onClick={() => navigate?.('/admin/delete-data')}
                 style={{ justifyContent: 'space-between', padding: '12px 16px', borderRadius: '12px', fontSize: '0.85rem' }}
               >
-                <span>Hướng dẫn xóa dữ liệu người dùng</span>
+                <span>Hướng dẫn xóa dữ liệu</span>
                 <ArrowRight size={16} style={{ color: 'var(--color-primary)' }} />
               </button>
             </div>

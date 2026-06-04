@@ -15,7 +15,7 @@ export const PrivacyPolicy: React.FC = () => {
       <div className="page-header">
         <div>
           <h1 className="page-title">
-            {isVi ? 'Chính sách quyền riêng tư' : 'Privacy Policy'}
+            {isVi ? 'Chính sách bảo mật' : 'Privacy Policy'}
           </h1>
           <p className="page-subtitle">
             {isVi ? 'Cập nhật lần cuối: 04 tháng 06, 2026' : 'Last updated: June 04, 2026'}
@@ -33,8 +33,8 @@ export const PrivacyPolicy: React.FC = () => {
             </div>
             <div className="alert-strip-desc">
               {isVi 
-                ? 'CardioGuard AI cam kết bảo vệ dữ liệu cá nhân và chỉ số sức khỏe của bạn theo các tiêu chuẩn bảo mật y khoa cao nhất.'
-                : 'CardioGuard AI is committed to protecting your personal details and health metrics according to the highest medical security standards.'}
+                ? 'CardioGuard AI cam kết bảo vệ dữ liệu cá nhân và chỉ số sức khỏe của bạn bằng các kiểm soát bảo mật và phân quyền truy cập phù hợp.'
+                : 'CardioGuard AI is committed to protecting your personal details and health metrics through appropriate security controls and access restrictions.'}
             </div>
           </div>
         </div>
@@ -65,14 +65,14 @@ export const PrivacyPolicy: React.FC = () => {
           </h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>
             {isVi 
-              ? 'Dữ liệu của bạn được sử dụng cho các mục đích lâm sàng và vận hành y khoa:'
-              : 'Your data is utilized for clinical and medical operational purposes:'}
+              ? 'Dữ liệu của bạn được sử dụng cho các mục đích vận hành và hỗ trợ chăm sóc sức khỏe:'
+              : 'Your data is used for healthcare operations and care support:'}
           </p>
           <ul style={{ paddingLeft: '20px', fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
             <li>{isVi ? 'Xác thực tài khoản và phân quyền truy cập an toàn (Admin / Bác sĩ / Bệnh nhân).' : 'Account verification and role-based secure access (Admin / Doctor / Patient).'}</li>
             <li>{isVi ? 'Cảnh báo tức thời và gửi tín hiệu SOS khẩn cấp đến bác sĩ khi các chỉ số vượt ngưỡng an toàn.' : 'Instant warning triggers and emergency SOS routing to doctor when vitals cross thresholds.'}</li>
             <li>{isVi ? 'Quản lý lịch hẹn tái khám và nhắc lịch khám tự động.' : 'Follow-up appointment management and automated notifications.'}</li>
-            <li>{isVi ? 'Hỗ trợ bác sĩ theo dõi sức khỏe và chẩn đoán lâm sàng từ xa.' : 'Remote clinical monitoring and diagnostics support for doctor.'}</li>
+            <li>{isVi ? 'Hỗ trợ bác sĩ theo dõi sức khỏe và xem xét lâm sàng từ xa.' : 'Support doctors with remote health monitoring and clinical review.'}</li>
           </ul>
         </section>
 
@@ -89,7 +89,7 @@ export const PrivacyPolicy: React.FC = () => {
           <ul style={{ paddingLeft: '20px', fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
             <li>{isVi ? 'Quyền xem và cập nhật hồ sơ cá nhân của bạn trên ứng dụng.' : 'Right to access and edit personal profiles on the app.'}</li>
             <li>{isVi ? 'Quyền yêu cầu đính chính dữ liệu sức khỏe hoặc bệnh án bị sai lệch.' : 'Right to correct health or medical record discrepancies.'}</li>
-            <li>{isVi ? 'Quyền yêu cầu xóa tài khoản và dữ liệu cá nhân liên kết Facebook.' : 'Right to request deletion of account and Facebook-associated personal details.'}</li>
+            <li>{isVi ? 'Quyền yêu cầu xóa tài khoản và dữ liệu cá nhân theo quy trình tiếp nhận hiện hành của CardioGuard AI.' : 'Right to request deletion of your account and personal data through CardioGuard AI’s current request process.'}</li>
           </ul>
         </section>
 

@@ -12,6 +12,7 @@ import { isStrongPassword, getPasswordPolicyMessage } from '../utils/passwordPol
 import { UserRole } from '../auth/roles';
 import { useLocale } from '../i18n/locale';
 import { readJsonResponse } from '../utils/response';
+import { LegalFooterLinks } from './LegalFooterLinks';
 
 interface RegisterProps {
   role: UserRole;
@@ -64,7 +65,7 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
     const normalizedName = normalizeName(fullName);
 
     if (!agreed) {
-      return 'Bạn phải đồng ý với Chính sách quyền riêng tư và Điều khoản dịch vụ để đăng ký tài khoản';
+      return 'Bạn phải đồng ý với Chính sách bảo mật và Điều khoản dịch vụ để đăng ký tài khoản';
     }
 
     if (!normalizedName || !email || !password || !confirmPassword) {
@@ -442,7 +443,7 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
             <label htmlFor="consent" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4, cursor: 'pointer', userSelect: 'none', textAlign: 'left' }}>
               Tôi đã đọc và đồng ý với{' '}
               <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
-                Chính sách quyền riêng tư
+                Chính sách bảo mật
               </a>{' '}
               và{' '}
               <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
@@ -563,13 +564,7 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
         </div>
       )}
       <footer style={{ marginTop: '2rem', padding: '1rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '15px' }}>
-          <a href="/privacy" style={{ color: 'var(--text-muted)', textDecoration: 'none' }} onClick={(e) => { e.preventDefault(); window.history.pushState(null, "", "/privacy"); window.dispatchEvent(new PopStateEvent('popstate')); }}>Chính sách bảo mật</a>
-          <span>•</span>
-          <a href="/terms" style={{ color: 'var(--text-muted)', textDecoration: 'none' }} onClick={(e) => { e.preventDefault(); window.history.pushState(null, "", "/terms"); window.dispatchEvent(new PopStateEvent('popstate')); }}>Điều khoản dịch vụ</a>
-          <span>•</span>
-          <a href="/data-deletion" style={{ color: 'var(--text-muted)', textDecoration: 'none' }} onClick={(e) => { e.preventDefault(); window.history.pushState(null, "", "/data-deletion"); window.dispatchEvent(new PopStateEvent('popstate')); }}>Yêu cầu xóa dữ liệu</a>
-        </div>
+        <LegalFooterLinks />
         <div>© 2026 CardioGuard AI. All rights reserved.</div>
       </footer>
     </div>
