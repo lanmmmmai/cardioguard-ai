@@ -43,6 +43,7 @@ class TestGetPatients(unittest.IsolatedAsyncioTestCase):
         mock_db.fetch_val = AsyncMock(return_value=1)
         mock_db.fetch_all = AsyncMock(return_value=[{
             "id": "patient-uuid-1",
+            "user_id": "patient-uuid-1",
             "user_full_name": "Me",
             "user_email": "me@example.com",
             "patient_full_name": None,

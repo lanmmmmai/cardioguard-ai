@@ -517,7 +517,7 @@ async def register(data: RegisterRequest, request: Request):
             if created_user:
                 # Ghi nhận lịch sử đồng ý vào bảng user_consents
                 ip_addr = request.client.host if request.client else None
-                user_ag = request.headers.get("user-agent")
+                user_ag = request.headers.get("user-agent") if hasattr(request, "headers") else None
                 consent_v = data.consent_version or "1.0"
                 
                 await database.execute(

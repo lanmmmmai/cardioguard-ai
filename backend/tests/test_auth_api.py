@@ -198,6 +198,7 @@ class TestRegisterFlow(unittest.IsolatedAsyncioTestCase):
         self.mock_request = types.SimpleNamespace()
         self.mock_request.client = types.SimpleNamespace()
         self.mock_request.client.host = "127.0.0.1"
+        self.mock_request.headers = {}
 
     @patch("app.api.auth_api.database")
     @patch("app.api.auth_api.get_client_ip")
@@ -279,10 +280,30 @@ class TestRegisterFlow(unittest.IsolatedAsyncioTestCase):
 
         with patch("app.api.auth_api.verify_otp_token", return_value=mock_otp_result):
             with patch("app.api.auth_api.invalidate_otp_tokens", AsyncMock()):
-                data = RegisterRequest(email="new@test.com", full_name="New User", password="Str@ng1!", otp="123456")
+                data = RegisterRequest(email="new@test.com", full_name="New User", password="Str@ng1!", otp="123456", agree_privacy=True, agree_terms=True)
                 result = await register(data, self.mock_request)
 
         self.assertEqual(result["message"], "Register successfully")
+
+    @patch("app.api.auth_api.check_rate_limit")
+    @patch("app.api.auth_api.get_client_ip")
+    async def test_register_missing_consent(self, mock_ip, mock_rate):
+        mock_ip.return_value = "127.0.0.1"
+        from app.api.auth_api import register, RegisterRequest
+        
+        # 1. missing privacy consent
+        data = RegisterRequest(email="new@test.com", full_name="New User", password="Str@ng1!", otp="123456", agree_privacy=False, agree_terms=True)
+        with self.assertRaises(HTTPException) as ctx:
+            await register(data, self.mock_request)
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertIn("đồng ý", ctx.exception.detail)
+
+        # 2. missing terms consent
+        data = RegisterRequest(email="new@test.com", full_name="New User", password="Str@ng1!", otp="123456", agree_privacy=True, agree_terms=False)
+        with self.assertRaises(HTTPException) as ctx:
+            await register(data, self.mock_request)
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertIn("đồng ý", ctx.exception.detail)
 
     @patch("app.api.auth_api.check_rate_limit")
     @patch("app.api.auth_api.get_client_ip")
@@ -296,7 +317,7 @@ class TestRegisterFlow(unittest.IsolatedAsyncioTestCase):
 
         from app.api.auth_api import register, RegisterRequest
         with patch("app.api.auth_api.verify_otp_token", return_value=mock_otp_result):
-            data = RegisterRequest(email="new@test.com", full_name="New User", password="Str@ng1!", otp="000000")
+            data = RegisterRequest(email="new@test.com", full_name="New User", password="Str@ng1!", otp="000000", agree_privacy=True, agree_terms=True)
             with self.assertRaises(HTTPException) as ctx:
                 await register(data, self.mock_request)
         self.assertEqual(ctx.exception.status_code, 400)
@@ -313,7 +334,7 @@ class TestRegisterFlow(unittest.IsolatedAsyncioTestCase):
 
         from app.api.auth_api import register, RegisterRequest
         with patch("app.api.auth_api.verify_otp_token", return_value=mock_otp_result):
-            data = RegisterRequest(email="new@test.com", full_name="New User", password="Str@ng1!", otp="000000")
+            data = RegisterRequest(email="new@test.com", full_name="New User", password="Str@ng1!", otp="000000", agree_privacy=True, agree_terms=True)
             with self.assertRaises(HTTPException) as ctx:
                 await register(data, self.mock_request)
         self.assertEqual(ctx.exception.status_code, 400)
