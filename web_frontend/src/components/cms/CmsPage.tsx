@@ -157,10 +157,20 @@ export const CmsPage: React.FC = () => {
       {toast && <div className="cms-toast">{toast}</div>}
       <div className="page-header cms-header">
         <div>
-          <h1 className="page-title">CardioGuard CMS</h1>
-          <p className="page-subtitle">Quản trị dữ liệu thật từ Supabase cho toàn bộ hệ thống.</p>
+          <h1 className="page-title">
+            {activeModule === 'domain_links' ? 'CMS Domain Links' : activeModule === 'email_templates' ? 'Email CMS' : 'CardioGuard CMS'}
+          </h1>
+          <p className="page-subtitle">
+            {activeModule === 'domain_links' 
+              ? 'Quản lý preview link cho Zalo, Messenger, Facebook và OG tags.' 
+              : activeModule === 'email_templates' 
+              ? 'Quản lý mẫu email, gửi thông báo và theo dõi lịch sử gửi.' 
+              : 'Quản trị dữ liệu thật từ Supabase cho toàn bộ hệ thống.'}
+          </p>
         </div>
-        <button className="btn btn-secondary" type="button" onClick={fetchRows}><RefreshCw size={16} /> Làm mới</button>
+        {activeModule !== 'domain_links' && activeModule !== 'email_templates' && (
+          <button className="btn btn-secondary" type="button" onClick={fetchRows}><RefreshCw size={16} /> Làm mới</button>
+        )}
       </div>
 
       <div className="cms-layout">
@@ -184,59 +194,61 @@ export const CmsPage: React.FC = () => {
           })}
         </aside>
 
-        <section className="panel cms-workspace">
-          {activeModule === 'domain_links' ? (
-            <DomainLinksCmsPage />
-          ) : activeModule === 'email_templates' ? (
-            <EmailCmsPage embedded={true} />
-          ) : (
-            <>
-              <div className="cms-toolbar">
-                <div className="cms-toolbar-title">
-                  <ActiveIcon size={20} />
-                  <strong>{config.label}</strong>
-                  <span>{total} bản ghi</span>
-                </div>
-                <div className="cms-toolbar-actions">
-                  <button type="button" className="btn btn-primary" onClick={() => setEditing('new')}><Plus size={16} /> Thêm mới</button>
-                  <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}><FileUp size={16} /> Import CSV</button>
-                  <button type="button" className="btn btn-secondary" onClick={exportCsv}><Download size={16} /> Export CSV</button>
-                  <button type="button" className="btn btn-secondary" onClick={downloadTemplate}><FileDown size={16} /> Template</button>
-                </div>
+        {activeModule === 'domain_links' || activeModule === 'email_templates' ? (
+          <section className="cms-workspace">
+            {activeModule === 'domain_links' ? (
+              <DomainLinksCmsPage embedded={true} />
+            ) : (
+              <EmailCmsPage embedded={true} />
+            )}
+          </section>
+        ) : (
+          <section className="panel cms-workspace">
+            <div className="cms-toolbar">
+              <div className="cms-toolbar-title">
+                <ActiveIcon size={20} />
+                <strong>{config.label}</strong>
+                <span>{total} bản ghi</span>
               </div>
-
-              <div className="cms-filters">
-                <label>
-                  <Search size={16} />
-                  <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm kiếm..." />
-                </label>
-                <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Lọc: status:online,role:patient" />
+              <div className="cms-toolbar-actions">
+                <button type="button" className="btn btn-primary" onClick={() => setEditing('new')}><Plus size={16} /> Thêm mới</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}><FileUp size={16} /> Import CSV</button>
+                <button type="button" className="btn btn-secondary" onClick={exportCsv}><Download size={16} /> Export CSV</button>
+                <button type="button" className="btn btn-secondary" onClick={downloadTemplate}><FileDown size={16} /> Template</button>
               </div>
+            </div>
 
-              {error && <div className="cms-inline-error">{error}</div>}
+            <div className="cms-filters">
+              <label>
+                <Search size={16} />
+                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm kiếm..." />
+              </label>
+              <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Lọc: status:online,role:patient" />
+            </div>
 
-              <DataTable
-                rows={rows}
-                columns={columns}
-                preferredColumns={config.preferredColumns}
-                sortBy={sortBy}
-                sortDir={sortDir}
-                loading={loading}
-                onSort={sort}
-                onView={setDetail}
-                onEdit={setEditing}
-                onDelete={setDeleting}
-                onAssignPatient={activeModule === 'cameras' ? setEditing : undefined}
-              />
+            {error && <div className="cms-inline-error">{error}</div>}
 
-              <div className="cms-pagination">
-                <button type="button" className="btn btn-secondary" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))}>Trước</button>
-                <span>Trang {page}/{totalPages}</span>
-                <button type="button" className="btn btn-secondary" disabled={page >= totalPages} onClick={() => setOffset(offset + limit)}>Sau</button>
-              </div>
-            </>
-          )}
-        </section>
+            <DataTable
+              rows={rows}
+              columns={columns}
+              preferredColumns={config.preferredColumns}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              loading={loading}
+              onSort={sort}
+              onView={setDetail}
+              onEdit={setEditing}
+              onDelete={setDeleting}
+              onAssignPatient={activeModule === 'cameras' ? setEditing : undefined}
+            />
+
+            <div className="cms-pagination">
+              <button type="button" className="btn btn-secondary" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))}>Trước</button>
+              <span>Trang {page}/{totalPages}</span>
+              <button type="button" className="btn btn-secondary" disabled={page >= totalPages} onClick={() => setOffset(offset + limit)}>Sau</button>
+            </div>
+          </section>
+        )}
       </div>
 
       {editing && (
