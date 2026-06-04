@@ -28,9 +28,11 @@ import asyncio
 import hashlib
 from datetime import datetime, timezone
 
-# Chèn thư mục cha để gói ``app`` có thể được giải quyết
+# Chèn thư mục backend vào ``sys.path`` để gói ``app`` có thể được import
 # bất kể thư mục làm việc hiện tại.
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
 from app.core.database import database, connect_db, disconnect_db
 

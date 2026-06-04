@@ -166,7 +166,7 @@ async def startup():
         migration_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "migrations",
-            "016_optimize_mv_refresh.sql",
+            "018_optimize_mv_refresh.sql",
         )
         if os.path.exists(migration_path):
             with open(migration_path, "r", encoding="utf-8") as f:

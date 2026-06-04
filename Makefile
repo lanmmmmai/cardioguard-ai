@@ -64,10 +64,10 @@ docker-build-no-cache: ## Build Docker images without cache
 
 # ── Database ─────────────────────────────────────────────────
 migrate: ## Run all database migrations on Supabase
-	cd $(BACKEND_DIR) && python $(MIGRATION_SCRIPT)
+	cd $(BACKEND_DIR) && python scripts/run_all_migrations.py
 
 migrate-force: ## Force re-apply all migrations (update checksums)
-	cd $(BACKEND_DIR) && python $(MIGRATION_SCRIPT) --force
+	cd $(BACKEND_DIR) && python scripts/run_all_migrations.py --force
 
 seed: ## Seed sample data into database
 	cd $(BACKEND_DIR) && python $(SEED_SCRIPT)
@@ -144,14 +144,14 @@ docker-ps: ## Show running containers
 deploy: ## Deploy to production (push to Git triggers auto-deploy)
 	@echo "=== Deploying CardioGuard AI ==="
 	@echo "Pushing to Git..."
-	git add backend web_frontend mobile_app Makefile BUGS.md
+	git add backend web_frontend mobile_app Makefile
 	@read -p "Commit message: " msg; \
 	git commit -m "$$msg"; \
 	git push origin HEAD
 	@echo "=== Deploy triggered! Render + Vercel will auto-deploy. ==="
 
 deploy-force: ## Force deploy (skip checks, push immediately)
-	git add backend web_frontend mobile_app Makefile BUGS.md && git commit -m "deploy: force deploy $(shell date +%Y%m%d-%H%M%S)" && git push origin HEAD
+	git add backend web_frontend mobile_app Makefile && git commit -m "deploy: force deploy $(shell date +%Y%m%d-%H%M%S)" && git push origin HEAD
 
 deploy-status: ## Check deployment status
 	@echo "=== Git Status ==="

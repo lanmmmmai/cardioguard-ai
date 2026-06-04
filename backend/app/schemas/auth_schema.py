@@ -192,15 +192,16 @@ class GoogleLoginRequest(BaseModel):
     """Thông tin xác thực cho đăng nhập bằng Google.
 
     Thuộc tính:
-        email: Địa chỉ email từ Google.
-        full_name: Tên đầy đủ từ Google.
-        google_id: ID định danh từ Google.
+        id_token: JWT do Google phát hành sau khi xác thực.
+        email: Địa chỉ email từ Google, giữ lại để tương thích ngược.
+        full_name: Tên đầy đủ từ Google, giữ lại để tương thích ngược.
+        google_id: ID định danh từ Google, giữ lại để tương thích ngược.
         avatar_url: Đường dẫn ảnh đại diện tùy chọn.
-        role: Vai trò đăng nhập mong muốn (admin/doctor/patient).
+        role: Vai trò đăng nhập mong muốn, không còn được tin cậy từ client.
     """
-    email: EmailStr
-    full_name: str
-    google_id: str
+    id_token: str
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    google_id: Optional[str] = None
     avatar_url: Optional[str] = None
     role: Optional[str] = "patient"
-

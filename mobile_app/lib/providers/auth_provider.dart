@@ -115,6 +115,9 @@ class AuthProvider extends ChangeNotifier {
     required String fullName,
     required String password,
     required String otp,
+    required bool agreePrivacy,
+    required bool agreeTerms,
+    String consentVersion = '1.0',
   }) async {
     AppLogger.log('registerPatient entered | email=$email');
     _setLoading(true);
@@ -127,6 +130,9 @@ class AuthProvider extends ChangeNotifier {
           'full_name': fullName,
           'password': password,
           'otp': otp,
+          'agree_privacy': agreePrivacy,
+          'agree_terms': agreeTerms,
+          'consent_version': consentVersion,
         },
       );
       _setLoading(false);
@@ -194,24 +200,18 @@ class AuthProvider extends ChangeNotifier {
 
   // Đăng nhập bằng Google
   Future<bool> loginWithGoogle({
-    required String email,
-    required String fullName,
-    required String googleId,
+    required String idToken,
     String? avatarUrl,
-    String role = 'patient',
   }) async {
-    AppLogger.log('loginWithGoogle entered | email=$email');
+    AppLogger.log('loginWithGoogle entered');
     _setLoading(true);
     _setError(null);
     try {
       final response = await _apiClient.post(
         AppConfig.googleLoginEndpoint,
         data: {
-          'email': email,
-          'full_name': fullName,
-          'google_id': googleId,
+          'id_token': idToken,
           'avatar_url': avatarUrl,
-          'role': role,
         },
       );
 
@@ -223,7 +223,7 @@ class AuthProvider extends ChangeNotifier {
         if (token != null && userJson != null) {
           _currentUser = User.fromJson(userJson);
           _isAuthenticated = true;
-          AppLogger.log('loginWithGoogle success | email=$email isAuthenticated=$_isAuthenticated');
+          AppLogger.log('loginWithGoogle success | isAuthenticated=$_isAuthenticated');
 
           // Lưu vào bộ nhớ an toàn
           await _secureStorage.saveToken(token);
@@ -235,12 +235,12 @@ class AuthProvider extends ChangeNotifier {
       }
       _setLoading(false);
       _setError('Đăng nhập Google thất bại.');
-      AppLogger.log('loginWithGoogle failed | email=$email status=${response.statusCode}');
+      AppLogger.log('loginWithGoogle failed | status=${response.statusCode}');
       return false;
     } catch (e) {
       _setLoading(false);
       _setError('Lỗi kết nối máy chủ khi đăng nhập Google.');
-      AppLogger.log('loginWithGoogle error | email=$email error=$e');
+      AppLogger.log('loginWithGoogle error | error=$e');
       return false;
     }
   }

@@ -34,6 +34,16 @@ ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
 
 
+def _is_within_directory(base_dir: str, candidate_path: str) -> bool:
+    """Kiểm tra đường dẫn ứng viên có nằm hoàn toàn trong thư mục gốc hay không."""
+    base_real = os.path.realpath(base_dir)
+    candidate_real = os.path.realpath(candidate_path)
+    try:
+        return os.path.commonpath([base_real, candidate_real]) == base_real
+    except ValueError:
+        return False
+
+
 def _resolve_upload_directory(user_id: str, file_type: str) -> str:
     """Trả về thư mục tương đối lưu trữ theo loại tài liệu.
 
@@ -514,7 +524,7 @@ async def download_file(
 ):
     full_path = os.path.abspath(os.path.join(STORAGE_ROOT, file_path))
     
-    if not full_path.startswith(STORAGE_ROOT):
+    if not _is_within_directory(STORAGE_ROOT, full_path):
         raise HTTPException(status_code=400, detail="Đường dẫn không hợp lệ")
         
     if not os.path.exists(full_path) or not os.path.isfile(full_path):

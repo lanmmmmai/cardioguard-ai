@@ -95,6 +95,11 @@ class TestNormalizeEmailType(unittest.TestCase):
     def test_alias_alert_critical(self):
         self.assertEqual(self._call("alert_critical"), "emergency_alert")
 
+    def test_doctor_profile_aliases(self):
+        self.assertEqual(self._call("doctor_profile_require_update"), "doctor_need_update")
+        self.assertEqual(self._call("doctor_verified_success"), "doctor_verified")
+        self.assertEqual(self._call("doctor_verified_rejected"), "doctor_rejected")
+
     def test_unknown_type_unchanged(self):
         self.assertEqual(self._call("custom_type"), "custom_type")
 

@@ -71,7 +71,6 @@ cardioguard-ai/
 ├── docker-compose.yml
 ├── Makefile                    # setup, dev, build, test, lint, migrate, seed, deploy
 ├── render.yaml                 # Render.com deployment config
-├── BUGS.md                     # Known issues & fix tracking
 └── README.md
 ```
 

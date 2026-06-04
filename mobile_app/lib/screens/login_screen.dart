@@ -13,6 +13,7 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../config/app_config.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/cg_widgets.dart';
 
@@ -58,19 +59,31 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _localError = null);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     try {
-      final googleSignIn = GoogleSignIn(
-        scopes: ['email', 'profile'],
-      );
+      final googleSignIn = AppConfig.googleServerClientId.isNotEmpty
+          ? GoogleSignIn(
+              scopes: const ['email', 'profile'],
+              serverClientId: AppConfig.googleServerClientId,
+            )
+          : GoogleSignIn(
+              scopes: const ['email', 'profile'],
+            );
       final account = await googleSignIn.signIn();
       if (account == null) {
         // User cancelled sign-in
         return;
       }
-      
+
+      final authentication = await account.authentication;
+      final idToken = authentication.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        setState(() {
+          _localError = 'Không thể lấy mã xác thực Google. Vui lòng thử lại.';
+        });
+        return;
+      }
+
       final success = await authProvider.loginWithGoogle(
-        email: account.email,
-        fullName: account.displayName ?? 'Người dùng Google',
-        googleId: account.id,
+        idToken: idToken,
         avatarUrl: account.photoUrl,
       );
 

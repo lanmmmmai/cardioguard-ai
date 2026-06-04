@@ -70,7 +70,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
     id: template?.id,
     function_id: template?.function_id,
     cms_email_id: template?.cms_email_id ?? '',
-    email_type: template?.email_type ?? SYSTEM_EMAIL_FUNCTIONS[0].email_type,
+    email_type: normalizeEmailType(template?.email_type ?? SYSTEM_EMAIL_FUNCTIONS[0].email_type),
     target_role: template?.target_role ?? 'all',
     name: template?.name ?? '',
     subject: template?.subject ?? '',
@@ -167,7 +167,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
           id: data.id ?? template.id,
           function_id: data.function_id,
           cms_email_id: data.cms_email_id || '',
-          email_type: data.email_type || data.type || SYSTEM_EMAIL_FUNCTIONS[0].email_type,
+          email_type: normalizeEmailType(data.email_type || data.type || SYSTEM_EMAIL_FUNCTIONS[0].email_type),
           target_role: data.target_role || 'all',
           name: data.name || '',
           subject: data.subject || '',
@@ -515,7 +515,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
                         email_type: normalizeEmailType(e.target.value),
                         cms_email_id: prev.cms_email_id || suggestCmsEmailId(normalizeEmailType(e.target.value)),
                       }))}
-                      placeholder="doctor_profile_require_update"
+                      placeholder="doctor_need_update"
                       disabled={readOnly}
                     />
                   </div>
@@ -525,7 +525,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
                       className="form-control"
                       value={draftFunction.cms_email_id}
                       onChange={(e) => setDraftFunction((prev) => ({ ...prev, cms_email_id: normalizeCmsEmailId(e.target.value) }))}
-                      placeholder="EMAIL_DOCTOR_PROFILE_REQUIRE_UPDATE"
+                      placeholder="EMAIL_DOCTOR_NEED_UPDATE"
                       disabled={readOnly}
                     />
                   </div>

@@ -25,6 +25,7 @@ Quan hệ:
 
 import asyncio
 from collections import OrderedDict
+import os
 import secrets
 import requests
 import logging
@@ -33,6 +34,8 @@ from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Request
 from jose import JWTError, jwt
+from google.auth.transport.requests import Request as GoogleAuthRequest
+from google.oauth2 import id_token as google_id_token
 from app.core.config import settings
 from app.core.database import database
 from app.core.security import ALGORITHM, SECRET_KEY, hash_password, verify_password, create_access_token
@@ -133,6 +136,55 @@ def _purge_expired_user_cache(now: float) -> None:
     while len(_user_cache) > _USER_CACHE_MAX_SIZE:
         _user_cache.popitem(last=False)
 
+
+def _enforce_user_access_rules(
+    result: dict,
+    *,
+    allow_must_change_password: bool = False,
+    allow_uncompleted: bool = False,
+    allow_unverified: bool = False,
+) -> None:
+    """Áp dụng nhất quán các điều kiện truy cập cho người dùng đã xác thực."""
+    status = (result.get("status") or "").strip().lower()
+    if status in {"inactive", "disabled", "deleted"}:
+        raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
+
+    if result.get("must_change_password") and not allow_must_change_password:
+        raise HTTPException(
+            status_code=403,
+            detail="Bạn phải đổi mật khẩu trước khi tiếp tục sử dụng hệ thống",
+        )
+
+    if not result.get("profile_completed") and not allow_uncompleted:
+        if result.get("role") in {"patient", "doctor"}:
+            raise HTTPException(
+                status_code=403,
+                detail="Tài khoản chưa hoàn thiện hồ sơ. Vui lòng hoàn thiện hồ sơ trước khi tiếp tục.",
+            )
+
+    if result.get("role") == "doctor" and not result.get("is_verified") and not allow_unverified:
+        raise HTTPException(
+            status_code=403,
+            detail="Tài khoản bác sĩ chưa được ban quản trị phê duyệt xác thực.",
+        )
+
+
+def _verify_google_id_token(token: str) -> dict:
+    """Xác minh ID token của Google và trả về claims đã tin cậy."""
+    client_id = (settings.GOOGLE_CLIENT_ID or os.getenv("GOOGLE_CLIENT_ID", "") or "").strip()
+    if not client_id:
+        raise HTTPException(status_code=500, detail="Google login is not configured")
+
+    try:
+        claims = google_id_token.verify_oauth2_token(token, GoogleAuthRequest(), client_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="Invalid Google ID token") from exc
+
+    if not isinstance(claims, dict):
+        raise HTTPException(status_code=401, detail="Invalid Google ID token")
+
+    return claims
+
 async def get_users_columns() -> set[str]:
     """Lấy tập hợp tên cột cho bảng users.
 
@@ -214,17 +266,12 @@ async def get_user_from_token(
             if time.monotonic() - cached_at < _USER_CACHE_TTL:
                 _user_cache.move_to_end(user_id)
                 result = dict(cached_user)
-                if result["must_change_password"] and not allow_must_change_password:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="Bạn phải đổi mật khẩu trước khi tiếp tục sử dụng hệ thống",
-                    )
-                if not result["profile_completed"] and not allow_uncompleted:
-                    if result["role"] in {"patient", "doctor"}:
-                        raise HTTPException(
-                            status_code=403,
-                            detail="Tài khoản chưa hoàn thiện hồ sơ. Vui lòng hoàn thiện hồ sơ trước khi tiếp tục.",
-                        )
+                _enforce_user_access_rules(
+                    result,
+                    allow_must_change_password=allow_must_change_password,
+                    allow_uncompleted=allow_uncompleted,
+                    allow_unverified=allow_unverified,
+                )
                 return result
 
     user_columns = await get_users_columns()
@@ -254,9 +301,6 @@ async def get_user_from_token(
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
-    if (user["status"] or "").strip().lower() in {"inactive", "disabled", "deleted"}:
-        raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
-
     result = {
         "id": user["id"],
         "full_name": user["full_name"],
@@ -278,26 +322,12 @@ async def get_user_from_token(
         _user_cache.move_to_end(user_id)
         _purge_expired_user_cache(time.monotonic())
 
-    if result["must_change_password"] and not allow_must_change_password:
-        raise HTTPException(
-            status_code=403,
-            detail="Bạn phải đổi mật khẩu trước khi tiếp tục sử dụng hệ thống",
-        )
-
-    # Check profile completion
-    if not result["profile_completed"] and not allow_uncompleted:
-        if result["role"] in {"patient", "doctor"}:
-            raise HTTPException(
-                status_code=403,
-                detail="Tài khoản chưa hoàn thiện hồ sơ. Vui lòng hoàn thiện hồ sơ trước khi tiếp tục."
-            )
-
-    # Check doctor verification
-    if result["role"] == "doctor" and not result["is_verified"] and not allow_unverified:
-        raise HTTPException(
-            status_code=403,
-            detail="Tài khoản bác sĩ chưa được ban quản trị phê duyệt xác thực."
-        )
+    _enforce_user_access_rules(
+        result,
+        allow_must_change_password=allow_must_change_password,
+        allow_uncompleted=allow_uncompleted,
+        allow_unverified=allow_unverified,
+    )
 
     return result
 
@@ -744,7 +774,18 @@ async def google_login(data: GoogleLoginRequest, request: Request):
     Nếu email đã tồn tại, liên kết/xác thực tài khoản và đăng nhập.
     """
     ip = request.client.host if request.client else "unknown"
-    email = data.email.lower()
+    claims = _verify_google_id_token(data.id_token)
+    email = (claims.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=401, detail="Google account does not include an email address")
+
+    google_sub = (claims.get("sub") or "").strip()
+    display_name = (
+        (claims.get("name") or "").strip()
+        or (data.full_name or "").strip()
+        or email.split("@", 1)[0]
+    )
+    avatar_url = (claims.get("picture") or data.avatar_url or None)
     logger.debug("Entry: google_login(email=%s)", email)
 
     # Lấy thông tin cột của bảng users để chắc chắn
@@ -803,15 +844,15 @@ async def google_login(data: GoogleLoginRequest, request: Request):
             )
             raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
 
-        # Cập nhật google_id và avatar_url nếu chưa có hoặc mới
+        # Cập nhật google_id và avatar_url bằng dữ liệu đã xác minh
         update_fields = []
         update_values = {"id": user["id"]}
-        if "google_id" in user_columns and (not user["google_id"] or user["google_id"] != data.google_id):
+        if "google_id" in user_columns and google_sub and (not user["google_id"] or user["google_id"] != google_sub):
             update_fields.append("google_id = :google_id")
-            update_values["google_id"] = data.google_id
-        if "avatar_url" in user_columns and data.avatar_url and not user["avatar_url"]:
+            update_values["google_id"] = google_sub
+        if "avatar_url" in user_columns and avatar_url and not user["avatar_url"]:
             update_fields.append("avatar_url = :avatar_url")
-            update_values["avatar_url"] = data.avatar_url
+            update_values["avatar_url"] = avatar_url
 
         if update_fields:
             update_query = f"""
@@ -826,13 +867,9 @@ async def google_login(data: GoogleLoginRequest, request: Request):
         db_role = normalize_role(user["role"])
     else:
         # Tài khoản chưa tồn tại, tự động đăng ký
-        role = data.role or "patient"
-        role = role.strip().lower()
-        if role not in VALID_ROLES:
-            role = "patient"
+        role = "patient"
         
         # Sinh mật khẩu ngẫu nhiên để băm (dành cho OAuth)
-        import secrets
         random_pw = secrets.token_hex(16)
         
         insert_query = """
@@ -846,12 +883,12 @@ async def google_login(data: GoogleLoginRequest, request: Request):
                 await database.execute(
                     query=insert_query,
                     values={
-                        "full_name": data.full_name,
+                        "full_name": display_name,
                         "email": email,
                         "password_hash": hash_password(random_pw),
                         "role": role,
-                        "avatar_url": data.avatar_url,
-                        "google_id": data.google_id
+                        "avatar_url": avatar_url,
+                        "google_id": google_sub
                     }
                 )
 
@@ -874,7 +911,7 @@ async def google_login(data: GoogleLoginRequest, request: Request):
                     patient_cols = {row["column_name"] for row in patient_columns}
                     patient_values = {
                         "id": user_id,
-                        "full_name": data.full_name,
+                        "full_name": display_name,
                     }
                     if "user_id" in patient_cols:
                         patient_values["user_id"] = user_id

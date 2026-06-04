@@ -1,4 +1,4 @@
-import os, sys, unittest, types
+import os, sys, unittest, types, time
 from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
 
@@ -8,6 +8,7 @@ if str(BACKEND_DIR) not in sys.path:
 
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test_db")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-with-at-least-32-chars")
+os.environ.setdefault("GOOGLE_CLIENT_ID", "test-google-client-id")
 
 import app.api.auth_api as auth_api_module
 
@@ -191,6 +192,34 @@ class TestGetUserFromToken(unittest.IsolatedAsyncioTestCase):
 
         result = await get_user_from_token("Bearer token", allow_unverified=True)
         self.assertEqual(result["id"], "doc-1")
+
+    @patch("app.api.auth_api.database")
+    @patch("app.api.auth_api.jwt.decode")
+    async def test_cached_unverified_doctor_is_still_blocked(self, mock_jwt_decode, mock_db):
+        auth_api_module._user_cache.clear()
+        auth_api_module._user_cache["doc-1"] = (
+            {
+                "id": "doc-1",
+                "full_name": "Doctor A",
+                "email": "dr@t.com",
+                "phone": None,
+                "role": "doctor",
+                "created_at": None,
+                "status": "active",
+                "must_change_password": False,
+                "profile_completed": True,
+                "is_verified": False,
+                "avatar_url": None,
+            },
+            time.monotonic(),
+        )
+        mock_jwt_decode.return_value = {"sub": "doc-1", "jti": "jti-1"}
+        mock_db.fetch_val = AsyncMock(return_value=None)
+        mock_db.fetch_one = AsyncMock(side_effect=AssertionError("DB lookup should not be reached for cached users"))
+
+        with self.assertRaises(HTTPException) as ctx:
+            await get_user_from_token("Bearer token")
+        self.assertEqual(ctx.exception.status_code, 403)
 
 
 class TestRegisterFlow(unittest.IsolatedAsyncioTestCase):
@@ -727,6 +756,75 @@ class TestChangePassword(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(HTTPException) as ctx:
             await change_password(data, self.mock_request, authorization="Bearer token")
         self.assertEqual(ctx.exception.status_code, 400)
+
+
+class TestGoogleLogin(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.mock_request = types.SimpleNamespace()
+        self.mock_request.client = types.SimpleNamespace()
+        self.mock_request.client.host = "127.0.0.1"
+
+    @patch("app.api.auth_api.get_users_columns", return_value=MOCK_USER_COLUMNS)
+    @patch("app.api.auth_api.database")
+    @patch("app.api.auth_api.google_id_token.verify_oauth2_token")
+    @patch("app.api.auth_api.create_access_token")
+    @patch("app.api.auth_api.log_activity")
+    async def test_google_login_existing_user_uses_verified_claims(
+        self, mock_log, mock_create_token, mock_verify_token, mock_db, mock_cols
+    ):
+        mock_log.return_value = None
+        mock_create_token.return_value = "google-jwt"
+        mock_verify_token.return_value = {
+            "email": "google@example.com",
+            "name": "Google User",
+            "picture": "https://example.com/avatar.png",
+            "sub": "google-sub-123",
+        }
+
+        mock_db.fetch_one = AsyncMock(side_effect=[
+            {
+                "id": "user-1",
+                "full_name": "Google User",
+                "email": "google@example.com",
+                "role": "patient",
+                "must_change_password": False,
+                "status": "active",
+                "profile_completed": True,
+                "is_verified": True,
+                "avatar_url": None,
+                "google_id": None,
+            },
+            {
+                "id": "user-1",
+                "full_name": "Google User",
+                "email": "google@example.com",
+                "role": "patient",
+                "must_change_password": False,
+                "status": "active",
+                "profile_completed": True,
+                "is_verified": True,
+                "avatar_url": "https://example.com/avatar.png",
+                "google_id": "google-sub-123",
+            },
+        ])
+        mock_db.execute = AsyncMock()
+
+        from app.api.auth_api import google_login, GoogleLoginRequest
+        data = GoogleLoginRequest(id_token="token", avatar_url="https://example.com/avatar.png")
+        result = await google_login(data, self.mock_request)
+
+        self.assertEqual(result["access_token"], "google-jwt")
+        self.assertEqual(result["user"]["email"], "google@example.com")
+        mock_create_token.assert_called_once()
+
+    @patch("app.api.auth_api.get_users_columns", return_value=MOCK_USER_COLUMNS)
+    @patch("app.api.auth_api.google_id_token.verify_oauth2_token", side_effect=ValueError("bad token"))
+    async def test_google_login_invalid_token(self, mock_verify_token, mock_cols):
+        from app.api.auth_api import google_login, GoogleLoginRequest
+        data = GoogleLoginRequest(id_token="invalid-token")
+        with self.assertRaises(HTTPException) as ctx:
+            await google_login(data, self.mock_request)
+        self.assertEqual(ctx.exception.status_code, 401)
 
 
 class TestMe(unittest.IsolatedAsyncioTestCase):

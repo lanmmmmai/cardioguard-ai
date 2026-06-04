@@ -192,12 +192,16 @@ class TestGoogleLoginRequest(unittest.TestCase):
 
     def test_valid_minimal(self):
         schema = GoogleLoginRequest(
-            email="a@gmail.com", full_name="Nguyen Van A", google_id="g123"
+            id_token="token",
+            email="a@gmail.com",
+            full_name="Nguyen Van A",
+            google_id="g123",
         )
         self.assertEqual(schema.role, "patient")
 
     def test_valid_with_optional_fields(self):
         schema = GoogleLoginRequest(
+            id_token="token",
             email="a@gmail.com",
             full_name="Nguyen Van A",
             google_id="g123",

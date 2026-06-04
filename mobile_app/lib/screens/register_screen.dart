@@ -32,6 +32,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Liệu OTP đã được gửi hay chưa (chuyển biểu mẫu sang chế độ nhập OTP).
   bool _isOtpSent = false;
+  bool _agreedToTerms = false;
   // Thông báo lỗi được quản lý cục bộ.
   String? _localError;
   // Thông báo thành công hiển thị sau khi OTP được gửi hoặc đăng ký hoàn tất.
@@ -100,6 +101,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       fullName: _nameController.text.trim(),
       password: _passwordController.text,
       otp: otp,
+      agreePrivacy: _agreedToTerms,
+      agreeTerms: _agreedToTerms,
+      consentVersion: '1.0',
     );
 
     if (success && mounted) {
@@ -213,6 +217,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               const InputDecoration(labelText: 'Mã OTP (6 số)'),
                         ),
                       ],
+                      const SizedBox(height: 12),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: _agreedToTerms,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        onChanged: authProvider.isLoading
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  _agreedToTerms = value ?? false;
+                                });
+                              },
+                        title: const Text(
+                          'Tôi đồng ý với Chính sách quyền riêng tư và Điều khoản dịch vụ',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        subtitle: const Text(
+                          'Bắt buộc để tạo tài khoản.',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
                       const SizedBox(height: 18),
                       SizedBox(
                         width: double.infinity,
@@ -220,7 +245,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: ElevatedButton(
                           onPressed: authProvider.isLoading
                               ? null
-                              : (_isOtpSent ? _handleRegister : _requestOtp),
+                              : (_isOtpSent
+                                  ? () {
+                                      if (!_agreedToTerms) {
+                                        setState(() {
+                                          _localError =
+                                              'Bạn phải đồng ý với chính sách quyền riêng tư và điều khoản dịch vụ.';
+                                        });
+                                        return;
+                                      }
+                                      _handleRegister();
+                                    }
+                                  : _requestOtp),
                           child: authProvider.isLoading
                               ? const SizedBox(
                                   width: 20,

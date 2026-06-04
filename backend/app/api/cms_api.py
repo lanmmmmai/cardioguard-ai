@@ -63,6 +63,16 @@ DOMAIN_LINKS_DEFAULT_PREVIEW = {
     "image_url": "https://giatky.site/images/preview.jpg",
 }
 
+
+def _is_within_directory(base_dir: str, candidate_path: str) -> bool:
+    """Kiểm tra candidate_path có nằm trong base_dir hay không."""
+    base_real = os.path.realpath(base_dir)
+    candidate_real = os.path.realpath(candidate_path)
+    try:
+        return os.path.commonpath([base_real, candidate_real]) == base_real
+    except ValueError:
+        return False
+
 CMS_MODULES = {
     "users": {
         "table": "users",
@@ -190,6 +200,22 @@ def normalize_domain_path(value: Optional[str]) -> str:
     if len(raw) > 1 and raw.endswith("/"):
         raw = raw.rstrip("/")
     return raw or "/"
+
+
+def normalize_domain_link_payload(values: dict[str, Any]) -> dict[str, Any]:
+    """Chuẩn hóa payload domain-links trước khi ghi xuống DB."""
+    normalized = dict(values)
+    normalized_path = normalize_domain_path(normalized.get("path"))
+    normalized["path"] = normalized_path
+
+    raw_url = (normalized.get("url") or "").strip()
+    if not raw_url:
+        raw_url = f"https://giatky.site{normalized_path}"
+    normalized["url"] = raw_url
+
+    parsed = urlparse(raw_url)
+    normalized["domain"] = parsed.netloc or (normalized.get("domain") or "").strip()
+    return normalized
 
 
 def get_request_base_url(request: Request) -> str:
@@ -557,7 +583,7 @@ async def resolve_domain_link(path: Optional[str] = Query(default="/")):
 async def get_domain_link_image(file_name: str):
     ensure_domain_links_storage_dir()
     full_path = os.path.abspath(os.path.join(DOMAIN_LINKS_STORAGE_ROOT, file_name))
-    if not full_path.startswith(DOMAIN_LINKS_STORAGE_ROOT):
+    if not _is_within_directory(DOMAIN_LINKS_STORAGE_ROOT, full_path):
         raise HTTPException(status_code=400, detail="Invalid file path")
     if not os.path.isfile(full_path):
         raise HTTPException(status_code=404, detail="Image not found")
@@ -810,6 +836,7 @@ async def create_cms_record(module: str, payload: dict[str, Any], request: Reque
     if errors:
         raise HTTPException(status_code=422, detail=errors)
     if table == "domain_links":
+        values = normalize_domain_link_payload(values)
         async with AsyncSessionLocal() as session:
             duplicate = await session.execute(
                 text(
@@ -886,6 +913,8 @@ async def update_cms_record(module: str, record_id: str, payload: dict[str, Any]
     values, errors = validate_payload(payload, columns, config, partial=True)
     if errors:
         raise HTTPException(status_code=422, detail=errors)
+    if table == "domain_links" and values:
+        values = normalize_domain_link_payload(values)
     if not values:
         return await get_cms_record(module, record_id, authorization)
     values["record_id"] = record_id

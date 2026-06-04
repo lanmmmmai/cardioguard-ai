@@ -84,6 +84,9 @@ class AppConfig {
   static const String keyToken = 'jwt_access_token';
   static const String keyUser = 'authenticated_user_profile';
 
+  // Google OAuth client IDs được truyền qua `--dart-define` khi build.
+  static const String googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+
   // Cài đặt mạng
   static const int connectTimeoutMs = 45000; // 45 giây (tăng cho thời gian khởi động nguội Render)
   static const int receiveTimeoutMs = 15000; // 15 giây
