@@ -13,6 +13,7 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, AlertTriangle, BarChart3, CalendarDays, Cpu, HeartPulse, MessageCircle, Pill, ShieldAlert, Stethoscope, Users, Radio, WifiOff } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useBrowserPath } from '../hooks/useBrowserPath';
 import { API_URL } from '../config';
 import { Alert, Patient, SensorData } from '../types';
 import { readJsonResponse } from '../utils/response';
@@ -37,9 +38,20 @@ const Card: React.FC<{ icon: React.ReactNode; label: string; value: string | num
  * biểu đồ cột so sánh các chỉ số đó và hoạt động hệ thống gần đây.
  */
 export const AdminDashboard: React.FC<{ patients: Patient[]; alerts: Alert[]; doctors?: unknown[] }> = ({ patients, alerts, doctors = [] }) => {
+  const { navigate } = useBrowserPath();
   const highAlerts = alerts.filter((alert) => alert.severity === 'high').length;
-  const chartValues = [patients.length, alerts.length, highAlerts, doctors.length, 0, 0, 0];
-  const maxChartValue = Math.max(...chartValues, 1);
+  
+  // Custom Chart Data
+  const chartData = [
+    { label: 'Bệnh nhân', value: patients.length, colorClass: 'accent-green' },
+    { label: 'Bác sĩ', value: doctors.length, colorClass: 'accent-blue' },
+    { label: 'Cảnh báo', value: alerts.length, colorClass: 'accent-warning' },
+    { label: 'Cảnh báo cao', value: highAlerts, colorClass: '' }
+  ];
+  const maxVal = Math.max(...chartData.map(d => d.value), 1);
+
+  // Mảng hiển thị hoạt động gần đây
+  const recentAlerts = alerts.slice(0, 4);
 
   return (
     <div className="role-page-stack">
@@ -51,33 +63,187 @@ export const AdminDashboard: React.FC<{ patients: Patient[]; alerts: Alert[]; do
       </div>
 
       <div className="role-stat-grid">
-        <Card icon={<Users size={22} />} label="Tổng số bệnh nhân" value={patients.length} hint="Đang được quản lý" />
-        <Card icon={<Stethoscope size={22} />} label="Tổng số bác sĩ" value={doctors.length} hint="Đang hoạt động" />
-        <Card icon={<Cpu size={22} />} label="Thiết bị IoT" value="0" hint="Chưa có thiết bị thật được liên kết" />
-        <Card icon={<ShieldAlert size={22} />} label="Cảnh báo" value={alerts.length} hint={`${highAlerts} cảnh báo mức cao`} tone="danger" />
+        <div 
+          className="role-stat-card admin-stat-card-link" 
+          onClick={() => navigate('/admin/patients')}
+        >
+          <div className="role-stat-icon"><Users size={22} /></div>
+          <div>
+            <div className="role-stat-label">Tổng số bệnh nhân</div>
+            <div className="role-stat-value">{patients.length}</div>
+            <div className="role-stat-hint">Đang được quản lý</div>
+          </div>
+        </div>
+
+        <div 
+          className="role-stat-card admin-stat-card-link" 
+          onClick={() => navigate('/admin/doctors')}
+        >
+          <div className="role-stat-icon"><Stethoscope size={22} /></div>
+          <div>
+            <div className="role-stat-label">Tổng số bác sĩ</div>
+            <div className="role-stat-value">{doctors.length}</div>
+            <div className="role-stat-hint">Đang hoạt động</div>
+          </div>
+        </div>
+
+        <div 
+          className="role-stat-card admin-stat-card-link" 
+          onClick={() => navigate('/admin/devices')}
+        >
+          <div className="role-stat-icon"><Cpu size={22} /></div>
+          <div>
+            <div className="role-stat-label">Thiết bị IoT</div>
+            <div className="role-stat-value">0</div>
+            <div className="role-stat-hint">Chưa liên kết thiết bị</div>
+          </div>
+        </div>
+
+        <div 
+          className="role-stat-card danger admin-stat-card-link" 
+          onClick={() => navigate('/admin/alerts')}
+        >
+          <div className="role-stat-icon"><ShieldAlert size={22} /></div>
+          <div>
+            <div className="role-stat-label">Cảnh báo hệ thống</div>
+            <div className="role-stat-value">{alerts.length}</div>
+            <div className="role-stat-hint">{highAlerts} cảnh báo mức cao</div>
+          </div>
+        </div>
       </div>
 
       <div className="role-page-grid">
-        <section className="panel">
+        <section className="panel" style={{ display: 'flex', flexDirection: 'column' }}>
           <h3 className="metric-title"><BarChart3 size={18} /> Biểu đồ thống kê</h3>
-          <div className="real-chart-bars">
-            {chartValues.map((value, index) => (
-              <span key={index} style={{ height: `${Math.max(8, (value / maxChartValue) * 100)}%` }} title={`${value}`} />
+          
+          <div className="admin-chart-wrapper">
+            {/* Trục Y */}
+            <div className="admin-chart-y-axis">
+              <span>{maxVal}</span>
+              <span>{Math.round(maxVal * 0.75)}</span>
+              <span>{Math.round(maxVal * 0.5)}</span>
+              <span>{Math.round(maxVal * 0.25)}</span>
+              <span>0</span>
+            </div>
+
+            {/* Khung chứa các cột */}
+            <div className="admin-chart-bars-container">
+              {/* Đường vạch đứt nền */}
+              <div className="admin-chart-grid-lines">
+                <div className="admin-chart-grid-line" />
+                <div className="admin-chart-grid-line" />
+                <div className="admin-chart-grid-line" />
+                <div className="admin-chart-grid-line" />
+                <div className="admin-chart-grid-line" style={{ borderTopStyle: 'solid' }} />
+              </div>
+
+              {chartData.map((item, index) => {
+                const percentage = (item.value / maxVal) * 100;
+                return (
+                  <div key={index} className="admin-chart-bar-col">
+                    <div 
+                      className={`admin-chart-bar-pillar ${item.colorClass}`}
+                      style={{ height: `${Math.max(6, percentage)}%` }}
+                    >
+                      <div className="admin-chart-bar-tooltip">
+                        {item.label}: {item.value}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Trục X */}
+          <div className="admin-chart-x-axis-labels">
+            {chartData.map((item, index) => (
+              <div key={index} className="admin-chart-x-label">{item.label}</div>
             ))}
           </div>
-          <p className="role-muted">Biểu đồ chỉ dùng dữ liệu thật hiện có, không tạo bệnh nhân ảo.</p>
+
+          <p className="role-muted" style={{ marginTop: '1rem' }}>
+            Biểu đồ hiển thị số lượng bản ghi thực tế đang được lưu trữ trên cơ sở dữ liệu.
+          </p>
         </section>
 
         <section className="panel">
           <h3 className="metric-title"><Activity size={18} /> Hoạt động hệ thống gần đây</h3>
-          <div className="activity-list">
-            <div>Đồng bộ telemetry realtime thành công.</div>
-            <div>WebSocket `/ws/realtime` đang sẵn sàng.</div>
-            <div>AI risk assistant ở chế độ hỗ trợ tham khảo, cần bác sĩ xác nhận.</div>
-            <div>Audit log ghi nhận phiên đăng nhập mới.</div>
+          <div className="activity-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {recentAlerts.length > 0 ? (
+              recentAlerts.map((alert, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', borderBottom: '1px solid var(--glass-border)', paddingBottom: '8px' }}>
+                  <span className={`connection-status-dot ${alert.severity === 'high' ? 'disconnected' : 'connected'}`} style={{ marginTop: '5px' }} />
+                  <div>
+                    <strong style={{ fontSize: '0.85rem' }}>{alert.full_name || 'Bệnh nhân'}</strong>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{alert.message}</div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {alert.created_at ? new Date(alert.created_at).toLocaleString('vi-VN') : 'Vừa xong'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span className="connection-status-dot connected" />
+                  <span>Đồng bộ telemetry realtime thành công.</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span className="connection-status-dot connected" />
+                  <span>WebSocket `/ws/realtime` đang sẵn sàng.</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span className="connection-status-dot connected" />
+                  <span>AI risk assistant đang hoạt động ở chế độ tham khảo.</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span className="connection-status-dot connected" />
+                  <span>Audit log ghi nhận phiên làm việc của quản trị viên.</span>
+                </div>
+              </>
+            )}
           </div>
         </section>
       </div>
+
+      {/* Quick Actions Panel */}
+      <section className="panel">
+        <h3 className="metric-title"><Cpu size={18} /> Phím tắt tác vụ nhanh</h3>
+        <div className="admin-quick-actions-panel">
+          <button type="button" className="admin-quick-action-btn" onClick={() => navigate('/admin/doctor-verification')}>
+            <div className="admin-quick-action-icon"><ShieldAlert size={16} /></div>
+            <div>
+              <div>Xác thực Bác sĩ</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Phê duyệt hồ sơ bác sĩ mới</div>
+            </div>
+          </button>
+
+          <button type="button" className="admin-quick-action-btn" onClick={() => navigate('/admin/users')}>
+            <div className="admin-quick-action-icon"><Users size={16} /></div>
+            <div>
+              <div>Quản lý tài khoản</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Thêm, sửa, xóa, phân quyền</div>
+            </div>
+          </button>
+
+          <button type="button" className="admin-quick-action-btn" onClick={() => navigate('/admin/settings')}>
+            <div className="admin-quick-action-icon"><Stethoscope size={16} /></div>
+            <div>
+              <div>Cài đặt hệ thống</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Cấu hình ngưỡng lâm sàng & AI</div>
+            </div>
+          </button>
+
+          <button type="button" className="admin-quick-action-btn" onClick={() => navigate('/admin/cms')}>
+            <div className="admin-quick-action-icon"><Activity size={16} /></div>
+            <div>
+              <div>CMS Dữ liệu</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Nhập xuất & quản trị database</div>
+            </div>
+          </button>
+        </div>
+      </section>
     </div>
   );
 };

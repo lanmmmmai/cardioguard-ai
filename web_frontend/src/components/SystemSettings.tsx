@@ -152,7 +152,7 @@ export const SystemSettings: React.FC = () => {
                     max="80" 
                     value={minHr} 
                     onChange={(e) => setMinHr(Number(e.target.value))}
-                    style={{ flex: 1, accentColor: 'var(--color-primary)' }}
+                    className="clinical-range-slider"
                   />
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Max:</span>
                   <input 
@@ -161,7 +161,7 @@ export const SystemSettings: React.FC = () => {
                     max="180" 
                     value={maxHr} 
                     onChange={(e) => setMaxHr(Number(e.target.value))}
-                    style={{ flex: 1, accentColor: 'var(--color-primary)' }}
+                    className="clinical-range-slider"
                   />
                 </div>
               </div>
