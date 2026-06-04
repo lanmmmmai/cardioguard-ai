@@ -3,27 +3,21 @@ import { Bell, CheckCircle2, Languages, Lock, Settings, Shield, UserRound, Arrow
 import { useAuth } from '../auth/AuthContext';
 import { useLocale, type Locale } from '../i18n/locale';
 
-type PatientPreferences = {
+type DoctorPreferences = {
   language: Locale;
-  vitalAlerts: boolean;
-  appointmentReminders: boolean;
-  doctorMessages: boolean;
-  emailSummaries: boolean;
-  shareHealthSummary: boolean;
+  emailAlerts: boolean;
+  patientMessages: boolean;
 };
 
-const STORAGE_KEY = 'cardioguard_patient_settings';
+const STORAGE_KEY = 'cardioguard_doctor_settings';
 
-const defaultPreferences: PatientPreferences = {
+const defaultPreferences: DoctorPreferences = {
   language: 'vi',
-  vitalAlerts: true,
-  appointmentReminders: true,
-  doctorMessages: true,
-  emailSummaries: false,
-  shareHealthSummary: false,
+  emailAlerts: true,
+  patientMessages: true,
 };
 
-const loadPreferences = (): PatientPreferences => {
+const loadPreferences = (): DoctorPreferences => {
   if (typeof window === 'undefined') return defaultPreferences;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -49,10 +43,10 @@ const SettingSwitch: React.FC<{
   </label>
 );
 
-export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: boolean) => void }> = ({ navigate }) => {
+export const DoctorSettingsPage: React.FC<{ navigate: (path: string, replace?: boolean) => void }> = ({ navigate }) => {
   const { user } = useAuth();
   const { locale, setLocale, t } = useLocale();
-  const [preferences, setPreferences] = useState<PatientPreferences>(loadPreferences);
+  const [preferences, setPreferences] = useState<DoctorPreferences>(loadPreferences);
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,7 +59,7 @@ export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: 
     setSavedAt(new Date().toLocaleString(locale === 'en' ? 'en-US' : 'vi-VN'));
   }, [preferences, locale, setLocale]);
 
-  const togglePreference = (key: keyof Omit<PatientPreferences, 'language'>, value: boolean) => {
+  const togglePreference = (key: keyof Omit<DoctorPreferences, 'language'>, value: boolean) => {
     setPreferences((current) => ({ ...current, [key]: value }));
   };
 
@@ -74,22 +68,29 @@ export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: 
     { value: 'en' as const, label: locale === 'en' ? 'English' : 'Tiếng Anh' },
   ]), [locale]);
 
+  const isVi = locale === 'vi';
+
   return (
     <div className="role-page-stack">
       <div className="page-header">
         <div>
-          <h1 className="page-title">{t('patient_settings_title')}</h1>
-          <p className="page-subtitle">{t('patient_settings_subtitle')}</p>
+          <h1 className="page-title">{isVi ? 'Cài đặt bác sĩ' : 'Doctor Settings'}</h1>
+          <p className="page-subtitle">
+            {isVi 
+              ? 'Quản lý cấu hình ngôn ngữ, thông báo cảnh báo và thiết lập bảo mật tài khoản bác sĩ.' 
+              : 'Manage language preferences, alert notifications, and doctor account security.'}
+          </p>
         </div>
       </div>
 
       <div className="settings-grid">
+        {/* Language Settings Card */}
         <section className="panel settings-card">
           <div className="settings-card-heading">
             <Languages size={18} />
             <div>
               <h3>{t('language_settings')}</h3>
-              <p>{locale === 'en' ? 'Choose the display language for the entire interface.' : 'Chọn ngôn ngữ hiển thị cho toàn bộ giao diện.'}</p>
+              <p>{isVi ? 'Chọn ngôn ngữ hiển thị cho giao diện bác sĩ.' : 'Choose the display language for the doctor interface.'}</p>
             </div>
           </div>
           <div className="settings-segmented-control" role="group" aria-label={t('language_settings')}>
@@ -111,66 +112,50 @@ export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: 
           </div>
         </section>
 
+        {/* Notifications Card */}
         <section className="panel settings-card">
           <div className="settings-card-heading">
             <Bell size={18} />
             <div>
-              <h3>{t('notification_settings')}</h3>
-              <p>{locale === 'en' ? 'Turn patient account alerts on or off.' : 'Bật hoặc tắt các loại cảnh báo dành cho tài khoản bệnh nhân.'}</p>
+              <h3>{isVi ? 'Thiết lập thông báo' : 'Notification Settings'}</h3>
+              <p>{isVi ? 'Bật hoặc tắt các cảnh báo cho tài khoản bác sĩ.' : 'Enable or disable alerts for the doctor account.'}</p>
             </div>
           </div>
           <div className="settings-switch-list">
             <SettingSwitch
-              checked={preferences.vitalAlerts}
-              label={locale === 'en' ? 'Vital sign alerts' : 'Cảnh báo chỉ số sinh hiệu'}
-              description={locale === 'en' ? 'Receive urgent alerts for heart rate, SpO2, and blood pressure.' : 'Nhận cảnh báo khẩn cấp cho nhịp tim, SpO2 và huyết áp.'}
-              onChange={(value) => togglePreference('vitalAlerts', value)}
+              checked={preferences.emailAlerts}
+              label={isVi ? 'Cảnh báo lâm sàng qua Email' : 'Clinical Email Alerts'}
+              description={isVi ? 'Nhận email cảnh báo khi chỉ số sinh hiệu của bệnh nhân phụ trách vượt ngưỡng.' : 'Receive email alerts when monitored patient vitals cross safe thresholds.'}
+              onChange={(value) => togglePreference('emailAlerts', value)}
             />
             <SettingSwitch
-              checked={preferences.appointmentReminders}
-              label={locale === 'en' ? 'Appointment reminders' : 'Nhắc lịch hẹn'}
-              description={locale === 'en' ? 'Get reminders before upcoming appointments.' : 'Nhận thông báo trước các lịch hẹn sắp tới.'}
-              onChange={(value) => togglePreference('appointmentReminders', value)}
-            />
-            <SettingSwitch
-              checked={preferences.doctorMessages}
-              label={locale === 'en' ? 'Doctor messages' : 'Tin nhắn từ bác sĩ'}
-              description={locale === 'en' ? 'Notify when your doctor sends a message.' : 'Thông báo khi bác sĩ gửi tin nhắn.'}
-              onChange={(value) => togglePreference('doctorMessages', value)}
-            />
-            <SettingSwitch
-              checked={preferences.emailSummaries}
-              label={locale === 'en' ? 'Email summaries' : 'Tóm tắt qua email'}
-              description={locale === 'en' ? 'Receive periodic health summaries by email.' : 'Nhận tóm tắt sức khỏe định kỳ qua email.'}
-              onChange={(value) => togglePreference('emailSummaries', value)}
+              checked={preferences.patientMessages}
+              label={isVi ? 'Tin nhắn từ bệnh nhân' : 'Patient Messages'}
+              description={isVi ? 'Thông báo khi bệnh nhân gửi tin nhắn tư vấn mới.' : 'Notify when patients send a new consultation message.'}
+              onChange={(value) => togglePreference('patientMessages', value)}
             />
           </div>
         </section>
 
+        {/* Security & Deletion Card */}
         <section className="panel settings-card">
           <div className="settings-card-heading">
             <Shield size={18} />
             <div>
-              <h3>{t('security')}</h3>
-              <p>{locale === 'en' ? 'Configure privacy and account security actions.' : 'Thiết lập quyền riêng tư và thao tác bảo mật tài khoản.'}</p>
+              <h3>{isVi ? 'Bảo mật & Quyền riêng tư' : 'Security & Privacy'}</h3>
+              <p>{isVi ? 'Thiết lập quyền riêng tư và thao tác bảo mật tài khoản.' : 'Configure privacy and account security actions.'}</p>
             </div>
           </div>
-          <div className="settings-switch-list">
-            <SettingSwitch
-              checked={preferences.shareHealthSummary}
-              label={locale === 'en' ? 'Share health summary' : 'Chia sẻ tóm tắt sức khỏe'}
-              description={locale === 'en' ? 'Allow doctors to see your latest health summary quickly.' : 'Cho phép bác sĩ xem tóm tắt sức khỏe gần nhất của bạn nhanh hơn.'}
-              onChange={(value) => togglePreference('shareHealthSummary', value)}
-            />
-          </div>
-          <div className="settings-action-grid" style={{ marginBottom: '1.25rem' }}>
+          
+          <div className="settings-action-grid" style={{ marginBottom: '1.5rem' }}>
             <button type="button" className="btn btn-primary" onClick={() => navigate('/change-password')}>
               <Lock size={16} /> {t('change_password')}
             </button>
-            <button type="button" className="btn btn-secondary" onClick={() => navigate('/patient/profile')}>
-              <UserRound size={16} /> {t('edit_profile')}
+            <button type="button" className="btn btn-secondary" onClick={() => navigate('/doctor/profile')}>
+              <UserRound size={16} /> {isVi ? 'Chỉnh sửa hồ sơ' : 'Edit Profile'}
             </button>
           </div>
+
           <div 
             style={{ 
               borderTop: '1px solid var(--glass-border)', 
@@ -181,26 +166,27 @@ export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: 
             }}
           >
             <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              {locale === 'en' ? 'Data Requests' : 'Yêu cầu dữ liệu'}
+              {isVi ? 'Yêu cầu dữ liệu' : 'Data Requests'}
             </h4>
             <button 
               type="button" 
               className="btn btn-secondary"
-              onClick={() => navigate('/patient/delete-data')}
+              onClick={() => navigate('/doctor/delete-data')}
               style={{ justifyContent: 'space-between', padding: '12px 16px', borderRadius: '12px', fontSize: '0.85rem' }}
             >
-              <span>{locale === 'en' ? 'User Data Deletion Guide' : 'Hướng dẫn xóa dữ liệu người dùng'}</span>
+              <span>{isVi ? 'Hướng dẫn xóa dữ liệu người dùng' : 'User Data Deletion Guide'}</span>
               <ArrowRight size={16} style={{ color: 'var(--color-primary)' }} />
             </button>
           </div>
         </section>
 
+        {/* Preferences Summary Card */}
         <section className="panel settings-card">
           <div className="settings-card-heading">
             <Settings size={18} />
             <div>
-              <h3>{t('preferences')}</h3>
-              <p>{locale === 'en' ? 'Account information and saved preference status.' : 'Thông tin tài khoản và trạng thái lưu cấu hình.'}</p>
+              <h3>{isVi ? 'Thông tin thiết lập' : 'Settings Summary'}</h3>
+              <p>{isVi ? 'Thông tin tài khoản và trạng thái lưu cấu hình.' : 'Account information and saved preference status.'}</p>
             </div>
           </div>
           <div className="settings-summary">
@@ -228,3 +214,5 @@ export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: 
     </div>
   );
 };
+
+export default DoctorSettingsPage;

@@ -39,6 +39,7 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const timerRef = useRef<any>(null);
 
@@ -59,6 +60,10 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
 
   const validateForm = () => {
     const normalizedName = normalizeName(fullName);
+
+    if (!agreed) {
+      return 'Bạn phải đồng ý với Chính sách quyền riêng tư và Điều khoản dịch vụ để đăng ký tài khoản';
+    }
 
     if (!normalizedName || !email || !password || !confirmPassword) {
       return 'Vui lòng nhập đầy đủ họ tên, Gmail và mật khẩu';
@@ -188,6 +193,9 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
           phone: role === 'doctor' ? phone : undefined,
           specialty: role === 'doctor' ? specialty : undefined,
           department: role === 'doctor' ? department : undefined,
+          agree_privacy: agreed,
+          agree_terms: agreed,
+          consent_version: '1.0',
         }),
       });
 
@@ -419,11 +427,33 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
             </div>
           </div>
 
+          <div className="consent-checkbox-wrapper" style={{ margin: '1.5rem 0', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+            <input
+              id="consent"
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              style={{ marginTop: '3px', width: '16px', height: '16px', accentColor: 'var(--color-primary)', cursor: 'pointer' }}
+              disabled={isLoading}
+            />
+            <label htmlFor="consent" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4, cursor: 'pointer', userSelect: 'none', textAlign: 'left' }}>
+              Tôi đã đọc và đồng ý với{' '}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+                Chính sách quyền riêng tư
+              </a>{' '}
+              và{' '}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+                Điều khoản dịch vụ
+              </a>{' '}
+              của CardioGuard AI.
+            </label>
+          </div>
+
           <button
             type="submit"
             className="btn btn-primary"
             style={{ width: '100%', justifyContent: 'center', height: '46px' }}
-            disabled={isLoading}
+            disabled={isLoading || !agreed}
           >
             {isLoading ? (
               <>

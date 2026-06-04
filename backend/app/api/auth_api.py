@@ -416,6 +416,12 @@ async def register(data: RegisterRequest, request: Request):
     Raises:
         HTTPException 400: Nếu OTP không hợp lệ/hết hạn hoặc email đã tồn tại.
     """
+    if not data.agree_privacy or not data.agree_terms:
+        raise HTTPException(
+            status_code=400, 
+            detail="Bạn phải đồng ý với Chính sách quyền riêng tư và Điều khoản dịch vụ để đăng ký tài khoản."
+        )
+
     email = data.email.lower()
     logger.debug("Entry: register(email=%s)", email)
     otp_result = await verify_otp_token(
@@ -433,8 +439,8 @@ async def register(data: RegisterRequest, request: Request):
     logger.info("Register OTP valid for email=%s", email)
 
     insert_query = """
-    INSERT INTO users(full_name, email, password_hash, role, phone, specialty, department, status, profile_completed, is_verified)
-    VALUES (:full_name, :email, :password_hash, :role, :phone, :specialty, :department, 'pending_profile', FALSE, FALSE)
+    INSERT INTO users(full_name, email, password_hash, role, phone, specialty, department, status, profile_completed, is_verified, privacy_accepted_at, terms_accepted_at, consent_version)
+    VALUES (:full_name, :email, :password_hash, :role, :phone, :specialty, :department, 'pending_profile', FALSE, FALSE, NOW(), NOW(), :consent_version)
     """
 
     user_id = None
@@ -467,7 +473,8 @@ async def register(data: RegisterRequest, request: Request):
                     "role": role,
                     "phone": phone,
                     "specialty": specialty,
-                    "department": department
+                    "department": department,
+                    "consent_version": data.consent_version or "1.0"
                 }
             )
 
@@ -477,6 +484,29 @@ async def register(data: RegisterRequest, request: Request):
                 {"email": email},
             )
             user_id = created_user["id"] if created_user else None
+
+            if created_user:
+                # Ghi nhận lịch sử đồng ý vào bảng user_consents
+                ip_addr = request.client.host if request.client else None
+                user_ag = request.headers.get("user-agent")
+                consent_v = data.consent_version or "1.0"
+                
+                await database.execute(
+                    """
+                    INSERT INTO user_consents (user_id, consent_type, consent_version, ip_address, user_agent)
+                    VALUES (CAST(:user_id AS uuid), 'privacy', :consent_version, :ip_address, :user_agent)
+                    """,
+                    {"user_id": user_id, "consent_version": consent_v, "ip_address": ip_addr, "user_agent": user_ag}
+                )
+                
+                await database.execute(
+                    """
+                    INSERT INTO user_consents (user_id, consent_type, consent_version, ip_address, user_agent)
+                    VALUES (CAST(:user_id AS uuid), 'terms', :consent_version, :ip_address, :user_agent)
+                    """,
+                    {"user_id": user_id, "consent_version": consent_v, "ip_address": ip_addr, "user_agent": user_ag}
+                )
+
             if created_user and role == "patient":
                 patient_columns = await database.fetch_all(
                     """

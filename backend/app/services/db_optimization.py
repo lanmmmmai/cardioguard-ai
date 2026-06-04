@@ -225,6 +225,21 @@ async def ensure_profile_schema() -> None:
         FOR EACH ROW
         EXECUTE FUNCTION update_profile_updated_at()
         """,
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMPTZ",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version TEXT",
+        """
+        CREATE TABLE IF NOT EXISTS user_consents (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            consent_type TEXT NOT NULL,
+            consent_version TEXT NOT NULL,
+            accepted_at TIMESTAMPTZ DEFAULT NOW(),
+            ip_address TEXT,
+            user_agent TEXT
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_user_consents_user_id ON user_consents(user_id)",
     ]
 
     try:

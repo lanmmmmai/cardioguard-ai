@@ -70,6 +70,7 @@ export const roleMenus: Record<UserRole, RoleMenuItem[]> = {
     { label: 'Báo cáo y tế', path: '/doctor/reports', icon: FileText },
     { label: 'Nhắn tin', path: '/doctor/chat', icon: MessageCircle },
     { label: 'Chatbot AI', path: '/doctor/chatbot', icon: Bot },
+    { label: 'Cài đặt', path: '/doctor/settings', icon: Settings },
   ],
   patient: [
     { label: 'Dashboard', path: '/patient/home', icon: Home },

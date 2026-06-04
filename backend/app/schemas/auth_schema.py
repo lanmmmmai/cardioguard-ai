@@ -88,6 +88,9 @@ class RegisterRequest(BaseModel):
     phone: Optional[str] = None
     specialty: Optional[str] = None
     department: Optional[str] = None
+    agree_privacy: Optional[bool] = False
+    agree_terms: Optional[bool] = False
+    consent_version: Optional[str] = "1.0"
 
     @field_validator("full_name")
     @classmethod

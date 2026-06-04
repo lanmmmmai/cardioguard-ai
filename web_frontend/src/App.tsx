@@ -46,6 +46,10 @@ import { AdminLayout, DoctorLayout, PatientLayout } from './layouts/RoleLayout';
 import { AdminDashboard, DoctorDashboard, PatientHome, PlaceholderPage } from './pages/RolePages';
 import { PatientHealthPage } from './pages/PatientHealthPage';
 import { PatientSettingsPage } from './pages/PatientSettingsPage';
+import { DoctorSettingsPage } from './pages/DoctorSettingsPage';
+import { UserDataDeletionPage } from './pages/UserDataDeletionPage';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useBrowserPath } from './hooks/useBrowserPath';
 import { privateRouteRole } from './navigation/routeMeta';
@@ -476,7 +480,13 @@ const AppContent: React.FC = () => {
       case '/admin/system-logs':
         return <ApiDataPage key={normalizedPath} title={getPageMeta(normalizedPath, locale)?.title || ''} subtitle={getPageMeta(normalizedPath, locale)?.subtitle || ''} endpoint="/audit-logs" />;
       case '/admin/settings':
-        return <SystemSettings />;
+        return <SystemSettings navigate={navigate} />;
+      case '/doctor/settings':
+        return <DoctorSettingsPage navigate={navigate} />;
+      case '/admin/delete-data':
+      case '/doctor/delete-data':
+      case '/patient/delete-data':
+        return <UserDataDeletionPage />;
       case '/admin/profile':
       case '/doctor/profile':
       case '/patient/profile':
@@ -508,6 +518,17 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return <div className="route-loading">Đang khôi phục phiên đăng nhập...</div>;
+  }
+
+  // Xử lý các trang pháp lý công khai (không yêu cầu xác thực)
+  if (path === '/privacy') {
+    return <PrivacyPolicy />;
+  }
+  if (path === '/terms') {
+    return <TermsOfService />;
+  }
+  if (path === '/data-deletion') {
+    return <UserDataDeletionPage />;
   }
 
   // Xử lý các trang Register

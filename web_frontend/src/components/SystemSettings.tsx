@@ -16,14 +16,15 @@ import {
   Sliders, 
   Cpu, 
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  ArrowRight
 } from 'lucide-react';
 
 /**
  * Component SystemSettings — bảng quản trị 5 phần cho cài đặt ngưỡng, mạng, thông báo,
  * cấu hình AI và chẩn đoán. Lưu trữ vào localStorage.
  */
-export const SystemSettings: React.FC = () => {
+export const SystemSettings: React.FC<{ navigate?: (path: string) => void }> = ({ navigate }) => {
   const [minHr, setMinHr] = useState<number>(50);
   const [maxHr, setMaxHr] = useState<number>(120);
   const [minSpo2, setMinSpo2] = useState<number>(92);
@@ -397,6 +398,26 @@ export const SystemSettings: React.FC = () => {
                 <span className="patient-status normal" style={{ fontSize: '0.75rem', padding: '2px 8px' }}>An toàn</span>
               </div>
 
+            </div>
+          </section>
+
+          <section className="panel" style={{ height: 'fit-content' }}>
+            <h3 className="metric-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
+              <ShieldAlert size={18} style={{ color: 'var(--color-primary)' }} /> Quy Định & Pháp Lý
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                Xem quy trình và hướng dẫn chi tiết yêu cầu xóa tài khoản và dữ liệu cá nhân liên kết Facebook.
+              </span>
+              <button 
+                type="button" 
+                className="btn btn-secondary"
+                onClick={() => navigate?.('/admin/delete-data')}
+                style={{ justifyContent: 'space-between', padding: '12px 16px', borderRadius: '12px', fontSize: '0.85rem' }}
+              >
+                <span>Hướng dẫn xóa dữ liệu người dùng</span>
+                <ArrowRight size={16} style={{ color: 'var(--color-primary)' }} />
+              </button>
             </div>
           </section>
 
