@@ -226,6 +226,7 @@ export const FeatureHub: React.FC<FeatureHubProps> = ({ type, role, patients }) 
           );
         }
       } catch {
+        // Ignored parsing errors
       }
     }
     

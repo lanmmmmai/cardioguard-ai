@@ -179,7 +179,6 @@ export const DoctorMedicalRecordsPage: React.FC<{
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, currentUserId, recordId, path]);
 
   const filteredRecords = useMemo(() => {
@@ -404,7 +403,6 @@ export const PatientMedicalRecordsPage: React.FC<{
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, user?.id, path]);
 
   if (loading) return <div className="route-loading">Đang tải bệnh án...</div>;
@@ -493,7 +491,6 @@ export const AdminMedicalRecordsPage: React.FC<{
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, recordId, path]);
 
   const filtered = useMemo(() => {
