@@ -6,7 +6,10 @@ export interface GoogleAuthUser {
   full_name: string;
   email: string;
   role: string;
+  status?: string;
   must_change_password?: boolean;
+  profile_completed?: boolean;
+  is_verified?: boolean;
 }
 
 export interface GoogleAuthResponse {
@@ -20,13 +23,13 @@ export interface GoogleAuthSuccessResponse {
   user: GoogleAuthUser;
 }
 
-export const exchangeGoogleIdToken = async (idToken: string): Promise<GoogleAuthSuccessResponse> => {
+export const exchangeGoogleIdToken = async (idToken: string, role: string): Promise<GoogleAuthSuccessResponse> => {
   const response = await fetch(`${API_URL}/auth/google-login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ id_token: idToken }),
+    body: JSON.stringify({ id_token: idToken, role }),
   });
 
   const data = await readJsonResponse<GoogleAuthResponse>(response);

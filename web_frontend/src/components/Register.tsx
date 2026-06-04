@@ -152,7 +152,7 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
     setIsLoading(true);
 
     try {
-      const data = await exchangeGoogleIdToken(idToken);
+      const data = await exchangeGoogleIdToken(idToken, role);
       onGoogleAuthSuccess(data.access_token, data.user);
     } catch (err: any) {
       setError(err?.message || 'Đăng nhập Google thất bại.');

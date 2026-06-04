@@ -770,14 +770,18 @@ async def login(data: LoginRequest, request: Request):
 @router.post("/auth/google-login")
 async def google_login(data: GoogleLoginRequest, request: Request):
     """Đăng nhập bằng tài khoản Google.
-    Nếu email chưa tồn tại, tự động tạo tài khoản mới với vai trò là 'patient' (bệnh nhân).
-    Nếu email đã tồn tại, liên kết/xác thực tài khoản và đăng nhập.
+    Nếu email chưa tồn tại, tự động tạo tài khoản mới theo vai trò client yêu cầu
+    (patient hoặc doctor). Nếu email đã tồn tại, liên kết/xác thực tài khoản và đăng nhập.
     """
     ip = request.client.host if request.client else "unknown"
     claims = _verify_google_id_token(data.id_token)
     email = (claims.get("email") or "").strip().lower()
     if not email:
         raise HTTPException(status_code=401, detail="Google account does not include an email address")
+
+    requested_role = (data.role or "patient").strip().lower()
+    if requested_role not in {"patient", "doctor"}:
+        raise HTTPException(status_code=400, detail="Unsupported Google auth role")
 
     google_sub = (claims.get("sub") or "").strip()
     display_name = (
@@ -865,16 +869,23 @@ async def google_login(data: GoogleLoginRequest, request: Request):
             user = await database.fetch_one(query=query, values={"email": email})
 
         db_role = normalize_role(user["role"])
+        if db_role != requested_role:
+            raise HTTPException(
+                status_code=403,
+                detail="Tài khoản Google này không khớp với vai trò đăng nhập hiện tại",
+            )
     else:
         # Tài khoản chưa tồn tại, tự động đăng ký
-        role = "patient"
+        role = requested_role
         
         # Sinh mật khẩu ngẫu nhiên để băm (dành cho OAuth)
         random_pw = secrets.token_hex(16)
         
+        status_value = "active" if role == "patient" else "pending_profile"
+        profile_completed = role == "patient"
         insert_query = """
         INSERT INTO users(full_name, email, password_hash, role, status, profile_completed, is_verified, avatar_url, google_id)
-        VALUES (:full_name, :email, :password_hash, :role, 'active', FALSE, FALSE, :avatar_url, :google_id)
+        VALUES (:full_name, :email, :password_hash, :role, :status, :profile_completed, FALSE, :avatar_url, :google_id)
         """
         
         try:
@@ -885,12 +896,14 @@ async def google_login(data: GoogleLoginRequest, request: Request):
                     values={
                         "full_name": display_name,
                         "email": email,
-                        "password_hash": hash_password(random_pw),
-                        "role": role,
-                        "avatar_url": avatar_url,
-                        "google_id": google_sub
-                    }
-                )
+                    "password_hash": hash_password(random_pw),
+                    "role": role,
+                    "status": status_value,
+                    "profile_completed": profile_completed,
+                    "avatar_url": avatar_url,
+                    "google_id": google_sub
+                }
+            )
 
                 # Fetch thông tin user vừa tạo
                 user = await database.fetch_one(query=query, values={"email": email})
@@ -921,6 +934,31 @@ async def google_login(data: GoogleLoginRequest, request: Request):
                     await database.execute(
                         f"INSERT INTO patients ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
                         patient_values,
+                    )
+                elif role == "doctor":
+                    doctor_columns = await database.fetch_all(
+                        """
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = 'doctor_profiles'
+                        """
+                    )
+                    doctor_cols = {row["column_name"] for row in doctor_columns}
+                    doctor_values = {
+                        "user_id": user_id,
+                        "full_name": display_name,
+                    }
+                    if "avatar_url" in doctor_cols:
+                        doctor_values["avatar_url"] = avatar_url
+                    if "status" in doctor_cols:
+                        doctor_values["status"] = "pending_profile"
+                    if "is_verified" in doctor_cols:
+                        doctor_values["is_verified"] = False
+                    insert_columns = ", ".join(doctor_values.keys())
+                    bind_columns = ", ".join(f":{key}" for key in doctor_values.keys())
+                    await database.execute(
+                        f"INSERT INTO doctor_profiles ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
+                        doctor_values,
                     )
                     
             # Ghi nhận log đăng ký qua Google thành công

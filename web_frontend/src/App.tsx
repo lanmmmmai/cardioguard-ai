@@ -378,7 +378,16 @@ const AppContent: React.FC = () => {
    * lưu trữ phiên qua AuthContext và điều hướng đến tuyến đường mặc định
    * thích hợp (hoặc buộc đổi mật khẩu nếu được yêu cầu).
    */
-  const handleLoginSuccess = (token: string, userData: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean }) => {
+  const handleLoginSuccess = (token: string, userData: {
+    id: string;
+    full_name: string;
+    email: string;
+    role: string;
+    must_change_password?: boolean;
+    profile_completed?: boolean;
+    is_verified?: boolean;
+    status?: string;
+  }) => {
     const userRole = normalizeRole(userData.role);
     if (!userRole) {
       throw new Error('Tài khoản chưa được phân quyền');
@@ -388,6 +397,18 @@ const AppContent: React.FC = () => {
     logger.info('Đăng nhập thành công: vai_trò=%s tên=%s', normalizedUser.role, normalizedUser.full_name);
     if (normalizedUser.must_change_password) {
       navigate('/change-password', true);
+    } else if (normalizedUser.role === 'doctor') {
+      if (!normalizedUser.profile_completed) {
+        navigate('/doctor/complete-profile', true);
+      } else if (normalizedUser.status === 'rejected') {
+        navigate('/doctor/verification-rejected', true);
+      } else if (!normalizedUser.is_verified) {
+        navigate('/doctor/pending-verification', true);
+      } else {
+        navigate(defaultRouteByRole[normalizedUser.role], true);
+      }
+    } else if (normalizedUser.role === 'patient' && !normalizedUser.profile_completed) {
+      navigate('/patient/complete-profile', true);
     } else {
       navigate(defaultRouteByRole[normalizedUser.role], true);
     }

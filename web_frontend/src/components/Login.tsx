@@ -21,7 +21,16 @@ import { exchangeGoogleIdToken } from '../lib/googleAuth';
 
 interface LoginProps {
   role: UserRole;
-  onLoginSuccess: (token: string, user: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean }) => void;
+  onLoginSuccess: (token: string, user: {
+    id: string;
+    full_name: string;
+    email: string;
+    role: string;
+    must_change_password?: boolean;
+    profile_completed?: boolean;
+    is_verified?: boolean;
+    status?: string;
+  }) => void;
   onNavigateToRegister: () => void;
   onNavigateToForgotPassword: () => void;
 }
@@ -60,7 +69,16 @@ export const Login: React.FC<LoginProps> = ({ role, onLoginSuccess, onNavigateTo
       const data = await readJsonResponse<{
         detail?: string;
         access_token?: string;
-        user?: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean };
+        user?: {
+          id: string;
+          full_name: string;
+          email: string;
+          role: string;
+          must_change_password?: boolean;
+          profile_completed?: boolean;
+          is_verified?: boolean;
+          status?: string;
+        };
       }>(response);
 
       if (!response.ok) {
@@ -84,7 +102,7 @@ export const Login: React.FC<LoginProps> = ({ role, onLoginSuccess, onNavigateTo
     setIsLoading(true);
 
     try {
-      const data = await exchangeGoogleIdToken(idToken);
+      const data = await exchangeGoogleIdToken(idToken, role);
       onLoginSuccess(data.access_token, data.user);
     } finally {
       setIsLoading(false);
