@@ -164,3 +164,6 @@ desktop.ini
 # Codex & Docs local specifications
 .codex/
 .docs/
+
+# CodeGraph files
+.codegraph/

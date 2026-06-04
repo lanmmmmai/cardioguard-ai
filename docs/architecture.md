@@ -53,31 +53,38 @@ CardioGuard AI là hệ thống giám sát sức khỏe đa nền tảng gồm 4
 
 | Layer | Công nghệ | Chức năng |
 |-------|----------|-----------|
-| API Router | FastAPI | REST endpoints: auth, patient, doctor, admin, CMS, IoT |
-| WebSocket | WebSocket Manager | Realtime: health_metrics, alerts, chat, appointments |
-| Auth | JWT + OTP | Xác thực bằng JWT token, OTP qua email |
-| AI | OpenAI / Mock | Chatbot hỗ trợ bệnh nhân và bác sĩ |
-| Database | SQLAlchemy + asyncpg | Async PostgreSQL access |
+| API Router | FastAPI | 14 routers: auth, user, patient, sensor, alert, crud, cms, email, chat, feature, profile, admin_doctor, realtime |
+| WebSocket | Connection Manager | Realtime role-aware: health_metrics, alerts, chat, appointments |
+| Auth | JWT (HS256) + OTP (HMAC-SHA256) | Xác thực JWT, OTP email verification |
+| AI | Rule-based (heart_ai) + OpenAI / Mock | Anomaly detection + chatbot |
+| Database | SQLAlchemy async + asyncpg + `databases` | Async PostgreSQL queries |
+| Security | Rate limiter, bcrypt, password policy, revoked tokens | Bảo vệ API |
 | IoT Ingest | HTTP endpoint | Nhận telemetry từ thiết bị ESP32 |
 
 **Cấu trúc thư mục:**
 
 ```
 backend/app/
-├── api/                # REST endpoint handlers
-│   ├── auth_api.py     # Login, register, OTP, password
-│   ├── patient_api.py  # Patient CRUD
-│   ├── admin_api.py    # Admin dashboard
-│   ├── admin_doctor_api.py  # Doctor management
-│   ├── alert_api.py    # Alert endpoints
-│   ├── chat_api.py     # Chat/AI endpoints
-│   └── iot/            # IoT telemetry ingest
-├── core/               # Config, database, security, rate limit
-├── models/             # SQLAlchemy ORM models
-├── schemas/            # Pydantic request/response schemas
-├── services/           # Business logic (email, OTP, AI, audit)
-├── websocket/          # WebSocket connection manager
-└── ai/                 # Rule-based abnormal detection
+├── api/                    # REST endpoint handlers
+│   ├── auth_api.py         # Login, register, OTP, password
+│   ├── user_api.py         # User management
+│   ├── patient_api.py      # Patient CRUD
+│   ├── sensor_api.py       # Sensor data + IoT telemetry
+│   ├── alert_api.py        # Alert endpoints
+│   ├── chat_api.py         # Chat/AI endpoints
+│   ├── crud_api.py         # Generic CRUD for 16+ tables
+│   ├── cms_api.py          # CMS: domain links, email templates, data tables
+│   ├── email_api.py        # Email template management, sending
+│   ├── profile_api.py      # Avatar upload, profile update
+│   ├── feature_api.py      # Feature flags
+│   ├── admin_doctor_api.py # Doctor verification, management
+│   └── realtime_api.py     # WebSocket handler
+├── ai/                     # Rule-based abnormal detection (heart_ai.py)
+├── core/                   # Config, database, security, rate_limit, password_policy
+├── models/                 # SQLAlchemy ORM models
+├── schemas/                # Pydantic request/response schemas
+├── services/               # Email, OTP, AI service, audit, db_optimization
+└── websocket/              # WebSocket connection manager (role-aware)
 ```
 
 ### 2.2 Web Frontend (React / TypeScript / Vite)
@@ -214,8 +221,8 @@ Client (Web/Mobile)        Backend WS Manager          DB / Other Clients
 | ORM | SQLAlchemy | 2.0+ |
 | JWT | python-jose | 3.3+ |
 | Frontend Framework | React | 18+ |
-| Build Tool | Vite | 5+ |
-| Mobile Framework | Flutter | 3.44+ |
+| Build Tool | Vite | 8+ |
+| Mobile Framework | Flutter | 3.38+ |
 | State Management | Provider | 6+ |
 | HTTP (Mobile) | Dio | 5+ |
 | MCU | ESP32-S3 | - |

@@ -186,3 +186,21 @@ class ChangePasswordRequest(BaseModel):
         if self.new_password == self.old_password:
             raise ValueError("New password must be different from old password")
         return self
+
+
+class GoogleLoginRequest(BaseModel):
+    """Thông tin xác thực cho đăng nhập bằng Google.
+
+    Thuộc tính:
+        email: Địa chỉ email từ Google.
+        full_name: Tên đầy đủ từ Google.
+        google_id: ID định danh từ Google.
+        avatar_url: Đường dẫn ảnh đại diện tùy chọn.
+        role: Vai trò đăng nhập mong muốn (admin/doctor/patient).
+    """
+    email: EmailStr
+    full_name: str
+    google_id: str
+    avatar_url: Optional[str] = None
+    role: Optional[str] = "patient"
+

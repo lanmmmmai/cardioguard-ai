@@ -29,6 +29,7 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
   const dataPointsRef = useRef<number[]>([]);
   const animationFrameIdRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+  const chartWidthRef = useRef<number>(0);
 
   const heartRateRef = useRef(heartRate);
   const liveEcgValueRef = useRef(liveEcgValue);
@@ -40,6 +41,17 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
   useEffect(() => {
     liveEcgValueRef.current = liveEcgValue;
   }, [liveEcgValue]);
+
+  const resizeBuffer = (width: number) => {
+    const nextLength = Math.max(120, Math.min(600, Math.round(width * 0.75)));
+    const current = dataPointsRef.current;
+    if (current.length === nextLength) return;
+    if (current.length > nextLength) {
+      dataPointsRef.current = current.slice(current.length - nextLength);
+      return;
+    }
+    dataPointsRef.current = [...Array(nextLength - current.length).fill(0), ...current];
+  };
 
   useEffect(() => {
     dataPointsRef.current = Array(300).fill(0);
@@ -59,6 +71,16 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const nextWidth = entry.contentRect.width;
+      if (!nextWidth || nextWidth === chartWidthRef.current) return;
+      chartWidthRef.current = nextWidth;
+      resizeBuffer(nextWidth);
+    });
+    observer.observe(canvas);
+
     const render = (timestamp: number) => {
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
@@ -74,6 +96,10 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
       const width = rect.width;
       const height = rect.height;
       const centerY = height / 2;
+      if (width && width !== chartWidthRef.current) {
+        chartWidthRef.current = width;
+        resizeBuffer(width);
+      }
       if (liveEcgValueRef.current === undefined) {
         if (!lastTimeRef.current) lastTimeRef.current = timestamp;
         const elapsed = timestamp - lastTimeRef.current;
@@ -184,6 +210,7 @@ export const ECGChart: React.FC<ECGChartProps> = ({ liveEcgValue, heartRate }) =
     animationFrameIdRef.current = requestAnimationFrame(render);
 
     return () => {
+      observer.disconnect();
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
       }

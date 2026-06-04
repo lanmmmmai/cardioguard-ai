@@ -48,7 +48,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Xác thực độ mạnh mật khẩu: >= 8 ký tự, chữ hoa, chữ cái, chữ số, ký tự đặc biệt.
   String? _validatePassword(String? value) {
-    final v = (value ?? '').trim();
+    final v = value ?? '';
     if (v.length < 8) return 'Mật khẩu phải từ 8 ký tự';
     if (!RegExp(r'[A-Z]').hasMatch(v)) return 'Mật khẩu cần ít nhất 1 chữ hoa';
     if (!RegExp(r'[a-zA-Z]').hasMatch(v)) return 'Mật khẩu cần chứa chữ cái';
@@ -98,7 +98,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final success = await authProvider.registerPatient(
       email: _emailController.text.trim(),
       fullName: _nameController.text.trim(),
-      password: _passwordController.text.trim(),
+      password: _passwordController.text,
       otp: otp,
     );
 
@@ -239,6 +239,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('Đã có tài khoản? Đăng nhập'),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/privacy'),
+                      child: const Text(
+                        'Bảo mật',
+                        style: TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('|', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/terms'),
+                      child: const Text(
+                        'Điều khoản',
+                        style: TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('|', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/data-deletion'),
+                      child: const Text(
+                        'Xóa dữ liệu',
+                        style: TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

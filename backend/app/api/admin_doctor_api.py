@@ -182,9 +182,12 @@ async def create_doctor(payload: DoctorCreate, admin: dict = Depends(require_adm
             }
         )
         return dict(row)
-    except Exception as e:
+    except Exception:
         logger.exception("Admin tạo bác sĩ thất bại: full_name=%s", payload.full_name)
-        raise HTTPException(status_code=500, detail=f"Lỗi thêm bác sĩ: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Không thể tạo tài khoản bác sĩ vào lúc này",
+        )
 
 @router.put("/doctors/{doctor_id}", response_model=DoctorResponse)
 async def update_doctor(doctor_id: str, payload: DoctorUpdate, admin: dict = Depends(require_admin)):
@@ -269,9 +272,12 @@ async def update_doctor(doctor_id: str, payload: DoctorUpdate, admin: dict = Dep
     try:
         row = await database.fetch_one(update_query, values)
         return dict(row)
-    except Exception as e:
+    except Exception:
         logger.exception("Admin cập nhật bác sĩ thất bại: doctor_id=%s", doctor_id)
-        raise HTTPException(status_code=500, detail=f"Lỗi cập nhật bác sĩ: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Không thể cập nhật thông tin bác sĩ vào lúc này",
+        )
 
 @router.delete("/doctors/{doctor_id}")
 async def delete_doctor(doctor_id: str, admin: dict = Depends(require_admin)):

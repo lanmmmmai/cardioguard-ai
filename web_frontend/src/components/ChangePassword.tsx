@@ -16,7 +16,8 @@ import { Activity, Lock, Loader2, CheckCircle2 } from 'lucide-react';
 import { API_URL } from '../config';
 import { useAuth } from '../auth/AuthContext';
 import type { UserRole } from '../auth/roles';
-import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
+import { isStrongPassword, getPasswordPolicyMessage } from '../utils/passwordPolicy';
+import { useLocale } from '../i18n/locale';
 
 interface ChangePasswordProps {
   onNavigateNext: (nextRole?: UserRole) => void;
@@ -27,6 +28,7 @@ interface ChangePasswordProps {
  */
 export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }) => {
   const { accessToken, login, refreshUser, role } = useAuth();
+  const { locale } = useLocale();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -59,7 +61,7 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ onNavigateNext }
       return;
     }
     if (!isStrongPassword(newPassword)) {
-      setError(passwordPolicyMessage);
+      setError(getPasswordPolicyMessage(locale));
       return;
     }
 

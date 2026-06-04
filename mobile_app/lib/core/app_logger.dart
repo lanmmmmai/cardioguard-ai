@@ -38,8 +38,11 @@ class AppLogger {
     // Tuân thủ HIPAA: Che dấu thông tin nhạy cảm đơn giản
     // Che dấu email
     text = text.replaceAllMapped(RegExp(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'), (m) => '***@***.***');
-    // Che dấu số điện thoại tiềm năng (10-11 chữ số)
-    text = text.replaceAllMapped(RegExp(r'\b\d{10,11}\b'), (m) => '***-***-****');
+    // Chỉ che dấu số điện thoại khi có ngữ cảnh rõ ràng để tránh che nhầm ID kỹ thuật.
+    text = text.replaceAllMapped(
+      RegExp(r'((phone|tel|mobile|sdt|so_dien_thoai)\s*[:=]\s*)(\+?\d[\d\s-]{8,}\d)', caseSensitive: false),
+      (m) => '${m.group(1)}***-***-****',
+    );
     
     debugPrint('[${level.name.toUpperCase()}] $text');
   }

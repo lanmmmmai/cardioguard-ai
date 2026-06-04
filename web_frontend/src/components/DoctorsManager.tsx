@@ -34,6 +34,7 @@ export const DoctorsManager: React.FC = () => {
   const { accessToken } = useAuth();
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -316,6 +317,9 @@ export const DoctorsManager: React.FC = () => {
   };
 
   const filteredDoctors = doctors.filter((doc) => {
+    if (statusFilter !== 'all' && doc.status !== statusFilter) {
+      return false;
+    }
     const term = searchQuery.toLowerCase().trim();
     if (!term) return true;
     return (
@@ -350,16 +354,37 @@ export const DoctorsManager: React.FC = () => {
       </div>
 
       <div className="panel" style={{ marginBottom: '1.5rem', padding: '12px 20px' }}>
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <Search size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Tìm kiếm theo tên, email hoặc số điện thoại..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '45px', border: 'none', background: 'transparent' }}
-          />
+        <div className="admin-toolbar-responsive">
+          <div className="admin-toolbar-search" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <Search size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Tìm kiếm theo tên, email hoặc số điện thoại..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ paddingLeft: '45px', border: 'none', background: 'transparent' }}
+            />
+          </div>
+
+          <div className="admin-toolbar-selects">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Trạng thái:</span>
+              <select 
+                className="form-control" 
+                value={statusFilter} 
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{ minWidth: '130px', padding: '6px 12px', height: '36px' }}
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="active">Hoạt động (Đã duyệt)</option>
+                <option value="inactive">Tạm ngưng</option>
+                <option value="pending_verification">Chờ xác thực</option>
+                <option value="rejected">Từ chối</option>
+                <option value="need_update">Cần bổ sung</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -441,8 +466,11 @@ export const DoctorsManager: React.FC = () => {
                       </div>
                     </td>
                     <td style={{ padding: '16px' }}>
-                      <span className={`patient-status ${doc.status === 'active' ? 'normal' : 'critical'}`} style={{ textTransform: 'capitalize' }}>
-                        {doc.status === 'active' ? 'Hoạt động' : 'Tạm ngưng'}
+                      <span className={`patient-status ${doc.status === 'active' ? 'normal' : doc.status === 'inactive' ? 'critical' : 'warning'}`}>
+                        {doc.status === 'active' ? 'Hoạt động' : 
+                         doc.status === 'inactive' ? 'Tạm ngưng' : 
+                         doc.status === 'pending_verification' ? 'Chờ duyệt' : 
+                         doc.status === 'rejected' ? 'Từ chối' : 'Cần bổ sung'}
                       </span>
                     </td>
                     <td style={{ padding: '16px', textAlign: 'right' }}>

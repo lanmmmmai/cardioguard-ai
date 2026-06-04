@@ -1,3 +1,12 @@
+/*
+ * Tệp: CardioGuard AI – Hệ thống kiểu dáng CSS toàn cục (index.css)
+ * Mục đích: Định nghĩa các biến CSS, thiết kế tối/sáng (Dark/Light mode), các kiểu dáng giao diện đặc thù
+ *           (vitals, ECG charts, alerts, buttons) và hệ thống phân cấp menu/điều hướng.
+ * Luồng xử lý: Áp dụng trên toàn bộ trang web frontend, tích hợp các chủ đề động và phong cách Responsive.
+ * Quan hệ:
+ *   - Được nạp vào đầu vào main.tsx để định hình kiểu dáng cho toàn bộ ứng dụng web frontend.
+ */
+
 /* Custom Premium Dark Mode Design System for CardioGuard AI */
 :root {
   /* Harmonious Color Palette */
@@ -4991,3 +5000,506 @@ body {
   animation: shimmer 1.5s infinite;
   border-radius: 8px;
 }
+
+/* Layout & Flex Utilities */
+.flex-row { display: flex; flex-direction: row; }
+.flex-col { display: flex; flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
+.justify-between { justify-content: space-between; }
+.justify-end { justify-content: flex-end; }
+.align-center { align-items: center; }
+.gap-4 { gap: 4px; }
+.gap-8 { gap: 8px; }
+.gap-10 { gap: 10px; }
+.gap-12 { gap: 12px; }
+.gap-14 { gap: 14px; }
+.gap-16 { gap: 16px; }
+.gap-20 { gap: 20px; }
+.text-center { text-align: center; }
+.w-full { width: 100%; }
+.m-auto-12 { margin: 0 auto 12px; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* ============================================================================
+   CardioGuard Navigation Groups & Mobile Drawer Optimizations
+   ============================================================================ */
+
+/* Menu Group Heading Styles in Sidebar */
+.menu-group-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.menu-group-header {
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 6px 12px 2px;
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
+.menu-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Mobile Bottom Sheet Drawer Grouping Layout Styles */
+.mobile-drawer-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 8px;
+}
+
+.mobile-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-drawer-section-title {
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0;
+  padding-left: 4px;
+  opacity: 0.8;
+}
+
+/* Group Transition Micro-animations */
+.menu-group-section,
+.mobile-drawer-section {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Collapsible menu groups */
+.menu-group-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.menu-group-toggle {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-weight: 750;
+  text-align: left;
+  transition: var(--transition-smooth);
+}
+
+.menu-group-toggle:hover,
+.menu-group-toggle.expanded {
+  color: var(--text-primary);
+  background: var(--hover-bg);
+}
+
+.menu-group-container.has-active .menu-group-toggle {
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.group-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.menu-group-sub-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 12px;
+  margin-top: 2px;
+  border-left: 1px dashed var(--glass-border);
+  margin-left: 20px;
+}
+
+.role-menu-item.sub-item {
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  border-radius: 10px;
+  font-weight: 650;
+}
+
+/* Mobile drawer group toggle */
+.mobile-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.mobile-drawer-section-toggle {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 4px;
+  font-weight: 800;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.mobile-drawer-flat-items {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+/* ==========================================================================
+   Admin UI Enhancements (Dashboard, Charts, Quick Actions & Badges)
+   ========================================================================== */
+
+/* Responsive filters toolbar for Admin views */
+.admin-toolbar-responsive {
+  display: flex;
+  flex-flow: row wrap;
+  gap: 16px;
+  align-items: center;
+  width: 100%;
+}
+
+.admin-toolbar-search {
+  flex: 1 1 300px;
+}
+
+.admin-toolbar-selects {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Premium Interactive Stat Card */
+.admin-stat-card-link {
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-stat-card-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-info));
+  opacity: 0;
+  transition: var(--transition-smooth);
+}
+
+.admin-stat-card-link:hover::before {
+  opacity: 1;
+}
+
+.admin-stat-card-link:hover {
+  transform: translateY(-4px);
+  background-color: var(--bg-tertiary);
+  box-shadow: var(--box-shadow-glow);
+  border-color: var(--color-primary-glow);
+}
+
+/* CSS-based Custom Charts */
+.admin-chart-wrapper {
+  display: flex;
+  height: 240px;
+  margin-top: 24px;
+  padding: 12px 0;
+  position: relative;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.admin-chart-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  width: 40px;
+  padding-right: 8px;
+  text-align: right;
+  border-right: 1px solid var(--glass-border);
+}
+
+.admin-chart-bars-container {
+  display: flex;
+  flex: 1;
+  justify-content: space-around;
+  align-items: flex-end;
+  height: 100%;
+  padding: 0 16px;
+  position: relative;
+}
+
+/* Grid grid lines for chart background */
+.admin-chart-grid-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.admin-chart-grid-line {
+  width: 100%;
+  border-top: 1px dashed rgba(255, 255, 255, 0.03);
+  height: 0;
+}
+
+/* Bar Column */
+.admin-chart-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 15%;
+  height: 100%;
+  justify-content: flex-end;
+  position: relative;
+  z-index: 2;
+}
+
+.admin-chart-bar-pillar {
+  width: 100%;
+  max-width: 48px;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(180deg, var(--color-primary), var(--color-primary-glow));
+  transition: height 0.8s cubic-bezier(0.25, 0.8, 0.25, 1);
+  position: relative;
+}
+
+.admin-chart-bar-pillar.accent-blue {
+  background: linear-gradient(180deg, var(--color-spo2), var(--color-spo2-glow));
+}
+
+.admin-chart-bar-pillar.accent-green {
+  background: linear-gradient(180deg, var(--color-bp), var(--color-bp-glow));
+}
+
+.admin-chart-bar-pillar.accent-warning {
+  background: linear-gradient(180deg, var(--color-warning), var(--color-warning-glow));
+}
+
+/* Custom Tooltip on Hover */
+.admin-chart-bar-tooltip {
+  position: absolute;
+  top: -36px;
+  background: var(--bg-primary);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--transition-smooth);
+  transform: translateY(8px);
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  z-index: 10;
+}
+
+.admin-chart-bar-pillar:hover .admin-chart-bar-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.admin-chart-x-axis-labels {
+  display: flex;
+  margin-left: 40px;
+  justify-content: space-around;
+  padding-top: 10px;
+}
+
+.admin-chart-x-label {
+  width: 15%;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* Admin Quick Actions Grid */
+.admin-quick-actions-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.admin-quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  text-align: left;
+  font-weight: 600;
+}
+
+.admin-quick-action-btn:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1);
+}
+
+.admin-quick-action-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--color-primary-glow);
+  color: var(--color-primary);
+}
+
+.admin-quick-action-btn:hover .admin-quick-action-icon {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* Clean Role Badges */
+.admin-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.admin-role-badge.admin {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.admin-role-badge.doctor {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0ea5e9;
+  border: 1px solid rgba(14, 165, 233, 0.2);
+}
+
+.admin-role-badge.patient {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+/* Verification list styles */
+.admin-verif-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 24px;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .admin-verif-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.verif-doc-card-preview {
+  position: relative;
+  height: 96px;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--glass-border);
+}
+
+.verif-doc-card-preview:hover {
+  border-color: var(--color-primary);
+}
+
+.verif-doc-card-preview::after {
+  content: 'Phóng to';
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #fff;
+  opacity: 0;
+  transition: var(--transition-smooth);
+}
+
+.verif-doc-card-preview:hover::after {
+  opacity: 1;
+}
+
+/* Premium Range Input */
+.clinical-range-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  outline: none;
+  transition: var(--transition-smooth);
+}
+
+.clinical-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  transition: transform 0.1s;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+.clinical-range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+

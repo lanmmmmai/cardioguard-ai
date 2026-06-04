@@ -26,9 +26,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const scrollToBottom = () => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -46,6 +54,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
 
     const userText = input.trim();
     setInput('');
+    setChatError(null);
     
     // Thêm tin nhắn người dùng một cách lạc quan (optimistic)
     const tempUserId = `u-${Date.now()}`;
@@ -86,6 +95,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
       
       let batchUpdateCount = 0;
       for (let i = 0; i < chunks.length; i++) {
+        if (!isMountedRef.current) {
+          return;
+        }
         currentText += (i === 0 ? '' : ' ') + chunks[i];
         batchUpdateCount++;
         
@@ -104,9 +116,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
       );
 
     } catch (err: any) {
+      if (!isMountedRef.current) {
+        return;
+      }
+      setChatError('Không thể gửi tin nhắn tới trợ lý AI. Vui lòng thử lại.');
       setMessages(prev => [...prev, { id: `err-${Date.now()}`, sender: 'ai', message: '⚠️ Lỗi kết nối AI. Vui lòng thử lại.' }]);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -138,6 +156,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
       </div>
 
       <div className="chat-input-area">
+        {chatError && <div className="form-error mb-2">{chatError}</div>}
         <form onSubmit={handleSend} className="chat-input-form">
           <input
             className="chat-input"

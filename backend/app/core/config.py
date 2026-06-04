@@ -15,13 +15,26 @@ QUAN HỆ:
     - Đọc từ: .env và backend/.env
 """
 
+import os
 from pathlib import Path
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# Thư mục gốc của dự án, tính từ vị trí tệp này đi lên 3 cấp
-BASE_DIR = Path(__file__).resolve().parents[3]
+def resolve_base_dir() -> Path:
+    """Xác định thư mục gốc dự án một cách bền vững hơn."""
+    configured_root = os.getenv("CARDIOGUARD_BASE_DIR")
+    if configured_root:
+        return Path(configured_root).resolve()
+
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        if (parent / "backend").exists() and (parent / "web_frontend").exists():
+            return parent
+    return current.parents[3]
+
+
+BASE_DIR = resolve_base_dir()
 
 
 class Settings(BaseSettings):
@@ -65,6 +78,14 @@ class Settings(BaseSettings):
         if "heart_monitor" in value.lower() or value == "secret_key":
             raise ValueError("SECRET_KEY phải là giá trị mạnh và không được mặc định")
         return value
+
+    @model_validator(mode="after")
+    def validate_production_safety(self) -> "Settings":
+        """Ngăn các cờ debug nhạy cảm được bật ở production."""
+        normalized_environment = self.ENVIRONMENT.strip().lower()
+        if normalized_environment in {"prod", "production"} and self.EXPOSE_DEV_OTP:
+            raise ValueError("EXPOSE_DEV_OTP không được bật trong production")
+        return self
 
     model_config = SettingsConfigDict(
         env_file=(BASE_DIR / ".env", BASE_DIR / "backend" / ".env"),

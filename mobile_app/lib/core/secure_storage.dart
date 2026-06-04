@@ -107,6 +107,9 @@ class SecureStorage {
 
   // Xóa tất cả các mục khỏi bộ nhớ an toàn (token + hồ sơ người dùng).
   Future<void> clearSession() async {
-    await _safeOperation<void>(() => _storage.deleteAll());
+    await _safeOperation<void>(() async {
+      await _storage.delete(key: AppConfig.keyToken);
+      await _storage.delete(key: AppConfig.keyUser);
+    });
   }
 }

@@ -64,7 +64,7 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
           queryParameters: {'filter': 'role:doctor', 'limit': 100});
       if (mounted) {
         setState(() {
-          _doctors = response.data['items'] ?? [];
+          _doctors = (response.data['items'] as List<dynamic>?) ?? [];
           _isLoadingDoctors = false;
         });
       }
@@ -164,8 +164,6 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
       return;
     }
 
-    setState(() => _isSubmitting = true);
-
     final scheduledDateTime = DateTime(
       _selectedDate!.year,
       _selectedDate!.month,
@@ -173,6 +171,13 @@ class _BookAppointmentSheetState extends State<BookAppointmentSheet> {
       _selectedTime!.hour,
       _selectedTime!.minute,
     );
+
+    if (scheduledDateTime.isBefore(DateTime.now())) {
+      setState(() => _errorMessage = 'Không thể đặt lịch hẹn trong quá khứ.');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
 
     final provider = Provider.of<AppointmentProvider>(context, listen: false);
     final ok = await provider.bookAppointment(

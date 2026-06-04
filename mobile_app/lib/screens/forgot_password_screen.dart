@@ -46,7 +46,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       return 'Mật khẩu phải có ít nhất 1 chữ số';
     }
     if (!RegExp(r'[^A-Za-z\d]').hasMatch(v)) {
-      return 'Mật khẩu phải có nhất 1 ký tự đặc biệt';
+      return 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt';
     }
     return null;
   }

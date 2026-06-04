@@ -90,7 +90,8 @@ async def get_patients(
     join_on = "p.user_id::text = u.id::text" if has_user_id else "p.id::text = u.id::text"
     
     select_fields = [
-        "u.id::text as id",
+        "p.id::text as id",
+        "u.id::text as user_id",
         "u.full_name as user_full_name",
         "u.email as user_email",
         "p.full_name as patient_full_name" if "full_name" in columns else "NULL::text as patient_full_name",
@@ -104,8 +105,8 @@ async def get_patients(
 
     base_query = f"""
     SELECT {", ".join(select_fields)}
-    FROM users u
-    LEFT JOIN patients p ON {join_on}
+    FROM patients p
+    LEFT JOIN users u ON {join_on}
     """
 
     where_sql = ""
@@ -121,35 +122,36 @@ async def get_patients(
         WHERE EXISTS (
             SELECT 1 FROM doctor_patient dp
             WHERE dp.doctor_id = CAST(:doctor_id AS uuid)
-              AND dp.patient_id = u.id
-        ) AND lower(u.role) = 'patient'
+              AND dp.patient_id = p.id
+        )
         """
         values["doctor_id"] = current_user["id"]
     else:
         logger.info("Patient filtering: role=admin, all patients")
-        where_sql = "WHERE lower(u.role) = 'patient'"
+        where_sql = ""
 
-    count_query = f"SELECT COUNT(*)::int AS total FROM users u LEFT JOIN patients p ON {join_on} {where_sql}"
+    count_query = f"SELECT COUNT(*)::int AS total FROM patients p LEFT JOIN users u ON {join_on} {where_sql}"
     total = await database.fetch_val(count_query, values)
 
     values["limit"] = min(limit, 500)
     values["offset"] = offset
-    query = f"{base_query} {where_sql} ORDER BY u.full_name ASC LIMIT :limit OFFSET :offset"
+    query = f"{base_query} {where_sql} ORDER BY COALESCE(p.full_name, u.full_name) ASC LIMIT :limit OFFSET :offset"
     rows = await database.fetch_all(query=query, values=values)
     logger.info("Danh sách bệnh nhân: role=%s user_id=%s count=%d", role, current_user["id"], len(rows))
 
     items = [
         {
             "id": row["id"],
-            "full_name": row["patient_full_name"] or row["user_full_name"],
+            "user_id": row["user_id"],
+            "full_name": row["patient_full_name"] or row["user_full_name"] or "Bệnh nhân mẫu",
             "age": row["age"] if row["age"] is not None else 0,
             "gender": row["gender"] or "Chưa cập nhật",
-            "phone": row["phone"] or row["user_email"],
+            "phone": row["phone"] or row["user_email"] or "Chưa cập nhật",
             "address": row["address"] or "Chưa cập nhật",
             "medical_history": row["medical_history"] or "Chưa cập nhật",
-            "email": row["user_email"],
+            "email": row["user_email"] or "Chưa cập nhật",
             "created_at": row["created_at"].isoformat() if row["created_at"] else None,
-            "source": "verified_patient_account"
+            "source": "verified_patient_account" if row["user_id"] else "clinical_patient_record"
         }
         for row in rows
     ]

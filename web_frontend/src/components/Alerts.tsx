@@ -17,6 +17,7 @@ import { getSeverityMeta } from '../utils/severity';
 import { useAuth } from '../auth/AuthContext';
 import { API_URL } from '../config';
 import { Alert } from '../types';
+import { readJsonResponse } from '../utils/response';
 
 interface AlertsProps {
   alerts: Alert[];
@@ -52,19 +53,9 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
       if (response.ok) {
         setLocalAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_resolved: true } : a));
       } else {
-        let data;
-
-        try {
-
-          data = await response.json();
-
-        } catch (e) {
-
-          throw new Error("Lỗi định dạng phản hồi từ server");
-
-        }
+        const data = await readJsonResponse<{ detail?: string }>(response);
         setError(data.detail || 'Không thể xác nhận xử lý cảnh báo');
-      setTimeout(() => setError(null), 5000);
+        setTimeout(() => setError(null), 5000);
       }
     } catch (err) {
       setError('Lỗi kết nối máy chủ khi xử lý cảnh báo');

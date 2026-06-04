@@ -12,9 +12,11 @@
 //      buộc đổi mật khẩu, giúp cấu hình lại bố cục tab một cách động.
 //   - MainTabWrapper nhận callback chuyển đổi chủ đề từ trạng thái cha.
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'core/app_logger.dart';
 
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
@@ -26,6 +28,7 @@ import 'screens/alerts_screen.dart';
 import 'screens/appointments_screen.dart';
 import 'screens/chat_ai_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/policy_screen.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/patient_provider.dart';
@@ -37,7 +40,7 @@ import 'ui/cg_tokens.dart';
 
 // Điểm vào chính của ứng dụng. Tạo widget HeartMonitorApp gốc.
 void main() {
-  debugPrint('[CardioGuard] App starting...');
+  AppLogger.info('[CardioGuard] App starting...');
   runApp(const HeartMonitorApp());
 }
 
@@ -54,12 +57,47 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
   // Theo dõi xem ứng dụng có đang sử dụng bảng màu tối hay không.
   bool _isDarkTheme = true;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadThemePreference();
+    _requestNotificationPermission();
+  }
+
+  Future<void> _loadThemePreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _isDarkTheme = prefs.getBool('is_dark_theme') ?? true;
+      });
+    } catch (e) {
+      AppLogger.error('Failed to load theme preference: $e');
+    }
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    try {
+      final status = await Permission.notification.status;
+      if (status.isDenied || status.isPermanentlyDenied) {
+        await Permission.notification.request();
+      }
+    } catch (e) {
+      AppLogger.error('Failed to request notification permission: $e');
+    }
+  }
+
   // Chuyển đổi giữa chủ đề tối và sáng, kích hoạt xây dựng lại giao diện.
-  void _toggleTheme() {
+  Future<void> _toggleTheme() async {
     setState(() {
       _isDarkTheme = !_isDarkTheme;
     });
-    debugPrint('[CardioGuard] Theme toggled: ${_isDarkTheme ? "dark" : "light"}');
+    AppLogger.info('[CardioGuard] Theme toggled: ${_isDarkTheme ? "dark" : "light"}');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_dark_theme', _isDarkTheme);
+    } catch (e) {
+      AppLogger.error('Failed to save theme preference: $e');
+    }
   }
 
   @override
@@ -67,23 +105,23 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) {
-          debugPrint('[CardioGuard] Initializing AuthProvider');
+          AppLogger.info('[CardioGuard] Initializing AuthProvider');
           return AuthProvider()..init();
         }),
         ChangeNotifierProvider(create: (_) {
-          debugPrint('[CardioGuard] Initializing PatientProvider');
+          AppLogger.info('[CardioGuard] Initializing PatientProvider');
           return PatientProvider();
         }),
         ChangeNotifierProvider(create: (_) {
-          debugPrint('[CardioGuard] Initializing AlertProvider');
+          AppLogger.info('[CardioGuard] Initializing AlertProvider');
           return AlertProvider();
         }),
         ChangeNotifierProvider(create: (_) {
-          debugPrint('[CardioGuard] Initializing ChatProvider');
+          AppLogger.info('[CardioGuard] Initializing ChatProvider');
           return ChatProvider();
         }),
         ChangeNotifierProvider(create: (_) {
-          debugPrint('[CardioGuard] Initializing AppointmentProvider');
+          AppLogger.info('[CardioGuard] Initializing AppointmentProvider');
           return AppointmentProvider();
         }),
       ],
@@ -101,6 +139,9 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
           '/forgot-password': (context) => const ForgotPasswordScreen(),
+          '/privacy': (context) => const PolicyScreen(type: 'privacy'),
+          '/terms': (context) => const PolicyScreen(type: 'terms'),
+          '/data-deletion': (context) => const PolicyScreen(type: 'data-deletion'),
           '/dashboard': (context) => MainTabWrapper(
                 isDarkTheme: _isDarkTheme,
                 onToggleTheme: _toggleTheme,

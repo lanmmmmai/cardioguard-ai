@@ -385,16 +385,6 @@ export const UsersManager: React.FC = () => {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
-  const getRoleBadgeStyle = (userRole: string) => {
-    switch (userRole.toLowerCase()) {
-      case 'admin':
-        return { background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' };
-      case 'doctor':
-        return { background: 'rgba(20, 184, 166, 0.1)', color: '#20b2aa', border: '1px solid rgba(20, 184, 166, 0.2)' };
-      default:
-        return { background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.2)' };
-    }
-  };
 
   const getRoleLabel = (userRole: string) => {
     switch (userRole.toLowerCase()) {
@@ -438,9 +428,9 @@ export const UsersManager: React.FC = () => {
       </div>
 
       <div className="panel" style={{ marginBottom: '1.5rem', padding: '16px 20px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '16px', alignItems: 'center' }}>
+        <div className="admin-toolbar-responsive">
           
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <div className="admin-toolbar-search" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <Search size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
             <input
               type="text"
@@ -452,33 +442,35 @@ export const UsersManager: React.FC = () => {
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Vai trò:</span>
-            <select 
-              className="form-control" 
-              value={roleFilter} 
-              onChange={(e) => setRoleFilter(e.target.value)}
-              style={{ minWidth: '130px', padding: '6px 12px', height: '36px' }}
-            >
-              <option value="all">Tất cả vai trò</option>
-              <option value="admin">Quản trị viên</option>
-              <option value="doctor">Bác sĩ</option>
-              <option value="patient">Bệnh nhân</option>
-            </select>
-          </div>
+          <div className="admin-toolbar-selects">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Vai trò:</span>
+              <select 
+                className="form-control" 
+                value={roleFilter} 
+                onChange={(e) => setRoleFilter(e.target.value)}
+                style={{ minWidth: '130px', padding: '6px 12px', height: '36px' }}
+              >
+                <option value="all">Tất cả vai trò</option>
+                <option value="admin">Quản trị viên</option>
+                <option value="doctor">Bác sĩ</option>
+                <option value="patient">Bệnh nhân</option>
+              </select>
+            </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Trạng thái:</span>
-            <select 
-              className="form-control" 
-              value={statusFilter} 
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ minWidth: '130px', padding: '6px 12px', height: '36px' }}
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="active">Hoạt động</option>
-              <option value="inactive">Tạm ngưng</option>
-            </select>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Trạng thái:</span>
+              <select 
+                className="form-control" 
+                value={statusFilter} 
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{ minWidth: '130px', padding: '6px 12px', height: '36px' }}
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="active">Hoạt động</option>
+                <option value="inactive">Tạm ngưng</option>
+              </select>
+            </div>
           </div>
 
         </div>
@@ -578,18 +570,7 @@ export const UsersManager: React.FC = () => {
                     </td>
 
                     <td style={{ padding: '16px' }}>
-                      <span 
-                        style={{ 
-                          display: 'inline-flex', 
-                          alignItems: 'center', 
-                          gap: '6px', 
-                          padding: '4px 10px', 
-                          borderRadius: '20px', 
-                          fontSize: '0.75rem', 
-                          fontWeight: 600,
-                          ...getRoleBadgeStyle(userAcc.role) 
-                        }}
-                      >
+                      <span className={`admin-role-badge ${userAcc.role.toLowerCase()}`}>
                         {userAcc.role === 'admin' ? (
                           <Shield size={10} />
                         ) : userAcc.role === 'doctor' ? (

@@ -61,8 +61,10 @@ export const PatientSettingsPage: React.FC<{ navigate: (path: string, replace?: 
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
-    setLocale(preferences.language);
-    setSavedAt(new Date().toLocaleString(locale === 'en' ? 'en-US' : 'vi-VN'));
+    if (locale !== preferences.language) {
+      setLocale(preferences.language);
+    }
+    setSavedAt(new Date().toLocaleString(preferences.language === 'en' ? 'en-US' : 'vi-VN'));
   }, [preferences, locale, setLocale]);
 
   const togglePreference = (key: keyof Omit<PatientPreferences, 'language'>, value: boolean) => {

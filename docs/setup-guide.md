@@ -10,7 +10,7 @@ Hướng dẫn từng bước để thiết lập môi trường phát triển C
 |---------|-------------------|---------|
 | Python | 3.11+ | Backend |
 | Node.js | 18+ | Web Frontend |
-| Flutter | 3.44+ | Mobile App |
+| Flutter | 3.38+ | Mobile App |
 | Docker Desktop | 24+ | Chạy backend + web (khuyên dùng) |
 | Git | 2.40+ | Quản lý phiên bản |
 
@@ -120,7 +120,11 @@ Tạo `web_frontend/.env`:
 ```env
 VITE_API_URL=http://localhost:8000
 VITE_WS_URL=ws://localhost:8000/ws/realtime
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
+
+> **Lưu ý:** Web frontend cần `VITE_SUPABASE_URL` và `VITE_SUPABASE_ANON_KEY` cho chức năng Supabase auth. Nếu chưa có, vào [Supabase Dashboard](https://supabase.com) → Project Settings → API để lấy.
 
 ## 7. Chạy Mobile App
 

@@ -69,18 +69,39 @@ const isLocalhost = typeof window !== 'undefined'
   && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const bakedApiUrl = import.meta.env.VITE_API_URL;
 const bakedWsUrl = import.meta.env.VITE_WS_URL;
-const savedApiUrl = isLocalhost && typeof window !== 'undefined' ? window.localStorage.getItem('settings_api_url') || undefined : undefined;
-const savedWsUrl = isLocalhost && typeof window !== 'undefined' ? window.localStorage.getItem('settings_ws_url') || undefined : undefined;
-const normalizedBakedApiUrl = isUsableApiUrl(bakedApiUrl) ? bakedApiUrl : undefined;
-const normalizedBakedWsUrl = isUsableWsUrl(bakedWsUrl) ? bakedWsUrl : undefined;
-const normalizedSavedApiUrl = isUsableApiUrl(savedApiUrl) ? savedApiUrl : undefined;
-const normalizedSavedWsUrl = isUsableWsUrl(savedWsUrl) ? savedWsUrl : undefined;
-const runtimeDerivedApiUrl = isUsableApiUrl(deriveApiUrlFromWsUrl(runtimeWsUrl)) ? deriveApiUrlFromWsUrl(runtimeWsUrl) : undefined;
-const bakedDerivedApiUrl = isUsableApiUrl(deriveApiUrlFromWsUrl(normalizedBakedWsUrl || normalizedSavedWsUrl)) ? deriveApiUrlFromWsUrl(normalizedBakedWsUrl || normalizedSavedWsUrl) : undefined;
-const savedDerivedApiUrl = isUsableApiUrl(deriveApiUrlFromWsUrl(normalizedSavedWsUrl)) ? deriveApiUrlFromWsUrl(normalizedSavedWsUrl) : undefined;
-const runtimeDerivedWsUrl = isUsableWsUrl(deriveWsUrlFromApiUrl(runtimeApiUrl)) ? deriveWsUrlFromApiUrl(runtimeApiUrl) : undefined;
-const bakedDerivedWsUrl = isUsableWsUrl(deriveWsUrlFromApiUrl(normalizedBakedApiUrl || normalizedSavedApiUrl)) ? deriveWsUrlFromApiUrl(normalizedBakedApiUrl || normalizedSavedApiUrl) : undefined;
-const savedDerivedWsUrl = isUsableWsUrl(deriveWsUrlFromApiUrl(normalizedSavedApiUrl)) ? deriveWsUrlFromApiUrl(normalizedSavedApiUrl) : undefined;
+const getResolvedApiUrl = (): string => {
+  if (runtimeApiUrl && !isPlaceholderUrl(runtimeApiUrl)) return runtimeApiUrl;
+  if (runtimeWsUrl && !isPlaceholderUrl(runtimeWsUrl)) {
+    const derived = deriveApiUrlFromWsUrl(runtimeWsUrl);
+    if (derived) return derived;
+  }
+  
+  if (isLocalhost && typeof window !== 'undefined') {
+    const saved = window.localStorage.getItem('settings_api_url');
+    if (saved && isUsableApiUrl(saved)) return saved;
+  }
+  
+  if (bakedApiUrl && isUsableApiUrl(bakedApiUrl)) return bakedApiUrl;
+  
+  return isLocalhost ? 'http://localhost:8000/api' : 'https://cardioguard-ai-backend.onrender.com/api';
+};
+
+const getResolvedWsUrl = (): string => {
+  if (runtimeWsUrl && !isPlaceholderUrl(runtimeWsUrl)) return runtimeWsUrl;
+  if (runtimeApiUrl && !isPlaceholderUrl(runtimeApiUrl)) {
+    const derived = deriveWsUrlFromApiUrl(runtimeApiUrl);
+    if (derived) return derived;
+  }
+  
+  if (isLocalhost && typeof window !== 'undefined') {
+    const saved = window.localStorage.getItem('settings_ws_url');
+    if (saved && isUsableWsUrl(saved)) return saved;
+  }
+  
+  if (bakedWsUrl && isUsableWsUrl(bakedWsUrl)) return bakedWsUrl;
+  
+  return isLocalhost ? 'ws://localhost:8000/ws/realtime' : 'wss://cardioguard-ai-backend.onrender.com/ws/realtime';
+};
 
 const ensureEndsWithApi = (url?: string) => {
   if (!url) return undefined;
@@ -93,27 +114,15 @@ const ensureEndsWithApi = (url?: string) => {
 };
 
 /** URL cơ sở của REST API – dự phòng về localhost:8000 */
-export const API_URL = ensureEndsWithApi(
-  runtimeDerivedApiUrl ||
-  (!isPlaceholderUrl(runtimeApiUrl) && isUsableApiUrl(runtimeApiUrl) ? runtimeApiUrl : undefined) ||
-  normalizedSavedApiUrl ||
-  normalizedBakedApiUrl ||
-  savedDerivedApiUrl ||
-  bakedDerivedApiUrl ||
-  (isLocalhost ? 'http://localhost:8000/api' : 'https://cardioguard-ai-backend.onrender.com/api')
-) as string;
+export const API_URL = ensureEndsWithApi(getResolvedApiUrl()) as string;
 
 /** Điểm cuối WebSocket cho dữ liệu telemetry thời gian thực */
-export const WS_URL =
-  runtimeDerivedWsUrl ||
-  (!isPlaceholderUrl(runtimeWsUrl) && isUsableWsUrl(runtimeWsUrl) ? runtimeWsUrl : undefined) ||
-  normalizedSavedWsUrl ||
-  normalizedBakedWsUrl ||
-  savedDerivedWsUrl ||
-  bakedDerivedWsUrl ||
-  (isLocalhost ? 'ws://localhost:8000/ws/realtime' : 'wss://cardioguard-ai-backend.onrender.com/ws/realtime');
+export const WS_URL = getResolvedWsUrl() as string;
 
 export const buildApiUrl = (path: string) => {
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   const base = API_URL.replace(/\/$/, '');
 

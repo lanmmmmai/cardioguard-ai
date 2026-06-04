@@ -50,7 +50,7 @@ export default async function handler(req, res) {
     const fullUrl = buildPublicUrl(req, pagePath);
     const html = await readIndexHtml(new URL(fullUrl).origin);
     const seo = await getSeoByPath(pagePath, fullUrl);
-    const finalHtml = injectSeoIntoHtml(html, seo);
+    const finalHtml = injectSeoIntoHtml(html, seo, req);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');

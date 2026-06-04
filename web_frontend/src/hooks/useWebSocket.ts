@@ -55,6 +55,7 @@ export const useWebSocket = (
   token?: string | null
 ) => {
   const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const intentionalCloseRef = useRef<boolean>(false);
@@ -89,9 +90,12 @@ export const useWebSocket = (
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       wsUrl = `${protocol}//${window.location.host}${url}`;
     } else if (window.location.protocol === 'https:' && wsUrl.startsWith('ws://')) {
-      wsUrl = wsUrl.replace(/^ws:\/\//i, 'wss://');
+      setConnectionError('Cấu hình WebSocket không hợp lệ: trang HTTPS không thể dùng endpoint ws://. Hãy cấu hình WSS.');
+      setIsConnected(false);
+      return;
     }
     try {
+      setConnectionError(null);
       const socket = new WebSocket(wsUrl);
       socketRef.current = socket;
 
@@ -161,12 +165,13 @@ export const useWebSocket = (
       socket.onerror = () => {
         if (socketRef.current !== socket) return;
         if (intentionalCloseRef.current) return; // Bỏ qua thông báo lỗi khi unmount trong StrictMode
+        setConnectionError('Không thể kết nối realtime tới máy chủ.');
         // Không sử dụng console.error để tránh làm ngập tràn (flooding) console đỏ khi server offline.
         // Trình duyệt đã tự động log lỗi kết nối thất bại mặc định.
         socket.close();
       };
     } catch (e) {
-      console.error('Không thể khởi tạo kết nối WebSocket:', e);
+      setConnectionError('Không thể khởi tạo kết nối realtime.');
     }
   }, [url, token]);
 
@@ -196,5 +201,5 @@ export const useWebSocket = (
     };
   }, [clearReconnectTimer, connect, token]);
 
-  return { isConnected };
+  return { isConnected, connectionError };
 };

@@ -14,6 +14,9 @@ STORAGE_ROOT = BACKEND_DIR / "storage"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
+import os
+os.environ["DATABASE_URL"] = os.getenv("TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/test_db")
+
 from app.main import app
 from app.core.database import database
 from app.core.security import hash_password

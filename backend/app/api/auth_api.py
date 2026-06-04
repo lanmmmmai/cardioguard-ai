@@ -24,6 +24,7 @@ Quan hệ:
 """
 
 import asyncio
+from collections import OrderedDict
 import secrets
 import requests
 import logging
@@ -38,7 +39,8 @@ from app.core.security import ALGORITHM, SECRET_KEY, hash_password, verify_passw
 from app.core.rate_limit import check_rate_limit, get_client_ip
 from app.schemas.auth_schema import (
     RegisterRequest, LoginRequest, RegisterOtpRequest,
-    ForgotPasswordRequest, ForgotPasswordVerifyRequest, ChangePasswordRequest
+    ForgotPasswordRequest, ForgotPasswordVerifyRequest, ChangePasswordRequest,
+    GoogleLoginRequest
 )
 from app.services.otp_service import (
     OTP_PURPOSE_FORGOT_PASSWORD,
@@ -54,7 +56,9 @@ logger = logging.getLogger(__name__)
 VALID_ROLES = {"admin", "doctor", "patient"}
 
 _USER_CACHE_TTL = 30  # 30 seconds - short TTL for auth freshness
-_user_cache: dict[str, tuple[dict, float]] = {}
+_USER_CACHE_MAX_SIZE = 1024
+_USERS_COLUMNS_CACHE_TTL = 300
+_user_cache: "OrderedDict[str, tuple[dict, float]]" = OrderedDict()
 _user_cache_lock = asyncio.Lock()
 
 
@@ -112,8 +116,22 @@ def extract_bearer_token(authorization: Optional[str]) -> str:
     return authorization.split(" ", 1)[1].strip()
 
 
-_users_columns_cache: Optional[set[str]] = None
+_users_columns_cache: Optional[tuple[set[str], float]] = None
 _users_columns_lock = asyncio.Lock()
+
+
+def _purge_expired_user_cache(now: float) -> None:
+    """Xóa cache auth đã hết hạn và chặn tăng trưởng bộ nhớ vô hạn."""
+    expired_user_ids = [
+        user_id
+        for user_id, (_, cached_at) in list(_user_cache.items())
+        if now - cached_at >= _USER_CACHE_TTL
+    ]
+    for user_id in expired_user_ids:
+        _user_cache.pop(user_id, None)
+
+    while len(_user_cache) > _USER_CACHE_MAX_SIZE:
+        _user_cache.popitem(last=False)
 
 async def get_users_columns() -> set[str]:
     """Lấy tập hợp tên cột cho bảng users.
@@ -125,9 +143,15 @@ async def get_users_columns() -> set[str]:
         Tập hợp các chuỗi tên cột cho bảng public.users.
     """
     global _users_columns_cache
-    if _users_columns_cache is None:
+    cached = _users_columns_cache
+    if cached is not None and time.monotonic() - cached[1] < _USERS_COLUMNS_CACHE_TTL:
+        return cached[0]
+    if _users_columns_cache is None or time.monotonic() - _users_columns_cache[1] >= _USERS_COLUMNS_CACHE_TTL:
         async with _users_columns_lock:
-            if _users_columns_cache is None:
+            cached = _users_columns_cache
+            if cached is not None and time.monotonic() - cached[1] < _USERS_COLUMNS_CACHE_TTL:
+                return cached[0]
+            if _users_columns_cache is None or time.monotonic() - _users_columns_cache[1] >= _USERS_COLUMNS_CACHE_TTL:
                 columns = await database.fetch_all(
                     """
                     SELECT column_name
@@ -135,8 +159,8 @@ async def get_users_columns() -> set[str]:
                     WHERE table_schema = 'public' AND table_name = 'users'
                     """
                 )
-                _users_columns_cache = {column["column_name"] for column in columns}
-    return _users_columns_cache
+                _users_columns_cache = ({column["column_name"] for column in columns}, time.monotonic())
+    return _users_columns_cache[0]
 
 
 
@@ -184,9 +208,11 @@ async def get_user_from_token(
 
     # Check user cache first (skip revoked check for cached non-revoked users)
     async with _user_cache_lock:
-        if user_id in _user_cache:
-            cached_user, cached_at = _user_cache[user_id]
+        cache_entry = _user_cache.get(user_id)
+        if cache_entry:
+            cached_user, cached_at = cache_entry
             if time.monotonic() - cached_at < _USER_CACHE_TTL:
+                _user_cache.move_to_end(user_id)
                 result = dict(cached_user)
                 if result["must_change_password"] and not allow_must_change_password:
                     raise HTTPException(
@@ -247,7 +273,10 @@ async def get_user_from_token(
 
     # Cache user for 30s to avoid repeated DB lookups
     async with _user_cache_lock:
+        _purge_expired_user_cache(time.monotonic())
         _user_cache[user_id] = (result, time.monotonic())
+        _user_cache.move_to_end(user_id)
+        _purge_expired_user_cache(time.monotonic())
 
     if result["must_change_password"] and not allow_must_change_password:
         raise HTTPException(
@@ -548,6 +577,9 @@ async def register(data: RegisterRequest, request: Request):
         ip_address=request.client.host if request.client else "-"
     )
 
+    # Vô hiệu hóa OTP sau khi đăng ký thành công
+    await invalidate_otp_tokens(purpose=OTP_PURPOSE_REGISTER, email=email)
+
     return {"message": "Register successfully"}
 
 
@@ -703,6 +735,207 @@ async def login(data: LoginRequest, request: Request):
             "avatar_url": user["avatar_url"]
         }
     }
+
+
+@router.post("/auth/google-login")
+async def google_login(data: GoogleLoginRequest, request: Request):
+    """Đăng nhập bằng tài khoản Google.
+    Nếu email chưa tồn tại, tự động tạo tài khoản mới với vai trò là 'patient' (bệnh nhân).
+    Nếu email đã tồn tại, liên kết/xác thực tài khoản và đăng nhập.
+    """
+    ip = request.client.host if request.client else "unknown"
+    email = data.email.lower()
+    logger.debug("Entry: google_login(email=%s)", email)
+
+    # Lấy thông tin cột của bảng users để chắc chắn
+    user_columns = await get_users_columns()
+    
+    # 1. Tìm kiếm người dùng theo email
+    select_cols = "id::text as id, full_name, email, role"
+    if "must_change_password" in user_columns:
+        select_cols += ", must_change_password"
+    else:
+        select_cols += ", FALSE as must_change_password"
+    if "status" in user_columns:
+        select_cols += ", status"
+    else:
+        select_cols += ", NULL::text as status"
+    if "profile_completed" in user_columns:
+        select_cols += ", profile_completed"
+    else:
+        select_cols += ", FALSE as profile_completed"
+    if "is_verified" in user_columns:
+        select_cols += ", is_verified"
+    else:
+        select_cols += ", FALSE as is_verified"
+    if "avatar_url" in user_columns:
+        select_cols += ", avatar_url"
+    else:
+        select_cols += ", NULL::text as avatar_url"
+    if "google_id" in user_columns:
+        select_cols += ", google_id"
+    else:
+        select_cols += ", NULL::text as google_id"
+
+    query = f"""
+    SELECT {select_cols}
+    FROM users
+    WHERE email = :email
+    """
+
+    user = await database.fetch_one(
+        query=query,
+        values={"email": email}
+    )
+
+    ip_addr = request.client.host if request.client else "-"
+
+    if user:
+        # Tài khoản đã tồn tại
+        if (user["status"] or "").strip().lower() in {"inactive", "disabled", "deleted"}:
+            await log_activity(
+                user_id=user["id"],
+                action="USER_LOGIN_FAILED",
+                entity_type="users",
+                entity_id=user["id"],
+                ip_address=ip_addr,
+                details={"email": email, "reason": "Account inactive, disabled or deleted via Google Login"}
+            )
+            raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
+
+        # Cập nhật google_id và avatar_url nếu chưa có hoặc mới
+        update_fields = []
+        update_values = {"id": user["id"]}
+        if "google_id" in user_columns and (not user["google_id"] or user["google_id"] != data.google_id):
+            update_fields.append("google_id = :google_id")
+            update_values["google_id"] = data.google_id
+        if "avatar_url" in user_columns and data.avatar_url and not user["avatar_url"]:
+            update_fields.append("avatar_url = :avatar_url")
+            update_values["avatar_url"] = data.avatar_url
+
+        if update_fields:
+            update_query = f"""
+            UPDATE users
+            SET {", ".join(update_fields)}
+            WHERE id = :id
+            """
+            await database.execute(query=update_query, values=update_values)
+            # Fetch lại user để lấy thông tin mới nhất
+            user = await database.fetch_one(query=query, values={"email": email})
+
+        db_role = normalize_role(user["role"])
+    else:
+        # Tài khoản chưa tồn tại, tự động đăng ký
+        role = data.role or "patient"
+        role = role.strip().lower()
+        if role not in VALID_ROLES:
+            role = "patient"
+        
+        # Sinh mật khẩu ngẫu nhiên để băm (dành cho OAuth)
+        import secrets
+        random_pw = secrets.token_hex(16)
+        
+        insert_query = """
+        INSERT INTO users(full_name, email, password_hash, role, status, profile_completed, is_verified, avatar_url, google_id)
+        VALUES (:full_name, :email, :password_hash, :role, 'active', FALSE, FALSE, :avatar_url, :google_id)
+        """
+        
+        try:
+            async with database.transaction():
+                # Thực hiện chèn user
+                await database.execute(
+                    query=insert_query,
+                    values={
+                        "full_name": data.full_name,
+                        "email": email,
+                        "password_hash": hash_password(random_pw),
+                        "role": role,
+                        "avatar_url": data.avatar_url,
+                        "google_id": data.google_id
+                    }
+                )
+
+                # Fetch thông tin user vừa tạo
+                user = await database.fetch_one(query=query, values={"email": email})
+                if not user:
+                    raise HTTPException(status_code=500, detail="Không thể tạo tài khoản mới qua Google")
+                
+                user_id = user["id"]
+                
+                # Đồng bộ bảng patients / doctor_profiles tùy role
+                if role == "patient":
+                    patient_columns = await database.fetch_all(
+                        """
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = 'patients'
+                        """
+                    )
+                    patient_cols = {row["column_name"] for row in patient_columns}
+                    patient_values = {
+                        "id": user_id,
+                        "full_name": data.full_name,
+                    }
+                    if "user_id" in patient_cols:
+                        patient_values["user_id"] = user_id
+                    
+                    insert_columns = ", ".join(patient_values.keys())
+                    bind_columns = ", ".join(f":{key}" for key in patient_values.keys())
+                    await database.execute(
+                        f"INSERT INTO patients ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
+                        patient_values,
+                    )
+                    
+            # Ghi nhận log đăng ký qua Google thành công
+            await log_activity(
+                user_id=user_id,
+                action="USER_REGISTER_SUCCESS",
+                entity_type="users",
+                entity_id=user_id,
+                ip_address=ip_addr,
+                details={"method": "google"}
+            )
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Google automatic registration failed unexpectedly for email=%s", email)
+            raise HTTPException(status_code=500, detail="Không thể đăng ký tự động bằng Google. Vui lòng thử lại sau.")
+
+        db_role = role
+
+    # Tạo JWT Token
+    token = create_access_token({
+        "sub": user["id"],
+        "email": user["email"],
+        "role": db_role
+    })
+
+    # Ghi nhận đăng nhập thành công
+    await log_activity(
+        user_id=user["id"],
+        action="USER_LOGIN_SUCCESS",
+        entity_type="users",
+        entity_id=user["id"],
+        ip_address=ip_addr,
+        details={"method": "google"}
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "full_name": user["full_name"],
+            "email": user["email"],
+            "role": db_role,
+            "status": user["status"],
+            "must_change_password": user["must_change_password"],
+            "profile_completed": bool(user["profile_completed"]),
+            "is_verified": bool(user["is_verified"]),
+            "avatar_url": user["avatar_url"]
+        }
+    }
+
 
 @router.post("/auth/logout")
 async def logout(authorization: Optional[str] = Header(default=None)):

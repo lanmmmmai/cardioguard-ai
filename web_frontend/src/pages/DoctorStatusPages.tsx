@@ -76,7 +76,7 @@ export const DoctorPendingVerification: React.FC = () => {
 };
 
 export const DoctorVerificationRejected: React.FC = () => {
-  const { logout } = useAuth();
+  const { logout, accessToken } = useAuth();
   const { navigate } = useBrowserPath();
   const [note, setNote] = React.useState<string | null>(null);
 
@@ -87,9 +87,13 @@ export const DoctorVerificationRejected: React.FC = () => {
   };
 
   React.useEffect(() => {
+    if (!accessToken) return;
+    const controller = new AbortController();
+
     // Fetch rejection reason from verification-status
     fetch(`${API_URL}/doctor/verification-status`, {
-      headers: { Authorization: `Bearer ${window.sessionStorage.getItem('access_token')}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: controller.signal,
     })
       .then((res) => {
         if (res.ok) return res.json();
@@ -100,8 +104,16 @@ export const DoctorVerificationRejected: React.FC = () => {
           setNote(data.verification_note);
         }
       })
-      .catch((e) => console.warn(e));
-  }, []);
+      .catch((e) => {
+        if (e.name !== 'AbortError') {
+          console.warn(e);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [accessToken]);
 
   return (
     <div className="onboarding-page-container flex-center">

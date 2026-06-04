@@ -14,6 +14,7 @@
 // - Vật lý xung: được điều khiển bởi DashboardScreen._onAnimationTick.
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../ui/cg_tokens.dart';
 
 // Một điểm 3D trong đám mây điểm trái tim.
 class Point3D {
@@ -146,7 +147,7 @@ class Heart3dPainter extends CustomPainter {
       double depthAlpha = (1.0 - (p.z + 18.0) / 36.0).clamp(0.15, 1.0);
 
       final paint = Paint()
-        ..color = const Color(0xFFFF3366).withValues(alpha: depthAlpha * 0.85)
+        ..color = CgColors.accent.withValues(alpha: depthAlpha * 0.85)
         ..style = PaintingStyle.fill;
 
       double radius = (1.5 * p.scale).clamp(0.6, 4.0);

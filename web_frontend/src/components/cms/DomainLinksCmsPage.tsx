@@ -123,7 +123,11 @@ const ModalShell: React.FC<{
   );
 };
 
-export const DomainLinksCmsPage: React.FC = () => {
+interface DomainLinksCmsPageProps {
+  embedded?: boolean;
+}
+
+export const DomainLinksCmsPage: React.FC<DomainLinksCmsPageProps> = ({ embedded = false }) => {
   const { accessToken } = useAuth();
   const [items, setItems] = useState<DomainLinkRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -380,27 +384,29 @@ export const DomainLinksCmsPage: React.FC = () => {
     <div className="domain-links-page">
       {toast && <div className="cms-toast">{toast}</div>}
 
-      <div className="page-header cms-header">
-        <div>
-          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Link2 size={22} style={{ color: 'var(--color-primary)' }} />
-            CMS Domain Links
-          </h1>
-          <p className="page-subtitle">Quản lý preview link cho Zalo, Messenger, Facebook và OG tags.</p>
+      {!embedded && (
+        <div className="page-header cms-header">
+          <div>
+            <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Link2 size={22} style={{ color: 'var(--color-primary)' }} />
+              CMS Domain Links
+            </h1>
+            <p className="page-subtitle">Quản lý preview link cho Zalo, Messenger, Facebook và OG tags.</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button type="button" className="btn btn-secondary" onClick={fetchRows}>
+              <RefreshCw size={14} /> Làm mới
+            </button>
+            <button type="button" className="btn btn-primary" onClick={openCreate}>
+              <Plus size={14} /> Thêm mẫu link
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-secondary" onClick={fetchRows}>
-            <RefreshCw size={14} /> Làm mới
-          </button>
-          <button type="button" className="btn btn-primary" onClick={openCreate}>
-            <Plus size={14} /> Thêm mẫu link
-          </button>
-        </div>
-      </div>
+      )}
 
       <div className="panel email-cms-panel">
-        <div className="domain-links-toolbar">
-          <label className="email-logs-search-wrap" style={{ flex: 1 }}>
+        <div className="domain-links-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <label className="email-logs-search-wrap" style={{ flex: 1, minWidth: '200px' }}>
             <Search size={15} style={{ color: 'var(--text-muted)' }} />
             <input
               className="email-logs-search"
@@ -409,7 +415,19 @@ export const DomainLinksCmsPage: React.FC = () => {
               onChange={(event) => setSearch(event.target.value)}
             />
           </label>
-          <span className="email-templates-count">{total} link</span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span className="email-templates-count">{total} link</span>
+            {embedded && (
+              <>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={fetchRows} style={{ height: '36px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <RefreshCw size={14} /> Làm mới
+                </button>
+                <button type="button" className="btn btn-primary btn-sm" onClick={openCreate} style={{ height: '36px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Plus size={14} /> Thêm mẫu link
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {error && <div className="cms-inline-error">{error}</div>}

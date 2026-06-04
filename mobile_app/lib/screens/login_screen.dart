@@ -11,6 +11,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../providers/auth_provider.dart';
 import '../widgets/cg_widgets.dart';
@@ -50,6 +51,36 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (success && mounted) {
       Navigator.pushReplacementNamed(context, '/dashboard');
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _localError = null);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    try {
+      final googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+      );
+      final account = await googleSignIn.signIn();
+      if (account == null) {
+        // User cancelled sign-in
+        return;
+      }
+      
+      final success = await authProvider.loginWithGoogle(
+        email: account.email,
+        fullName: account.displayName ?? 'Người dùng Google',
+        googleId: account.id,
+        avatarUrl: account.photoUrl,
+      );
+
+      if (success && mounted) {
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      }
+    } catch (e) {
+      setState(() {
+        _localError = 'Đăng nhập Google thất bại: $e';
+      });
     }
   }
 
@@ -155,10 +186,81 @@ class _LoginScreenState extends State<LoginScreen> {
                           : const Text('Đăng nhập hệ thống'),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton(
+                      onPressed: authProvider.isLoading ? null : _handleGoogleSignIn,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.15)
+                              : Colors.black.withValues(alpha: 0.15),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        backgroundColor: isDark
+                            ? Colors.white.withValues(alpha: 0.03)
+                            : Colors.white,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.g_mobiledata_rounded, color: Colors.red, size: 24),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Đăng nhập bằng Google',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () => Navigator.pushNamed(context, '/register'),
                     child: const Text('Chưa có tài khoản? Đăng ký ngay'),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/privacy'),
+                        child: const Text(
+                          'Bảo mật',
+                          style: TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.underline),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text('|', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/terms'),
+                        child: const Text(
+                          'Điều khoản',
+                          style: TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.underline),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text('|', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/data-deletion'),
+                        child: const Text(
+                          'Xóa dữ liệu',
+                          style: TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.underline),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

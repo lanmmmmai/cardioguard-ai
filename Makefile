@@ -144,14 +144,14 @@ docker-ps: ## Show running containers
 deploy: ## Deploy to production (push to Git triggers auto-deploy)
 	@echo "=== Deploying CardioGuard AI ==="
 	@echo "Pushing to Git..."
-	git add -A
+	git add backend web_frontend mobile_app Makefile BUGS.md
 	@read -p "Commit message: " msg; \
 	git commit -m "$$msg"; \
 	git push origin HEAD
 	@echo "=== Deploy triggered! Render + Vercel will auto-deploy. ==="
 
 deploy-force: ## Force deploy (skip checks, push immediately)
-	git add -A && git commit -m "deploy: force deploy $(shell date +%Y%m%d-%H%M%S)" && git push origin HEAD
+	git add backend web_frontend mobile_app Makefile BUGS.md && git commit -m "deploy: force deploy $(shell date +%Y%m%d-%H%M%S)" && git push origin HEAD
 
 deploy-status: ## Check deployment status
 	@echo "=== Git Status ==="

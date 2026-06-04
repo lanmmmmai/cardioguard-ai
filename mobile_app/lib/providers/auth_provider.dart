@@ -15,6 +15,8 @@
 //   - Hiển thị currentUser, isAuthenticated, requiresPasswordChange
 //     cho lớp giao diện người dùng và cấu hình tab trong MainTabWrapper.
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:flutter/scheduler.dart';
 import '../core/app_logger.dart';
 import '../core/api_client.dart';
 import '../core/secure_storage.dart';
@@ -55,9 +57,9 @@ class AuthProvider extends ChangeNotifier {
   // Khởi tạo provider: đăng ký callback 401 unauthorized để
   // phiên được xóa im lặng khi máy chủ từ chối token.
   void init() {
-    ApiClient.onUnauthorized = () {
+    _apiClient.setOnUnauthorized(() {
       _logoutSilent();
-    };
+    });
   }
 
   // Cập nhật trạng thái tải và thông báo cho listeners.
@@ -190,6 +192,59 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Đăng nhập bằng Google
+  Future<bool> loginWithGoogle({
+    required String email,
+    required String fullName,
+    required String googleId,
+    String? avatarUrl,
+    String role = 'patient',
+  }) async {
+    AppLogger.log('loginWithGoogle entered | email=$email');
+    _setLoading(true);
+    _setError(null);
+    try {
+      final response = await _apiClient.post(
+        AppConfig.googleLoginEndpoint,
+        data: {
+          'email': email,
+          'full_name': fullName,
+          'google_id': googleId,
+          'avatar_url': avatarUrl,
+          'role': role,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = response.data;
+        final token = data['access_token'];
+        final userJson = data['user'];
+
+        if (token != null && userJson != null) {
+          _currentUser = User.fromJson(userJson);
+          _isAuthenticated = true;
+          AppLogger.log('loginWithGoogle success | email=$email isAuthenticated=$_isAuthenticated');
+
+          // Lưu vào bộ nhớ an toàn
+          await _secureStorage.saveToken(token);
+          await _secureStorage.saveUser(userJson);
+
+          _setLoading(false);
+          return true;
+        }
+      }
+      _setLoading(false);
+      _setError('Đăng nhập Google thất bại.');
+      AppLogger.log('loginWithGoogle failed | email=$email status=${response.statusCode}');
+      return false;
+    } catch (e) {
+      _setLoading(false);
+      _setError('Lỗi kết nối máy chủ khi đăng nhập Google.');
+      AppLogger.log('loginWithGoogle error | email=$email error=$e');
+      return false;
+    }
+  }
+
   // Cố gắng khôi phục phiên trước đó bằng token đã lưu.
   // Gọi /auth/me để xác thực token và làm mới hồ sơ người dùng.
   Future<bool> tryAutoLogin() async {
@@ -228,7 +283,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       WebSocketService.disconnect();
       try {
-        await _apiClient.post('/auth/logout');
+        await _apiClient.post(AppConfig.logoutEndpoint);
       } catch (e) {
         AppLogger.log('Đăng xuất máy chủ thất bại: $e');
       }
@@ -246,11 +301,14 @@ class AuthProvider extends ChangeNotifier {
   // Đăng xuất im lặng được kích hoạt bởi phản hồi 401 Unauthorized từ API.
   // Xóa trạng thái phiên mà không gọi điểm cuối đăng xuất máy chủ.
   void _logoutSilent() {
-    WebSocketService.disconnect();
-    _currentUser = null;
-    _isAuthenticated = false;
-    _errorMessage = 'Phiên làm việc hết hạn. Vui lòng đăng nhập lại.';
-    notifyListeners();
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      WebSocketService.disconnect();
+      unawaited(_secureStorage.clearSession());
+      _currentUser = null;
+      _isAuthenticated = false;
+      _errorMessage = 'Phiên làm việc hết hạn. Vui lòng đăng nhập lại.';
+      notifyListeners();
+    });
   }
 
   // Request Forgot Password OTP
@@ -259,7 +317,7 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     try {
       final response = await _apiClient.post(
-        '/auth/forgot-password/request-otp',
+        AppConfig.forgotPasswordRequestOtpEndpoint,
         data: {'email': email},
       );
       _setLoading(false);
@@ -281,7 +339,7 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     try {
       final response = await _apiClient.post(
-        '/auth/forgot-password/verify-otp',
+        AppConfig.forgotPasswordVerifyOtpEndpoint,
         data: {
           'email': email,
           'otp': otp,

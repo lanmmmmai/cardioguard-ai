@@ -82,10 +82,10 @@ const requestJson = async <T = any>(path: string, token?: string | null, init: R
 const toProfileMap = (rows: any[] | null | undefined) => {
   const map = new Map<string, MedicalRecordProfile>();
   (rows || []).forEach((row) => {
-    const userId = row?.user_id || row?.id;
+    const userId = row?.id;
     if (!userId) return;
     map.set(String(userId), {
-      user_id: String(userId),
+      user_id: row.user_id ? String(row.user_id) : String(row.id),
       full_name: row.full_name || row.name || null,
       phone: row.phone || null,
       gender: row.gender || null,

@@ -20,6 +20,7 @@ import 'package:heart_monitor_app/providers/chat_provider.dart';
 import 'package:heart_monitor_app/providers/appointment_provider.dart';
 import 'package:heart_monitor_app/screens/dashboard_screen.dart';
 import 'package:heart_monitor_app/screens/patients_screen.dart';
+import 'package:heart_monitor_app/screens/stats_screen.dart';
 import 'package:heart_monitor_app/models/models.dart';
 
 // Bọc widget child trong MediaQuery và MultiProvider để kiểm thử tích hợp.
@@ -121,14 +122,33 @@ class FakePatientProvider extends PatientProvider {
 // Giả lập AlertProvider với danh sách cảnh báo có thể kiểm soát.
 class FakeAlertProvider extends AlertProvider {
   List<Alert> _fakeAlerts = [];
+  List<dynamic> _fakeWeeklyStats = [];
 
   void setFakeAlerts(List<Alert> alerts) {
     _fakeAlerts = alerts;
     notifyListeners();
   }
 
+  void setFakeWeeklyStats(List<dynamic> stats) {
+    _fakeWeeklyStats = stats;
+    notifyListeners();
+  }
+
   @override
   List<Alert> get alerts => _fakeAlerts;
+
+  @override
+  List<dynamic> get weeklyStats => _fakeWeeklyStats;
+
+  @override
+  Future<void> fetchAlerts() async {
+    // Ghi đè để ngăn các lời gọi HTTP thực trong quá trình kiểm thử
+  }
+
+  @override
+  Future<void> fetchWeeklyStats() async {
+    // Ghi đè để ngăn các lời gọi HTTP thực trong quá trình kiểm thử
+  }
 }
 
 // Giả lập AppointmentProvider với danh sách lịch hẹn có thể kiểm soát.
@@ -331,6 +351,70 @@ void main() {
       // Panel detail bên phải lập tức hiển thị thông tin bệnh nhân
       expect(find.text('Chẩn đoán:'), findsNothing); // tab bệnh án mặc định trống hoặc chưa load
       expect(find.textContaining('Nam • 45 tuổi'), findsOneWidget); // Tab chỉ số hiển thị chi tiết tuổi bệnh nhân trực quan
+    });
+
+    testWidgets('Kịch bản 4: Hiển thị Màn hình Thống kê StatsScreen sử dụng Providers', (WidgetTester tester) async {
+      fakeAuth.setFakeUser(
+        User(
+          id: 'doc1',
+          fullName: 'Bác sĩ A',
+          email: 'doc@cardioguard.com',
+          role: 'doctor',
+          status: 'active',
+          mustChangePassword: false,
+        ),
+      );
+
+      fakePatient.setFakePatients([
+        Patient(
+          id: 'p1',
+          fullName: 'Bệnh nhân A',
+          age: 45,
+          gender: 'Nam',
+          phone: '0987654321',
+          address: 'Hà Nội',
+          medicalHistory: 'Huyết áp cao',
+        )
+      ]);
+
+      fakeAlert.setFakeAlerts([
+        Alert(
+          id: 'a1',
+          patientId: 'p1',
+          fullName: 'Bệnh nhân A',
+          alertType: 'HIGH_HEART_RATE',
+          message: 'Nhịp tim cao',
+          severity: 'high',
+          isResolved: false,
+          createdAt: DateTime.now(),
+        )
+      ]);
+
+      fakeAlert.setFakeWeeklyStats([
+        {'label': 'T2', 'count': 2.0},
+        {'label': 'T3', 'count': 4.0},
+      ]);
+
+      await tester.pumpWidget(
+        createTestableWidget(
+          child: const StatsScreen(isDarkTheme: true),
+          authProvider: fakeAuth,
+          patientProvider: fakePatient,
+          alertProvider: fakeAlert,
+          appointmentProvider: fakeAppointment,
+          chatProvider: fakeChat,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Kiểm tra tiêu đề màn hình hiển thị
+      expect(find.text('Thống kê hệ thống'), findsOneWidget);
+      // Kiểm tra KPI hiển thị số lượng
+      expect(find.text('1'), findsNWidgets(3)); // 1 bệnh nhân, 1 cảnh báo, 1 nguy kịch
+      expect(find.text('BỆNH NHÂN'), findsOneWidget);
+      expect(find.text('CẢNH BÁO'), findsOneWidget);
+      expect(find.text('NGUY KỊCH'), findsOneWidget);
     });
   });
 }

@@ -114,6 +114,14 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
+        jti = payload.get("jti")
+
+        if jti:
+            revoked = await database.fetch_val("SELECT 1 FROM revoked_tokens WHERE jti = :jti", {"jti": jti})
+            if revoked:
+                logger.warning("WS bị từ chối: token đã bị thu hồi (revoked)")
+                await websocket.close(code=1008, reason="Token has been revoked")
+                return
 
         if not user_id:
             logger.warning("WS bị từ chối: payload token thiếu chủ thể")

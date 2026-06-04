@@ -90,6 +90,7 @@ async def ensure_profile_schema() -> None:
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN DEFAULT FALSE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT",
         """
         CREATE TABLE IF NOT EXISTS patients (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

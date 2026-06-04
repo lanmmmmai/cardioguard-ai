@@ -16,6 +16,7 @@ import { Bot, Users, Activity, FileText } from 'lucide-react';
 import { ChatWindow } from '../components/chat/ChatWindow';
 import { useAuth } from '../auth/AuthContext';
 import { API_URL } from '../config';
+import { readJsonResponse } from '../utils/response';
 
 /**
  * Trang chatbot chính cho bác sĩ. Hiển thị thanh bên chọn bệnh nhân và
@@ -25,18 +26,27 @@ export const DoctorChatbot: React.FC = () => {
   const { accessToken } = useAuth();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [loadingPatients, setLoadingPatients] = useState(true);
+  const [patientsError, setPatientsError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPatients = async () => {
+      setLoadingPatients(true);
+      setPatientsError(null);
       try {
         const res = await fetch(`${API_URL}/patients`, {
           headers: { Authorization: `Bearer ${accessToken}` }
         });
-        const data = await res.json();
+        if (!res.ok) {
+          throw new Error('Không thể tải danh sách bệnh nhân');
+        }
+        const data = await readJsonResponse<any>(res);
         const items = Array.isArray(data) ? data : (data.items || []);
         setPatients(items);
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        setPatientsError(err.message || 'Không thể tải danh sách bệnh nhân');
+      } finally {
+        setLoadingPatients(false);
       }
     };
     fetchPatients();
@@ -58,6 +68,8 @@ export const DoctorChatbot: React.FC = () => {
         <div className="chatbot-side-col">
           <div className="panel patient-selector-panel">
             <h3 className="panel-title"><Users size={16}/> Chọn bệnh nhân để phân tích</h3>
+            {patientsError && <div className="form-error mt-2">{patientsError}</div>}
+            {loadingPatients && <div className="text-sm text-muted mt-2">Đang tải danh sách bệnh nhân...</div>}
             <div className="patient-list-compact mt-3">
               <div 
                 className={`patient-row-compact ${selectedPatientId === null ? 'active' : ''}`}

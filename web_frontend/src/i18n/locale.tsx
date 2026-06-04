@@ -1,3 +1,14 @@
+/**
+ * Tệp: CardioGuard AI – Quản lý dịch thuật và ngôn ngữ (locale)
+ * Mục đích: Cung cấp ngữ cảnh dịch thuật tiếng Việt (vi) và tiếng Anh (en) cho các nhãn trong ứng dụng,
+ *           bao gồm siêu dữ liệu trang (PAGE_META), nhãn vai trò, nhãn menu và nhãn dùng chung.
+ * Luồng xử lý: 1. Đọc và khôi phục ngôn ngữ đã lưu hoặc tự động phát hiện ngôn ngữ trình duyệt.
+ *              2. Cung cấp LocaleProvider và hook useLocale để các thành phần con truy xuất hàm t(key).
+ *              3. Lưu cấu hình ngôn ngữ đã thay đổi vào localStorage.
+ * Quan hệ:
+ *   - Được sử dụng bởi các thành phần giao diện chính như RoleLayout, App và các trang quản trị để hiển thị nhãn dịch thuật.
+ */
+
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { UserRole } from '../auth/roles';
 
@@ -189,6 +200,18 @@ const COMMON_LABELS: Record<Locale, Record<string, string>> = {
     layout_admin: 'Quản trị CardioGuard',
     layout_doctor: 'Không gian bác sĩ',
     layout_patient: 'Trang bệnh nhân',
+    group_overview: 'Tổng quan',
+    group_users: 'Quản lý người dùng',
+    group_devices: 'Giám sát & Phần cứng',
+    group_medical: 'Y tế & Báo cáo',
+    group_system: 'Hệ thống & Cấu hình',
+    group_overview_ai: 'Tổng quan & Trợ lý AI',
+    group_clinical_mgmt: 'Quản lý & Lâm sàng',
+    group_monitoring_reports: 'Giám sát & Báo cáo',
+    group_communication: 'Giao tiếp',
+    group_health_medical: 'Sức khỏe & Y tế',
+    group_comm_notifs: 'Giao tiếp & Thông báo',
+    group_account: 'Tài khoản cá nhân',
   },
   en: {
     logout: 'Log out',
@@ -214,6 +237,18 @@ const COMMON_LABELS: Record<Locale, Record<string, string>> = {
     layout_admin: 'CardioGuard Admin',
     layout_doctor: 'Doctor Workspace',
     layout_patient: 'Patient Portal',
+    group_overview: 'Overview',
+    group_users: 'User Management',
+    group_devices: 'Monitoring & Hardware',
+    group_medical: 'Medical & Reports',
+    group_system: 'System & Config',
+    group_overview_ai: 'Overview & AI',
+    group_clinical_mgmt: 'Clinical Management',
+    group_monitoring_reports: 'Monitoring & Reports',
+    group_communication: 'Communication',
+    group_health_medical: 'Health & Medical',
+    group_comm_notifs: 'Communication & Notifications',
+    group_account: 'Personal Account',
   },
 };
 

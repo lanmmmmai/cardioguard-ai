@@ -21,6 +21,18 @@ PASSWORD_PATTERN = re.compile(r"^(?=.*[A-Z])(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\
 PASSWORD_POLICY_MESSAGE = (
     "Mật khẩu phải có độ dài từ 8 đến 72 ký tự và bao gồm chữ hoa, chữ cái, chữ số và ký tự đặc biệt"
 )
+COMMON_PASSWORDS = {
+    "password",
+    "password1",
+    "password123",
+    "admin123",
+    "qwerty123",
+    "12345678",
+    "123456789",
+    "letmein123",
+    "welcome123",
+    "abc12345",
+}
 
 
 def validate_password(value: str) -> str:
@@ -35,8 +47,11 @@ def validate_password(value: str) -> str:
     Ngoại lệ:
         ValueError: Nếu mật khẩu vượt quá 72 byte hoặc không đáp ứng yêu cầu mẫu.
     """
+    normalized_candidate = re.sub(r"[^a-z0-9]", "", value.strip().lower())
     if len(value.encode("utf-8")) > 72:
         raise ValueError("Mật khẩu không được dài quá 72 byte do hạn chế băm bảo mật")
+    if normalized_candidate in COMMON_PASSWORDS:
+        raise ValueError("Mật khẩu quá phổ biến và không được phép sử dụng")
     if not PASSWORD_PATTERN.fullmatch(value):
         raise ValueError(PASSWORD_POLICY_MESSAGE)
     return value

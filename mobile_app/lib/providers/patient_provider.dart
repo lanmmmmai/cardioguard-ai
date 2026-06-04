@@ -74,8 +74,7 @@ class PatientProvider extends ChangeNotifier {
     try {
       final response = await _apiClient.get(AppConfig.patientsEndpoint);
       if (response.statusCode == 200) {
-        if (response.data is! List) throw Exception("Dữ liệu trả về phải là một danh sách");
-        final List<dynamic> list = response.data as List<dynamic>;
+        final List<dynamic> list = ApiClient.extractListData(response.data);
         _patients = list.map((item) => Patient.fromJson(item)).toList();
       }
     } catch (e) {
@@ -138,11 +137,12 @@ class PatientProvider extends ChangeNotifier {
   Future<void> fetchMedicalRecords(String patientId) async {
     _setLoading(true);
     try {
-      final response = await _apiClient.get('/medical-records', queryParameters: {'patient_id': patientId});
+      final response = await _apiClient
+          .get('/medical-records', queryParameters: {'patient_id': patientId});
       if (response.statusCode == 200) {
-        if (response.data is! List) throw Exception("Dữ liệu trả về phải là một danh sách");
-        final List<dynamic> list = response.data as List<dynamic>;
-        _medicalRecords = list.map((item) => MedicalRecord.fromJson(item)).toList();
+        final List<dynamic> list = ApiClient.extractListData(response.data);
+        _medicalRecords =
+            list.map((item) => MedicalRecord.fromJson(item)).toList();
       }
     } catch (e) {
       AppLogger.log('Lỗi tìm nạp hồ sơ bệnh án: $e');
@@ -188,11 +188,12 @@ class PatientProvider extends ChangeNotifier {
   Future<void> fetchPrescriptions(String patientId) async {
     _setLoading(true);
     try {
-      final response = await _apiClient.get('/prescriptions', queryParameters: {'patient_id': patientId});
+      final response = await _apiClient
+          .get('/prescriptions', queryParameters: {'patient_id': patientId});
       if (response.statusCode == 200) {
-        if (response.data is! List) throw Exception("Dữ liệu trả về phải là một danh sách");
-        final List<dynamic> list = response.data as List<dynamic>;
-        _prescriptions = list.map((item) => Prescription.fromJson(item)).toList();
+        final List<dynamic> list = ApiClient.extractListData(response.data);
+        _prescriptions =
+            list.map((item) => Prescription.fromJson(item)).toList();
       }
     } catch (e) {
       AppLogger.log('Lỗi tìm nạp đơn thuốc: $e');
@@ -245,7 +246,9 @@ class PatientProvider extends ChangeNotifier {
       'spo2': metrics['spo2'] ?? _liveMetrics['spo2'],
       'systolic_bp': metrics['systolic_bp'] ?? _liveMetrics['systolic_bp'],
       'diastolic_bp': metrics['diastolic_bp'] ?? _liveMetrics['diastolic_bp'],
-      'ecg_value': metrics['ecg_value'] is num ? (metrics['ecg_value'] as num).toDouble() : _liveMetrics['ecg_value'],
+      'ecg_value': metrics['ecg_value'] is num
+          ? (metrics['ecg_value'] as num).toDouble()
+          : _liveMetrics['ecg_value'],
       'is_abnormal': metrics['is_abnormal'] ?? _liveMetrics['is_abnormal'],
     };
     notifyListeners();
@@ -280,14 +283,23 @@ class PatientProvider extends ChangeNotifier {
         'patient_id': patientId,
         'limit': 1,
       });
-      if (response.statusCode == 200 && response.data is List && response.data.isNotEmpty) {
-        final latest = response.data[0] as Map<String, dynamic>;
+      if (response.statusCode == 200) {
+        final List<dynamic> list = ApiClient.extractListData(response.data);
+        if (list.isEmpty) {
+          return;
+        }
+        final latest = list[0] as Map<String, dynamic>;
         _liveMetrics = {
-          'heart_rate': latest['heart_rate'] ?? _liveMetrics['heart_rate'] ?? 75,
+          'heart_rate':
+              latest['heart_rate'] ?? _liveMetrics['heart_rate'] ?? 75,
           'spo2': latest['spo2'] ?? _liveMetrics['spo2'] ?? 98,
-          'systolic_bp': latest['systolic_bp'] ?? _liveMetrics['systolic_bp'] ?? 120,
-          'diastolic_bp': latest['diastolic_bp'] ?? _liveMetrics['diastolic_bp'] ?? 80,
-          'ecg_value': latest['ecg_value'] is num ? (latest['ecg_value'] as num).toDouble() : 0.0,
+          'systolic_bp':
+              latest['systolic_bp'] ?? _liveMetrics['systolic_bp'] ?? 120,
+          'diastolic_bp':
+              latest['diastolic_bp'] ?? _liveMetrics['diastolic_bp'] ?? 80,
+          'ecg_value': latest['ecg_value'] is num
+              ? (latest['ecg_value'] as num).toDouble()
+              : 0.0,
           'is_abnormal': latest['is_abnormal'] ?? false,
         };
         notifyListeners();
@@ -306,9 +318,10 @@ class PatientProvider extends ChangeNotifier {
         'patient_id': patientId,
         'limit': 30,
       });
-      if (response.statusCode == 200 && response.data is List) {
-        final List<dynamic> list = response.data as List<dynamic>;
-        _sensorHistory = list.map((item) => item as Map<String, dynamic>).toList();
+      if (response.statusCode == 200) {
+        final List<dynamic> list = ApiClient.extractListData(response.data);
+        _sensorHistory =
+            list.map((item) => item as Map<String, dynamic>).toList();
         notifyListeners();
       }
     } catch (e) {

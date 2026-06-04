@@ -45,6 +45,7 @@ from app.api.email_api import cms_router as cms_email_router, router as email_ro
 from app.api.chat_api import router as chat_router
 from app.services.otp_service import ensure_otp_table
 from app.services.db_optimization import ensure_domain_links_schema, ensure_email_cms_schema, ensure_performance_indexes, ensure_profile_schema, ensure_user_account_timestamps
+from app.services.audit_service import shutdown_audit_logging
 
 
 logging.basicConfig(
@@ -88,11 +89,6 @@ def get_cors_origins() -> list[str]:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_cors_origins(),
-    allow_origin_regex=(
-        r"^(https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?"
-        r"|https://([A-Za-z0-9-]+\.)*giatky\.site"
-        r"|https://[A-Za-z0-9-]+\.vercel\.app)$"
-    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -201,6 +197,15 @@ async def startup():
 async def shutdown():
     """Gracefully close the database connection pool during shutdown."""
     logger.info("Shutting down CardioGuard AI backend...")
+    global _mv_refresh_task
+    if _mv_refresh_task:
+        logger.info("Cancelling periodic materialized view refresh task...")
+        _mv_refresh_task.cancel()
+        try:
+            await _mv_refresh_task
+        except asyncio.CancelledError:
+            logger.info("Materialized view refresh task cancelled successfully")
+    await shutdown_audit_logging()
     await disconnect_db()
     logger.info("Application shutdown complete")
 
@@ -269,5 +274,5 @@ def root():
         "message": "CardioGuard AI Backend is running",
         "status": "running",
         "database_configured": True,
-        "database_connected": True
+        "database_connected": bool(database.is_connected),
     }

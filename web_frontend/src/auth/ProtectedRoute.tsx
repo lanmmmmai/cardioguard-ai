@@ -29,7 +29,7 @@ interface ProtectedRouteProps {
  * trạng thái xác thực và các vai trò được phép.
  */
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, currentPath, navigate, children }) => {
-  const { isAuthenticated, loading, role, logout, requiresPasswordChange, user } = useAuth();
+  const { isAuthenticated, loading, role, requiresPasswordChange, user } = useAuth();
 
   React.useEffect(() => {
     if (loading) return;
@@ -128,23 +128,6 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, cu
     (role === 'doctor' && ['/doctor/complete-profile', '/doctor/pending-verification', '/doctor/verification-rejected'].includes(currentPath));
 
   if (!isOnboardingRoute && !allowedRoles.includes(role)) {
-    return null;
-  }
-
-  if (!defaultRouteByRole[role]) {
-    logout();
-    let targetLogin = '/login';
-    const lastRole = sessionStorage.getItem('last_role') || role;
-    if (currentPath.startsWith('/admin')) {
-      targetLogin = '/login-admin';
-    } else if (currentPath.startsWith('/doctor')) {
-      targetLogin = '/login-doctor';
-    } else if (lastRole === 'admin') {
-      targetLogin = '/login-admin';
-    } else if (lastRole === 'doctor') {
-      targetLogin = '/login-doctor';
-    }
-    navigate(targetLogin, true);
     return null;
   }
 

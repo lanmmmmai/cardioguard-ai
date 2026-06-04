@@ -12,6 +12,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_logger.dart';
 import '../core/api_client.dart';
+import '../config/app_config.dart';
 import '../models/models.dart';
 
 class AppointmentProvider extends ChangeNotifier {
@@ -19,9 +20,11 @@ class AppointmentProvider extends ChangeNotifier {
   final ApiClient _apiClient = ApiClient();
 
   bool _isLoading = false;
+  String? _errorMessage;
 
   // Liệu một yêu cầu mạng có đang được tiến hành hay không.
   bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
 
   List<Appointment> _appointments = [];
 
@@ -34,19 +37,27 @@ class AppointmentProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _setError(String? message) {
+    _errorMessage = message;
+    notifyListeners();
+  }
+
   // Tìm nạp lịch hẹn từ máy chủ và sắp xếp theo scheduledAt giảm dần.
   Future<void> fetchAppointments() async {
     _setLoading(true);
+    _setError(null);
     try {
-      final response = await _apiClient.get('/appointments');
+      final response = await _apiClient.get(AppConfig.appointmentsEndpoint);
       if (response.statusCode == 200) {
-        if (response.data is! List) throw Exception("Dữ liệu trả về phải là một danh sách");
-        final List<dynamic> list = response.data as List<dynamic>;
+        final List<dynamic> list = ApiClient.extractListData(response.data);
         _appointments = list.map((item) => Appointment.fromJson(item)).toList();
         // Sắp xếp ngày hẹn mới nhất ở đầu
         _appointments.sort((a, b) => b.scheduledAt.compareTo(a.scheduledAt));
+      } else {
+        _setError('Không thể tải danh sách lịch hẹn.');
       }
     } catch (e) {
+      _setError('Không thể tải danh sách lịch hẹn.');
       AppLogger.log('Lỗi tìm nạp lịch hẹn: $e');
     } finally {
       _setLoading(false);
@@ -62,9 +73,10 @@ class AppointmentProvider extends ChangeNotifier {
     String channel = 'offline',
   }) async {
     _setLoading(true);
+    _setError(null);
     try {
       final response = await _apiClient.post(
-        '/appointments',
+        AppConfig.appointmentsEndpoint,
         data: {
           'doctor_id': doctorId,
           'title': title,
@@ -80,9 +92,11 @@ class AppointmentProvider extends ChangeNotifier {
         _setLoading(false);
         return true;
       }
+      _setError('Không thể đặt lịch hẹn.');
       _setLoading(false);
       return false;
     } catch (e) {
+      _setError('Không thể đặt lịch hẹn.');
       AppLogger.log('Lỗi đặt lịch hẹn: $e');
       _setLoading(false);
       return false;
@@ -90,10 +104,12 @@ class AppointmentProvider extends ChangeNotifier {
   }
 
   // Cập nhật trạng thái của một lịch hẹn (thao tác của bác sĩ/quản trị viên).
-  Future<bool> updateAppointmentStatus(String appointmentId, String status) async {
+  Future<bool> updateAppointmentStatus(
+      String appointmentId, String status) async {
+    _setError(null);
     try {
       final response = await _apiClient.patch(
-        '/appointments/$appointmentId',
+        '${AppConfig.appointmentsEndpoint}/$appointmentId',
         data: {'status': status},
       );
       if (response.statusCode == 200) {
@@ -101,8 +117,10 @@ class AppointmentProvider extends ChangeNotifier {
         _addOrUpdateLocal(updatedAppt);
         return true;
       }
+      _setError('Không thể cập nhật trạng thái lịch hẹn.');
       return false;
     } catch (e) {
+      _setError('Không thể cập nhật trạng thái lịch hẹn.');
       AppLogger.log('Lỗi cập nhật trạng thái lịch hẹn: $e');
       return false;
     }

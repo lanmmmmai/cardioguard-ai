@@ -34,7 +34,6 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    authProvider.init(); // Khởi tạo các hook token
 
     final autoLoginSuccess = await authProvider.tryAutoLogin();
     if (!mounted) return;

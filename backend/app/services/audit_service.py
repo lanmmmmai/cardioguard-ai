@@ -151,6 +151,25 @@ async def _delayed_flush() -> None:
     await _flush_buffer()
 
 
+async def flush_audit_logs() -> None:
+    """Flush thủ công audit buffer đang chờ."""
+    await _flush_buffer()
+
+
+async def shutdown_audit_logging() -> None:
+    """Dừng task flush nền và flush nốt audit buffer trước khi shutdown."""
+    global _flush_task
+    flush_task = _flush_task
+    _flush_task = None
+    if flush_task is not None and not flush_task.done():
+        flush_task.cancel()
+        try:
+            await flush_task
+        except asyncio.CancelledError:
+            logger.debug("Audit delayed flush task cancelled during shutdown")
+    await _flush_buffer()
+
+
 async def log_activity(
     user_id: Optional[str],
     action: str,

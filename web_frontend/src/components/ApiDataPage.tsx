@@ -31,6 +31,16 @@ export const ApiDataPage: React.FC<ApiDataPageProps> = ({ title, subtitle, endpo
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const normalizeRows = (data: any): Array<Record<string, any>> => {
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (Array.isArray(data?.items)) {
+      return data.items;
+    }
+    return data && typeof data === 'object' ? [data] : [];
+  };
+
   const fetchRows = async () => {
     if (!accessToken) return;
     setLoading(true);
@@ -51,7 +61,7 @@ export const ApiDataPage: React.FC<ApiDataPageProps> = ({ title, subtitle, endpo
 
       }
       if (!response.ok) throw new Error(data.detail || 'Không lấy được dữ liệu');
-      setRows(Array.isArray(data) ? data : [data]);
+      setRows(normalizeRows(data));
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
     } finally {

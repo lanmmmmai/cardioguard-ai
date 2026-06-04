@@ -19,10 +19,13 @@ Quan hệ:
 """
 
 import logging
+import uuid
 from typing import Optional
 from fastapi import APIRouter, Header
 from app.core.database import database
 from app.api.auth_api import get_user_from_token
+from app.api.crud_api import to_jsonable
+from app.websocket.connection_manager import manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -225,10 +228,7 @@ async def resolve_alert(alert_id: str, authorization: Optional[str] = Header(def
     )
     
     alert_dict = {key: updated_alert[key] for key in updated_alert.keys()}
-    from app.api.crud_api import to_jsonable
     alert_dict = to_jsonable(alert_dict)
-    
-    from app.websocket.connection_manager import manager
     await manager.broadcast_alert(patient_id, alert_dict)
     
     return {"message": "Cảnh báo đã được xác nhận xử lý thành công", "alert_id": alert_id}
@@ -260,7 +260,6 @@ async def create_sos_alert(payload: AlertCreate, authorization: Optional[str] = 
     if current_user["role"] != "patient":
         raise HTTPException(status_code=403, detail="Chỉ bệnh nhân mới có thể gửi cảnh báo SOS")
         
-    import uuid
     alert_id = str(uuid.uuid4())
     insert_query = """
     INSERT INTO alerts (id, patient_id, alert_type, message, severity, is_resolved)
@@ -298,10 +297,7 @@ async def create_sos_alert(payload: AlertCreate, authorization: Optional[str] = 
     )
     
     alert_dict = {key: updated_alert[key] for key in updated_alert.keys()}
-    from app.api.crud_api import to_jsonable
     alert_dict = to_jsonable(alert_dict)
-    
-    from app.websocket.connection_manager import manager
     await manager.broadcast_alert(current_user["id"], alert_dict)
     
     return alert_dict

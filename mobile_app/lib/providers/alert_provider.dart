@@ -31,6 +31,11 @@ class AlertProvider extends ChangeNotifier {
   // Danh sách đầy đủ các cảnh báo (cảnh báo mới nhất ở đầu sau khi chèn).
   List<Alert> get alerts => _alerts;
 
+  List<dynamic> _weeklyStats = [];
+
+  // Thống kê cảnh báo hàng tuần
+  List<dynamic> get weeklyStats => _weeklyStats;
+
   // Số lượng cảnh báo chưa được giải quyết.
   int get activeAlertCount => _alerts.where((a) => !a.isResolved).length;
 
@@ -46,8 +51,7 @@ class AlertProvider extends ChangeNotifier {
     try {
       final response = await _apiClient.get(AppConfig.alertsEndpoint);
       if (response.statusCode == 200) {
-        if (response.data is! List) throw Exception("Dữ liệu trả về phải là một danh sách");
-        final List<dynamic> list = response.data as List<dynamic>;
+        final List<dynamic> list = ApiClient.extractListData(response.data);
         _alerts = list.map((item) => Alert.fromJson(item)).toList();
       }
     } catch (e) {
@@ -60,7 +64,9 @@ class AlertProvider extends ChangeNotifier {
   // Đánh dấu một cảnh báo đã được giải quyết trên máy chủ và cập nhật trạng thái cục bộ.
   Future<bool> resolveAlert(String alertId) async {
     try {
-      final response = await _apiClient.patch('/alerts/$alertId/resolve');
+      final response = await _apiClient.patch(
+        '${AppConfig.alertsEndpoint}/$alertId/resolve',
+      );
       if (response.statusCode == 200) {
         // Cập nhật danh sách cục bộ
         final index = _alerts.indexWhere((a) => a.id == alertId);
@@ -121,6 +127,19 @@ class AlertProvider extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       AppLogger.log('Lỗi xử lý cảnh báo thời gian thực: $e');
+    }
+  }
+
+  // Tìm nạp dữ liệu thống kê cảnh báo hàng tuần từ máy chủ.
+  Future<void> fetchWeeklyStats() async {
+    try {
+      final response = await _apiClient.get(AppConfig.alertsWeeklyStatsEndpoint);
+      if (response.statusCode == 200) {
+        _weeklyStats = ApiClient.extractListData(response.data);
+        notifyListeners();
+      }
+    } catch (e) {
+      AppLogger.log('Lỗi tìm nạp thống kê tuần: $e');
     }
   }
 }

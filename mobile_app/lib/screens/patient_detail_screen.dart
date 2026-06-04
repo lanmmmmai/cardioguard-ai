@@ -62,10 +62,10 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   @override
   void initState() {
     super.initState();
-    debugPrint(
+    AppLogger.info(
         '[CardioGuard] PatientDetailScreen initState | patientId=${widget.patient['id']}');
 
-    // Điền ban đầu với các điểm giả định ổn định
+    // Điển ban đầu với các điểm giả định ổn định
     for (int i = 0; i < 15; i++) {
       _hrSpots.add(FlSpot(i.toDouble(), 75.0));
       _spo2Spots.add(FlSpot(i.toDouble(), 98.0));
@@ -82,7 +82,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           Provider.of<PatientProvider>(context, listen: false);
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-      debugPrint(
+      AppLogger.info(
           '[CardioGuard] PatientDetailScreen fetching data for patientId=$patientId');
       patientProvider.fetchMedicalRecords(patientId);
       patientProvider.fetchPrescriptions(patientId);
@@ -92,7 +92,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         if (!mounted) return;
         final history = patientProvider.sensorHistory;
         if (history.isNotEmpty) {
-          debugPrint(
+          AppLogger.info(
               '[CardioGuard] PatientDetailScreen sensorHistory loaded | count=${history.length}');
           setState(() {
             _hrSpots.clear();
@@ -122,7 +122,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    debugPrint(
+    AppLogger.info(
         '[CardioGuard] PatientDetailScreen didChangeDependencies | patientId=${widget.patient['id']}');
   }
 
@@ -138,7 +138,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     } else if (type == 'health_metrics' &&
         event['patient_id'] == widget.patient['id']) {
       final metrics = event['data'] as Map<String, dynamic>;
-      debugPrint(
+      AppLogger.info(
           '[CardioGuard] PatientDetailScreen WS health_metrics | HR=${metrics['heart_rate']} SpO2=${metrics['spo2']} BP=${metrics['systolic_bp']}/${metrics['diastolic_bp']}');
       setState(() {
         _currentHr = (metrics['heart_rate'] as num?)?.toDouble() ?? 75.0;
@@ -147,18 +147,22 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         _currentDiaBp = (metrics['diastolic_bp'] as num?)?.toDouble() ?? 80.0;
 
         _tickCount++;
-        _hrSpots.removeAt(0);
         _hrSpots.add(FlSpot(_tickCount.toDouble(), _currentHr));
+        if (_hrSpots.length > 30) {
+          _hrSpots.removeAt(0);
+        }
 
-        _spo2Spots.removeAt(0);
         _spo2Spots.add(FlSpot(_tickCount.toDouble(), _currentSpo2));
+        if (_spo2Spots.length > 30) {
+          _spo2Spots.removeAt(0);
+        }
       });
     }
   }
 
   @override
   void dispose() {
-    debugPrint(
+    AppLogger.info(
         '[CardioGuard] PatientDetailScreen dispose | patientId=${widget.patient['id']}');
     WebSocketService.removeListener(_onWebSocketEvent);
     _messageController.dispose();
@@ -167,7 +171,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
   // Mở bottom sheet để bác sĩ thêm hồ sơ bệnh án mới.
   void _showAddRecordSheet() {
-    debugPrint(
+    AppLogger.info(
         '[CardioGuard] PatientDetailScreen opening AddRecordSheet | patientId=${widget.patient['id']}');
     showModalBottomSheet(
       context: context,
@@ -182,13 +186,13 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           isDarkTheme: widget.isDarkTheme,
         );
       },
-    ).whenComplete(() => debugPrint(
+    ).whenComplete(() => AppLogger.info(
         '[CardioGuard] PatientDetailScreen AddRecordSheet closed'));
   }
 
   // Mở bottom sheet để bác sĩ thêm đơn thuốc mới.
   void _showAddPrescriptionSheet() {
-    debugPrint(
+    AppLogger.info(
         '[CardioGuard] PatientDetailScreen opening AddPrescriptionSheet | patientId=${widget.patient['id']}');
     showModalBottomSheet(
       context: context,
@@ -203,7 +207,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           isDarkTheme: widget.isDarkTheme,
         );
       },
-    ).whenComplete(() => debugPrint(
+    ).whenComplete(() => AppLogger.info(
         '[CardioGuard] PatientDetailScreen AddPrescriptionSheet closed'));
   }
 
@@ -280,9 +284,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 fontWeight: FontWeight.bold, color: textColor, fontSize: 16),
           ),
           bottom: TabBar(
-            labelColor: const Color(0xFFFF3366),
+            labelColor: CgColors.accent,
             unselectedLabelColor: textMuted,
-            indicatorColor: const Color(0xFFFF3366),
+            indicatorColor: CgColors.accent,
             tabs: const [
               Tab(text: 'Chỉ số'),
               Tab(text: 'Bệnh án'),
@@ -460,7 +464,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               floatingActionButton: role == 'doctor'
                   ? FloatingActionButton(
                       onPressed: _showAddRecordSheet,
-                      backgroundColor: const Color(0xFFFF3366),
+                      backgroundColor: CgColors.accent,
                       child:
                           const Icon(LucideIcons.filePlus, color: Colors.white),
                     )
@@ -501,7 +505,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                     presc.medicationName,
                                     style: const TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFFFF3366),
+                                        color: CgColors.accent,
                                         fontSize: 15),
                                   ),
                                   Container(
@@ -535,7 +539,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               floatingActionButton: role == 'doctor'
                   ? FloatingActionButton(
                       onPressed: _showAddPrescriptionSheet,
-                      backgroundColor: const Color(0xFFFF3366),
+                      backgroundColor: CgColors.accent,
                       child: const Icon(LucideIcons.plus, color: Colors.white),
                     )
                   : null,
@@ -560,7 +564,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                             final isMe =
                                 msg.senderId == (authProvider.currentUser?.id ?? '');
                             final bubbleColor = isMe
-                                ? const Color(0xFFFF3366)
+                                ? CgColors.accent
                                 : (isDark
                                     ? const Color(0xFF1C222D)
                                     : Colors.black.withValues(alpha: 0.04));
@@ -622,7 +626,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                       ),
                       IconButton(
                         icon: const Icon(LucideIcons.send,
-                            color: Color(0xFFFF3366)),
+                            color: CgColors.accent),
                         style: IconButton.styleFrom(
                             minimumSize: const Size(48, 48)),
                         onPressed: _sendChatMessage,
@@ -812,6 +816,7 @@ class AddRecordSheetContent extends StatefulWidget {
 }
 
 class _AddRecordSheetContentState extends State<AddRecordSheetContent> {
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _typeController;
   late final TextEditingController _diagnosisController;
   late final TextEditingController _summaryController;
@@ -842,56 +847,62 @@ class _AddRecordSheetContentState extends State<AddRecordSheetContent> {
         top: 20,
       ),
       child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Thêm Bệnh Án Mới',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            TextField(
-                controller: _typeController,
-                decoration: const InputDecoration(labelText: 'Loại khám')),
-            const SizedBox(height: 12),
-            TextField(
-                controller: _diagnosisController,
-                decoration: const InputDecoration(labelText: 'Chẩn đoán')),
-            const SizedBox(height: 12),
-            TextField(
-                controller: _summaryController,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Tóm tắt / Kết luận')),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF3366)),
-                onPressed: () async {
-                  if (_diagnosisController.text.isEmpty ||
-                      _summaryController.text.isEmpty) {
-                    return;
-                  }
-                  final patientProvider =
-                      Provider.of<PatientProvider>(context, listen: false);
-                  final success = await patientProvider.addMedicalRecord(
-                    patientId: widget.patient['id'],
-                    type: _typeController.text.trim(),
-                    diagnosis: _diagnosisController.text.trim(),
-                    summary: _summaryController.text.trim(),
-                  );
-                  if (success && context.mounted) {
-                    Navigator.pop(context);
-                  }
-                },
-                child: const Text('Lưu Bệnh Án',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold)),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Thêm Bệnh Án Mới',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              TextFormField(
+                  controller: _typeController,
+                  decoration: const InputDecoration(labelText: 'Loại khám'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Vui lòng nhập loại khám' : null,
               ),
-            ),
-            const SizedBox(height: 20),
-          ],
+              const SizedBox(height: 12),
+              TextFormField(
+                  controller: _diagnosisController,
+                  decoration: const InputDecoration(labelText: 'Chẩn đoán'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Vui lòng nhập chẩn đoán' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                  controller: _summaryController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Tóm tắt / Kết luận'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Vui lòng nhập tóm tắt/kết luận' : null,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: CgColors.accent),
+                  onPressed: () async {
+                    if (!_formKey.currentState!.validate()) return;
+                    final patientProvider =
+                        Provider.of<PatientProvider>(context, listen: false);
+                    final success = await patientProvider.addMedicalRecord(
+                      patientId: widget.patient['id'],
+                      type: _typeController.text.trim(),
+                      diagnosis: _diagnosisController.text.trim(),
+                      summary: _summaryController.text.trim(),
+                    );
+                    if (success && context.mounted) {
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Lưu Bệnh Án',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );
@@ -914,6 +925,7 @@ class AddPrescriptionSheetContent extends StatefulWidget {
 }
 
 class _AddPrescriptionSheetContentState extends State<AddPrescriptionSheetContent> {
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _medController;
   late final TextEditingController _dosageController;
   late final TextEditingController _freqController;
@@ -947,62 +959,70 @@ class _AddPrescriptionSheetContentState extends State<AddPrescriptionSheetConten
         top: 20,
       ),
       child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Kê Đơn Thuốc Mới',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            TextField(
-                controller: _medController,
-                decoration: const InputDecoration(labelText: 'Tên thuốc')),
-            const SizedBox(height: 12),
-            TextField(
-                controller: _dosageController,
-                decoration: const InputDecoration(
-                    labelText: 'Liều lượng (e.g. 500mg)')),
-            const SizedBox(height: 12),
-            TextField(
-                controller: _freqController,
-                decoration: const InputDecoration(
-                    labelText: 'Tần suất (e.g. 2 lần/ngày)')),
-            const SizedBox(height: 12),
-            TextField(
-                controller: _instructController,
-                decoration: const InputDecoration(labelText: 'Hướng dẫn sử dụng')),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF3366)),
-                onPressed: () async {
-                  if (_medController.text.isEmpty ||
-                      _dosageController.text.isEmpty) {
-                    return;
-                  }
-                  final patientProvider =
-                      Provider.of<PatientProvider>(context, listen: false);
-                  final success = await patientProvider.addPrescription(
-                    patientId: widget.patient['id'],
-                    medicationName: _medController.text.trim(),
-                    dosage: _dosageController.text.trim(),
-                    frequency: _freqController.text.trim(),
-                    instructions: _instructController.text.trim(),
-                  );
-                  if (success && context.mounted) {
-                    Navigator.pop(context);
-                  }
-                },
-                child: const Text('Lưu Đơn Thuốc',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold)),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Kê Đơn Thuốc Mới',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              TextFormField(
+                  controller: _medController,
+                  decoration: const InputDecoration(labelText: 'Tên thuốc'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Vui lòng nhập tên thuốc' : null,
               ),
-            ),
-            const SizedBox(height: 20),
-          ],
+              const SizedBox(height: 12),
+              TextFormField(
+                  controller: _dosageController,
+                  decoration: const InputDecoration(
+                      labelText: 'Liều lượng (e.g. 500mg)'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Vui lòng nhập liều lượng' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                  controller: _freqController,
+                  decoration: const InputDecoration(
+                      labelText: 'Tần suất (e.g. 2 lần/ngày)'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Vui lòng nhập tần suất' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                  controller: _instructController,
+                  decoration: const InputDecoration(labelText: 'Hướng dẫn sử dụng'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Vui lòng nhập hướng dẫn sử dụng' : null,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: CgColors.accent),
+                  onPressed: () async {
+                    if (!_formKey.currentState!.validate()) return;
+                    final patientProvider =
+                        Provider.of<PatientProvider>(context, listen: false);
+                    final success = await patientProvider.addPrescription(
+                      patientId: widget.patient['id'],
+                      medicationName: _medController.text.trim(),
+                      dosage: _dosageController.text.trim(),
+                      frequency: _freqController.text.trim(),
+                      instructions: _instructController.text.trim(),
+                    );
+                    if (success && context.mounted) {
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text('Lưu Đơn Thuốc',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );
