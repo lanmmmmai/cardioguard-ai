@@ -6,14 +6,14 @@
  *           và trạng thái kết nối.
  * Luồng xử lý: 1. Nhận vai trò, đường dẫn, điều hướng, chủ đề và thành phần con.
  *              2. Hiển thị sidebar dọc (máy tính) + điều hướng dưới cùng (di động).
- *              3. Trên di động, drawer trượt lên hiển thị menu đầy đủ.
+ *              3. Trên di động, drawer trượt lên hiển thị menu phân nhóm đầy đủ.
  *              4. Tiêu đề hiển thị nhãn vai trò, tiêu đề trang, nút chủ đề, thẻ người dùng.
  * Quan hệ:
  *   - sử dụng: AuthContext (user, logout), roleMenus, routeMeta (pageTitles)
  *   - xuất AdminLayout, DoctorLayout, PatientLayout cho App.tsx
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Activity, LogOut, Menu, Moon, Sun, MoreHorizontal, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { type UserRole } from '../auth/roles';
@@ -39,7 +39,9 @@ const layoutTitle: Record<UserRole, string> = {
 
 /**
  * RoleLayout – Shell ứng dụng đầy đủ với sidebar, tiêu đề, điều hướng di động
- * và drawer trượt lên cho tất cả các mục điều hướng.
+ * và drawer trượt lên cho tất cả các mục điều hướng được phân nhóm logic.
+ *
+ * @param props - Các thuộc tính cấu hình bao gồm vai trò, đường dẫn hiện tại và hành động điều phối.
  */
 export const RoleLayout: React.FC<RoleLayoutProps> = ({
   role,
@@ -55,6 +57,24 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
   const menuItems = roleMenus[role];
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Phân nhóm động các mục menu theo trường group
+  const groupedMenuItems = useMemo(() => {
+    const groups: Record<string, typeof menuItems> = {};
+    menuItems.forEach((item) => {
+      const g = item.group || 'none';
+      if (!groups[g]) {
+        groups[g] = [];
+      }
+      groups[g].push(item);
+    });
+    return groups;
+  }, [menuItems]);
+
+  /**
+   * Chuẩn hóa đường dẫn media về URL API tuyệt đối.
+   *
+   * @param path - Đường dẫn ảnh thô từ DB.
+   */
   const getMediaUrl = (path?: string | null) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
@@ -103,19 +123,33 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
         </div>
 
         <nav className="role-menu" aria-label={`${translateCommonLabel('all_features', locale)} ${translateRoleLabel(role, locale)}`}>
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentPath === item.path;
+          {Object.entries(groupedMenuItems).map(([groupKey, items]) => {
+            const hasHeader = groupKey !== 'none' && groupKey !== '';
             return (
-              <button
-                key={item.path}
-                type="button"
-                className={`role-menu-item ${isActive ? 'active' : ''}`}
-                onClick={() => navigate(item.path)}
-              >
-                <Icon size={18} />
-                <span>{translateMenuLabel(item.label, locale)}</span>
-              </button>
+              <div key={groupKey} className="menu-group-section">
+                {hasHeader && (
+                  <div className="menu-group-header">
+                    {translateCommonLabel(groupKey, locale)}
+                  </div>
+                )}
+                <div className="menu-group-items">
+                  {items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = currentPath === item.path;
+                    return (
+                      <button
+                        key={item.path}
+                        type="button"
+                        className={`role-menu-item ${isActive ? 'active' : ''}`}
+                        onClick={() => navigate(item.path)}
+                      >
+                        <Icon size={18} />
+                        <span>{translateMenuLabel(item.label, locale)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </nav>
@@ -243,23 +277,37 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
                 <X size={16} />
               </button>
             </div>
-            <div className="mobile-drawer-grid">
-              {menuItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = currentPath === item.path;
+            <div className="mobile-drawer-sections">
+              {Object.entries(groupedMenuItems).map(([groupKey, items]) => {
+                const hasHeader = groupKey !== 'none' && groupKey !== '';
                 return (
-                  <button
-                    key={item.path}
-                    type="button"
-                    className={`mobile-drawer-item ${isActive ? 'active' : ''}`}
-                    onClick={() => {
-                      navigate(item.path);
-                      setIsMobileMenuOpen(false);
-                    }}
-                  >
-                    <Icon size={20} />
-                    <span>{translateMenuLabel(item.label, locale)}</span>
-                  </button>
+                  <div key={groupKey} className="mobile-drawer-section">
+                    {hasHeader && (
+                      <h3 className="mobile-drawer-section-title">
+                        {translateCommonLabel(groupKey, locale)}
+                      </h3>
+                    )}
+                    <div className="mobile-drawer-grid">
+                      {items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = currentPath === item.path;
+                        return (
+                          <button
+                            key={item.path}
+                            type="button"
+                            className={`mobile-drawer-item ${isActive ? 'active' : ''}`}
+                            onClick={() => {
+                              navigate(item.path);
+                              setIsMobileMenuOpen(false);
+                            }}
+                          >
+                            <Icon size={20} />
+                            <span>{translateMenuLabel(item.label, locale)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
             </div>

@@ -1,3 +1,12 @@
+/*
+ * Tệp: CardioGuard AI – Hệ thống kiểu dáng CSS toàn cục (index.css)
+ * Mục đích: Định nghĩa các biến CSS, thiết kế tối/sáng (Dark/Light mode), các kiểu dáng giao diện đặc thù
+ *           (vitals, ECG charts, alerts, buttons) và hệ thống phân cấp menu/điều hướng.
+ * Luồng xử lý: Áp dụng trên toàn bộ trang web frontend, tích hợp các chủ đề động và phong cách Responsive.
+ * Quan hệ:
+ *   - Được nạp vào đầu vào main.tsx để định hình kiểu dáng cho toàn bộ ứng dụng web frontend.
+ */
+
 /* Custom Premium Dark Mode Design System for CardioGuard AI */
 :root {
   /* Harmonious Color Palette */
@@ -4990,4 +4999,83 @@ body {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 8px;
+}
+
+/* Layout & Flex Utilities */
+.flex-row { display: flex; flex-direction: row; }
+.flex-col { display: flex; flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
+.justify-between { justify-content: space-between; }
+.justify-end { justify-content: flex-end; }
+.align-center { align-items: center; }
+.gap-4 { gap: 4px; }
+.gap-8 { gap: 8px; }
+.gap-10 { gap: 10px; }
+.gap-12 { gap: 12px; }
+.gap-14 { gap: 14px; }
+.gap-16 { gap: 16px; }
+.gap-20 { gap: 20px; }
+.text-center { text-align: center; }
+.w-full { width: 100%; }
+.m-auto-12 { margin: 0 auto 12px; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* ============================================================================
+   CardioGuard Navigation Groups & Mobile Drawer Optimizations
+   ============================================================================ */
+
+/* Menu Group Heading Styles in Sidebar */
+.menu-group-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.menu-group-header {
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  padding: 6px 12px 2px;
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
+.menu-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Mobile Bottom Sheet Drawer Grouping Layout Styles */
+.mobile-drawer-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 8px;
+}
+
+.mobile-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mobile-drawer-section-title {
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0;
+  padding-left: 4px;
+  opacity: 0.8;
+}
+
+/* Group Transition Micro-animations */
+.menu-group-section,
+.mobile-drawer-section {
+  animation: fade-in 0.3s ease-out;
 }
