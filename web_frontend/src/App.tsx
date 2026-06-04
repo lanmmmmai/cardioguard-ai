@@ -36,6 +36,7 @@ import { UsersManager } from './components/UsersManager';
 import { SystemSettings } from './components/SystemSettings';
 import { PatientCompleteProfile } from './pages/PatientCompleteProfile';
 import { DoctorCompleteProfile } from './pages/DoctorCompleteProfile';
+import { PublicPolicies } from './pages/PublicPolicies';
 import { DoctorPendingVerification, DoctorVerificationRejected } from './pages/DoctorStatusPages';
 import { AdminDoctorVerification } from './components/AdminDoctorVerification';
 import { AdminMedicalRecordsPage, DoctorMedicalRecordsPage, PatientMedicalRecordsPage } from './components/medical-records/MedicalRecordsPages';
@@ -508,6 +509,11 @@ const AppContent: React.FC = () => {
 
   if (loading) {
     return <div className="route-loading">Đang khôi phục phiên đăng nhập...</div>;
+  }
+
+  // Xử lý các trang chính sách công khai (Privacy, Terms, Data Deletion)
+  if (['/privacy', '/terms', '/data-deletion'].includes(path)) {
+    return <PublicPolicies path={path} theme={theme} onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')} navigate={navigate} />;
   }
 
   // Xử lý các trang Register

@@ -160,6 +160,41 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: () => Navigator.pushNamed(context, '/register'),
                     child: const Text('Chưa có tài khoản? Đăng ký ngay'),
                   ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/privacy'),
+                        child: const Text(
+                          'Bảo mật',
+                          style: TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.underline),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text('|', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/terms'),
+                        child: const Text(
+                          'Điều khoản',
+                          style: TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.underline),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        child: Text('|', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/data-deletion'),
+                        child: const Text(
+                          'Xóa dữ liệu',
+                          style: TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.underline),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

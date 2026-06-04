@@ -26,6 +26,7 @@ import 'screens/alerts_screen.dart';
 import 'screens/appointments_screen.dart';
 import 'screens/chat_ai_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/policy_screen.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/patient_provider.dart';
@@ -101,6 +102,9 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
           '/forgot-password': (context) => const ForgotPasswordScreen(),
+          '/privacy': (context) => const PolicyScreen(type: 'privacy'),
+          '/terms': (context) => const PolicyScreen(type: 'terms'),
+          '/data-deletion': (context) => const PolicyScreen(type: 'data-deletion'),
           '/dashboard': (context) => MainTabWrapper(
                 isDarkTheme: _isDarkTheme,
                 onToggleTheme: _toggleTheme,

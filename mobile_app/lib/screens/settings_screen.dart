@@ -618,6 +618,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+
+            // Policies section
+            const Text('Điều khoản & Chính sách',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFFF3366))),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.07)
+                      : Colors.black.withValues(alpha: 0.08),
+                ),
+              ),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(LucideIcons.shieldCheck, color: Color(0xFFFF3366), size: 20),
+                    title: const Text('Chính sách bảo mật', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    trailing: const Icon(Icons.chevron_right, size: 20),
+                    onTap: () => Navigator.pushNamed(context, '/privacy'),
+                  ),
+                  Divider(
+                    height: 1,
+                    color: isDark ? Colors.white10 : Colors.black12,
+                  ),
+                  ListTile(
+                    leading: const Icon(LucideIcons.fileText, color: Color(0xFFFF3366), size: 20),
+                    title: const Text('Điều khoản dịch vụ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    trailing: const Icon(Icons.chevron_right, size: 20),
+                    onTap: () => Navigator.pushNamed(context, '/terms'),
+                  ),
+                  Divider(
+                    height: 1,
+                    color: isDark ? Colors.white10 : Colors.black12,
+                  ),
+                  ListTile(
+                    leading: const Icon(LucideIcons.trash2, color: Color(0xFFFF3366), size: 20),
+                    title: const Text('Yêu cầu xóa dữ liệu', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    trailing: const Icon(Icons.chevron_right, size: 20),
+                    onTap: () => Navigator.pushNamed(context, '/data-deletion'),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 32),
 
             // Logout Button
