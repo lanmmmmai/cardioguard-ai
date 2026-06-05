@@ -95,6 +95,13 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def add_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+    return response
+
+
 _mv_refresh_task: asyncio.Task[None] | None = None
 
 
