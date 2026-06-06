@@ -294,6 +294,8 @@ void loop() {
   }
 
   // 4. Logic ngủ nông (Light Sleep) để tiết kiệm pin khi nhàn rỗi (không chạy AP Portal)
+  // Lưu ý: Tạm thời tắt khi kết nối USB debug để tránh làm ngắt kết nối USB-CDC ảo trên chip ESP32-S3 SuperMini
+  /*
   if (!IsWiFiPortalActive()) {
     unsigned long next_tick = g_last_tick_ms + kTelemetryIntervalMs;
     unsigned long cur_time = millis();
@@ -309,4 +311,5 @@ void loop() {
       }
     }
   }
+  */
 }
