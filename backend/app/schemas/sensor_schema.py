@@ -127,3 +127,26 @@ class IotTelemetryPayload(BaseModel):
     readings: IotTelemetryReadings
     signal: IotTelemetrySignal | None = None
     device: IotTelemetryDevice | None = None
+
+
+class DeviceClaim(BaseModel):
+    """Mô hình yêu cầu liên kết thiết bị.
+
+    Thuộc tính:
+        device_mac: Địa chỉ MAC của thiết bị phần cứng.
+        device_name: Tên gợi nhớ tùy chọn.
+        device_type: Loại thiết bị tùy chọn (mặc định "Wearable").
+    """
+    device_mac: str = Field(..., description="Địa chỉ MAC của thiết bị")
+    device_name: str | None = Field(default=None, description="Tên thiết bị")
+    device_type: str | None = Field(default="Wearable", description="Loại thiết bị")
+
+
+class DeviceUnclaim(BaseModel):
+    """Mô hình yêu cầu hủy liên kết thiết bị.
+
+    Thuộc tính:
+        device_mac: Địa chỉ MAC của thiết bị phần cứng.
+    """
+    device_mac: str = Field(..., description="Địa chỉ MAC của thiết bị")
+

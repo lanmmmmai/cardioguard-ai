@@ -22,6 +22,8 @@
 #include <Preferences.h>
 #include <WebServer.h>
 #include <DNSServer.h>
+#include <LittleFS.h>
+#include <WiFiClientSecure.h>
 
 #include "config.h"
 
@@ -186,21 +188,40 @@ unsigned long g_backoff_until_ms = 0UL;    // Thời điểm kết thúc thời 
 uint16_t g_backoff_ms = kBackoffMinMs;     // Thời gian backoff hiện tại (tăng dần khi lỗi liên tiếp)
 String g_device_mac;                       // Địa chỉ MAC của thiết bị
 
+void SaveBufferToFlash() {
+  File file = LittleFS.open("/buffer.dat", "w");
+  if (!file) {
+    Serial.println("[CardioGuard] LittleFS: Failed to open buffer file for writing");
+    return;
+  }
+  uint16_t temp_head = g_buffer_head;
+  for (uint16_t i = 0; i < g_buffer_count; i++) {
+    file.println(g_buffer[temp_head]);
+    temp_head = (temp_head + 1) % kOfflineBufferMaxFrames;
+  }
+  file.close();
+  Serial.print("[CardioGuard] LittleFS: Saved ");
+  Serial.print(g_buffer_count);
+  Serial.println(" frames to flash.");
+}
+
 // Đẩy một khung telemetry vào bộ đệm vòng, trả về true nếu thành công
 bool PushBufferedPayload(const String &payload) {
+  bool success = true;
   if (g_buffer_count < kOfflineBufferMaxFrames) {
     const uint16_t tail = (g_buffer_head + g_buffer_count) % kOfflineBufferMaxFrames;
     g_buffer[tail] = payload;
     g_buffer_count++;
     Serial.print("[CardioGuard] Buffer push OK, count=");
     Serial.println(g_buffer_count);
-    return true;
+  } else {
+    Serial.println("[CardioGuard] WARNING: Buffer full! Oldest frame overwritten.");
+    g_buffer[g_buffer_head] = payload;
+    g_buffer_head = (g_buffer_head + 1) % kOfflineBufferMaxFrames;
+    success = false;
   }
-
-  Serial.println("[CardioGuard] WARNING: Buffer full! Oldest frame overwritten.");
-  g_buffer[g_buffer_head] = payload;
-  g_buffer_head = (g_buffer_head + 1) % kOfflineBufferMaxFrames;
-  return false;
+  SaveBufferToFlash();
+  return success;
 }
 
 // Lấy một khung telemetry từ bộ đệm vòng, trả về true nếu có dữ liệu
@@ -217,39 +238,108 @@ bool PopBufferedPayload(String &payload) {
   Serial.print(count_before);
   Serial.print(" after=");
   Serial.println(g_buffer_count);
+  SaveBufferToFlash();
   return true;
 }
 
 // Gửi một payload HTTP POST đến endpoint telemetry, trả về mã trạng thái HTTP
-int PostPayload(const String &payload) {
+int PostPayload(const String &payload, const String &endpoint) {
   HTTPClient http;
   http.setTimeout(kHttpTimeoutMs);
-  http.begin(kTelemetryEndpoint);
-  http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-Device-Uid", kDeviceUid);
-  if (g_device_mac.length() > 0) {
-    http.addHeader("X-Device-Mac", g_device_mac);
+  
+  int status_code = -1;
+
+  if (endpoint.startsWith("https://")) {
+    WiFiClientSecure client;
+    client.setInsecure();
+    if (http.begin(client, endpoint)) {
+      http.addHeader("Content-Type", "application/json");
+      http.addHeader("X-Device-Uid", kDeviceUid);
+      if (g_device_mac.length() > 0) {
+        http.addHeader("X-Device-Mac", g_device_mac);
+      }
+      http.addHeader("X-Device-Token", kDeviceToken);
+      const unsigned long post_start = millis();
+      Serial.print("[CardioGuard] HTTPS POST ");
+      Serial.print(endpoint);
+      Serial.print(" payload_size=");
+      Serial.println(payload.length());
+      
+      status_code = http.POST(payload);
+      const unsigned long post_duration = millis() - post_start;
+      Serial.print("[CardioGuard] HTTPS response status=");
+      Serial.print(status_code);
+      Serial.print(" duration=");
+      Serial.println(post_duration);
+      http.end();
+    } else {
+      Serial.println("[CardioGuard] Failed to begin HTTPS connection");
+    }
+  } else {
+    WiFiClient client;
+    if (http.begin(client, endpoint)) {
+      http.addHeader("Content-Type", "application/json");
+      http.addHeader("X-Device-Uid", kDeviceUid);
+      if (g_device_mac.length() > 0) {
+        http.addHeader("X-Device-Mac", g_device_mac);
+      }
+      http.addHeader("X-Device-Token", kDeviceToken);
+      const unsigned long post_start = millis();
+      Serial.print("[CardioGuard] HTTP POST ");
+      Serial.print(endpoint);
+      Serial.print(" payload_size=");
+      Serial.println(payload.length());
+      
+      status_code = http.POST(payload);
+      const unsigned long post_duration = millis() - post_start;
+      Serial.print("[CardioGuard] HTTP response status=");
+      Serial.print(status_code);
+      Serial.print(" duration=");
+      Serial.println(post_duration);
+      http.end();
+    } else {
+      Serial.println("[CardioGuard] Failed to begin HTTP connection");
+    }
   }
-  http.addHeader("X-Device-Token", kDeviceToken);
-  const unsigned long post_start = millis();
-  Serial.print("[CardioGuard] HTTP POST ");
-  Serial.print(kTelemetryEndpoint);
-  Serial.print(" payload_size=");
-  Serial.println(payload.length());
-  // Use http.POST(String) to avoid const cast issue on Espressif SDK HTTPClient
-  const int status_code = http.POST(payload);
-  const unsigned long post_duration = millis() - post_start;
-  Serial.print("[CardioGuard] HTTP response status=");
-  Serial.print(status_code);
-  Serial.print(" duration=");
-  Serial.println(post_duration);
-  http.end();
   return status_code;
 }
 
 // Kiểm tra xem mã trạng thái HTTP có thể thử lại hay không
 bool IsRetryableStatus(int status_code) {
   return status_code == 429 || status_code == 500 || status_code == 502 || status_code == 503;
+}
+
+void LoadBufferFromFlash() {
+  if (!LittleFS.begin(true)) {
+    Serial.println("[CardioGuard] LittleFS: Mount failed! Formatting...");
+    return;
+  }
+  
+  if (!LittleFS.exists("/buffer.dat")) {
+    Serial.println("[CardioGuard] LittleFS: No offline buffer file found.");
+    return;
+  }
+
+  File file = LittleFS.open("/buffer.dat", "r");
+  if (!file) {
+    Serial.println("[CardioGuard] LittleFS: Failed to open buffer file for reading");
+    return;
+  }
+
+  g_buffer_head = 0;
+  g_buffer_count = 0;
+  while (file.available() && g_buffer_count < kOfflineBufferMaxFrames) {
+    String line = file.readStringUntil('\n');
+    line.trim();
+    if (line.length() > 0) {
+      g_buffer[g_buffer_count] = line;
+      g_buffer_count++;
+    }
+  }
+  file.close();
+  Serial.print("[CardioGuard] LittleFS: Loaded ");
+  Serial.print(g_buffer_count);
+  Serial.println(" frames from flash.");
 }
 }  // Kết thúc namespace ẩn danh
 
@@ -322,6 +412,7 @@ void HandleWiFiPortal() {
 
 // Khởi tạo bộ gửi telemetry: cấu hình WiFi ở chế độ station và bắt đầu kết nối
 void InitializeTelemetrySender() {
+  LoadBufferFromFlash();
   WiFi.mode(WIFI_STA);
   g_device_mac = WiFi.macAddress();
   LoadWifiCredentials();
@@ -398,6 +489,58 @@ uint16_t PendingBufferSize() {
   return g_buffer_count;
 }
 
+// Xả bộ đệm offline (gửi các gói tin cũ lên server khi có mạng)
+void DrainOfflineBuffer() {
+  if (!IsWifiConnected() || g_buffer_count == 0) {
+    return;
+  }
+
+  const unsigned long now = millis();
+  if (now < g_backoff_until_ms) {
+    return;
+  }
+
+  Serial.println("[CardioGuard] Draining offline buffer...");
+
+  uint8_t sent_count = 0;
+  // Gửi tối đa 5 gói mỗi lần gọi để tránh chặn CPU quá lâu
+  while (g_buffer_count > 0 && IsWifiConnected() && sent_count < 5) {
+    String send_payload;
+    if (PopBufferedPayload(send_payload)) {
+      int status_code = PostPayload(send_payload, kTelemetryEndpointOnline);
+      if (status_code >= 200 && status_code < 300) {
+        sent_count++;
+        g_backoff_ms = kBackoffMinMs;
+        g_backoff_until_ms = 0UL;
+        if (g_was_in_backoff) {
+          g_was_in_backoff = false;
+        }
+      } else {
+        // Gửi lỗi -> nhét ngược lại vào đầu buffer
+        g_buffer_head = (g_buffer_head + kOfflineBufferMaxFrames - 1) % kOfflineBufferMaxFrames;
+        g_buffer[g_buffer_head] = send_payload;
+        g_buffer_count++;
+
+        if (IsRetryableStatus(status_code) || status_code <= 0) {
+          g_backoff_until_ms = millis() + g_backoff_ms;
+          Serial.print("[CardioGuard] Buffer drain failed, backoff started, delay=");
+          Serial.print(g_backoff_ms);
+          Serial.println("ms");
+          g_backoff_ms = static_cast<uint16_t>(min(static_cast<unsigned long>(kBackoffMaxMs), static_cast<unsigned long>(g_backoff_ms) * 2UL));
+        }
+        break; // Dừng xả buffer
+      }
+    }
+  }
+
+  if (g_buffer_count == 0) {
+    Serial.println("[CardioGuard] Buffer drained successfully!");
+  } else {
+    Serial.print("[CardioGuard] Buffer drain progress: pending=");
+    Serial.println(g_buffer_count);
+  }
+}
+
 // Gửi một khung telemetry, xử lý backoff, bộ đệm offline và các lỗi xác thực
 SendResult SendTelemetryFrame(const String &payload) {
   SendResult result{};
@@ -436,56 +579,43 @@ SendResult SendTelemetryFrame(const String &payload) {
     g_was_in_backoff = false;
   }
 
-  String send_payload = payload;
-  bool is_buffered_frame = false;
+  // Nếu buffer đang có dữ liệu chờ gửi, ta phải nhét gói mới này vào buffer để đảm bảo thứ tự gửi (FIFO)
+  // và sau đó tiến hành xả buffer.
   if (g_buffer_count > 0) {
-    PopBufferedPayload(send_payload);
-    is_buffered_frame = true;
+    result.buffer_overwritten = !PushBufferedPayload(payload);
+    result.buffered = true;
+
+    // Gọi xả buffer
+    DrainOfflineBuffer();
+
+    result.buffer_size = PendingBufferSize();
+    result.sent = true; // Đánh dấu là đã xử lý
+    return result;
   }
 
-  result.status_code = PostPayload(send_payload);
+  // Nếu không có dữ liệu trong buffer, gửi trực tiếp gói mới
+  // Gửi lên Online trước làm trạng thái chính
+  result.status_code = PostPayload(payload, kTelemetryEndpointOnline);
+  // Gửi song song lên Local dạng Best-Effort (chỉ dùng để debug, lỗi không lưu đệm)
+  PostPayload(payload, kTelemetryEndpointLocal);
 
   if (result.status_code >= 200 && result.status_code < 300) {
     result.sent = true;
     result.buffer_size = PendingBufferSize();
-    if (g_buffer_count == 0 && is_buffered_frame) {
-      Serial.println("[CardioGuard] Buffer drained, all pending frames sent");
-    }
     g_backoff_ms = kBackoffMinMs;
     g_backoff_until_ms = 0UL;
-
-    if (is_buffered_frame) {
-      result.buffer_overwritten = !PushBufferedPayload(payload);
-      result.buffered = true;
-      result.buffer_size = PendingBufferSize();
-    }
     return result;
   }
 
   if (result.status_code == 401 || result.status_code == 403) {
     result.auth_failed = true;
     Serial.println("[CardioGuard] Auth failure: HTTP " + String(result.status_code));
-    if (is_buffered_frame) {
-      result.buffer_overwritten = !PushBufferedPayload(send_payload);
-    }
     result.buffer_size = PendingBufferSize();
     return result;
   }
 
-  if (result.status_code == 400 || result.status_code == 404) {
-    if (is_buffered_frame) {
-      result.buffer_overwritten = !PushBufferedPayload(send_payload);
-      result.buffered = true;
-    }
-    result.buffer_size = PendingBufferSize();
-    return result;
-  }
-
-  if (is_buffered_frame) {
-    result.buffer_overwritten = !PushBufferedPayload(send_payload);
-  }
-  const bool over = !PushBufferedPayload(payload);
-  result.buffer_overwritten = result.buffer_overwritten || over;
+  // Gửi trực tiếp lỗi -> nhét vào buffer
+  result.buffer_overwritten = !PushBufferedPayload(payload);
   result.buffered = true;
   result.buffer_size = PendingBufferSize();
 
@@ -499,4 +629,9 @@ SendResult SendTelemetryFrame(const String &payload) {
   }
 
   return result;
+}
+
+void SetStatusLed(uint8_t r, uint8_t g, uint8_t b) {
+  // LED RGB trên pin 48 của ESP32-S3 SuperMini
+  neopixelWrite(48, r, g, b);
 }

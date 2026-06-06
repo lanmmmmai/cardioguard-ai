@@ -30,10 +30,11 @@ from decimal import Decimal
 import asyncio
 import logging
 import time
+import uuid
 from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
-from app.schemas.sensor_schema import IotTelemetryPayload, SensorDataCreate
+from app.schemas.sensor_schema import IotTelemetryPayload, SensorDataCreate, DeviceClaim, DeviceUnclaim
 from app.core.database import database
 from app.core.config import settings
 from app.api.auth_api import get_user_from_token
@@ -837,3 +838,112 @@ async def get_sensor_history(
         limit=limit,
         offset=offset,
     )
+
+
+def format_mac_address(raw_mac: str) -> str:
+    """Chuẩn hóa địa chỉ MAC thành định dạng xx:xx:xx:xx:xx:xx"""
+    clean = raw_mac.strip().lower().replace(":", "").replace("-", "")
+    if len(clean) != 12:
+        raise HTTPException(status_code=400, detail="Địa chỉ MAC phải chứa đúng 12 ký tự hex.")
+    if not all(c in "0123456789abcdef" for c in clean):
+        raise HTTPException(status_code=400, detail="Địa chỉ MAC chứa ký tự không hợp lệ.")
+    return ":".join(clean[i:i+2] for i in range(0, 12, 2))
+
+
+@router.post("/iot/devices/claim")
+async def claim_device(
+    payload: DeviceClaim,
+    authorization: Optional[str] = Header(default=None)
+):
+    """Bệnh nhân liên kết thiết bị phần cứng (MAC) vào tài khoản của mình."""
+    current_user = await get_user_from_token(authorization)
+    if current_user["role"] != "patient":
+        raise HTTPException(status_code=403, detail="Chỉ bệnh nhân mới có quyền liên kết thiết bị")
+    
+    patient_id = current_user["id"]
+    formatted_mac = format_mac_address(payload.device_mac)
+        
+    # Tìm kiếm thiết bị theo MAC trong DB
+    device_row = await get_device_by_mac(formatted_mac)
+    
+    if device_row:
+        # Thiết bị đã tồn tại trong DB
+        db_patient_id = device_row["patient_id"]
+        if db_patient_id:
+            if str(db_patient_id) != str(patient_id):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Thiết bị này đã được liên kết với một bệnh nhân khác. Vui lòng liên hệ bác sĩ hoặc admin để được hỗ trợ."
+                )
+            # Nếu đã liên kết với chính bệnh nhân hiện tại, trả về thông tin thiết bị luôn
+            full_device = await database.fetch_one("SELECT * FROM devices WHERE id = CAST(:device_id AS uuid)", {"device_id": device_row["id"]})
+            return {
+                "message": "Thiết bị đã được liên kết từ trước",
+                "device": row_to_dict(full_device)
+            }
+        
+        # Nếu chưa gán cho ai, tiến hành cập nhật patient_id cho thiết bị
+        await database.execute(
+            "UPDATE devices SET patient_id = CAST(:patient_id AS uuid), status = 'online' WHERE id = CAST(:device_id AS uuid)",
+            {"patient_id": patient_id, "device_id": device_row["id"]}
+        )
+        updated_device = await database.fetch_one("SELECT * FROM devices WHERE id = CAST(:device_id AS uuid)", {"device_id": device_row["id"]})
+        return {
+            "message": "Liên kết thiết bị thành công",
+            "device": row_to_dict(updated_device)
+        }
+    else:
+        # Thiết bị chưa tồn tại, tự động tạo mới
+        device_id = str(uuid.uuid4())
+        device_name = payload.device_name or "CardioGuard Wearable Prototype"
+        device_type = payload.device_type or "Wearable"
+        
+        await database.execute(
+            """
+            INSERT INTO devices(id, patient_id, device_name, device_type, device_mac, status, created_at)
+            VALUES (CAST(:id AS uuid), CAST(:patient_id AS uuid), :device_name, :device_type, :device_mac, 'online', NOW())
+            """,
+            {
+                "id": device_id,
+                "patient_id": patient_id,
+                "device_name": device_name,
+                "device_type": device_type,
+                "device_mac": formatted_mac
+            }
+        )
+        
+        new_device = await database.fetch_one("SELECT * FROM devices WHERE id = CAST(:id AS uuid)", {"id": device_id})
+        return {
+            "message": "Đã tạo mới và liên kết thiết bị thành công",
+            "device": row_to_dict(new_device)
+        }
+
+
+@router.post("/iot/devices/unclaim")
+async def unclaim_device(
+    payload: DeviceUnclaim,
+    authorization: Optional[str] = Header(default=None)
+):
+    """Bệnh nhân hủy liên kết thiết bị phần cứng ra khỏi tài khoản."""
+    current_user = await get_user_from_token(authorization)
+    if current_user["role"] != "patient":
+        raise HTTPException(status_code=403, detail="Chỉ bệnh nhân mới có quyền hủy liên kết thiết bị")
+        
+    patient_id = current_user["id"]
+    formatted_mac = format_mac_address(payload.device_mac)
+    
+    device_row = await get_device_by_mac(formatted_mac)
+    if not device_row:
+        raise HTTPException(status_code=404, detail="Không tìm thấy thiết bị với địa chỉ MAC này")
+        
+    db_patient_id = device_row["patient_id"]
+    if not db_patient_id or str(db_patient_id) != str(patient_id):
+        raise HTTPException(status_code=403, detail="Bạn không có quyền quản lý thiết bị này")
+        
+    await database.execute(
+        "UPDATE devices SET patient_id = NULL WHERE id = CAST(:device_id AS uuid)",
+        {"device_id": device_row["id"]}
+    )
+    
+    return {"message": "Đã hủy liên kết thiết bị thành công"}
+

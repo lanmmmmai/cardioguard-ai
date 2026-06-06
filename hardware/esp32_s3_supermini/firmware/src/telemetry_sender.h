@@ -35,5 +35,10 @@ void StopWiFiPortal();
 bool IsWiFiPortalActive();
 // Xử lý các yêu cầu DNS/Web (gọi liên tục trong loop)
 void HandleWiFiPortal();
+// Xả bộ đệm offline (gửi các gói tin cũ lên server khi có mạng)
+void DrainOfflineBuffer();
+// Điều khiển đèn LED trạng thái WS2812 trên pin 48
+void SetStatusLed(uint8_t r, uint8_t g, uint8_t b);
+
 
 
