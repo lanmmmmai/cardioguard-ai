@@ -4,8 +4,6 @@
 inline constexpr const char* kDeviceUid = "CG-ESP32S3-0001";             // Định danh duy nhất của thiết bị
 inline constexpr const char* kFirmwareVersion = "0.2.0-random";           // Phiên bản firmware hiện tại
 inline constexpr unsigned long kTelemetryIntervalMs = 1000UL;             // Khoảng thời gian giữa các lần gửi telemetry (ms)
-inline constexpr const char* kWifiSsid = "REPLACE_WIFI_SSID";             // Tên mạng WiFi (SSID) cần thay thế
-inline constexpr const char* kWifiPassword = "REPLACE_WIFI_PASSWORD";     // Mật khẩu WiFi cần thay thế
 inline constexpr const char* kTelemetryEndpoint = "http://192.168.1.25:8000/api/iot/telemetry";  // Endpoint nhận telemetry
 inline constexpr const char* kDeviceToken = "cgdt_dev_shared_token_vitals";       // Token xác thực thiết bị, cần thay thế
 inline constexpr uint16_t kHttpTimeoutMs = 2500;                         // Thời gian chờ tối đa cho mỗi yêu cầu HTTP (ms)

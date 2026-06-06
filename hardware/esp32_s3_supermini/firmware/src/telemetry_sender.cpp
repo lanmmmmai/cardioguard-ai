@@ -19,6 +19,7 @@
 
 #include <HTTPClient.h>
 #include <WiFi.h>
+#include <Preferences.h>
 
 #include "config.h"
 
@@ -26,6 +27,26 @@
 static bool g_was_in_backoff = false;
 
 namespace {
+Preferences preferences;
+String g_ssid;
+String g_password;
+
+void LoadWifiCredentials() {
+  preferences.begin("wifi-config", true); // Read-only mode
+  g_ssid = preferences.getString("ssid", "");
+  g_password = preferences.getString("password", "");
+  preferences.end();
+}
+
+void SaveWifiCredentials(const String &ssid, const String &password) {
+  preferences.begin("wifi-config", false); // Read-write mode
+  preferences.putString("ssid", ssid);
+  preferences.putString("password", password);
+  preferences.end();
+  g_ssid = ssid;
+  g_password = password;
+}
+
 String g_buffer[kOfflineBufferMaxFrames];  // Bộ đệm vòng lưu trữ các khung telemetry khi mất kết nối
 uint16_t g_buffer_head = 0;                // Chỉ số đầu của bộ đệm vòng
 uint16_t g_buffer_count = 0;               // Số lượng khung đang có trong bộ đệm
@@ -105,12 +126,21 @@ bool IsRetryableStatus(int status_code) {
 void InitializeTelemetrySender() {
   WiFi.mode(WIFI_STA);
   g_device_mac = WiFi.macAddress();
-  WiFi.begin(kWifiSsid, kWifiPassword);
+  LoadWifiCredentials();
+  if (g_ssid.length() > 0) {
+    Serial.println("[CardioGuard] WiFi configured, SSID: " + g_ssid);
+    WiFi.begin(g_ssid.c_str(), g_password.c_str());
+  } else {
+    Serial.println("[CardioGuard] WiFi not configured. Please use command: wifi <ssid> <password>");
+  }
   g_last_wifi_attempt_ms = millis();
 }
 
 // Duy trì kết nối WiFi, tự động thử kết nối lại sau mỗi khoảng thời gian
 void MaintainConnectivity() {
+  if (g_ssid.length() == 0) {
+    return;
+  }
   if (WiFi.status() == WL_CONNECTED) {
     return;
   }
@@ -122,8 +152,24 @@ void MaintainConnectivity() {
 
   g_last_wifi_attempt_ms = now;
   WiFi.disconnect();
-  Serial.println("[CardioGuard] WiFi reconnecting...");
-  WiFi.begin(kWifiSsid, kWifiPassword);
+  Serial.println("[CardioGuard] WiFi reconnecting to SSID: " + g_ssid);
+  WiFi.begin(g_ssid.c_str(), g_password.c_str());
+}
+
+void UpdateWifiConfig(const String &ssid, const String &password) {
+  SaveWifiCredentials(ssid, password);
+  WiFi.disconnect();
+  if (ssid.length() > 0) {
+    Serial.println("[CardioGuard] Saving new WiFi config. Connecting to: " + ssid);
+    WiFi.begin(ssid.c_str(), password.c_str());
+  } else {
+    Serial.println("[CardioGuard] WiFi config cleared.");
+  }
+  g_last_wifi_attempt_ms = millis();
+}
+
+bool IsWifiConfigured() {
+  return g_ssid.length() > 0;
 }
 
 // Kiểm tra xem WiFi đã kết nối hay chưa

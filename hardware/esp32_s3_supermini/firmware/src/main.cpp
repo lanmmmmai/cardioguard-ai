@@ -33,6 +33,43 @@ void HandleSerialCommand(const String &command) {
     return;
   }
 
+  if (command.startsWith("wifi ")) {
+    String body = command.substring(5);
+    body.trim();
+
+    String ssid, password;
+    if (body.startsWith("\"")) {
+      int next_quote = body.indexOf("\"", 1);
+      if (next_quote != -1) {
+        ssid = body.substring(1, next_quote);
+        String rest = body.substring(next_quote + 1);
+        rest.trim();
+        if (rest.startsWith("\"") && rest.endsWith("\"") && rest.length() >= 2) {
+          password = rest.substring(1, rest.length() - 1);
+        } else {
+          password = rest;
+        }
+      }
+    } else {
+      int space_idx = body.indexOf(" ");
+      if (space_idx != -1) {
+        ssid = body.substring(0, space_idx);
+        password = body.substring(space_idx + 1);
+        password.trim();
+      } else {
+        ssid = body;
+        password = "";
+      }
+    }
+
+    if (ssid.length() > 0) {
+      UpdateWifiConfig(ssid, password);
+    } else {
+      Serial.println("[CardioGuard] Invalid wifi command syntax. Use: wifi <ssid> <password> or wifi \"ssid\" \"password\"");
+    }
+    return;
+  }
+
   if (command == "status") {
     Serial.print("[CardioGuard] State=");
     Serial.print(StateToString(g_state));
@@ -54,6 +91,7 @@ void HandleSerialCommand(const String &command) {
     Serial.println("  mode critical");
     Serial.println("  mode poor_signal");
     Serial.println("  mode offline");
+    Serial.println("  wifi <ssid> <password>  Configure WiFi credentials");
     Serial.println("  status");
     return;
   }
@@ -123,8 +161,12 @@ void loop() {
       Serial.println("[CardioGuard] WiFi connected! Transition -> TIME_SYNCING");
     } else {
       static unsigned long last_conn_print = 0;
-      if (now_ms - last_conn_print > 3000) {
-        Serial.println("[CardioGuard] Connecting to WiFi...");
+      if (now_ms - last_conn_print > 5000) {
+        if (!IsWifiConfigured()) {
+          Serial.println("[CardioGuard] WiFi not configured. Please enter command: wifi <ssid> <password>");
+        } else {
+          Serial.println("[CardioGuard] Connecting to WiFi...");
+        }
         last_conn_print = now_ms;
       }
     }

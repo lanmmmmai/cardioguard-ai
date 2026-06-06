@@ -23,3 +23,8 @@ bool IsWifiConnected();
 uint16_t PendingBufferSize();
 // Gửi một khung telemetry và trả về kết quả
 SendResult SendTelemetryFrame(const String &payload);
+// Cập nhật cấu hình WiFi động và lưu vào NVS Preferences
+void UpdateWifiConfig(const String &ssid, const String &password);
+// Kiểm tra xem WiFi đã có cấu hình trong NVS chưa
+bool IsWifiConfigured();
+
