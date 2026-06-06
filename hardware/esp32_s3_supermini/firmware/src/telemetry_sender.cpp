@@ -1,3 +1,20 @@
+// C++
+// CardioGuard AI — Telemetry Sender Module
+//
+// File Purpose:
+//   Manages WiFi connectivity, offline telemetry buffering, and HTTP transmission
+//   of health metrics data frames from the ESP32 to the backend.
+//
+// Overall Workflow/Logic:
+//   1. Maintain WiFi connection in station mode.
+//   2. Attempt to POST new telemetry frames to the backend.
+//   3. If offline or server is busy, queue telemetry in a circular buffer (FIFO).
+//   4. Drain the buffer when the connection is restored, applying exponential backoff on errors.
+//
+// System Component Relationships:
+//   - Relies on config.h for endpoints and constants.
+//   - Interfaces with the FastAPI backend via POST /api/iot/telemetry.
+
 #include "telemetry_sender.h"
 
 #include <HTTPClient.h>
@@ -67,7 +84,8 @@ int PostPayload(const String &payload) {
   Serial.print(kTelemetryEndpoint);
   Serial.print(" payload_size=");
   Serial.println(payload.length());
-  const int status_code = http.POST(reinterpret_cast<const uint8_t *>(payload.c_str()), payload.length());
+  // Use http.POST(String) to avoid const cast issue on Espressif SDK HTTPClient
+  const int status_code = http.POST(payload);
   const unsigned long post_duration = millis() - post_start;
   Serial.print("[CardioGuard] HTTP response status=");
   Serial.print(status_code);

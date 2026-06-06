@@ -199,6 +199,7 @@ class TestCreateIotTelemetry(unittest.IsolatedAsyncioTestCase):
         self.mock_request.client = types.SimpleNamespace()
         self.mock_request.client.host = "127.0.0.1"
 
+    @patch("app.api.sensor_api.get_devices_table_columns", return_value=MOCK_DEVICE_COLUMNS)
     @patch("app.api.sensor_api.get_device_by_mac")
     @patch("app.api.sensor_api.has_any_iot_token_config")
     @patch("app.api.sensor_api.verify_iot_device_token")
@@ -210,7 +211,7 @@ class TestCreateIotTelemetry(unittest.IsolatedAsyncioTestCase):
     @patch("app.api.sensor_api.log_activity")
     async def test_success(
         self, mock_log, mock_rate, mock_ip, mock_manager, mock_detect,
-        mock_db, mock_verify, mock_has_token, mock_get_device
+        mock_db, mock_verify, mock_has_token, mock_get_device, mock_cols
     ):
         mock_ip.return_value = "127.0.0.1"
         mock_get_device.return_value = {

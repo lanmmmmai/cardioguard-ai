@@ -170,34 +170,38 @@ async def ensure_device_access(user: dict[str, Any], device_uid: str) -> dict[st
     columns = await get_devices_table_columns()
     device_key = normalize_device_identifier(device_uid)
     uses_device_mac = "device_mac" in columns
+    name_col = "device_name" if "device_name" in columns else "name"
     device_match_sql = (
         "lower(replace(replace(device_mac, ':', ''), '-', '')) = :device_key"
         if uses_device_mac
-        else "lower(replace(replace(name, ':', ''), '-', '')) = :device_key"
+        else f"lower(replace(replace({name_col}, ':', ''), '-', '')) = :device_key"
     )
     device_row = await database.fetch_one(
         """
         SELECT
             id::text AS id,
             patient_id::text AS patient_id,
-            name,
+            {name_select}
             {device_mac_select}
             status,
-            battery,
-            last_seen_at,
+            {battery_select}
+            {last_seen_select}
             device_type,
             {firmware_version_select}
-            updated_at
+            {updated_at_select}
         FROM devices
         WHERE ({device_match_sql})
-           OR lower(name) = :device_uid_lower
+           OR lower({name_col}) = :device_uid_lower
         LIMIT 1
         """.format(
             device_match_sql=device_match_sql,
+            name_col=name_col,
+            name_select=f"{name_col} AS name," if name_col in columns else "NULL::text AS name,",
             device_mac_select="device_mac," if uses_device_mac else "NULL::text AS device_mac,",
-            firmware_version_select=(
-                "firmware_version," if "firmware_version" in columns else "NULL::text AS firmware_version,"
-            ),
+            battery_select="battery_level AS battery," if "battery_level" in columns else ("battery," if "battery" in columns else "NULL::int AS battery,"),
+            last_seen_select="last_seen AS last_seen_at," if "last_seen" in columns else ("last_seen_at," if "last_seen_at" in columns else "NULL::timestamptz AS last_seen_at,"),
+            firmware_version_select="firmware_version," if "firmware_version" in columns else "NULL::text AS firmware_version,",
+            updated_at_select="updated_at" if "updated_at" in columns else "NULL::timestamptz AS updated_at",
         ),
         {"device_key": device_key, "device_uid_lower": device_uid.lower()},
     )
@@ -512,23 +516,37 @@ async def create_iot_telemetry(
 
     logger.info("Đo xa IoT nhận được: patient_id=%s device_uid=%s", patient_id, x_device_uid)
 
-    await database.execute(
-        """
+    columns = await get_devices_table_columns()
+    update_parts = ["status = :status"]
+    update_values = {
+        "status": "online",
+        "device_id": device_row["id"],
+    }
+
+    if "battery_level" in columns:
+        update_parts.append("battery_level = COALESCE(:battery_level, battery_level)")
+        update_values["battery_level"] = data.device.battery if data.device else None
+    elif "battery" in columns:
+        update_parts.append("battery = COALESCE(:battery, battery)")
+        update_values["battery"] = data.device.battery if data.device else None
+
+    if "last_seen" in columns:
+        update_parts.append("last_seen = :last_seen")
+        update_values["last_seen"] = datetime.now(timezone.utc).replace(tzinfo=None)
+    elif "last_seen_at" in columns:
+        update_parts.append("last_seen_at = :last_seen_at")
+        update_values["last_seen_at"] = datetime.now(timezone.utc)
+
+    if "updated_at" in columns:
+        update_parts.append("updated_at = :updated_at")
+        update_values["updated_at"] = datetime.now(timezone.utc)
+
+    update_query = f"""
         UPDATE devices
-        SET status = :status,
-            battery = COALESCE(:battery, battery),
-            last_seen_at = :last_seen_at,
-            updated_at = :updated_at
+        SET {", ".join(update_parts)}
         WHERE id = CAST(:device_id AS uuid)
-        """,
-        {
-            "status": "online",
-            "battery": data.device.battery if data.device else None,
-            "last_seen_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc),
-            "device_id": device_row["id"],
-        },
-    )
+    """
+    await database.execute(update_query, update_values)
 
     await database.execute(
         """
