@@ -20,6 +20,8 @@
 #include <HTTPClient.h>
 #include <WiFi.h>
 #include <Preferences.h>
+#include <WebServer.h>
+#include <DNSServer.h>
 
 #include "config.h"
 
@@ -30,6 +32,135 @@ namespace {
 Preferences preferences;
 String g_ssid;
 String g_password;
+
+DNSServer dnsServer;
+WebServer webServer(80);
+const byte DNS_PORT = 53;
+bool g_ap_mode_active = false;
+unsigned long g_connection_start_ms = 0;
+
+const char kPortalHtml[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CardioGuard WiFi Setup</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 30px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      box-sizing: border-box;
+    }
+    h2 {
+      margin-top: 0;
+      text-align: center;
+      color: #00d2ff;
+      font-size: 24px;
+      letter-spacing: 1px;
+    }
+    p {
+      text-align: center;
+      color: #ccc;
+      font-size: 14px;
+      margin-bottom: 25px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #00d2ff;
+    }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      font-size: 16px;
+      box-sizing: border-box;
+      transition: all 0.3s ease;
+      outline: none;
+    }
+    input[type="text"]:focus, input[type="password"]:focus {
+      border-color: #00d2ff;
+      background: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 10px rgba(0, 210, 255, 0.5);
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(90deg, #00d2ff, #0066ff);
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 102, 255, 0.4);
+    }
+    button:hover {
+      background: linear-gradient(90deg, #00e5ff, #0077ff);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 102, 255, 0.6);
+    }
+    button:active {
+      transform: translateY(1px);
+    }
+    .footer {
+      margin-top: 25px;
+      font-size: 10px;
+      text-align: center;
+      color: #777;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>CardioGuard AI</h2>
+    <p>WiFi Configuration Portal</p>
+    <form action="/save" method="POST">
+      <div class="form-group">
+        <label for="ssid">WiFi Network (SSID)</label>
+        <input type="text" id="ssid" name="ssid" placeholder="Enter WiFi SSID" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Enter Password">
+      </div>
+      <button type="submit">Connect Device</button>
+    </form>
+    <div class="footer">
+      CardioGuard Wearable v0.2.0 &bull; ESP32-S3 SuperMini
+    </div>
+  </div>
+</body>
+</html>
+)rawliteral";
 
 void LoadWifiCredentials() {
   preferences.begin("wifi-config", true); // Read-only mode
@@ -122,6 +253,73 @@ bool IsRetryableStatus(int status_code) {
 }
 }  // Kết thúc namespace ẩn danh
 
+// Khởi chạy cổng thông tin Web AP
+void StartWiFiPortal() {
+  WiFi.disconnect();
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP("CardioGuard-Setup");
+
+  // Khởi động DNS Server để tự động chuyển hướng truy cập (Captive Portal)
+  dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
+
+  // Định nghĩa các handler cho Web Server
+  webServer.on("/", HTTP_GET, []() {
+    webServer.send(200, "text/html", kPortalHtml);
+  });
+
+  webServer.on("/save", HTTP_POST, []() {
+    String ssid = webServer.arg("ssid");
+    String password = webServer.arg("password");
+    if (ssid.length() > 0) {
+      String successHtml = "<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+                           "<style>body{background:#0f2027;color:#fff;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;flex-direction:column;text-align:center;}h2{color:#00d2ff;}</style></head>"
+                           "<body><h2>Configuration Saved!</h2><p>Connecting to WiFi: " + ssid + "...</p><p>You can close this window now.</p></body></html>";
+      webServer.send(200, "text/html", successHtml);
+      delay(1000);
+      UpdateWifiConfig(ssid, password);
+      StopWiFiPortal();
+    } else {
+      webServer.send(400, "text/plain", "SSID cannot be empty");
+    }
+  });
+
+  webServer.onNotFound([]() {
+    String host = webServer.hostHeader();
+    if (host != "192.168.4.1") {
+      webServer.sendHeader("Location", "http://192.168.4.1/", true);
+      webServer.send(302, "text/plain", "");
+    } else {
+      webServer.send(404, "text/plain", "Not Found");
+    }
+  });
+
+  webServer.begin();
+  g_ap_mode_active = true;
+  Serial.println("[CardioGuard] WiFi Access Point Portal started: 'CardioGuard-Setup' (192.168.4.1)");
+}
+
+// Dừng cổng thông tin Web AP
+void StopWiFiPortal() {
+  webServer.stop();
+  dnsServer.stop();
+  g_ap_mode_active = false;
+  WiFi.mode(WIFI_STA);
+  Serial.println("[CardioGuard] WiFi Access Point Portal stopped.");
+}
+
+// Kiểm tra xem cổng Web AP có đang hoạt động hay không
+bool IsWiFiPortalActive() {
+  return g_ap_mode_active;
+}
+
+// Xử lý các yêu cầu DNS/Web (gọi liên tục trong loop)
+void HandleWiFiPortal() {
+  if (g_ap_mode_active) {
+    dnsServer.processNextRequest();
+    webServer.handleClient();
+  }
+}
+
 // Khởi tạo bộ gửi telemetry: cấu hình WiFi ở chế độ station và bắt đầu kết nối
 void InitializeTelemetrySender() {
   WiFi.mode(WIFI_STA);
@@ -130,30 +328,44 @@ void InitializeTelemetrySender() {
   if (g_ssid.length() > 0) {
     Serial.println("[CardioGuard] WiFi configured, SSID: " + g_ssid);
     WiFi.begin(g_ssid.c_str(), g_password.c_str());
+    g_connection_start_ms = millis();
   } else {
-    Serial.println("[CardioGuard] WiFi not configured. Please use command: wifi <ssid> <password>");
+    Serial.println("[CardioGuard] WiFi not configured. Initializing AP Web Portal.");
+    StartWiFiPortal();
   }
   g_last_wifi_attempt_ms = millis();
 }
 
-// Duy trì kết nối WiFi, tự động thử kết nối lại sau mỗi khoảng thời gian
+// Duy trì kết nối WiFi, tự động thử kết nối lại hoặc chuyển sang AP Mode
 void MaintainConnectivity() {
-  if (g_ssid.length() == 0) {
+  if (g_ap_mode_active) {
     return;
   }
+
+  if (g_ssid.length() == 0) {
+    StartWiFiPortal();
+    return;
+  }
+
   if (WiFi.status() == WL_CONNECTED) {
     return;
   }
 
   const unsigned long now = millis();
+
+  // Nếu đã cố gắng kết nối quá 15 giây mà thất bại -> chuyển sang AP Portal
+  if (now - g_connection_start_ms > 15000) {
+    Serial.println("[CardioGuard] WiFi connection timeout. Falling back to AP Portal.");
+    StartWiFiPortal();
+    return;
+  }
+
   if (now - g_last_wifi_attempt_ms < kReconnectIntervalMs) {
     return;
   }
 
   g_last_wifi_attempt_ms = now;
-  WiFi.disconnect();
-  Serial.println("[CardioGuard] WiFi reconnecting to SSID: " + g_ssid);
-  WiFi.begin(g_ssid.c_str(), g_password.c_str());
+  Serial.println("[CardioGuard] Reconnecting to SSID: " + g_ssid);
 }
 
 void UpdateWifiConfig(const String &ssid, const String &password) {
@@ -162,6 +374,7 @@ void UpdateWifiConfig(const String &ssid, const String &password) {
   if (ssid.length() > 0) {
     Serial.println("[CardioGuard] Saving new WiFi config. Connecting to: " + ssid);
     WiFi.begin(ssid.c_str(), password.c_str());
+    g_connection_start_ms = millis();
   } else {
     Serial.println("[CardioGuard] WiFi config cleared.");
   }

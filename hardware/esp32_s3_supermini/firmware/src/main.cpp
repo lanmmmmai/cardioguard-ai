@@ -138,6 +138,7 @@ void setup() {
 }
 
 void loop() {
+  HandleWiFiPortal();
   PollSerialCommands();
   MaintainConnectivity();
 

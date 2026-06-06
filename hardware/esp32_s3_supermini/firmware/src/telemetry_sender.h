@@ -27,4 +27,13 @@ SendResult SendTelemetryFrame(const String &payload);
 void UpdateWifiConfig(const String &ssid, const String &password);
 // Kiểm tra xem WiFi đã có cấu hình trong NVS chưa
 bool IsWifiConfigured();
+// Khởi chạy cổng thông tin Web AP
+void StartWiFiPortal();
+// Dừng cổng thông tin Web AP
+void StopWiFiPortal();
+// Kiểm tra xem cổng Web AP có đang hoạt động hay không
+bool IsWiFiPortalActive();
+// Xử lý các yêu cầu DNS/Web (gọi liên tục trong loop)
+void HandleWiFiPortal();
+
 
