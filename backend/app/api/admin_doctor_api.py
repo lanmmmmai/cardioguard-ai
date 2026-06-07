@@ -29,6 +29,19 @@ from app.schemas.profile_schema import DoctorVerificationAction
 from app.services.email_service import send_doctor_status_email
 
 logger = logging.getLogger(__name__)
+
+
+def mask_email(email: str) -> str:
+    if not email or "@" not in email:
+        return "***"
+    parts = email.split("@", 1)
+    local = parts[0]
+    domain = parts[1]
+    if len(local) <= 2:
+        return f"{local[0]}***@{domain}"
+    return f"{local[0]}***{local[-1]}@{domain}"
+
+
 router = APIRouter(prefix="/admin", tags=["admin_doctors"])
 
 async def require_admin(authorization: Optional[str] = Header(default=None)):
@@ -154,7 +167,7 @@ async def create_doctor(payload: DoctorCreate, admin: dict = Depends(require_adm
         HTTPException 500: Nếu thêm vào cơ sở dữ liệu thất bại.
     """
     email = payload.email.lower()
-    logger.debug("Entry: create_doctor(email=%s, full_name=%s)", email, payload.full_name)
+    logger.debug("Entry: create_doctor(email=%s, full_name=%s)", mask_email(email), payload.full_name)
 
     # Kiểm tra email đã tồn tại chưa
     check_query = "SELECT id FROM users WHERE email = :email"

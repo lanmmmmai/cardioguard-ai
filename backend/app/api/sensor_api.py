@@ -190,43 +190,81 @@ async def ensure_device_access(user: dict[str, Any], device_uid: str) -> dict[st
     columns = await get_devices_table_columns()
     device_key = normalize_device_identifier(device_uid)
     uses_device_mac = "device_mac" in columns
-    name_col = "device_name" if "device_name" in columns else "name"
-    device_match_sql = (
-        "lower(replace(replace(device_mac, ':', ''), '-', '')) = :device_key"
-        if uses_device_mac
-        else f"lower(replace(replace({name_col}, ':', ''), '-', '')) = :device_key"
-    )
-    device_row = await database.fetch_one(
-        """
-        SELECT
-            id::text AS id,
-            patient_id::text AS patient_id,
-            {name_select}
-            {device_mac_select}
-            status,
-            {battery_select}
-            {last_seen_select}
-            device_type,
-            {firmware_version_select}
-            {updated_at_select}
-        FROM devices
-        WHERE ({device_match_sql})
-           OR lower({name_col}) = :device_uid_lower
-        LIMIT 1
-        """.format(
-            device_match_sql=device_match_sql,
-            name_col=name_col,
-            name_select=f"{name_col} AS name," if name_col in columns else "NULL::text AS name,",
-            device_mac_select="device_mac," if uses_device_mac else "NULL::text AS device_mac,",
-            battery_select="battery_level AS battery," if "battery_level" in columns else ("battery," if "battery" in columns else "NULL::int AS battery,"),
-            last_seen_select="last_seen AS last_seen_at," if "last_seen" in columns else ("last_seen_at," if "last_seen_at" in columns else "NULL::timestamptz AS last_seen_at,"),
-            firmware_version_select="firmware_version," if "firmware_version" in columns else "NULL::text AS firmware_version,",
-            updated_at_select="updated_at" if "updated_at" in columns else "NULL::timestamptz AS updated_at",
-        ),
+
+    if uses_device_mac:
+        if "device_name" in columns:
+            query = """
+                SELECT * FROM devices
+                WHERE lower(replace(replace(device_mac, ':', ''), '-', '')) = :device_key
+                   OR lower(device_name) = :device_uid_lower
+                LIMIT 1
+            """
+        else:
+            query = """
+                SELECT * FROM devices
+                WHERE lower(replace(replace(device_mac, ':', ''), '-', '')) = :device_key
+                   OR lower(name) = :device_uid_lower
+                LIMIT 1
+            """
+    else:
+        if "device_name" in columns:
+            query = """
+                SELECT * FROM devices
+                WHERE lower(replace(replace(device_name, ':', ''), '-', '')) = :device_key
+                   OR lower(device_name) = :device_uid_lower
+                LIMIT 1
+            """
+        else:
+            query = """
+                SELECT * FROM devices
+                WHERE lower(replace(replace(name, ':', ''), '-', '')) = :device_key
+                   OR lower(name) = :device_uid_lower
+                LIMIT 1
+            """
+
+    device_row_raw = await database.fetch_one(
+        query,
         {"device_key": device_key, "device_uid_lower": device_uid.lower()},
     )
-    if not device_row:
+    if not device_row_raw:
         raise HTTPException(status_code=404, detail="Device not found")
+
+    row_dict = dict(device_row_raw)
+    
+    # Map database row to expected output dictionary structure
+    device_row = {
+        "id": str(row_dict.get("id")),
+        "patient_id": str(row_dict.get("patient_id")) if row_dict.get("patient_id") else None,
+        "status": row_dict.get("status"),
+        "device_type": row_dict.get("device_type"),
+    }
+    
+    # Map name
+    if "device_name" in row_dict:
+        device_row["name"] = row_dict["device_name"]
+    else:
+        device_row["name"] = row_dict.get("name")
+        
+    # Map device_mac
+    device_row["device_mac"] = row_dict.get("device_mac")
+    
+    # Map battery
+    if "battery_level" in row_dict:
+        device_row["battery"] = row_dict["battery_level"]
+    else:
+        device_row["battery"] = row_dict.get("battery")
+        
+    # Map last_seen
+    if "last_seen" in row_dict:
+        device_row["last_seen_at"] = row_dict["last_seen"]
+    else:
+        device_row["last_seen_at"] = row_dict.get("last_seen_at")
+        
+    # Map firmware_version
+    device_row["firmware_version"] = row_dict.get("firmware_version")
+    
+    # Map updated_at
+    device_row["updated_at"] = row_dict.get("updated_at")
 
     patient_id = device_row["patient_id"]
     if not patient_id:
@@ -251,37 +289,38 @@ async def get_device_by_mac(device_mac: str) -> dict[str, Any] | None:
     columns = await get_devices_table_columns()
     device_key = normalize_device_identifier(device_mac)
     uses_device_mac = "device_mac" in columns
-    device_match_sql = (
-        "lower(replace(replace(device_mac, ':', ''), '-', '')) = :device_key"
-        if uses_device_mac
-        else "lower(replace(replace(name, ':', ''), '-', '')) = :device_key"
-    )
-    query = """
-    SELECT
-        id::text AS id,
-        patient_id::text AS patient_id,
-        status,
-        {device_mac_select}
-        {device_token_hash_select}
-        {token_last_rotated_at_select}
-        {firmware_version_select}
-    FROM devices
-    WHERE {device_match_sql}
-    LIMIT 1
-    """.format(
-        device_match_sql=device_match_sql,
-        device_mac_select="device_mac," if uses_device_mac else "NULL::text AS device_mac,",
-        device_token_hash_select=(
-            "device_token_hash," if "device_token_hash" in columns else "NULL::text AS device_token_hash,"
-        ),
-        token_last_rotated_at_select=(
-            "token_last_rotated_at," if "token_last_rotated_at" in columns else "NULL::timestamptz AS token_last_rotated_at,"
-        ),
-        firmware_version_select=(
-            "firmware_version" if "firmware_version" in columns else "NULL::text AS firmware_version"
-        ),
-    )
-    return await database.fetch_one(query, {"device_key": device_key})
+    
+    if uses_device_mac:
+        query = """
+            SELECT * FROM devices
+            WHERE lower(replace(replace(device_mac, ':', ''), '-', '')) = :device_key
+            LIMIT 1
+        """
+    else:
+        query = """
+            SELECT * FROM devices
+            WHERE lower(replace(replace(name, ':', ''), '-', '')) = :device_key
+            LIMIT 1
+        """
+        
+    device_row_raw = await database.fetch_one(query, {"device_key": device_key})
+    if not device_row_raw:
+        return None
+        
+    row_dict = dict(device_row_raw)
+    
+    # Map database row to expected output dictionary structure
+    device_row = {
+        "id": str(row_dict.get("id")),
+        "patient_id": str(row_dict.get("patient_id")) if row_dict.get("patient_id") else None,
+        "status": row_dict.get("status"),
+        "device_mac": row_dict.get("device_mac"),
+        "device_token_hash": row_dict.get("device_token_hash"),
+        "token_last_rotated_at": row_dict.get("token_last_rotated_at"),
+        "firmware_version": row_dict.get("firmware_version"),
+    }
+    
+    return device_row
 
 
 def verify_iot_device_token(device_row: dict[str, Any], device_token: str) -> bool:
@@ -856,27 +895,77 @@ async def get_sensor_data(
         )
         values["current_user_id"] = current_user["id"]
 
-    if patient_id:
-        await ensure_patient_access(current_user, patient_id)
-        where_parts.append("patient_id = CAST(:patient_id AS uuid)")
-        values["patient_id"] = patient_id
+    role = current_user["role"]
+    query_values = {}
+    if role == "patient":
+        # Bệnh nhân chỉ thấy dữ liệu của chính mình
+        query = """
+            SELECT id::text as id, patient_id::text as patient_id, heart_rate, spo2, systolic_bp, diastolic_bp, ecg_value, created_at
+            FROM sensor_data
+            WHERE patient_id = CAST(:current_user_id AS uuid)
+            ORDER BY created_at DESC
+            LIMIT :limit OFFSET :offset
+        """
+        query_values["current_user_id"] = current_user["id"]
+        count_query = "SELECT COUNT(*)::int AS total FROM sensor_data WHERE patient_id = CAST(:current_user_id AS uuid)"
+    elif role == "doctor":
+        if patient_id:
+            await ensure_patient_access(current_user, patient_id)
+            query = """
+                SELECT id::text as id, patient_id::text as patient_id, heart_rate, spo2, systolic_bp, diastolic_bp, ecg_value, created_at
+                FROM sensor_data
+                WHERE patient_id = CAST(:patient_id AS uuid)
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """
+            query_values["patient_id"] = patient_id
+            count_query = "SELECT COUNT(*)::int AS total FROM sensor_data WHERE patient_id = CAST(:patient_id AS uuid)"
+        else:
+            query = """
+                SELECT id::text as id, patient_id::text as patient_id, heart_rate, spo2, systolic_bp, diastolic_bp, ecg_value, created_at
+                FROM sensor_data
+                WHERE EXISTS (
+                    SELECT 1 FROM doctor_patient dp
+                    WHERE dp.doctor_id = CAST(:current_user_id AS uuid)
+                      AND dp.patient_id = sensor_data.patient_id
+                )
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """
+            query_values["current_user_id"] = current_user["id"]
+            count_query = """
+                SELECT COUNT(*)::int AS total FROM sensor_data
+                WHERE EXISTS (
+                    SELECT 1 FROM doctor_patient dp
+                    WHERE dp.doctor_id = CAST(:current_user_id AS uuid)
+                      AND dp.patient_id = sensor_data.patient_id
+                )
+            """
+    else:  # admin
+        if patient_id:
+            query = """
+                SELECT id::text as id, patient_id::text as patient_id, heart_rate, spo2, systolic_bp, diastolic_bp, ecg_value, created_at
+                FROM sensor_data
+                WHERE patient_id = CAST(:patient_id AS uuid)
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """
+            query_values["patient_id"] = patient_id
+            count_query = "SELECT COUNT(*)::int AS total FROM sensor_data WHERE patient_id = CAST(:patient_id AS uuid)"
+        else:
+            query = """
+                SELECT id::text as id, patient_id::text as patient_id, heart_rate, spo2, systolic_bp, diastolic_bp, ecg_value, created_at
+                FROM sensor_data
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """
+            count_query = "SELECT COUNT(*)::int AS total FROM sensor_data"
 
-    where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
-
-    count_query = f"SELECT COUNT(*)::int AS total FROM sensor_data {where_sql}"
-    total = await database.fetch_val(count_query, values)
-
-    query = """
-    SELECT id::text as id, patient_id::text as patient_id, heart_rate, spo2, systolic_bp, diastolic_bp, ecg_value, created_at
-    FROM sensor_data
-    {where_sql}
-    ORDER BY created_at DESC
-    LIMIT :limit OFFSET :offset
-    """
+    total = await database.fetch_val(count_query, query_values)
 
     data = await database.fetch_all(
-        query.format(where_sql=where_sql),
-        {**values, "limit": limit, "offset": offset},
+        query,
+        {**query_values, "limit": limit, "offset": offset},
     )
 
     return {

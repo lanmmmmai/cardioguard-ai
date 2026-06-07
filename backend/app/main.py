@@ -126,8 +126,20 @@ async def _periodic_mv_refresh() -> None:
     while True:
         try:
             await asyncio.sleep(300)  # 5 minutes
-            await database.execute("SELECT safe_refresh_reports_summary_mv()")
-            logger.info("Materialized view reports_summary_mv refreshed")
+            exists = await database.fetch_val(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_proc
+                    WHERE proname = 'safe_refresh_reports_summary_mv'
+                )
+                """
+            )
+            if exists:
+                await database.execute("SELECT safe_refresh_reports_summary_mv()")
+                logger.info("Materialized view reports_summary_mv refreshed")
+            else:
+                logger.warning("Materialized view refresh function safe_refresh_reports_summary_mv does not exist, skipping refresh")
         except Exception:
             logger.exception("Failed to refresh materialized view")
 

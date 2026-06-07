@@ -6,6 +6,7 @@ MỤC ĐÍCH:
     một cửa sổ thời gian trượt. Hỗ trợ Redis làm Shared State và fallback In-memory.
 """
 
+import asyncio
 from collections import OrderedDict
 import logging
 import time
@@ -14,10 +15,23 @@ from app.core.redis import redis_client
 
 logger = logging.getLogger(__name__)
 
+
+def mask_email(email: str) -> str:
+    if not email or "@" not in email:
+        return "***"
+    parts = email.split("@", 1)
+    local = parts[0]
+    domain = parts[1]
+    if len(local) <= 2:
+        return f"{local[0]}***@{domain}"
+    return f"{local[0]}***{local[-1]}@{domain}"
+
+
 # Bộ nhớ lưu trữ giới hạn tốc độ: { (ip, email, endpoint): [danh_sách_dấu_thời_gian] }
 _rate_limits: "OrderedDict[tuple[str, str, str], list[float]]" = OrderedDict()
 _RATE_LIMIT_STORE_MAX_KEYS = 2048
 _RATE_LIMIT_RETENTION_SECONDS = 300
+_rate_limit_lock = asyncio.Lock()
 
 
 def _prune_rate_limits(now: float) -> None:
@@ -65,7 +79,7 @@ async def check_rate_limit(ip: str, email: str, endpoint: str, max_requests: int
                     ttl = await redis_client.ttl(key)
                     if ttl < 0:
                         ttl = window_seconds
-                    logger.warning("Vượt quá giới hạn tốc độ (Redis): ip=%s email=%s endpoint=%s chờ=%ds", ip, email, endpoint, ttl)
+                    logger.warning("Vượt quá giới hạn tốc độ (Redis): ip=%s email=%s endpoint=%s chờ=%ds", ip, mask_email(email), endpoint, ttl)
                     raise HTTPException(
                         status_code=429,
                         detail=f"Quá nhiều yêu cầu gửi tới {endpoint}. Vui lòng thử lại sau {ttl} giây."
@@ -78,26 +92,29 @@ async def check_rate_limit(ip: str, email: str, endpoint: str, max_requests: int
             logger.exception("Lỗi khi kiểm tra rate limit bằng Redis, chuyển sang fallback bộ nhớ trong...")
 
     # 2. Fallback In-memory
-    now = time.time()
-    key_mem = (ip, normalized_email, endpoint)
+    async with _rate_limit_lock:
+        now = time.time()
+        key_mem = (ip, normalized_email, endpoint)
 
-    # Lấy danh sách dấu thời gian hiện tại hoặc khởi tạo danh sách rỗng
-    timestamps = _rate_limits.get(key_mem, [])
-    # Chỉ giữ lại các dấu thời gian còn trong cửa sổ
-    timestamps = [t for t in timestamps if now - t < window_seconds]
+        # Lấy danh sách dấu thời gian hiện tại hoặc khởi tạo danh sách rỗng
+        timestamps = _rate_limits.get(key_mem, [])
+        # Chỉ giữ lại các dấu thời gian còn trong cửa sổ
+        timestamps = [t for t in timestamps if now - t < window_seconds]
 
-    # Nếu số lượng yêu cầu đã đạt giới hạn, ném lỗi 429
-    if len(timestamps) >= max_requests:
-        wait_time = int(window_seconds - (now - timestamps[0]))
-        logger.warning("Vượt quá giới hạn tốc độ (In-memory Fallback): ip=%s email=%s endpoint=%s chờ=%ds", ip, email, endpoint, wait_time)
-        raise HTTPException(
-            status_code=429,
-            detail=f"Quá nhiều yêu cầu gửi tới {endpoint}. Vui lòng thử lại sau {wait_time} giây."
-        )
+        # Nếu số lượng yêu cầu đã đạt giới hạn, ném lỗi 429
+        if len(timestamps) >= max_requests:
+            wait_time = int(window_seconds - (now - timestamps[0]))
+            if wait_time <= 0:
+                wait_time = 1
+            logger.warning("Vượt quá giới hạn tốc độ (In-memory Fallback): ip=%s email=%s endpoint=%s chờ=%ds", ip, mask_email(email), endpoint, wait_time)
+            raise HTTPException(
+                status_code=429,
+                detail=f"Quá nhiều yêu cầu gửi tới {endpoint}. Vui lòng thử lại sau {wait_time} giây."
+            )
 
-    # Thêm dấu thời gian hiện tại vào danh sách
-    timestamps.append(now)
-    _rate_limits[key_mem] = timestamps
-    _rate_limits.move_to_end(key_mem)
-    _prune_rate_limits(now)
-    logger.debug("check_rate_limit (In-memory Fallback): allowed, ip=%s email=%s endpoint=%s count=%d/%d window=%ds", ip, email, endpoint, len(timestamps), max_requests, window_seconds)
+        # Thêm dấu thời gian hiện tại vào danh sách
+        timestamps.append(now)
+        _rate_limits[key_mem] = timestamps
+        _rate_limits.move_to_end(key_mem)
+        _prune_rate_limits(now)
+        logger.debug("check_rate_limit (In-memory Fallback): allowed, ip=%s email=%s endpoint=%s count=%d/%d window=%ds", ip, mask_email(email), endpoint, len(timestamps), max_requests, window_seconds)
