@@ -363,68 +363,60 @@ async def ensure_email_cms_schema() -> None:
 
     missing_items: list[str] = []
     try:
-        # Batch query columns
-        column_rows = await database.fetch_all(
-            """
-            SELECT table_name, column_name 
-            FROM information_schema.columns 
-            WHERE table_schema = 'public' 
-              AND table_name IN ('cms_email_functions', 'email_templates', 'email_logs')
-            """
-        )
-        existing_columns = {}
-        for r in column_rows:
-            existing_columns.setdefault(r["table_name"], set()).add(r["column_name"])
+        for table_name, required_columns in (
+            ("cms_email_functions", required_email_function_columns),
+            ("email_templates", required_email_template_columns),
+            ("email_logs", required_email_log_columns),
+        ):
+            for column_name in required_columns:
+                exists = await database.fetch_val(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = :table_name
+                          AND column_name = :column_name
+                    )
+                    """,
+                    {"table_name": table_name, "column_name": column_name},
+                )
+                if not exists:
+                    missing_items.append(f"{table_name}.{column_name}")
 
-        # Batch query indexes
-        index_rows = await database.fetch_all(
-            """
-            SELECT indexname 
-            FROM pg_indexes 
-            WHERE schemaname = 'public' 
-              AND tablename IN ('cms_email_functions', 'email_templates', 'email_logs')
-            """
-        )
-        existing_indexes = {r["indexname"] for r in index_rows}
+        for index_name in (
+            *required_email_function_indexes,
+            *required_email_template_indexes,
+            *required_email_log_indexes,
+        ):
+            exists = await database.fetch_val(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_indexes
+                    WHERE schemaname = 'public'
+                      AND indexname = :index_name
+                )
+                """,
+                {"index_name": index_name},
+            )
+            if not exists:
+                missing_items.append(f"index:{index_name}")
 
-        # Batch query triggers
-        trigger_rows = await database.fetch_all(
-            """
-            SELECT trigger_name 
-            FROM information_schema.triggers 
-            WHERE event_object_schema = 'public' 
-              AND event_object_table IN ('cms_email_functions', 'email_templates', 'email_logs')
-            """
-        )
-        existing_triggers = {r["trigger_name"] for r in trigger_rows}
-
-        # Check cms_email_functions columns
-        cms_cols = existing_columns.get("cms_email_functions", set())
-        for col in required_email_function_columns:
-            if col not in cms_cols:
-                missing_items.append(f"cms_email_functions.{col}")
-
-        # Check email_templates columns
-        tpl_cols = existing_columns.get("email_templates", set())
-        for col in required_email_template_columns:
-            if col not in tpl_cols:
-                missing_items.append(f"email_templates.{col}")
-
-        # Check email_logs columns
-        log_cols = existing_columns.get("email_logs", set())
-        for col in required_email_log_columns:
-            if col not in log_cols:
-                missing_items.append(f"email_logs.{col}")
-
-        # Check indexes
-        for idx in (*required_email_function_indexes, *required_email_template_indexes, *required_email_log_indexes):
-            if idx not in existing_indexes:
-                missing_items.append(f"index:{idx}")
-
-        # Check triggers
-        for trg in (*required_email_function_triggers, *required_email_template_triggers):
-            if trg not in existing_triggers:
-                missing_items.append(f"trigger:{trg}")
+        for trigger_name in (*required_email_function_triggers, *required_email_template_triggers):
+            exists = await database.fetch_val(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.triggers
+                    WHERE event_object_schema = 'public'
+                      AND trigger_name = :trigger_name
+                )
+                """,
+                {"trigger_name": trigger_name},
+            )
+            if not exists:
+                missing_items.append(f"trigger:{trigger_name}")
     except Exception:
         logger.warning("Failed to check existing email CMS schema, forcing synchronization", exc_info=True)
         missing_items.append("forced_sync")
@@ -868,53 +860,45 @@ async def ensure_domain_links_schema() -> None:
     missing_columns = []
     
     try:
-        # Check if table exists first
-        table_exists = await database.fetch_val(
-            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'domain_links')"
+        for column_name in required_columns:
+            exists = await database.fetch_val(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'domain_links'
+                      AND column_name = :column_name
+                )
+                """,
+                {"column_name": column_name},
+            )
+            if not exists:
+                missing_columns.append(column_name)
+
+        index_exists = await database.fetch_val(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM pg_indexes
+                WHERE schemaname = 'public'
+                  AND tablename = 'domain_links'
+                  AND indexname = 'idx_domain_links_path_unique'
+            )
+            """
         )
-        if not table_exists:
-            # Table doesn't exist, so all columns are missing
-            missing_columns = list(required_columns)
-            index_exists = False
-            trigger_exists = False
-        else:
-            # Query columns in batch
-            column_rows = await database.fetch_all(
-                """
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_schema = 'public' 
-                  AND table_name = 'domain_links'
-                """
-            )
-            existing_cols = {r["column_name"] for r in column_rows}
-            missing_columns = [col for col in required_columns if col not in existing_cols]
 
-            # Query index existence
-            index_exists = await database.fetch_val(
-                """
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM pg_indexes
-                    WHERE schemaname = 'public'
-                      AND tablename = 'domain_links'
-                      AND indexname = 'idx_domain_links_path_unique'
-                )
-                """
+        trigger_exists = await database.fetch_val(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.triggers
+                WHERE event_object_schema = 'public'
+                  AND event_object_table = 'domain_links'
+                  AND trigger_name = 'trg_domain_links_updated_at'
             )
-
-            # Query trigger existence
-            trigger_exists = await database.fetch_val(
-                """
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM information_schema.triggers
-                    WHERE event_object_schema = 'public'
-                      AND event_object_table = 'domain_links'
-                      AND trigger_name = 'trg_domain_links_updated_at'
-                )
-                """
-            )
+            """
+        )
     except Exception:
         logger.warning("Failed to check domain_links schema, forcing DDL execution", exc_info=True)
         missing_columns = list(required_columns)

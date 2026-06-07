@@ -30,6 +30,19 @@ logger = logging.getLogger(__name__)
 AI_MEDICAL_DISCLAIMER = "\n\n*Lưu ý: Đây là phân tích tham khảo từ trợ lý AI, không thay thế cho chẩn đoán y khoa chuyên nghiệp.*"
 
 
+def is_notification_database_ready() -> bool:
+    """Check whether the real database connection is available for notification side effects.
+
+    Returns:
+        False when the concrete application database has not been connected yet.
+        True for test doubles, so patched database mocks can still exercise service logic.
+    """
+    connected = getattr(database, "is_connected", True)
+    if isinstance(connected, bool):
+        return connected
+    return True
+
+
 def enforce_medical_disclaimer(message: str, notification_type: str) -> str:
     """Đảm bảo các thông báo liên quan đến phân tích AI đi kèm disclaimer y tế.
 
@@ -123,6 +136,10 @@ async def create_notification(
     Returns:
         Dict thông báo đã được lưu hoặc None nếu bị bỏ qua do tuỳ chọn hoặc do cooldown.
     """
+    if not is_notification_database_ready():
+        logger.debug("Bỏ qua create_notification vì database chưa kết nối: user_id=%s type=%s", user_id, type)
+        return None
+
     logger.info("Bắt đầu create_notification: user_id=%s category=%s type=%s severity=%s", user_id, category, type, severity)
     
     # 1. Kiểm tra tuỳ chọn nhận thông báo
@@ -152,7 +169,7 @@ async def create_notification(
 
     # 3. Tạo ID và chuẩn bị dữ liệu insert
     notification_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc)
     
     query = """
     INSERT INTO notifications (
@@ -248,6 +265,10 @@ async def notify_patient(
     Returns:
         Bản ghi thông báo đã được lưu.
     """
+    if not is_notification_database_ready():
+        logger.debug("Bỏ qua notify_patient vì database chưa kết nối: patient_id=%s type=%s", patient_id, type)
+        return None
+
     logger.debug("Gọi notify_patient: patient_id=%s title=%s", patient_id, title)
     # Tìm user_id tương ứng với patient_id từ bảng patients
     try:
@@ -311,6 +332,10 @@ async def notify_assigned_doctors(
     Returns:
         Danh sách thông báo đã lưu thành công.
     """
+    if not is_notification_database_ready():
+        logger.debug("Bỏ qua notify_assigned_doctors vì database chưa kết nối: patient_id=%s type=%s", patient_id, type)
+        return []
+
     logger.debug("Gọi notify_assigned_doctors: patient_id=%s", patient_id)
     results = []
     try:
@@ -377,6 +402,10 @@ async def notify_admins(
     Returns:
         Danh sách thông báo đã lưu thành công.
     """
+    if not is_notification_database_ready():
+        logger.debug("Bỏ qua notify_admins vì database chưa kết nối: type=%s", type)
+        return []
+
     logger.debug("Gọi notify_admins: type=%s", type)
     results = []
     try:
@@ -421,7 +450,7 @@ async def mark_as_read(notification_id: str, user_id: str) -> bool:
     """
     logger.info("Gọi mark_as_read: notification_id=%s user_id=%s", notification_id, user_id)
     try:
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(timezone.utc)
         rows_updated = await database.execute(
             """
             UPDATE notifications 
@@ -458,7 +487,7 @@ async def mark_all_as_read(user_id: str) -> bool:
     """
     logger.info("Gọi mark_all_as_read: user_id=%s", user_id)
     try:
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(timezone.utc)
         await database.execute(
             """
             UPDATE notifications 

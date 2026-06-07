@@ -3,8 +3,12 @@
 Run: python -m unittest tests.test_ai_service
 """
 
-import os, sys, unittest
-from unittest.mock import AsyncMock, patch
+import importlib
+import os
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -13,6 +17,50 @@ if str(BACKEND_DIR) not in sys.path:
 
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test_db")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-with-at-least-32-chars")
+
+
+def import_ai_service_without_openai_key():
+    """Load ai_service in an isolated config context with no .env OpenAI key."""
+    module_names = ("app.services.ai_service", "app.core.config")
+    original_modules = {name: sys.modules.get(name) for name in module_names}
+    services_package = sys.modules.get("app.services")
+    core_package = sys.modules.get("app.core")
+    original_ai_attr = getattr(services_package, "ai_service", None) if services_package else None
+    original_config_attr = getattr(core_package, "config", None) if core_package else None
+
+    for name in module_names:
+        sys.modules.pop(name, None)
+    if services_package and hasattr(services_package, "ai_service"):
+        delattr(services_package, "ai_service")
+    if core_package and hasattr(core_package, "config"):
+        delattr(core_package, "config")
+
+    try:
+        with tempfile.TemporaryDirectory() as base_dir:
+            test_env = {
+                "CARDIOGUARD_BASE_DIR": base_dir,
+                "DATABASE_URL": "postgresql+asyncpg://test:test@localhost:5432/test_db",
+                "SECRET_KEY": "test-secret-key-with-at-least-32-chars",
+                "OPENAI_API_KEY": "",
+            }
+            with patch.dict(os.environ, test_env, clear=False):
+                return importlib.import_module("app.services.ai_service")
+    finally:
+        for name in module_names:
+            sys.modules.pop(name, None)
+        for name, module in original_modules.items():
+            if module is not None:
+                sys.modules[name] = module
+        if services_package is not None:
+            if original_ai_attr is not None:
+                setattr(services_package, "ai_service", original_ai_attr)
+            elif hasattr(services_package, "ai_service"):
+                delattr(services_package, "ai_service")
+        if core_package is not None:
+            if original_config_attr is not None:
+                setattr(core_package, "config", original_config_attr)
+            elif hasattr(core_package, "config"):
+                delattr(core_package, "config")
 
 
 class TestMockResponse(unittest.TestCase):
@@ -90,20 +138,30 @@ class TestGenerateChatResponseInit(unittest.TestCase):
     """Tests for HAS_OPENAI initialization."""
 
     def test_has_openai_false_without_key(self):
-        from app.services.ai_service import HAS_OPENAI
-        self.assertFalse(HAS_OPENAI)
+        module = import_ai_service_without_openai_key()
+        self.assertFalse(module.HAS_OPENAI)
 
     def test_client_none_without_key(self):
-        from app.services.ai_service import client
-        self.assertIsNone(client)
+        module = import_ai_service_without_openai_key()
+        self.assertIsNone(module.client)
 
 
 class TestGenerateChatResponse(unittest.TestCase):
     """Tests for generate_chat_response — fallback when no OpenAI."""
 
     def setUp(self):
-        from app.services.ai_service import AIService
-        self.service = AIService
+        from app.services import ai_service as ai_module
+        self._patches = [
+            patch.object(ai_module, "HAS_OPENAI", False),
+            patch.object(ai_module, "client", None),
+        ]
+        for patcher in self._patches:
+            patcher.start()
+        self.service = ai_module.AIService
+
+    def tearDown(self):
+        for patcher in reversed(self._patches):
+            patcher.stop()
 
     def test_fallback_without_openai(self):
         result = asyncio_run(self.service.generate_chat_response("patient", "nhịp tim"))

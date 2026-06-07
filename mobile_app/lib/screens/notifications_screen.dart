@@ -411,14 +411,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   String _formatDateTime(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 60) {
+    final vnDt = dt.toUtc().add(const Duration(hours: 7));
+    final now = DateTime.now().toUtc().add(const Duration(hours: 7));
+    final diff = now.difference(vnDt);
+    if (diff.isNegative || diff.inSeconds < 60) {
+      return 'Vừa xong';
+    } else if (diff.inMinutes < 60) {
       return '${diff.inMinutes} phút trước';
     } else if (diff.inHours < 24) {
       return '${diff.inHours} giờ trước';
     } else {
-      return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      return '${vnDt.day.toString().padLeft(2, '0')}/${vnDt.month.toString().padLeft(2, '0')} ${vnDt.hour.toString().padLeft(2, '0')}:${vnDt.minute.toString().padLeft(2, '0')}';
     }
   }
 

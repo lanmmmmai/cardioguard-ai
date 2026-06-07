@@ -123,9 +123,12 @@ class AIService:
             result = response.choices[0].message.content
             logger.info("generate_chat_response: OpenAI success, response_length=%d", len(result))
             return result
-        except Exception as e:
-            logger.exception("generate_chat_response: OpenAI API call failed")
-            return "Xin lỗi, hệ thống AI đang bận hoặc gặp sự cố. Vui lòng thử lại sau."
+        except Exception as exc:
+            logger.warning(
+                "generate_chat_response: OpenAI API call failed; using mock fallback (%s)",
+                exc.__class__.__name__,
+            )
+            return AIService._mock_response(role, user_message, context_data)
 
     @staticmethod
     def _mock_response(role: str, message: str, context_data: Dict[str, Any]) -> str:

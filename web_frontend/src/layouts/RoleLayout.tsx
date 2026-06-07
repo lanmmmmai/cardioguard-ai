@@ -402,8 +402,8 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
                               textAlign: 'right',
                             }}
                           >
-                            {new Date(notif.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}{' '}
-                            {new Date(notif.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                            {new Date(notif.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Ho_Chi_Minh' })}{' '}
+                            {new Date(notif.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })}
                           </div>
                         </div>
                       ))
