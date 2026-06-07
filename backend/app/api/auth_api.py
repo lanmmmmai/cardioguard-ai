@@ -416,7 +416,7 @@ async def request_register_otp(data: RegisterOtpRequest, request: Request):
     """
     ip = get_client_ip(request)
     email = data.email.lower()
-    check_rate_limit(ip, email, "/auth/register/request-otp", max_requests=5, window_seconds=60)
+    await check_rate_limit(ip, email, "/auth/register/request-otp", max_requests=5, window_seconds=60)
 
     reg_role = (data.role or "patient").strip().lower()
     logger.debug("Entry: request_register_otp(email=%s, role=%s)", email, reg_role)
@@ -634,7 +634,7 @@ async def login(data: LoginRequest, request: Request):
     """
     ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
-    check_rate_limit(ip, email, "/auth/login", max_requests=5, window_seconds=60)
+    await check_rate_limit(ip, email, "/auth/login", max_requests=5, window_seconds=60)
     logger.debug("Entry: login(email=%s)", email)
 
     user_columns = await get_users_columns()
@@ -1066,7 +1066,7 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Requ
     """
     ip = get_client_ip(request)
     email = data.email.lower()
-    check_rate_limit(ip, email, "/auth/forgot-password/request-otp", max_requests=5, window_seconds=60)
+    await check_rate_limit(ip, email, "/auth/forgot-password/request-otp", max_requests=5, window_seconds=60)
     logger.debug("Entry: request_forgot_password_otp(email=%s)", email)
 
     response = generic_forgot_password_response(email)
@@ -1124,7 +1124,7 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
     """
     ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
-    check_rate_limit(ip, email, "/auth/forgot-password/verify-otp", max_requests=5, window_seconds=60)
+    await check_rate_limit(ip, email, "/auth/forgot-password/verify-otp", max_requests=5, window_seconds=60)
     logger.debug("Entry: verify_forgot_password_otp(email=%s)", email)
 
     otp_result = await verify_otp_token(

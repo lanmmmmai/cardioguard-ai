@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     """
     ENVIRONMENT: str = "development"
     DATABASE_URL: str
+    REDIS_URL: str = ""
     NEXT_PUBLIC_SUPABASE_URL: str = ""
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: str = ""
     BREVO_API_KEY: str = ""

@@ -30,6 +30,8 @@ from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import connect_db, disconnect_db, database
+from app.core.redis import redis_client
+from app.services.cleanup_service import cleanup_expired_data
 from app.api.patient_api import router as patient_router
 from app.api.sensor_api import router as sensor_router
 from app.api.alert_api import router as alert_router
@@ -103,6 +105,19 @@ async def add_headers(request, call_next):
 
 
 _mv_refresh_task: asyncio.Task[None] | None = None
+_cleanup_task: asyncio.Task[None] | None = None
+
+
+async def _periodic_cleanup() -> None:
+    """Periodically run data cleanup every hour (3600 seconds)."""
+    while True:
+        try:
+            await asyncio.sleep(3600)  # 1 hour
+            await cleanup_expired_data()
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Failed to run periodic cleanup task")
 
 
 async def _periodic_mv_refresh() -> None:
@@ -194,9 +209,17 @@ async def startup():
     except Exception:
         logger.exception("Failed to apply MV refresh migration")
 
+    # Connect to Redis
+    await redis_client.initialize()
+
     # Start periodic refresh background task
     global _mv_refresh_task
     _mv_refresh_task = asyncio.create_task(_periodic_mv_refresh())
+
+    # Start periodic cleanup background task
+    global _cleanup_task
+    asyncio.create_task(cleanup_expired_data())
+    _cleanup_task = asyncio.create_task(_periodic_cleanup())
 
     logger.info("Application startup complete")
 
@@ -213,6 +236,17 @@ async def shutdown():
             await _mv_refresh_task
         except asyncio.CancelledError:
             logger.info("Materialized view refresh task cancelled successfully")
+
+    global _cleanup_task
+    if _cleanup_task:
+        logger.info("Cancelling periodic cleanup task...")
+        _cleanup_task.cancel()
+        try:
+            await _cleanup_task
+        except asyncio.CancelledError:
+            logger.info("Cleanup task cancelled successfully")
+
+    await redis_client.close()
     await shutdown_audit_logging()
     await disconnect_db()
     logger.info("Application shutdown complete")
@@ -246,29 +280,30 @@ async def health():
             database responds.  Returns HTTP 500 with equivalent JSON on
             failure.
     """
+    db_ok = False
+    redis_ok = redis_client.is_active
     try:
         # Probe the database with a no-op query to verify connectivity
         await database.execute("SELECT 1")
-        return {
-            "status": "healthy",
-            "database": "connected",
+        db_ok = True
+    except Exception:
+        logger.exception("Database health check failed")
+
+    status_code = 200 if db_ok else 503
+    status_str = "healthy" if db_ok else "unhealthy"
+
+    return Response(
+        content=json.dumps({
+            "status": status_str,
+            "database": "connected" if db_ok else "error: unavailable",
+            "redis": "connected" if redis_ok else "offline/fallback",
             "services": {
                 "web_server": "running"
             }
-        }
-    except Exception as e:
-        logger.exception("Database health check failed")
-        return Response(
-            content=json.dumps({
-                "status": "unhealthy",
-                "database": "error: unavailable",
-                "services": {
-                    "web_server": "running"
-                }
-            }),
-            status_code=500,
-            media_type="application/json"
-        )
+        }),
+        status_code=status_code,
+        media_type="application/json"
+    )
 
 
 @app.get("/")

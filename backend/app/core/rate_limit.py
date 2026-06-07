@@ -1,25 +1,16 @@
-"""Giới hạn tốc độ trong bộ nhớ cho các điểm cuối xác thực.
+"""Giới hạn tốc độ trong bộ nhớ và Redis cho các điểm cuối xác thực.
 
 MỤC ĐÍCH:
     Bảo vệ các điểm cuối xác thực (đăng nhập, OTP) khỏi tấn công brute-force
     bằng cách giới hạn yêu cầu theo tổ hợp IP/email/điểm cuối trong
-    một cửa sổ thời gian trượt.
-
-LUỒNG XỬ LÝ:
-    1. Trích xuất địa chỉ IP thực của máy khách từ header proxy (X-Forwarded-For).
-    2. Lưu trữ dấu thời gian yêu cầu theo khóa (ip, email, endpoint).
-    3. Mỗi yêu cầu, loại bỏ dấu thời gian hết hạn và kiểm tra số lượng.
-    4. Ném HTTP 429 nếu vượt quá giới hạn kèm thông báo thử lại sau.
-
-QUAN HỆ:
-    - Được sử dụng bởi: auth_api (các điểm cuối đăng nhập, xác thực OTP, quên mật khẩu)
-    - Dữ liệu: từ điển trong bộ nhớ (mất khi khởi động lại máy chủ)
+    một cửa sổ thời gian trượt. Hỗ trợ Redis làm Shared State và fallback In-memory.
 """
 
 from collections import OrderedDict
 import logging
 import time
 from fastapi import HTTPException, Request
+from app.core.redis import redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -42,17 +33,9 @@ def _prune_rate_limits(now: float) -> None:
     while len(_rate_limits) > _RATE_LIMIT_STORE_MAX_KEYS:
         _rate_limits.popitem(last=False)
 
+
 def get_client_ip(request: Request) -> str:
-    """Trích xuất địa chỉ IP thực của máy khách từ các header yêu cầu.
-
-    Tôn trọng header X-Forwarded-For và X-Real-IP cho thiết lập reverse proxy.
-
-    Tham số:
-        request: Yêu cầu đến FastAPI.
-
-    Trả về:
-        Chuỗi địa chỉ IP của máy khách, hoặc "unknown" nếu không có.
-    """
+    """Trích xuất địa chỉ IP thực của máy khách từ các header yêu cầu."""
     x_forwarded_for = request.headers.get("X-Forwarded-For")
     if x_forwarded_for:
         return x_forwarded_for.split(",")[0].strip()
@@ -61,34 +44,52 @@ def get_client_ip(request: Request) -> str:
         return x_real_ip.strip()
     return request.client.host if request.client else "unknown"
 
-def check_rate_limit(ip: str, email: str, endpoint: str, max_requests: int = 5, window_seconds: int = 60):
+
+async def check_rate_limit(ip: str, email: str, endpoint: str, max_requests: int = 5, window_seconds: int = 60):
     """Kiểm tra và thực thi giới hạn tốc độ cho một máy khách + hành động cụ thể.
 
-    Thuật toán cửa sổ trượt: loại bỏ các dấu thời gian cũ hơn window_seconds,
-    sau đó từ chối nếu số lượng còn lại đạt hoặc vượt quá max_requests.
-
-    Tham số:
-        ip: Địa chỉ IP của máy khách.
-        email: Email người dùng đã chuẩn hóa.
-        endpoint: Định danh điểm cuối API (ví dụ "/auth/login").
-        max_requests: Số yêu cầu tối đa cho phép trong cửa sổ.
-        window_seconds: Thời lượng cửa sổ trượt tính bằng giây.
-
-    Ngoại lệ:
-        HTTPException: 429 Too Many Requests kèm thông báo thử lại sau.
+    Nếu Redis được kết nối, sử dụng Redis làm Shared Rate Limiting.
+    Ngược lại, tự động chuyển sang fallback In-memory.
     """
+    normalized_email = email.lower().strip()
+
+    # 1. Thử sử dụng Redis
+    if redis_client.is_active:
+        key = f"ratelimit:{ip}:{normalized_email}:{endpoint}"
+        try:
+            current = await redis_client.incr(key)
+            if current is not None:
+                if current == 1:
+                    await redis_client.expire(key, window_seconds)
+                if current > max_requests:
+                    ttl = await redis_client.ttl(key)
+                    if ttl < 0:
+                        ttl = window_seconds
+                    logger.warning("Vượt quá giới hạn tốc độ (Redis): ip=%s email=%s endpoint=%s chờ=%ds", ip, email, endpoint, ttl)
+                    raise HTTPException(
+                        status_code=429,
+                        detail=f"Quá nhiều yêu cầu gửi tới {endpoint}. Vui lòng thử lại sau {ttl} giây."
+                    )
+                logger.debug("check_rate_limit (Redis): allowed, key=%s count=%d/%d window=%ds", key, current, max_requests, window_seconds)
+                return
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Lỗi khi kiểm tra rate limit bằng Redis, chuyển sang fallback bộ nhớ trong...")
+
+    # 2. Fallback In-memory
     now = time.time()
-    key = (ip, email.lower().strip(), endpoint)
+    key_mem = (ip, normalized_email, endpoint)
 
     # Lấy danh sách dấu thời gian hiện tại hoặc khởi tạo danh sách rỗng
-    timestamps = _rate_limits.get(key, [])
+    timestamps = _rate_limits.get(key_mem, [])
     # Chỉ giữ lại các dấu thời gian còn trong cửa sổ
     timestamps = [t for t in timestamps if now - t < window_seconds]
 
     # Nếu số lượng yêu cầu đã đạt giới hạn, ném lỗi 429
     if len(timestamps) >= max_requests:
         wait_time = int(window_seconds - (now - timestamps[0]))
-        logger.warning("Vượt quá giới hạn tốc độ: ip=%s email=%s endpoint=%s chờ=%ds", ip, email, endpoint, wait_time)
+        logger.warning("Vượt quá giới hạn tốc độ (In-memory Fallback): ip=%s email=%s endpoint=%s chờ=%ds", ip, email, endpoint, wait_time)
         raise HTTPException(
             status_code=429,
             detail=f"Quá nhiều yêu cầu gửi tới {endpoint}. Vui lòng thử lại sau {wait_time} giây."
@@ -96,8 +97,7 @@ def check_rate_limit(ip: str, email: str, endpoint: str, max_requests: int = 5, 
 
     # Thêm dấu thời gian hiện tại vào danh sách
     timestamps.append(now)
-    _rate_limits[key] = timestamps
-    _rate_limits.move_to_end(key)
+    _rate_limits[key_mem] = timestamps
+    _rate_limits.move_to_end(key_mem)
     _prune_rate_limits(now)
-    logger.debug("check_rate_limit: allowed, ip=%s email=%s endpoint=%s count=%d/%d window=%ds", ip, email, endpoint, len(timestamps), max_requests, window_seconds)
-
+    logger.debug("check_rate_limit (In-memory Fallback): allowed, ip=%s email=%s endpoint=%s count=%d/%d window=%ds", ip, email, endpoint, len(timestamps), max_requests, window_seconds)

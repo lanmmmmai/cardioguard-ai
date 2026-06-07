@@ -498,7 +498,7 @@ async def create_iot_telemetry(
     # Áp dụng rate limit cho IoT thiết bị (tối đa 60 requests/phút)
     from app.core.rate_limit import check_rate_limit, get_client_ip
     ip = get_client_ip(request)
-    check_rate_limit(ip, x_device_mac, "/iot/telemetry", max_requests=60, window_seconds=60)
+    await check_rate_limit(ip, x_device_mac, "/iot/telemetry", max_requests=60, window_seconds=60)
 
     device_row = await get_device_by_mac(x_device_mac)
     if not device_row:

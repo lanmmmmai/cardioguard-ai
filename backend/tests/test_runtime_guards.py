@@ -26,7 +26,7 @@ from app.core.password_policy import validate_password  # noqa: E402
 from app.services import audit_service  # noqa: E402
 
 
-class TestRuntimeGuards(unittest.TestCase):
+class TestRuntimeGuards(unittest.IsolatedAsyncioTestCase):
     """Verify runtime guards that protect production and telemetry flows."""
 
     def test_detect_abnormal_ignores_missing_sensor_values(self):
@@ -67,12 +67,12 @@ class TestRuntimeGuards(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_password("Password123!")
 
-    def test_rate_limit_store_is_bounded(self):
+    async def test_rate_limit_store_is_bounded(self):
         """In-memory rate-limit storage must not grow without bound."""
         rate_limit._rate_limits.clear()
 
         for index in range(rate_limit._RATE_LIMIT_STORE_MAX_KEYS + 50):
-            rate_limit.check_rate_limit(
+            await rate_limit.check_rate_limit(
                 ip=f"10.0.0.{index}",
                 email=f"user{index}@example.com",
                 endpoint="/auth/login",

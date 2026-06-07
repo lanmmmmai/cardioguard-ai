@@ -84,6 +84,11 @@ const getResolvedApiUrl = (): string => {
   
   if (bakedApiUrl && isUsableApiUrl(bakedApiUrl)) return bakedApiUrl;
   
+  // For Vercel production deployment, use relative proxy /api (resolved dynamically)
+  if (typeof window !== 'undefined' && !isLocalhost) {
+    return `${window.location.origin}/api`;
+  }
+  
   return isLocalhost ? 'http://localhost:8000/api' : 'https://cardioguard-ai-backend.onrender.com/api';
 };
 

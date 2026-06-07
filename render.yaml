@@ -37,12 +37,24 @@ services:
         sync: false  # Set manually
       - key: PYTHONUNBUFFERED
         value: "1"
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: cardioguard-redis
+          property: connectionString
     plan: free
     # Auto-deploy triggers:
     # - Push to 'main' branch (production)
     # - Render dashboard manual deploy
     # - API deploy hook (optional)
 
+  # ── Redis Service ──────────────────────────────────────────
+  - type: redis
+    name: cardioguard-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+
   # ── Frontend (Vercel handles this, not Render) ─────────────
   # Frontend is deployed via Vercel, not Render.
   # See DEPLOYMENT.md for Vercel configuration.
+

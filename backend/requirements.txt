@@ -19,3 +19,6 @@ requests==2.32.5
 ruff==0.12.10
 SQLAlchemy==2.0.50
 uvicorn[standard]==0.39.0
+redis>=5.0.0
+alembic>=1.13.0
+

@@ -60,7 +60,7 @@ class TestSettingsValidation(unittest.TestCase):
             "EMAIL_FROM_EMAIL": "noreply@giatky.site",
         }
         defaults.update(overrides)
-        return Settings(**defaults)
+        return Settings(_env_file=None, **defaults)
 
     def test_default_environment(self):
         s = self._make_settings()
