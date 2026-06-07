@@ -49,6 +49,7 @@ export const roleMenus: Record<UserRole, RoleMenuItem[]> = {
   admin: [
     // 1. Tổng quan
     { label: 'Dashboard', path: '/admin/dashboard', icon: BarChart3, group: 'group_overview' },
+    { label: 'Thông báo', path: '/admin/notifications', icon: Bell, group: 'group_overview' },
     
     // 2. Quản lý người dùng
     { label: 'Quản lý tài khoản', path: '/admin/users', icon: UserCog, group: 'group_users' },
@@ -88,6 +89,7 @@ export const roleMenus: Record<UserRole, RoleMenuItem[]> = {
     
     // 4. Giao tiếp
     { label: 'Nhắn tin', path: '/doctor/chat', icon: MessageCircle, group: 'group_communication' },
+    { label: 'Thông báo', path: '/doctor/notifications', icon: Bell, group: 'group_communication' },
 
     // 5. Tài khoản cá nhân
     { label: 'Cài đặt', path: '/doctor/settings', icon: Settings, group: 'group_account' },

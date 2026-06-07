@@ -35,6 +35,8 @@ import 'providers/patient_provider.dart';
 import 'providers/alert_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/appointment_provider.dart';
+import 'providers/notification_provider.dart';
+import 'screens/notifications_screen.dart';
 import 'ui/cg_theme.dart';
 import 'ui/cg_tokens.dart';
 
@@ -124,6 +126,10 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
           AppLogger.info('[CardioGuard] Initializing AppointmentProvider');
           return AppointmentProvider();
         }),
+        ChangeNotifierProvider(create: (_) {
+          AppLogger.info('[CardioGuard] Initializing NotificationProvider');
+          return NotificationProvider();
+        }),
       ],
       child: MaterialApp(
         title: 'Smart Heart Patient Monitoring',
@@ -146,6 +152,7 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
                 isDarkTheme: _isDarkTheme,
                 onToggleTheme: _toggleTheme,
               ),
+          '/notifications': (context) => const NotificationsScreen(),
         },
       ),
     );

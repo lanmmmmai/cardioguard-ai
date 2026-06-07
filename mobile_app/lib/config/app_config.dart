@@ -73,6 +73,7 @@ class AppConfig {
   static const String patientsEndpoint = '/patients';
   static const String alertsEndpoint = '/alerts';
   static const String alertsWeeklyStatsEndpoint = '/alerts/stats/last-7-days';
+  static const String notificationsEndpoint = '/notifications';
   static const String assignmentsEndpoint = '/admin/assignments';
   static const String cmsUsersEndpoint = '/cms/users';
   static const String appointmentsEndpoint = '/appointments';

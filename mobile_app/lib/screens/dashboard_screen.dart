@@ -28,6 +28,7 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 import '../providers/auth_provider.dart';
 import '../providers/patient_provider.dart';
 import '../providers/alert_provider.dart';
+import '../providers/notification_provider.dart';
 import 'stats_screen.dart';
 import '../services/websocket_service.dart';
 import '../widgets/ecg_painter.dart';
@@ -111,6 +112,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final patientProvider =
           Provider.of<PatientProvider>(context, listen: false);
+      final notifProvider =
+          Provider.of<NotificationProvider>(context, listen: false);
+      notifProvider.fetchNotifications();
 
       if (authProvider.currentUser?.role == 'patient') {
         _selectedPatientId = authProvider.currentUser?.id;
@@ -187,6 +191,12 @@ class _DashboardScreenState extends State<DashboardScreen>
               '${alertData['full_name'] ?? 'Bệnh nhân'}: ${alertData['message']}';
         });
         _triggerBannerFlash();
+      }
+    } else if (type == 'notifications') {
+      final notifData = event['data'] as Map<String, dynamic>?;
+      if (notifData != null) {
+        Provider.of<NotificationProvider>(context, listen: false)
+            .addOrUpdateRealtimeNotification(notifData);
       }
     }
   }
@@ -453,6 +463,56 @@ class _DashboardScreenState extends State<DashboardScreen>
                           ),
                       ],
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  Consumer<NotificationProvider>(
+                    builder: (context, notifProvider, child) {
+                      final count = notifProvider.unreadCount;
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          IconButton(
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/notifications');
+                            },
+                            icon: const Icon(
+                              LucideIcons.bell,
+                              color: Color(0xFF00F2FE),
+                            ),
+                            style: IconButton.styleFrom(
+                              backgroundColor: cardBg,
+                              shape: const CircleBorder(),
+                              side: BorderSide(color: borderColor),
+                            ),
+                          ),
+                          if (count > 0)
+                            Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 16,
+                                  minHeight: 16,
+                                ),
+                                child: Text(
+                                  count > 99 ? '99+' : count.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(width: 8),
                   IconButton(

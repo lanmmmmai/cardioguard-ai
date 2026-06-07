@@ -28,6 +28,7 @@ import { Appointments } from './components/Appointments';
 import { ApiDataPage } from './components/ApiDataPage';
 import { ProfilePage } from './components/ProfilePage';
 import { CmsPage } from './components/cms/CmsPage';
+import { NotificationsPage } from './components/notifications/NotificationsPage';
 import { logger } from './utils/logger';
 import { EmailCmsPage } from './components/cms/EmailCmsPage';
 import { PatientChatbot } from './pages/PatientChatbot';
@@ -58,6 +59,7 @@ import { privateRouteRole } from './navigation/routeMeta';
 import { API_URL, WS_URL } from './config';
 import { Patient, Alert, SensorData } from './types';
 import { LocaleProvider, getPageMeta, useLocale } from './i18n/locale';
+import { NotificationProvider } from './components/notifications/NotificationProvider';
 
 /**
  * Thành phần bên trong có thể tiêu thụ AuthContext một cách an toàn. Điều phối tất cả
@@ -323,6 +325,12 @@ const AppContent: React.FC = () => {
    * telemetry trực tiếp và banner cảnh báo hoạt động.
    */
   const handleRealtimeMessage = useCallback((message: any) => {
+    if (message?.type === 'notifications' && message.data) {
+      const event = new CustomEvent('ws-notification', { detail: message.data });
+      window.dispatchEvent(event);
+      return;
+    }
+
     // Các thông báo không có trường type được coi là SensorData thô
     if (!message?.type) {
       handleSensorTelemetry(message as SensorData);
@@ -500,7 +508,9 @@ const AppContent: React.FC = () => {
       case '/patient/chat':
         return <ApiDataPage key={normalizedPath} title={getPageMeta(normalizedPath, locale)?.title || ''} subtitle={getPageMeta(normalizedPath, locale)?.subtitle || ''} endpoint="/chat-messages" />;
       case '/patient/notifications':
-        return <ApiDataPage key={normalizedPath} title={getPageMeta(normalizedPath, locale)?.title || ''} subtitle={getPageMeta(normalizedPath, locale)?.subtitle || ''} endpoint="/notifications" />;
+      case '/doctor/notifications':
+      case '/admin/notifications':
+        return <NotificationsPage key={normalizedPath} />;
       case '/admin/system-logs':
         return <ApiDataPage key={normalizedPath} title={getPageMeta(normalizedPath, locale)?.title || ''} subtitle={getPageMeta(normalizedPath, locale)?.subtitle || ''} endpoint="/audit-logs" />;
       case '/admin/settings':
@@ -699,7 +709,9 @@ const AppContent: React.FC = () => {
 export const App: React.FC = () => (
   <LocaleProvider>
     <AuthProvider>
-      <AppContent />
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
     </AuthProvider>
   </LocaleProvider>
 );

@@ -12,6 +12,8 @@ echo "=== CardioGuard AI Backend ==="
 echo "Starting at: $(date)"
 
 # ── Run database migrations ─────────────────────────────────
+echo "Waiting for network to stabilize..."
+sleep 3
 echo "Running database migrations..."
 python scripts/run_all_migrations.py 2>&1 || {
     echo "WARNING: Migration failed or partially applied. Continuing startup..."

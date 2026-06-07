@@ -231,6 +231,21 @@ async def resolve_alert(alert_id: str, authorization: Optional[str] = Header(def
     alert_dict = to_jsonable(alert_dict)
     await manager.broadcast_alert(patient_id, alert_dict)
     
+    # Gửi thông báo tới bệnh nhân
+    from app.services import notification_service
+    await notification_service.notify_patient(
+        patient_id=patient_id,
+        title="Cảnh báo đã được xử lý",
+        message=f"Cảnh báo '{alert_dict.get('message')}' của bạn đã được xác nhận xử lý thành công.",
+        type="alert_resolved",
+        category="health",
+        severity="success",
+        actor_id=current_user["id"],
+        source_table="alerts",
+        source_id=alert_id,
+        action_url="/patient/health"
+    )
+    
     return {"message": "Cảnh báo đã được xác nhận xử lý thành công", "alert_id": alert_id}
 
 
@@ -299,5 +314,48 @@ async def create_sos_alert(payload: AlertCreate, authorization: Optional[str] = 
     alert_dict = {key: updated_alert[key] for key in updated_alert.keys()}
     alert_dict = to_jsonable(alert_dict)
     await manager.broadcast_alert(current_user["id"], alert_dict)
+    
+    # Gửi thông báo
+    from app.services import notification_service
+    patient_name = alert_dict.get("full_name") or "Bệnh nhân"
+    # 1. Xác nhận cho bệnh nhân
+    await notification_service.notify_patient(
+        patient_id=current_user["id"],
+        title="Yêu cầu khẩn cấp SOS đã gửi",
+        message="Yêu cầu hỗ trợ khẩn cấp (SOS) của bạn đã được gửi thành công. Bác sĩ và hệ thống đã được báo động.",
+        type="sos_sent",
+        category="health",
+        severity="critical",
+        actor_id=current_user["id"],
+        source_table="alerts",
+        source_id=alert_id,
+        action_url="/patient/sos"
+    )
+    # 2. Báo động bác sĩ phụ trách
+    await notification_service.notify_assigned_doctors(
+        patient_id=current_user["id"],
+        title="CẢNH BÁO SOS KHẨN CẤP",
+        message=f"Bệnh nhân {patient_name} đã kích hoạt yêu cầu SOS khẩn cấp: '{payload.message}'",
+        type="sos_triggered",
+        category="health",
+        severity="critical",
+        actor_id=current_user["id"],
+        source_table="alerts",
+        source_id=alert_id,
+        action_url="/doctor/alerts"
+    )
+    # 3. Báo động admin
+    await notification_service.notify_admins(
+        title="CẢNH BÁO SOS TOÀN HỆ THỐNG",
+        message=f"Bệnh nhân {patient_name} đã kích hoạt SOS: '{payload.message}'",
+        type="sos_triggered",
+        category="health",
+        severity="critical",
+        patient_id=current_user["id"],
+        actor_id=current_user["id"],
+        source_table="alerts",
+        source_id=alert_id,
+        action_url="/admin/alerts"
+    )
     
     return alert_dict

@@ -70,7 +70,6 @@ TABLES = {
     "medical_records": {"path": "/medical-records", "create": MedicalRecordCreate, "update": MedicalRecordUpdate},
     "prescriptions": {"path": "/prescriptions", "create": PrescriptionCreate, "update": PrescriptionUpdate},
     "devices": {"path": "/devices", "create": DeviceCreate, "update": DeviceUpdate},
-    "notifications": {"path": "/notifications", "create": NotificationCreate, "update": NotificationUpdate},
     "chat_messages": {"path": "/chat-messages", "create": ChatMessageCreate, "update": ChatMessageUpdate},
     "cameras": {"path": "/cameras", "create": CameraCreate, "update": CameraUpdate},
     "reports": {"path": "/reports", "create": ReportCreate, "update": ReportUpdate},
@@ -528,6 +527,153 @@ async def trigger_websocket_broadcast(table: str, record: dict[str, Any]):
         logger.exception("Lỗi khi kích hoạt phát sóng WebSocket cho table=%s", table)
 
 
+async def trigger_domain_notifications(table: str, operation: str, record: dict[str, Any], current_user: dict[str, Any]):
+    """Trigger notifications based on table CRUD changes.
+
+    Args:
+        table: Target table name.
+        operation: Operation type ('create' or 'update').
+        record: The database record dict.
+        current_user: The authenticated user making the request.
+    """
+    from app.services import notification_service
+    try:
+        logger.info("trigger_domain_notifications: table=%s op=%s", table, operation)
+        if table == "medical_records":
+            status = record.get("status")
+            patient_id = record.get("patient_id")
+            doctor_id = record.get("doctor_id")
+            record_id = record.get("id")
+            if status == "signed" and patient_id:
+                await notification_service.notify_patient(
+                    patient_id=str(patient_id),
+                    title="Bệnh án đã được ký xác nhận",
+                    message="Bác sĩ đã ký xác nhận bệnh án mới. Bạn có thể xem trong mục Bệnh án điện tử.",
+                    type="medical_record_signed",
+                    category="record",
+                    severity="success",
+                    actor_id=str(doctor_id) if doctor_id else None,
+                    source_table="medical_records",
+                    source_id=str(record_id),
+                    metadata={"record_id": str(record_id)},
+                    action_url=f"/patient/medical-records/{record_id}"
+                )
+        elif table == "appointments":
+            patient_id = record.get("patient_id")
+            doctor_id = record.get("doctor_id")
+            status = record.get("status", "pending")
+            appt_id = record.get("id")
+            title = record.get("title", "Lịch hẹn khám")
+            
+            if operation == "create":
+                if patient_id:
+                    await notification_service.notify_patient(
+                        patient_id=str(patient_id),
+                        title="Đăng ký lịch hẹn thành công",
+                        message=f"Lịch hẹn '{title}' đã được đăng ký thành công và đang chờ bác sĩ xác nhận.",
+                        type="appointment_created",
+                        category="appointment",
+                        severity="info",
+                        actor_id=current_user["id"],
+                        source_table="appointments",
+                        source_id=str(appt_id),
+                        action_url="/patient/appointments"
+                    )
+                if doctor_id and patient_id:
+                    await notification_service.create_notification(
+                        user_id=str(doctor_id),
+                        title="Yêu cầu lịch hẹn mới",
+                        message=f"Bạn nhận được yêu cầu hẹn khám mới: '{title}'.",
+                        type="appointment_created",
+                        category="appointment",
+                        severity="info",
+                        patient_id=str(patient_id),
+                        actor_id=current_user["id"],
+                        source_table="appointments",
+                        source_id=str(appt_id),
+                        action_url="/doctor/appointments"
+                    )
+            elif operation == "update":
+                status_texts = {
+                    "confirmed": "được xác nhận",
+                    "completed": "hoàn thành",
+                    "cancelled": "bị hủy"
+                }
+                status_text = status_texts.get(status, f"cập nhật thành '{status}'")
+                
+                if patient_id:
+                    await notification_service.notify_patient(
+                        patient_id=str(patient_id),
+                        title=f"Lịch hẹn {status_text}",
+                        message=f"Lịch hẹn '{title}' của bạn đã {status_text}.",
+                        type=f"appointment_{status}",
+                        category="appointment",
+                        severity="warning" if status == "cancelled" else "success" if status == "confirmed" else "info",
+                        actor_id=current_user["id"],
+                        source_table="appointments",
+                        source_id=str(appt_id),
+                        action_url="/patient/appointments"
+                    )
+                if doctor_id and patient_id:
+                    await notification_service.create_notification(
+                        user_id=str(doctor_id),
+                        title=f"Lịch hẹn {status_text}",
+                        message=f"Lịch hẹn '{title}' đã {status_text}.",
+                        type=f"appointment_{status}",
+                        category="appointment",
+                        severity="warning" if status == "cancelled" else "success" if status == "confirmed" else "info",
+                        patient_id=str(patient_id),
+                        actor_id=current_user["id"],
+                        source_table="appointments",
+                        source_id=str(appt_id),
+                        action_url="/doctor/appointments"
+                    )
+        elif table == "prescriptions":
+            patient_id = record.get("patient_id")
+            doctor_id = record.get("doctor_id")
+            med_name = record.get("medication_name", "Thuốc")
+            prescription_id = record.get("id")
+            
+            if patient_id:
+                await notification_service.notify_patient(
+                    patient_id=str(patient_id),
+                    title="Đơn thuốc mới/cập nhật",
+                    message=f"Bạn nhận được đơn thuốc '{med_name}' từ bác sĩ.",
+                    type="prescription_updated",
+                    category="record",
+                    severity="success",
+                    actor_id=str(doctor_id) if doctor_id else None,
+                    source_table="prescriptions",
+                    source_id=str(prescription_id),
+                    action_url="/patient/prescriptions"
+                )
+        elif table == "chat_messages":
+            sender_id = record.get("sender_id")
+            recipient_id = record.get("recipient_id")
+            msg_id = record.get("id")
+            msg_text = record.get("message", "")
+            snippet = msg_text[:30] + "..." if len(msg_text) > 30 else msg_text
+            
+            if recipient_id:
+                sender_row = await database.fetch_one("SELECT full_name FROM users WHERE id = CAST(:id AS uuid)", {"id": str(sender_id)})
+                sender_name = sender_row["full_name"] if sender_row else "Người dùng"
+                
+                await notification_service.create_notification(
+                    user_id=str(recipient_id),
+                    title=f"Tin nhắn mới từ {sender_name}",
+                    message=snippet,
+                    type="chat_received",
+                    category="chat",
+                    severity="info",
+                    actor_id=str(sender_id),
+                    source_table="chat_messages",
+                    source_id=str(msg_id),
+                    action_url="/patient/chat" if current_user["role"] == "doctor" else "/doctor/chat"
+                )
+    except Exception as e:
+        logger.exception("Lỗi khi xử lý trigger_domain_notifications cho table=%s, operation=%s", table, operation)
+
+
 async def create_record(table: str, payload: dict[str, Any], authorization: Optional[str], request: Optional[Request] = None):
     """Tạo một bản ghi mới với đầy đủ phân quyền và xác thực.
 
@@ -565,6 +711,7 @@ async def create_record(table: str, payload: dict[str, Any], authorization: Opti
     )
     inserted_row = await fetch_authorized_row(table, str(record_id), columns, user)
     await trigger_websocket_broadcast(table, inserted_row)
+    await trigger_domain_notifications(table, "create", inserted_row, user)
 
     # Ghi nhận audit log (tránh ghi log của chính audit_logs để ngăn đệ quy)
     if table != "audit_logs":
@@ -618,6 +765,7 @@ async def update_record(table: str, record_id: str, payload: dict[str, Any], aut
     )
     updated_row = await fetch_authorized_row(table, record_id, columns, user)
     await trigger_websocket_broadcast(table, updated_row)
+    await trigger_domain_notifications(table, "update", updated_row, user)
 
     # Ghi nhận audit log
     if table != "audit_logs":

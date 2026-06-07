@@ -328,6 +328,19 @@ async def verify_doctor(doctor_id: str, admin: dict = Depends(require_admin)):
                WHERE user_id = CAST(:doctor_id AS uuid)""",
             {"doctor_id": doctor_id, "admin_id": admin["id"]},
         )
+        
+        # Gửi thông báo đến bác sĩ
+        from app.services import notification_service
+        await notification_service.create_notification(
+            user_id=doctor_id,
+            title="Hồ sơ bác sĩ đã được duyệt",
+            message="Chúc mừng! Hồ sơ bác sĩ của bạn đã được quản trị viên duyệt thành công. Bạn hiện có thể truy cập không gian bác sĩ.",
+            type="doctor_verified",
+            category="security",
+            severity="success",
+            actor_id=admin["id"],
+            action_url="/doctor/dashboard"
+        )
 
     try:
         await send_doctor_status_email(doctor["email"], doctor["full_name"], "active")
@@ -355,6 +368,19 @@ async def reject_doctor(doctor_id: str, action: DoctorVerificationAction, admin:
             "UPDATE doctor_profiles SET is_verified = FALSE, status = 'rejected', verification_note = :note WHERE user_id = CAST(:doctor_id AS uuid)",
             {"doctor_id": doctor_id, "note": action.verification_note},
         )
+        
+        # Gửi thông báo đến bác sĩ
+        from app.services import notification_service
+        await notification_service.create_notification(
+            user_id=doctor_id,
+            title="Yêu cầu xác thực bị từ chối",
+            message=f"Hồ sơ đăng ký của bạn không được phê duyệt. Lý do: {action.verification_note}",
+            type="doctor_rejected",
+            category="security",
+            severity="critical",
+            actor_id=admin["id"],
+            action_url="/doctor/verification-rejected"
+        )
 
     try:
         await send_doctor_status_email(doctor["email"], doctor["full_name"], "rejected", action.verification_note)
@@ -381,6 +407,19 @@ async def request_update_doctor(doctor_id: str, action: DoctorVerificationAction
         await database.execute(
             "UPDATE doctor_profiles SET is_verified = FALSE, status = 'need_update', verification_note = :note WHERE user_id = CAST(:doctor_id AS uuid)",
             {"doctor_id": doctor_id, "note": action.verification_note},
+        )
+        
+        # Gửi thông báo đến bác sĩ
+        from app.services import notification_service
+        await notification_service.create_notification(
+            user_id=doctor_id,
+            title="Yêu cầu cập nhật hồ sơ bác sĩ",
+            message=f"Quản trị viên yêu cầu bạn bổ sung thông tin hồ sơ. Lý do: {action.verification_note}",
+            type="doctor_update_requested",
+            category="security",
+            severity="warning",
+            actor_id=admin["id"],
+            action_url="/doctor/complete-profile"
         )
 
     try:

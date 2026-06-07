@@ -424,6 +424,35 @@ async def create_sensor_data(data: SensorDataCreate, request: Request, authoriza
                 "severity": alert["severity"]
             }
         )
+        # Gửi thông báo đến bác sĩ phụ trách và admin (cooldown: 5 phút để tránh spam)
+        from app.services import notification_service
+        patient_row = await database.fetch_one("SELECT full_name FROM users WHERE id = CAST(:id AS uuid)", {"id": str(data.patient_id)})
+        patient_name = patient_row["full_name"] if patient_row else "Bệnh nhân"
+        
+        await notification_service.notify_assigned_doctors(
+            patient_id=str(data.patient_id),
+            title="CẢNH BÁO SỨC KHỎE BỆNH NHÂN",
+            message=f"Bệnh nhân {patient_name} có chỉ số bất thường: '{alert['message']}'",
+            type=f"alert_{alert['alert_type'].lower()}",
+            category="health",
+            severity=alert["severity"],
+            actor_id=current_user["id"],
+            source_table="alerts",
+            action_url="/doctor/alerts",
+            cooldown_mins=5
+        )
+        await notification_service.notify_admins(
+            title="CẢNH BÁO SỨC KHỎE BỆNH NHÂN (TOÀN HỆ THỐNG)",
+            message=f"Bệnh nhân {patient_name} có chỉ số bất thường: '{alert['message']}'",
+            type=f"alert_{alert['alert_type'].lower()}",
+            category="health",
+            severity=alert["severity"],
+            patient_id=str(data.patient_id),
+            actor_id=current_user["id"],
+            source_table="alerts",
+            action_url="/admin/alerts",
+            cooldown_mins=5
+        )
     broadcast_data = {
         "patient_id": str(data.patient_id),
         "heart_rate": data.heart_rate,
@@ -603,6 +632,33 @@ async def create_iot_telemetry(
                 "message": alert["message"],
                 "severity": alert["severity"],
             },
+        )
+        # Gửi thông báo đến bác sĩ phụ trách và admin (cooldown: 5 phút để tránh spam)
+        from app.services import notification_service
+        patient_row = await database.fetch_one("SELECT full_name FROM users WHERE id = CAST(:id AS uuid)", {"id": str(patient_id)})
+        patient_name = patient_row["full_name"] if patient_row else "Bệnh nhân"
+        
+        await notification_service.notify_assigned_doctors(
+            patient_id=str(patient_id),
+            title="CẢNH BÁO SỨC KHỎE BỆNH NHÂN (IoT)",
+            message=f"Bệnh nhân {patient_name} có chỉ số bất thường: '{alert['message']}'",
+            type=f"alert_{alert['alert_type'].lower()}",
+            category="health",
+            severity=alert["severity"],
+            source_table="alerts",
+            action_url="/doctor/alerts",
+            cooldown_mins=5
+        )
+        await notification_service.notify_admins(
+            title="CẢNH BÁO SỨC KHỎE BỆNH NHÂN (IoT TOÀN HỆ THỐNG)",
+            message=f"Bệnh nhân {patient_name} có chỉ số bất thường: '{alert['message']}'",
+            type=f"alert_{alert['alert_type'].lower()}",
+            category="health",
+            severity=alert["severity"],
+            patient_id=str(patient_id),
+            source_table="alerts",
+            action_url="/admin/alerts",
+            cooldown_mins=5
         )
 
     broadcast_data = {
