@@ -33,6 +33,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _addressController = TextEditingController();
   final _historyController = TextEditingController();
 
+  final _macController = TextEditingController();
+  final _deviceNameController = TextEditingController();
+
   bool _isChangingPassword = false;
   bool _isSavingProfile = false;
   String? _profileError;
@@ -68,6 +71,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _phoneController.dispose();
     _addressController.dispose();
     _historyController.dispose();
+    _macController.dispose();
+    _deviceNameController.dispose();
     super.dispose();
   }
 
@@ -79,6 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (authProvider.currentUser?.role == 'patient') {
         final patientProvider =
             Provider.of<PatientProvider>(context, listen: false);
+        patientProvider.fetchPairedDevice(authProvider.currentUser!.id);
         patientProvider.fetchMyProfile().then((_) {
           final profile = patientProvider.currentPatientProfile;
           if (profile != null) {
@@ -573,6 +579,229 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 24),
+              const Text('Thiết bị y tế IoT (Phần cứng)',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: CgColors.accent)),
+              const SizedBox(height: 12),
+              Consumer<PatientProvider>(
+                builder: (context, provider, child) {
+                  final device = provider.pairedDevice;
+                  final isLoading = provider.isLoadingDevice;
+
+                  if (isLoading) {
+                    return Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.07)
+                              : Colors.black.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  if (device != null) {
+                    // Đã liên kết thiết bị
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.07)
+                              : Colors.black.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(LucideIcons.cpu, color: CgColors.accent, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    device.deviceName,
+                                    style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: device.status == 'online'
+                                      ? Colors.green.withValues(alpha: 0.1)
+                                      : Colors.red.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  device.status.toUpperCase(),
+                                  style: TextStyle(
+                                    color: device.status == 'online'
+                                        ? Colors.green
+                                        : Colors.red,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Divider(),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Địa chỉ MAC:', style: TextStyle(color: textMuted, fontSize: 13)),
+                              Text(
+                                device.deviceMac,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Loại thiết bị:', style: TextStyle(color: textMuted, fontSize: 13)),
+                              Text(
+                                device.deviceType,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                final result = await provider.unclaimDevice(deviceMac: device.deviceMac);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(result['message'] ?? ''),
+                                      backgroundColor: result['success'] ? Colors.green : Colors.red,
+                                    ),
+                                  );
+                                }
+                              },
+                              icon: const Icon(LucideIcons.trash2, color: Colors.white, size: 16),
+                              label: const Text('Hủy liên kết thiết bị', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: CgColors.critical,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // Chưa liên kết thiết bị
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.07)
+                            : Colors.black.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Liên kết thiết bị đeo CardioGuard bằng địa chỉ MAC.',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _macController,
+                          decoration: const InputDecoration(
+                            labelText: 'Địa chỉ MAC thiết bị',
+                            hintText: 'Ví dụ: ac:27:6e:b1:0a:18',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _deviceNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Tên thiết bị (Tùy chọn)',
+                            hintText: 'Ví dụ: ESP32 Wearable',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              final mac = _macController.text.trim();
+                              if (mac.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Vui lòng nhập địa chỉ MAC'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
+                              final name = _deviceNameController.text.trim();
+                              final result = await provider.claimDevice(
+                                deviceMac: mac,
+                                deviceName: name.isNotEmpty ? name : null,
+                              );
+                              if (result['success']) {
+                                _macController.clear();
+                                _deviceNameController.clear();
+                              }
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(result['message'] ?? ''),
+                                    backgroundColor: result['success'] ? Colors.green : Colors.red,
+                                  ),
+                                );
+                              }
+                            },
+                            icon: const Icon(LucideIcons.plusCircle, color: Colors.white, size: 16),
+                            label: const Text('Liên kết thiết bị', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: CgColors.primary,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 24),
             ],

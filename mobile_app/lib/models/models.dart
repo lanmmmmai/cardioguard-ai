@@ -522,3 +522,47 @@ DateTime _parseDateTime(dynamic value) {
     return DateTime.now();
   }
 }
+
+// Đại diện cho một thiết bị IoT phần cứng.
+class Device {
+  final String id;
+  final String? patientId;
+  final String deviceName;
+  final String deviceType;
+  final String deviceMac;
+  final String status;
+  final DateTime createdAt;
+
+  Device({
+    required this.id,
+    this.patientId,
+    required this.deviceName,
+    required this.deviceType,
+    required this.deviceMac,
+    required this.status,
+    required this.createdAt,
+  });
+
+  factory Device.fromJson(Map<String, dynamic> json) {
+    return Device(
+      id: json['id'] ?? '',
+      patientId: json['patient_id'],
+      deviceName: json['device_name'] ?? 'CardioGuard Prototype',
+      deviceType: json['device_type'] ?? 'Wearable',
+      deviceMac: json['device_mac'] ?? '',
+      status: json['status'] ?? 'offline',
+      createdAt: _parseDateTime(json['created_at']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'patient_id': patientId,
+        'device_name': deviceName,
+        'device_type': deviceType,
+        'device_mac': deviceMac,
+        'status': status,
+        'created_at': createdAt.toIso8601String(),
+      };
+}
+

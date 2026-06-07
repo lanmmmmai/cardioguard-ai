@@ -70,19 +70,8 @@ async def ensure_user_account_timestamps() -> None:
 
 async def ensure_profile_schema() -> None:
     """Ensure role profile tables/columns exist before profile update flows run."""
-    existing = await database.fetch_val(
-        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='doctor_profiles')"
-    )
-    if existing:
-        logger.info("Role profile schema already exists, skipping DDL")
-        return
-    logger.info("Synchronizing role profile schema")
-    try:
-        await database.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
-    except Exception:
-        logger.warning("Could not ensure pgcrypto extension; continuing if gen_random_uuid is available", exc_info=True)
-
-    statements = [
+    # Ensure users columns always exist first
+    user_column_statements = [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS specialty TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS department TEXT",
@@ -91,6 +80,45 @@ async def ensure_profile_schema() -> None:
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN DEFAULT FALSE",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMPTZ",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version TEXT",
+    ]
+    try:
+        for stmt in user_column_statements:
+            await database.execute(stmt)
+        # Ensure user_consents table is also always created on startup
+        await database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_consents (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                consent_type TEXT NOT NULL,
+                consent_version TEXT NOT NULL,
+                accepted_at TIMESTAMPTZ DEFAULT NOW(),
+                ip_address TEXT,
+                user_agent TEXT
+            )
+            """
+        )
+        await database.execute("CREATE INDEX IF NOT EXISTS idx_user_consents_user_id ON user_consents(user_id)")
+    except Exception:
+        logger.exception("Failed to synchronize users profile columns or consents table")
+        raise
+
+    existing = await database.fetch_val(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='doctor_profiles')"
+    )
+    if existing:
+        logger.info("Role profile schema tables already exist, skipping table DDL")
+        return
+    logger.info("Synchronizing role profile schema tables")
+    try:
+        await database.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+    except Exception:
+        logger.warning("Could not ensure pgcrypto extension; continuing if gen_random_uuid is available", exc_info=True)
+
+    statements = [
         """
         CREATE TABLE IF NOT EXISTS patients (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

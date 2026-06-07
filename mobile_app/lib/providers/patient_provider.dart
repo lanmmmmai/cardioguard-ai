@@ -38,6 +38,21 @@ class PatientProvider extends ChangeNotifier {
   // Hồ sơ của bệnh nhân hiện đang đăng nhập (nếu vai trò là bệnh nhân).
   Patient? get currentPatientProfile => _currentPatientProfile;
 
+  Device? _pairedDevice;
+
+  // Thiết bị IoT đã liên kết với bệnh nhân hiện tại.
+  Device? get pairedDevice => _pairedDevice;
+
+  bool _isLoadingDevice = false;
+
+  // Trạng thái đang tải thông tin thiết bị.
+  bool get isLoadingDevice => _isLoadingDevice;
+
+  void _setLoadingDevice(bool loading) {
+    _isLoadingDevice = loading;
+    notifyListeners();
+  }
+
   List<MedicalRecord> _medicalRecords = [];
 
   // Hồ sơ bệnh án lâm sàng cho bệnh nhân đã chọn.
@@ -326,6 +341,101 @@ class PatientProvider extends ChangeNotifier {
       }
     } catch (e) {
       AppLogger.log('Fetch sensor history error: $e');
+    }
+  }
+
+  Future<void> fetchPairedDevice(String currentUserId) async {
+    _setLoadingDevice(true);
+    try {
+      final response = await _apiClient.get('/devices');
+      if (response.statusCode == 200) {
+        final List<dynamic> list = ApiClient.extractListData(response.data);
+        Device? foundDevice;
+        for (var item in list) {
+          if (item is Map<String, dynamic> &&
+              item['patient_id']?.toString() == currentUserId &&
+              item['device_mac'] != null) {
+            foundDevice = Device.fromJson(item);
+            break;
+          }
+        }
+        _pairedDevice = foundDevice;
+      }
+    } catch (e) {
+      AppLogger.log('Lỗi tìm nạp thiết bị đã liên kết: $e');
+      _pairedDevice = null;
+    } finally {
+      _setLoadingDevice(false);
+    }
+  }
+
+  Future<Map<String, dynamic>> claimDevice({
+    required String deviceMac,
+    String? deviceName,
+  }) async {
+    _setLoadingDevice(true);
+    try {
+      final response = await _apiClient.post(
+        '/iot/devices/claim',
+        data: {
+          'device_mac': deviceMac,
+          if (deviceName != null && deviceName.isNotEmpty)
+            'device_name': deviceName,
+        },
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final responseData = response.data as Map<String, dynamic>;
+        if (responseData['device'] != null) {
+          _pairedDevice = Device.fromJson(responseData['device']);
+        }
+        _setLoadingDevice(false);
+        return {
+          'success': true,
+          'message': responseData['message'] ?? 'Liên kết thiết bị thành công',
+        };
+      }
+      _setLoadingDevice(false);
+      return {'success': false, 'message': 'Liên kết thiết bị thất bại'};
+    } catch (e) {
+      AppLogger.log('Lỗi liên kết thiết bị: $e');
+      _setLoadingDevice(false);
+      String errMsg = 'Lỗi kết nối máy chủ';
+      if (e is Exception) {
+        errMsg = e.toString().replaceAll('Exception: ', '');
+      }
+      return {'success': false, 'message': errMsg};
+    }
+  }
+
+  Future<Map<String, dynamic>> unclaimDevice({
+    required String deviceMac,
+  }) async {
+    _setLoadingDevice(true);
+    try {
+      final response = await _apiClient.post(
+        '/iot/devices/unclaim',
+        data: {
+          'device_mac': deviceMac,
+        },
+      );
+      if (response.statusCode == 200) {
+        _pairedDevice = null;
+        _setLoadingDevice(false);
+        return {
+          'success': true,
+          'message': response.data['message'] ?? 'Hủy liên kết thiết bị thành công',
+        };
+      }
+      _setLoadingDevice(false);
+      return {'success': false, 'message': 'Hủy liên kết thiết bị thất bại'};
+    } catch (e) {
+      AppLogger.log('Lỗi hủy liên kết thiết bị: $e');
+      _setLoadingDevice(false);
+      String errMsg = 'Lỗi kết nối máy chủ';
+      if (e is Exception) {
+        errMsg = e.toString().replaceAll('Exception: ', '');
+      }
+      return {'success': false, 'message': errMsg};
     }
   }
 }
