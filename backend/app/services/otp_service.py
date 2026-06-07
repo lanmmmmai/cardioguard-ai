@@ -110,6 +110,13 @@ async def ensure_otp_table() -> None:
     và theo thời gian hết hạn. Đây là một khởi tạo nhẹ không thay đổi — an toàn
     để gọi trên mỗi lần khởi động ứng dụng.
     """
+    # Check if table already exists to avoid redundant queries
+    existing = await database.fetch_val(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'auth_otp_tokens')"
+    )
+    if existing:
+        return
+
     await database.execute(
         """
         CREATE TABLE IF NOT EXISTS auth_otp_tokens (
