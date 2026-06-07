@@ -14,7 +14,7 @@
  *   - Được sử dụng bởi: các layout để hiển thị bell badge, các trang hiển thị thông báo.
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { notificationsService, Notification, NotificationPreferences } from '../../services/notificationsService';
 import { useAuth } from '../../auth/AuthContext';
 import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from 'lucide-react';
@@ -57,6 +57,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const notificationsRef = useRef<Notification[]>([]);
+
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
 
   // Lấy unread count
   const fetchUnreadCount = useCallback(async () => {
@@ -176,15 +181,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
 
       const newNotif = data as Notification;
-      
-      // Đưa thông báo mới lên đầu danh sách
-      setNotifications((prev) => {
-        // Tránh trùng lặp
-        if (prev.some(n => n.id === newNotif.id)) return prev;
-        return [newNotif, ...prev];
-      });
+      const existing = notificationsRef.current.find((item) => item.id === newNotif.id);
 
-      // Tăng unread count
+      if (existing) {
+        setNotifications((prev) =>
+          prev.map((item) => (item.id === newNotif.id ? { ...item, ...newNotif } : item))
+        );
+        if (!existing.is_read && newNotif.is_read) {
+          setUnreadCount((prev) => Math.max(0, prev - 1));
+        } else if (existing.is_read && !newNotif.is_read) {
+          setUnreadCount((prev) => prev + 1);
+        }
+        return;
+      }
+
+      setNotifications((prev) => [newNotif, ...prev]);
+
       if (!newNotif.is_read) {
         setUnreadCount((prev) => prev + 1);
         

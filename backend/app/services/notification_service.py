@@ -163,7 +163,7 @@ async def create_notification(
         CAST(:id AS uuid), CAST(:user_id AS uuid), 
         CAST(:patient_id AS uuid), CAST(:actor_id AS uuid),
         :type, :category, :severity, :title, :message, :source_table,
-        CAST(:source_id AS uuid), :metadata, :action_url,
+        CAST(:source_id AS uuid), CAST(:metadata AS jsonb), :action_url,
         FALSE, :created_at, :updated_at, :expires_at
     )
     """

@@ -229,7 +229,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               SizedBox(height: 8),
               Text(
                 'Mọi cập nhật sức khỏe và lịch hẹn sẽ hiển thị ở đây.',
-                textAlign: TextCenter,
+                textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: Colors.grey),
               ),
             ],

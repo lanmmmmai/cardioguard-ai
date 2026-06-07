@@ -144,7 +144,7 @@ describe('medicalRecordsService', () => {
     ).rejects.toThrow('Bệnh án đã ký, cần tạo bản bổ sung/chỉnh sửa thay vì sửa trực tiếp.');
   });
 
-  it('signMedicalRecord() cập nhật trạng thái đã ký và gửi notification', async () => {
+  it('signMedicalRecord() cập nhật trạng thái đã ký', async () => {
     const mockSignedResponse = {
       id: 'rec-1',
       patient_id: 'pat-1',
@@ -163,7 +163,6 @@ describe('medicalRecordsService', () => {
 
     expect(result.status).toBe('signed');
     expect(result.is_visible_to_patient).toBe(true);
-    // 2 calls: 1 for patching record, 1 for patient notification
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

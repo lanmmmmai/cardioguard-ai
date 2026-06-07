@@ -53,6 +53,24 @@ _devices_columns_cache: Optional[tuple[set[str], float]] = None
 _devices_columns_lock = asyncio.Lock()
 
 
+def patient_display_name(row: Any) -> str:
+    """Extract a safe patient display name from an optional database row.
+
+    Args:
+        row: Database row or dict-like object that may contain ``full_name``.
+
+    Returns:
+        Patient display name when available; otherwise a generic Vietnamese label.
+    """
+    if not row:
+        return "Bệnh nhân"
+    try:
+        full_name = row["full_name"] if "full_name" in row else None
+    except (KeyError, TypeError):
+        full_name = None
+    return str(full_name) if full_name else "Bệnh nhân"
+
+
 def normalize_device_identifier(value: str) -> str:
     """Chuẩn hóa định danh thiết bị bằng cách loại bỏ dấu phân cách và chuyển sang chữ thường.
 
@@ -427,7 +445,7 @@ async def create_sensor_data(data: SensorDataCreate, request: Request, authoriza
         # Gửi thông báo đến bác sĩ phụ trách và admin (cooldown: 5 phút để tránh spam)
         from app.services import notification_service
         patient_row = await database.fetch_one("SELECT full_name FROM users WHERE id = CAST(:id AS uuid)", {"id": str(data.patient_id)})
-        patient_name = patient_row["full_name"] if patient_row else "Bệnh nhân"
+        patient_name = patient_display_name(patient_row)
         
         await notification_service.notify_assigned_doctors(
             patient_id=str(data.patient_id),
@@ -636,7 +654,7 @@ async def create_iot_telemetry(
         # Gửi thông báo đến bác sĩ phụ trách và admin (cooldown: 5 phút để tránh spam)
         from app.services import notification_service
         patient_row = await database.fetch_one("SELECT full_name FROM users WHERE id = CAST(:id AS uuid)", {"id": str(patient_id)})
-        patient_name = patient_row["full_name"] if patient_row else "Bệnh nhân"
+        patient_name = patient_display_name(patient_row)
         
         await notification_service.notify_assigned_doctors(
             patient_id=str(patient_id),
@@ -1089,4 +1107,3 @@ async def camera_fall_detection(
         "message": "Cảnh báo ngã đã được kích hoạt thành công",
         "alert": alert_dict
     }
-

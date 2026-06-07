@@ -365,7 +365,6 @@ export const medicalRecordsService = {
     });
 
     const signedRecord = parseRecord(result);
-    await this.createPatientNotification(context, signedRecord.patient_id, signedRecord.id);
     console.info('[signMedicalRecord] signed recordId=%s', recordId);
     return signedRecord;
   },
@@ -401,36 +400,6 @@ export const medicalRecordsService = {
     });
     console.info('[createMedicalRecordAmendment] created amended id=%s from recordId=%s', data.id, recordId);
     return parseRecord(data);
-  },
-
-  async createPatientNotification(context: ServiceContext, patientId: string | null, recordId: string) {
-    if (!patientId) {
-      console.debug('[createPatientNotification] skipped — no patientId');
-      return;
-    }
-    console.debug('[createPatientNotification] patientId=%s recordId=%s', patientId, recordId);
-    console.info('[createPatientNotification] POST /notifications');
-    try {
-      await requestJson('/notifications', context.accessToken, {
-        method: 'POST',
-        headers: jsonHeaders(context.accessToken),
-        body: JSON.stringify({
-          user_id: patientId,
-          patient_id: patientId,
-          title: 'Bệnh án đã được ký xác nhận',
-          message: 'Bác sĩ đã ký xác nhận bệnh án mới. Bạn có thể xem trong mục Bệnh án điện tử.',
-          type: 'medical_record_signed',
-          is_read: false,
-          created_at: nowIso(),
-          updated_at: nowIso(),
-          metadata: { record_id: recordId },
-        } as any),
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Không tạo được notification cho bệnh nhân';
-      console.error('[createPatientNotification] %s', message);
-      console.warn('Không tạo được notification cho bệnh nhân:', message);
-    }
   },
 
   serializeTemplateExtras(form: MedicalRecordFormState) {
