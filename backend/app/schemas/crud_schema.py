@@ -185,3 +185,19 @@ class ReportCreate(CrudCreate):
 class ReportUpdate(ReportCreate):
     """Tải trọng để cập nhật bản ghi báo cáo."""
     pass
+
+
+class ArticleCreate(CrudCreate):
+    """Tải trọng để tạo bài đăng/bài viết CMS."""
+    title: Optional[str] = None
+    slug: Optional[str] = None
+    content: Optional[str] = None
+    summary: Optional[str] = None
+    author_id: Optional[UUID] = None
+    category: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class ArticleUpdate(ArticleCreate):
+    """Tải trọng để cập nhật bài đăng/bài viết CMS."""
+    pass

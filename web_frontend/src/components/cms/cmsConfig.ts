@@ -5,7 +5,7 @@
  *              moduleByKey để truy cập nhanh theo khóa module.
  * Quan hệ: Được sử dụng bởi CmsPage và CsvImportModal để xác định siêu dữ liệu theo module.
  */
-import { Globe, Mail } from 'lucide-react';
+import { Globe, Mail, BookOpen } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface CmsModuleConfig {
@@ -31,6 +31,14 @@ export const cmsModules: CmsModuleConfig[] = [
     templateColumns: [], 
     preferredColumns: [] 
   },
+  { 
+    key: 'articles', 
+    label: 'Bài viết & CMS', 
+    icon: BookOpen, 
+    templateColumns: ['title', 'slug', 'content', 'summary', 'category', 'is_active'], 
+    preferredColumns: ['title', 'slug', 'category', 'is_active'] 
+  },
 ];
 
 export const moduleByKey = Object.fromEntries(cmsModules.map((module) => [module.key, module]));
+

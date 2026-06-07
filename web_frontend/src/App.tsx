@@ -51,6 +51,7 @@ import { DoctorSettingsPage } from './pages/DoctorSettingsPage';
 import { UserDataDeletionPage } from './pages/UserDataDeletionPage';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { TermsOfService } from './pages/TermsOfService';
+import { AboutUs } from './pages/AboutUs';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useBrowserPath } from './hooks/useBrowserPath';
 import { privateRouteRole } from './navigation/routeMeta';
@@ -552,6 +553,9 @@ const AppContent: React.FC = () => {
   }
   if (path === '/data-deletion') {
     return <UserDataDeletionPage />;
+  }
+  if (path === '/about') {
+    return <AboutUs />;
   }
 
   // Xử lý các trang Register

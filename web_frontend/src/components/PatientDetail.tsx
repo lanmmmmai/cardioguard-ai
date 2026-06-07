@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, User, Heart, Activity, AlertTriangle, MapPin, Calendar, Clipboard, Mail } from 'lucide-react';
 import { getSeverityMeta } from '../utils/severity';
 import { Patient, Alert, SensorData } from '../types';
+import { useAuth } from '../auth/AuthContext';
 
 interface PatientDetailProps {
   patient: Patient;
@@ -36,6 +37,56 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
   onBackClick
 }) => {
   const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const { accessToken } = useAuth();
+  const [cameras, setCameras] = useState<any[]>([]);
+  const [fallSimulating, setFallSimulating] = useState(false);
+  const [fallSimulateSuccess, setFallSimulateSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    fetch('/api/cameras', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : data.items || [];
+        setCameras(list);
+      })
+      .catch(err => console.error('Error fetching cameras:', err));
+  }, [accessToken]);
+
+  const handleSimulateFall = async () => {
+    const targetCamera = cameras.find(c => c.assigned_patient_id === patient.id) || cameras[0];
+    if (!targetCamera) {
+      alert('Không tìm thấy camera nào trong hệ thống!');
+      return;
+    }
+    setFallSimulating(true);
+    setFallSimulateSuccess(null);
+    try {
+      const response = await fetch(`/api/cameras/${targetCamera.id}/fall-detection`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        }
+      });
+      if (response.ok) {
+        setFallSimulateSuccess('Kích hoạt cảnh báo ngã thành công!');
+        setTimeout(() => setFallSimulateSuccess(null), 3000);
+      } else {
+        const errorData = await response.json();
+        alert(`Lỗi: ${errorData.detail || 'Không thể kích hoạt'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi kết nối khi giả lập ngã');
+    } finally {
+      setFallSimulating(false);
+    }
+  };
 
   useEffect(() => {
     setHistory([]);
@@ -266,7 +317,25 @@ export const PatientDetail: React.FC<PatientDetailProps> = ({
             <strong style={{ display: 'block', marginBottom: '6px', color: 'var(--text-primary)' }}>Lưu ý giám sát:</strong>
             Thực hiện cập nhật dữ liệu định kỳ qua thiết bị đeo. Khi có cảnh báo nhịp tim đập nhanh (từ 120 trở lên) hoặc SpO2 tụt giảm dưới 92%, hệ thống thông báo báo động trung tâm tự động kích hoạt.
           </div>
+
+          <div style={{ marginTop: '1rem' }}>
+            <button 
+              type="button"
+              className="btn btn-primary" 
+              style={{ width: '100%', background: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              onClick={handleSimulateFall}
+              disabled={fallSimulating}
+            >
+              <AlertTriangle size={16} /> {fallSimulating ? 'Đang kích hoạt...' : 'Giả lập Té ngã (Camera AI)'}
+            </button>
+            {fallSimulateSuccess && (
+              <div style={{ color: 'var(--color-primary)', fontSize: '0.8rem', marginTop: '8px', textAlign: 'center', fontWeight: 600 }}>
+                {fallSimulateSuccess}
+              </div>
+            )}
+          </div>
         </div>
+
       </div>
     </div>
   );

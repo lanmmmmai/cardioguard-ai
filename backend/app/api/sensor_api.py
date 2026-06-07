@@ -42,6 +42,7 @@ from app.ai.heart_ai import detect_abnormal
 from app.core.security import hash_password, verify_password
 from app.websocket.connection_manager import manager
 from app.services.audit_service import log_activity
+from app.api.crud_api import to_jsonable
 import secrets
 
 router = APIRouter()
@@ -946,4 +947,90 @@ async def unclaim_device(
     )
     
     return {"message": "Đã hủy liên kết thiết bị thành công"}
+
+
+@router.post("/cameras/{camera_id}/fall-detection")
+async def camera_fall_detection(
+    camera_id: str,
+    authorization: Optional[str] = Header(default=None)
+):
+    """Giả lập sự kiện phát hiện té ngã từ Camera AI."""
+    # Xác thực người dùng
+    current_user = await get_user_from_token(authorization)
+    
+    # 1. Tìm thông tin camera
+    camera = await database.fetch_one(
+        "SELECT * FROM cameras WHERE id = CAST(:camera_id AS uuid)",
+        {"camera_id": camera_id}
+    )
+    if not camera:
+        raise HTTPException(status_code=404, detail="Không tìm thấy camera giám sát")
+        
+    patient_id = camera.get("assigned_patient_id")
+    if not patient_id:
+        raise HTTPException(status_code=400, detail="Camera chưa được phân công cho bệnh nhân nào")
+        
+    camera_location = camera.get("location") or "Phòng bệnh"
+    camera_name = camera.get("camera_name") or camera.get("name") or "Camera AI"
+    
+    # 2. Tạo bản ghi cảnh báo trong CSDL
+    alert_id = str(uuid.uuid4())
+    insert_query = """
+    INSERT INTO alerts (id, patient_id, alert_type, message, severity, is_resolved)
+    VALUES (:id, :patient_id, :alert_type, :message, :severity, FALSE)
+    """
+    
+    await database.execute(
+        insert_query,
+        {
+            "id": alert_id,
+            "patient_id": patient_id,
+            "alert_type": "FALL_DETECTION",
+            "message": f"Phát hiện bệnh nhân té ngã tại vị trí {camera_location} qua phân tích {camera_name}",
+            "severity": "critical"
+        }
+    )
+    
+    # 3. Lấy thông tin cảnh báo đầy đủ kèm theo tên bệnh nhân
+    updated_alert = await database.fetch_one(
+        """
+        SELECT 
+            alerts.id,
+            alerts.patient_id::text as patient_id,
+            users.full_name,
+            alerts.alert_type,
+            alerts.message,
+            alerts.severity,
+            alerts.is_resolved,
+            alerts.created_at
+        FROM alerts
+        JOIN users ON alerts.patient_id::text = users.id::text AND lower(users.role) = 'patient'
+        WHERE alerts.id = CAST(:alert_id AS uuid)
+        """,
+        {"alert_id": alert_id}
+    )
+    
+    if not updated_alert:
+        raise HTTPException(status_code=500, detail="Lỗi tạo cảnh báo té ngã")
+        
+    alert_dict = {key: updated_alert[key] for key in updated_alert.keys()}
+    alert_dict = to_jsonable(alert_dict)
+    
+    # 4. Phát sóng thời gian thực qua WebSocket Connection Manager
+    await manager.broadcast_alert(str(patient_id), alert_dict)
+    
+    # Ghi nhật ký kiểm toán hoạt động
+    await log_activity(
+        user_id=current_user["id"],
+        action="FALL_DETECTION_TRIGGERED",
+        entity_type="cameras",
+        entity_id=camera_id,
+        details={"patient_id": str(patient_id), "alert_id": alert_id, "location": camera_location}
+    )
+    
+    return {
+        "status": "success",
+        "message": "Cảnh báo ngã đã được kích hoạt thành công",
+        "alert": alert_dict
+    }
 

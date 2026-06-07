@@ -128,6 +128,14 @@ CMS_MODULES = {
         "aliases": {},
         "csv_columns": ["path", "url", "domain", "title", "description", "image_url", "is_active"],
     },
+    "articles": {
+        "table": "articles",
+        "hidden": set(),
+        "readonly": {"id", "created_at", "updated_at"},
+        "required": {"title", "slug", "content"},
+        "aliases": {},
+        "csv_columns": ["title", "slug", "content", "summary", "category", "is_active"],
+    },
 }
 
 TEXT_TYPES = {"text", "varchar", "bpchar", "citext", "uuid"}
