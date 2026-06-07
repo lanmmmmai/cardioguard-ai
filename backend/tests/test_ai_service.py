@@ -19,6 +19,21 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:
 os.environ.setdefault("SECRET_KEY", "test-secret-key-with-at-least-32-chars")
 
 
+class FailingOpenAICompletions:
+    async def create(self, **kwargs):
+        raise RuntimeError("OpenAI unavailable")
+
+
+class FailingOpenAIChat:
+    def __init__(self):
+        self.completions = FailingOpenAICompletions()
+
+
+class FailingOpenAIClient:
+    def __init__(self):
+        self.chat = FailingOpenAIChat()
+
+
 def import_ai_service_without_openai_key():
     """Load ai_service in an isolated config context with no .env OpenAI key."""
     module_names = ("app.services.ai_service", "app.core.config")
@@ -181,6 +196,13 @@ class TestGenerateChatResponse(unittest.TestCase):
         result = asyncio_run(self.service.generate_chat_response("patient", "sức khỏe", context))
         self.assertIn("72", result)
         self.assertIn("98", result)
+
+    @patch("app.services.ai_service.client", FailingOpenAIClient())
+    @patch("app.services.ai_service.HAS_OPENAI", True)
+    def test_openai_error_uses_mock_fallback(self):
+        result = asyncio_run(self.service.generate_chat_response("patient", "nhịp tim"))
+        self.assertIn("nhịp tim", result.lower())
+        self.assertIn("Mock Mode", result)
 
     @patch("app.services.ai_service.HAS_OPENAI", False)
     def test_analyze_patient_data(self):
