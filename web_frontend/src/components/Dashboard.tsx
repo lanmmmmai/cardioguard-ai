@@ -49,6 +49,56 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isSimulating, setIsSimulating] = useState(false);
   const [lastTelemetryTime, setLastTelemetryTime] = useState<Date | null>(null);
   const [isStale, setIsStale] = useState(true);
+  const [cameras, setCameras] = useState<any[]>([]);
+  const [fallSimulating, setFallSimulating] = useState(false);
+  const [fallSimulateSuccess, setFallSimulateSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    fetch('/api/cameras', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : data.items || [];
+        setCameras(list);
+      })
+      .catch(err => console.error('Error fetching cameras:', err));
+  }, [accessToken]);
+
+  const handleSimulateFall = async () => {
+    const targetCamera = cameras.find(c => c.assigned_patient_id === selectedPatientId) || cameras[0];
+    if (!targetCamera) {
+      alert('Không tìm thấy camera nào trong hệ thống!');
+      return;
+    }
+    setFallSimulating(true);
+    setFallSimulateSuccess(null);
+    try {
+      const response = await fetch(`/api/cameras/${targetCamera.id}/fall-detection`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        }
+      });
+      if (response.ok) {
+        setFallSimulateSuccess('Kích hoạt cảnh báo ngã thành công!');
+        setTimeout(() => setFallSimulateSuccess(null), 3000);
+      } else {
+        const errorData = await response.json();
+        alert(`Lỗi: ${errorData.detail || 'Không thể kích hoạt'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Lỗi kết nối khi giả lập ngã');
+    } finally {
+      setFallSimulating(false);
+    }
+  };
+
 
   const hasTelemetryForSelectedPatient = latestTelemetry?.patient_id === selectedPatientId;
   const isRealtimeActive = hasTelemetryForSelectedPatient && !isStale;
@@ -560,9 +610,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
             >
               <AlertTriangle size={16} /> Giả lập Bất thường
             </button>
+
+            <button 
+              className="btn btn-primary" 
+              style={{ background: 'var(--color-primary)' }}
+              onClick={handleSimulateFall}
+              disabled={fallSimulating}
+              title="Giả lập sự kiện bệnh nhân té ngã phát hiện qua phân tích Camera AI"
+            >
+              <AlertTriangle size={16} /> {fallSimulating ? 'Đang kích hoạt...' : 'Giả lập Té ngã (Camera AI)'}
+            </button>
           </div>
+          {fallSimulateSuccess && (
+            <div style={{ color: 'var(--color-primary)', fontSize: '0.85rem', marginTop: '10px', fontWeight: 600 }}>
+              {fallSimulateSuccess}
+            </div>
+          )}
         </div>
       )}
+
     </div>
   );
 };

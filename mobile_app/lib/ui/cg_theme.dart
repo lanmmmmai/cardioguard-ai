@@ -38,7 +38,7 @@ ThemeData buildCgTheme(Brightness brightness) {
     colorScheme: scheme,
     primaryColor: CgColors.primary,
     scaffoldBackgroundColor:
-        isDark ? const Color(0xFF07080A) : const Color(0xFFF4F6FA),
+        isDark ? const Color(0xFF07080A) : const Color(0xFFE4F4FD),
     textTheme: base.textTheme.copyWith(
       titleLarge: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22),
       titleMedium: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),

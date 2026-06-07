@@ -2,6 +2,7 @@ import React from 'react';
 import { useBrowserPath } from '../hooks/useBrowserPath';
 
 const LINKS = [
+  { path: '/about', label: 'Giới thiệu' },
   { path: '/privacy', label: 'Chính sách bảo mật' },
   { path: '/terms', label: 'Điều khoản dịch vụ' },
   { path: '/data-deletion', label: 'Yêu cầu xóa dữ liệu' },

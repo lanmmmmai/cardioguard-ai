@@ -23,8 +23,8 @@
   --text-muted: #616875;
   
   /* Clinical Semantic Accents (Soften Colors, Less Cyber-Neon) */
-  --color-primary: #ef4444; /* Soft Red */
-  --color-primary-glow: rgba(239, 68, 68, 0.15);
+  --color-primary: #0369a1; /* Ocean Blue */
+  --color-primary-glow: rgba(3, 105, 161, 0.15);
   
   --color-spo2: #0ea5e9; /* Professional Sky Blue */
   --color-spo2-glow: rgba(14, 165, 233, 0.15);
@@ -2719,9 +2719,9 @@ body {
    ========================================================================== */
 
 [data-theme="light"] {
-  --bg-primary: #f5f6f8;
+  --bg-primary: #e4f4fd;
   --bg-secondary: #ffffff;
-  --bg-tertiary: #eaecf0;
+  --bg-tertiary: #d0e7f7;
   
   --glass-bg: rgba(255, 255, 255, 0.75);
   --glass-border: rgba(0, 0, 0, 0.08);
@@ -2739,7 +2739,7 @@ body {
   --alert-strip-hover-bg: rgba(0, 0, 0, 0.03);
   
   /* Adjusted neon accents glow for light background to look elegant */
-  --color-primary-glow: rgba(255, 51, 102, 0.12);
+  --color-primary-glow: rgba(3, 105, 161, 0.12);
   --color-spo2-glow: rgba(0, 242, 254, 0.12);
   --color-bp-glow: rgba(57, 255, 20, 0.12);
   --color-warning-glow: rgba(255, 182, 6, 0.12);

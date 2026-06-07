@@ -1361,3 +1361,41 @@ async def ensure_performance_indexes() -> None:
         logger.info("Performance indexes synchronized: count=%s", executed_count)
     except Exception as e:
         logger.exception("Failed to synchronize performance indexes")
+
+
+async def ensure_articles_schema() -> None:
+    """Ensure articles table exists for CMS medical articles."""
+    existing = await database.fetch_val(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='articles')"
+    )
+    if existing:
+        logger.info("Articles schema already exists, skipping DDL")
+        return
+    logger.info("Synchronizing articles schema")
+    try:
+        await database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS articles (
+                id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                title      TEXT NOT NULL,
+                slug       TEXT UNIQUE NOT NULL,
+                content    TEXT NOT NULL,
+                summary    TEXT,
+                author_id  UUID REFERENCES users(id) ON DELETE SET NULL,
+                category   TEXT DEFAULT 'general',
+                is_active  BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+            """
+        )
+        await database.execute(
+            "CREATE INDEX IF NOT EXISTS idx_articles_is_active ON articles(is_active)"
+        )
+        await database.execute(
+            "CREATE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug)"
+        )
+        logger.info("Articles schema created successfully")
+    except Exception:
+        logger.exception("Failed to create articles schema")
+        raise

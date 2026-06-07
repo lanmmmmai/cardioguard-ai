@@ -58,6 +58,8 @@ from app.schemas.crud_schema import (
     PrescriptionUpdate,
     ReportCreate,
     ReportUpdate,
+    ArticleCreate,
+    ArticleUpdate,
 )
 
 router = APIRouter()
@@ -72,6 +74,7 @@ TABLES = {
     "chat_messages": {"path": "/chat-messages", "create": ChatMessageCreate, "update": ChatMessageUpdate},
     "cameras": {"path": "/cameras", "create": CameraCreate, "update": CameraUpdate},
     "reports": {"path": "/reports", "create": ReportCreate, "update": ReportUpdate},
+    "articles": {"path": "/articles", "create": ArticleCreate, "update": ArticleUpdate},
 }
 
 ALIASES = {

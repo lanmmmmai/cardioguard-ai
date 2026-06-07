@@ -17,7 +17,7 @@ class CgColors {
   static const hr = Color(0xFFE11D48);
   static const spo2 = Color(0xFF0891B2);
   static const bp = Color(0xFF7A5AF8);
-  static const primary = Color(0xFFE11D48);
+  static const primary = Color(0xFF0369A1);
   static const accent = Color(0xFFFF3366);
 }
 
