@@ -479,11 +479,11 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
             />
             <label htmlFor="consent" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4, cursor: 'pointer', userSelect: 'none', textAlign: 'left' }}>
               Tôi đã đọc và đồng ý với{' '}
-              <a href="/chinh-sach-bao-mat" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
                 Chính sách bảo mật
               </a>{' '}
               và{' '}
-              <a href="/dieu-khoan-dich-vu" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+              <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
                 Điều khoản dịch vụ
               </a>{' '}
               của CardioGuard AI.

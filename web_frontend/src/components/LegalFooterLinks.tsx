@@ -9,10 +9,10 @@ import React from 'react';
 import { useBrowserPath } from '../hooks/useBrowserPath';
 
 const LINKS = [
-  { path: '/gioi-thieu', label: 'Giới thiệu' },
-  { path: '/chinh-sach-bao-mat', label: 'Chính sách bảo mật' },
-  { path: '/dieu-khoan-dich-vu', label: 'Điều khoản dịch vụ' },
-  { path: '/yeu-cau-xoa-du-lieu', label: 'Yêu cầu xóa dữ liệu' },
+  { path: '/about', label: 'Giới thiệu' },
+  { path: '/privacy', label: 'Chính sách bảo mật' },
+  { path: '/terms', label: 'Điều khoản dịch vụ' },
+  { path: '/data-deletion', label: 'Yêu cầu xóa dữ liệu' },
 ];
 
 /**

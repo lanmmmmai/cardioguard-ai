@@ -56,7 +56,7 @@ interface DomainLinkFormState {
 
 const LIMIT = 12;
 const DEFAULT_SITE_URL = 'https://giatky.site';
-const DEFAULT_LEGAL_PATH = '/gioi-thieu';
+const DEFAULT_LEGAL_PATH = '/about';
 
 const blankForm = (): DomainLinkFormState => ({
   path: DEFAULT_LEGAL_PATH,
@@ -546,7 +546,7 @@ export const DomainLinksCmsPage: React.FC<DomainLinksCmsPageProps> = ({ embedded
                     className="form-control"
                     value={form.path}
                     onChange={(event) => handlePathChange(event.target.value)}
-                    placeholder="/gioi-thieu"
+                    placeholder="/about"
                     disabled={editorMode === 'view'}
                   />
                   <small style={{ color: 'var(--text-muted)' }}>Dùng để resolve preview cho một route cụ thể.</small>
@@ -558,7 +558,7 @@ export const DomainLinksCmsPage: React.FC<DomainLinksCmsPageProps> = ({ embedded
                     className="form-control"
                     value={form.url}
                     onChange={(event) => handleUrlChange(event.target.value)}
-                    placeholder="https://giatky.site/gioi-thieu"
+                    placeholder="https://giatky.site/about"
                     disabled={editorMode === 'view'}
                   />
                 </div>

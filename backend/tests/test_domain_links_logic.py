@@ -42,13 +42,13 @@ class TestDomainLinksNormalization(unittest.TestCase):
         self.assertEqual(payload["domain"], "giatky.site")
 
     def test_domain_links_default_payload_uses_public_legal_preview(self):
-        about_payload = domain_links_default_payload("/gioi-thieu")
-        deletion_payload = domain_links_default_payload("/yeu-cau-xoa-du-lieu")
+        about_payload = domain_links_default_payload("/about")
+        deletion_payload = domain_links_default_payload("/data-deletion")
 
-        self.assertEqual(about_payload["path"], "/gioi-thieu")
-        self.assertEqual(about_payload["url"], "https://giatky.site/gioi-thieu")
+        self.assertEqual(about_payload["path"], "/about")
+        self.assertEqual(about_payload["url"], "https://giatky.site/about")
         self.assertIn("Giới thiệu", about_payload["title"])
-        self.assertEqual(deletion_payload["path"], "/yeu-cau-xoa-du-lieu")
+        self.assertEqual(deletion_payload["path"], "/data-deletion")
         self.assertIn("Yêu cầu xóa dữ liệu", deletion_payload["title"])
 
 
