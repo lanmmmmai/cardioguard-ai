@@ -18,8 +18,9 @@ from app.services.db_optimization import ensure_email_cms_schema  # noqa: E402
 class TestEmailCmsSchemaSync(unittest.IsolatedAsyncioTestCase):
     @patch("app.services.db_optimization.database")
     async def test_schema_sync_skips_when_current(self, mock_db):
-        mock_db.fetch_val = AsyncMock(side_effect=[True] * 44)
+        mock_db.fetch_val = AsyncMock(return_value=True)
         mock_db.execute = AsyncMock()
+        mock_db.fetch_one = AsyncMock(return_value=None)
 
         await ensure_email_cms_schema()
 
@@ -27,7 +28,7 @@ class TestEmailCmsSchemaSync(unittest.IsolatedAsyncioTestCase):
 
     @patch("app.services.db_optimization.database")
     async def test_schema_sync_seeds_expected_system_email_functions(self, mock_db):
-        mock_db.fetch_val = AsyncMock(side_effect=[False] + [True] * 43)
+        mock_db.fetch_all = AsyncMock(return_value=[])
         mock_db.fetch_one = AsyncMock(return_value=None)
         mock_db.execute = AsyncMock()
 

@@ -55,7 +55,7 @@ class TestDomainLinksNormalization(unittest.TestCase):
 class TestDomainLinksSchemaSync(unittest.IsolatedAsyncioTestCase):
     @patch("app.services.db_optimization.database")
     async def test_schema_sync_skips_when_current(self, mock_db):
-        mock_db.fetch_val = AsyncMock(side_effect=[True, True, True, True, True, True, True])
+        mock_db.fetch_val = AsyncMock(return_value=True)
         mock_db.execute = AsyncMock()
 
         await ensure_domain_links_schema()
@@ -64,8 +64,7 @@ class TestDomainLinksSchemaSync(unittest.IsolatedAsyncioTestCase):
 
     @patch("app.services.db_optimization.database")
     async def test_schema_sync_runs_when_columns_missing(self, mock_db):
-        mock_db.fetch_val = AsyncMock(side_effect=[False, True, True, True, True, True, True])
-        mock_db.fetch_one = AsyncMock(return_value=None)
+        mock_db.fetch_val = AsyncMock(return_value=False)
         mock_db.fetch_all = AsyncMock(return_value=[])
         mock_db.execute = AsyncMock()
 

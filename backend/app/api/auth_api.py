@@ -56,6 +56,18 @@ from app.services.audit_service import log_activity
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
+def mask_email(email: str) -> str:
+    if not email or "@" not in email:
+        return "***"
+    parts = email.split("@", 1)
+    local = parts[0]
+    domain = parts[1]
+    if len(local) <= 2:
+        return f"{local[0]}***@{domain}"
+    return f"{local[0]}***{local[-1]}@{domain}"
+
+
 VALID_ROLES = {"admin", "doctor", "patient"}
 
 _USER_CACHE_TTL = 30  # 30 seconds - short TTL for auth freshness
@@ -419,7 +431,7 @@ async def request_register_otp(data: RegisterOtpRequest, request: Request):
     await check_rate_limit(ip, email, "/auth/register/request-otp", max_requests=5, window_seconds=60)
 
     reg_role = (data.role or "patient").strip().lower()
-    logger.debug("Entry: request_register_otp(email=%s, role=%s)", email, reg_role)
+    logger.debug("Entry: request_register_otp(email=%s, role=%s)", mask_email(email), reg_role)
     if reg_role == "admin":
         raise HTTPException(status_code=400, detail="Đăng ký tài khoản Admin không được phép công khai.")
     if reg_role not in VALID_ROLES:
@@ -482,7 +494,7 @@ async def register(data: RegisterRequest, request: Request):
         )
 
     email = data.email.lower()
-    logger.debug("Entry: register(email=%s)", email)
+    logger.debug("Entry: register(email=%s)", mask_email(email))
     otp_result = await verify_otp_token(
         purpose=OTP_PURPOSE_REGISTER,
         email=email,
@@ -491,11 +503,11 @@ async def register(data: RegisterRequest, request: Request):
 
     if not otp_result.is_valid:
         if otp_result.reason == "expired":
-            logger.info("Register OTP expired for email=%s", email)
+            logger.info("Register OTP expired for email=%s", mask_email(email))
             raise HTTPException(status_code=400, detail="OTP expired")
-        logger.info("Invalid register OTP for email=%s", email)
+        logger.info("Invalid register OTP for email=%s", mask_email(email))
         raise HTTPException(status_code=400, detail="Invalid OTP")
-    logger.info("Register OTP valid for email=%s", email)
+    logger.info("Register OTP valid for email=%s", mask_email(email))
 
     insert_query = """
     INSERT INTO users(full_name, email, password_hash, role, phone, specialty, department, status, profile_completed, is_verified, privacy_accepted_at, terms_accepted_at, consent_version)
@@ -595,7 +607,7 @@ async def register(data: RegisterRequest, request: Request):
         err_msg = str(exc).lower()
         if "unique constraint" in err_msg or "duplicate key" in err_msg:
             raise HTTPException(status_code=400, detail="Email already exists")
-        logger.exception("Registration failed unexpectedly for email=%s", email)
+        logger.exception("Registration failed unexpectedly for email=%s", mask_email(email))
         raise
 
     # Ghi nhận log đăng ký thành công
@@ -635,7 +647,7 @@ async def login(data: LoginRequest, request: Request):
     ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
     await check_rate_limit(ip, email, "/auth/login", max_requests=5, window_seconds=60)
-    logger.debug("Entry: login(email=%s)", email)
+    logger.debug("Entry: login(email=%s)", mask_email(email))
 
     user_columns = await get_users_columns()
     select_cols = "id::text as id, full_name, email, password_hash, role"
@@ -735,11 +747,10 @@ async def login(data: LoginRequest, request: Request):
 
     token = create_access_token({
         "sub": user["id"],
-        "email": user["email"],
         "role": db_role
     })
 
-    logger.info("Login successful: email=%s role=%s", email, db_role)
+    logger.info("Login successful: email=%s role=%s", mask_email(email), db_role)
 
     # Ghi nhận đăng nhập thành công
     await log_activity(
@@ -790,7 +801,7 @@ async def google_login(data: GoogleLoginRequest, request: Request):
         or email.split("@", 1)[0]
     )
     avatar_url = (claims.get("picture") or data.avatar_url or None)
-    logger.debug("Entry: google_login(email=%s)", email)
+    logger.debug("Entry: google_login(email=%s)", mask_email(email))
 
     # Lấy thông tin cột của bảng users để chắc chắn
     user_columns = await get_users_columns()
@@ -973,7 +984,7 @@ async def google_login(data: GoogleLoginRequest, request: Request):
         except HTTPException:
             raise
         except Exception:
-            logger.exception("Google automatic registration failed unexpectedly for email=%s", email)
+            logger.exception("Google automatic registration failed unexpectedly for email=%s", mask_email(email))
             raise HTTPException(status_code=500, detail="Không thể đăng ký tự động bằng Google. Vui lòng thử lại sau.")
 
         db_role = role
@@ -981,7 +992,6 @@ async def google_login(data: GoogleLoginRequest, request: Request):
     # Tạo JWT Token
     token = create_access_token({
         "sub": user["id"],
-        "email": user["email"],
         "role": db_role
     })
 
@@ -1067,7 +1077,7 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Requ
     ip = get_client_ip(request)
     email = data.email.lower()
     await check_rate_limit(ip, email, "/auth/forgot-password/request-otp", max_requests=5, window_seconds=60)
-    logger.debug("Entry: request_forgot_password_otp(email=%s)", email)
+    logger.debug("Entry: request_forgot_password_otp(email=%s)", mask_email(email))
 
     response = generic_forgot_password_response(email)
     user = await database.fetch_one(
@@ -1125,7 +1135,7 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
     ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
     await check_rate_limit(ip, email, "/auth/forgot-password/verify-otp", max_requests=5, window_seconds=60)
-    logger.debug("Entry: verify_forgot_password_otp(email=%s)", email)
+    logger.debug("Entry: verify_forgot_password_otp(email=%s)", mask_email(email))
 
     otp_result = await verify_otp_token(
         purpose=OTP_PURPOSE_FORGOT_PASSWORD,
@@ -1135,11 +1145,11 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
 
     if not otp_result.is_valid:
         if otp_result.reason == "expired":
-            logger.info("OTP expired for email=%s", email)
+            logger.info("OTP expired for email=%s", mask_email(email))
             raise HTTPException(status_code=400, detail="OTP expired")
-        logger.info("Invalid OTP for email=%s", email)
+        logger.info("Invalid OTP for email=%s", mask_email(email))
         raise HTTPException(status_code=400, detail="Invalid OTP")
-    logger.info("OTP valid for email=%s", email)
+    logger.info("OTP valid for email=%s", mask_email(email))
 
     user_id = otp_result.metadata.get("user_id")
     if user_id:
@@ -1162,10 +1172,14 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
         import string
         from app.core.password_policy import PASSWORD_PATTERN
         chars = string.ascii_letters + string.digits + "@!#?$"
-        while True:
+        attempts = 0
+        while attempts < 1000:
             new_password = "".join(secrets.choice(chars) for _ in range(16))
             if PASSWORD_PATTERN.fullmatch(new_password):
                 break
+            attempts += 1
+        else:
+            new_password = "TempPass123!456#"  # Safe compliant fallback
         must_change_password = True
     
     hashed_password = hash_password(new_password)
@@ -1271,7 +1285,6 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
 
     new_token = create_access_token({
         "sub": current_user["id"],
-        "email": current_user["email"],
         "role": current_user["role"],
     })
     updated_user = {

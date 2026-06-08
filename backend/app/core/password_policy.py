@@ -47,10 +47,11 @@ def validate_password(value: str) -> str:
     Ngoại lệ:
         ValueError: Nếu mật khẩu vượt quá 72 byte hoặc không đáp ứng yêu cầu mẫu.
     """
-    normalized_candidate = re.sub(r"[^a-z0-9]", "", value.strip().lower())
+    clean_val = value.strip().lower()
+    normalized_candidate = re.sub(r"[^a-z0-9]", "", clean_val)
     if len(value.encode("utf-8")) > 72:
         raise ValueError("Mật khẩu không được dài quá 72 byte do hạn chế băm bảo mật")
-    if normalized_candidate in COMMON_PASSWORDS:
+    if normalized_candidate in COMMON_PASSWORDS or clean_val in COMMON_PASSWORDS:
         raise ValueError("Mật khẩu quá phổ biến và không được phép sử dụng")
     if not PASSWORD_PATTERN.fullmatch(value):
         raise ValueError(PASSWORD_POLICY_MESSAGE)
