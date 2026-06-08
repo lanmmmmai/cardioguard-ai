@@ -14,6 +14,7 @@ services:
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PYTHONUNBUFFERED: "1"
+      TZ: "Asia/Ho_Chi_Minh"
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -22,7 +23,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 240s
+      start_period: 600s
 
   web:
     build:
@@ -42,6 +43,7 @@ services:
       BACKEND_API_URL: ${BACKEND_API_URL:-http://backend:8000}
       BACKEND_WS_URL: ${BACKEND_WS_URL:-ws://backend:8000/ws/realtime}
       PUBLIC_SITE_URL: ${PUBLIC_SITE_URL:-https://giatky.site}
+      TZ: "Asia/Ho_Chi_Minh"
     ports:
       - "5173:8080"
     restart: unless-stopped
