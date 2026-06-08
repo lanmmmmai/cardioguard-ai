@@ -56,14 +56,15 @@ interface DomainLinkFormState {
 
 const LIMIT = 12;
 const DEFAULT_SITE_URL = 'https://giatky.site';
+const DEFAULT_LEGAL_PATH = '/gioi-thieu';
 
 const blankForm = (): DomainLinkFormState => ({
-  path: '/login',
-  url: `${DEFAULT_SITE_URL}/login`,
+  path: DEFAULT_LEGAL_PATH,
+  url: `${DEFAULT_SITE_URL}${DEFAULT_LEGAL_PATH}`,
   domain: 'giatky.site',
-  title: '',
-  description: '',
-  image_url: '',
+  title: 'CardioGuard AI - Giới thiệu',
+  description: 'Tìm hiểu về nền tảng CardioGuard AI, hệ thống giám sát tim mạch, SpO2, huyết áp và cảnh báo lâm sàng thời gian thực.',
+  image_url: `${DEFAULT_SITE_URL}/og-about.png`,
   is_active: true,
 });
 
@@ -545,7 +546,7 @@ export const DomainLinksCmsPage: React.FC<DomainLinksCmsPageProps> = ({ embedded
                     className="form-control"
                     value={form.path}
                     onChange={(event) => handlePathChange(event.target.value)}
-                    placeholder="/login"
+                    placeholder="/gioi-thieu"
                     disabled={editorMode === 'view'}
                   />
                   <small style={{ color: 'var(--text-muted)' }}>Dùng để resolve preview cho một route cụ thể.</small>
@@ -557,7 +558,7 @@ export const DomainLinksCmsPage: React.FC<DomainLinksCmsPageProps> = ({ embedded
                     className="form-control"
                     value={form.url}
                     onChange={(event) => handleUrlChange(event.target.value)}
-                    placeholder="https://giatky.site/login"
+                    placeholder="https://giatky.site/gioi-thieu"
                     disabled={editorMode === 'view'}
                   />
                 </div>
@@ -568,7 +569,7 @@ export const DomainLinksCmsPage: React.FC<DomainLinksCmsPageProps> = ({ embedded
                     className="form-control"
                     value={form.title}
                     onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-                    placeholder="CardioGuard AI - Đăng nhập"
+                    placeholder="CardioGuard AI - Giới thiệu"
                     disabled={editorMode === 'view'}
                   />
                 </div>

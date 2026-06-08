@@ -12,7 +12,11 @@ if str(BACKEND_DIR) not in sys.path:
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test_db")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-with-at-least-32-chars")
 
-from app.api.cms_api import normalize_domain_link_payload, normalize_domain_path  # noqa: E402
+from app.api.cms_api import (  # noqa: E402
+    domain_links_default_payload,
+    normalize_domain_link_payload,
+    normalize_domain_path,
+)
 from app.services.db_optimization import ensure_domain_links_schema  # noqa: E402
 
 
@@ -36,6 +40,16 @@ class TestDomainLinksNormalization(unittest.TestCase):
         self.assertEqual(payload["path"], "/login")
         self.assertEqual(payload["url"], "https://giatky.site/login")
         self.assertEqual(payload["domain"], "giatky.site")
+
+    def test_domain_links_default_payload_uses_public_legal_preview(self):
+        about_payload = domain_links_default_payload("/gioi-thieu")
+        deletion_payload = domain_links_default_payload("/yeu-cau-xoa-du-lieu")
+
+        self.assertEqual(about_payload["path"], "/gioi-thieu")
+        self.assertEqual(about_payload["url"], "https://giatky.site/gioi-thieu")
+        self.assertIn("Giới thiệu", about_payload["title"])
+        self.assertEqual(deletion_payload["path"], "/yeu-cau-xoa-du-lieu")
+        self.assertIn("Yêu cầu xóa dữ liệu", deletion_payload["title"])
 
 
 class TestDomainLinksSchemaSync(unittest.IsolatedAsyncioTestCase):

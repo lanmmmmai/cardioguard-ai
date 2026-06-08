@@ -62,6 +62,63 @@ DOMAIN_LINKS_DEFAULT_PREVIEW = {
     "description": "CardioGuard AI - Hệ thống giám sát sức khỏe tim mạch thời gian thực. Theo dõi nhịp tim, SpO2, huyết áp và điện tâm đồ thông qua các cảm biến IoT đeo thông minh.",
     "image_url": "https://giatky.site/images/preview.jpg",
 }
+DOMAIN_LINKS_ROUTE_PREVIEWS = {
+    "/about": {
+        "title": "CardioGuard AI - Giới thiệu",
+        "description": "Tìm hiểu về nền tảng CardioGuard AI, hệ thống giám sát tim mạch, SpO2, huyết áp và cảnh báo lâm sàng thời gian thực.",
+        "image_url": "https://giatky.site/og-about.png",
+    },
+    "/gioi-thieu": {
+        "title": "CardioGuard AI - Giới thiệu",
+        "description": "Tìm hiểu về nền tảng CardioGuard AI, hệ thống giám sát tim mạch, SpO2, huyết áp và cảnh báo lâm sàng thời gian thực.",
+        "image_url": "https://giatky.site/og-about.png",
+    },
+    "/privacy": {
+        "title": "CardioGuard AI - Chính sách bảo mật",
+        "description": "Chính sách bảo mật dữ liệu cá nhân và dữ liệu sức khỏe của bệnh nhân, bác sĩ và quản trị viên trên CardioGuard AI.",
+        "image_url": "https://giatky.site/og-privacy.png",
+    },
+    "/privacy-policy": {
+        "title": "CardioGuard AI - Chính sách bảo mật",
+        "description": "Chính sách bảo mật dữ liệu cá nhân và dữ liệu sức khỏe của bệnh nhân, bác sĩ và quản trị viên trên CardioGuard AI.",
+        "image_url": "https://giatky.site/og-privacy.png",
+    },
+    "/chinh-sach-bao-mat": {
+        "title": "CardioGuard AI - Chính sách bảo mật",
+        "description": "Chính sách bảo mật dữ liệu cá nhân và dữ liệu sức khỏe của bệnh nhân, bác sĩ và quản trị viên trên CardioGuard AI.",
+        "image_url": "https://giatky.site/og-privacy.png",
+    },
+    "/terms": {
+        "title": "CardioGuard AI - Điều khoản dịch vụ",
+        "description": "Điều khoản sử dụng nền tảng CardioGuard AI, bao gồm trách nhiệm tài khoản, cảnh báo y tế tham khảo và quy định truy cập.",
+        "image_url": "https://giatky.site/og-terms.png",
+    },
+    "/terms-of-service": {
+        "title": "CardioGuard AI - Điều khoản dịch vụ",
+        "description": "Điều khoản sử dụng nền tảng CardioGuard AI, bao gồm trách nhiệm tài khoản, cảnh báo y tế tham khảo và quy định truy cập.",
+        "image_url": "https://giatky.site/og-terms.png",
+    },
+    "/dieu-khoan-dich-vu": {
+        "title": "CardioGuard AI - Điều khoản dịch vụ",
+        "description": "Điều khoản sử dụng nền tảng CardioGuard AI, bao gồm trách nhiệm tài khoản, cảnh báo y tế tham khảo và quy định truy cập.",
+        "image_url": "https://giatky.site/og-terms.png",
+    },
+    "/data-deletion": {
+        "title": "CardioGuard AI - Yêu cầu xóa dữ liệu",
+        "description": "Hướng dẫn gửi yêu cầu xóa tài khoản, dữ liệu cá nhân và dữ liệu liên quan theo quy trình bảo mật của CardioGuard AI.",
+        "image_url": "https://giatky.site/og-data-deletion.png",
+    },
+    "/data-deletion-request": {
+        "title": "CardioGuard AI - Yêu cầu xóa dữ liệu",
+        "description": "Hướng dẫn gửi yêu cầu xóa tài khoản, dữ liệu cá nhân và dữ liệu liên quan theo quy trình bảo mật của CardioGuard AI.",
+        "image_url": "https://giatky.site/og-data-deletion.png",
+    },
+    "/yeu-cau-xoa-du-lieu": {
+        "title": "CardioGuard AI - Yêu cầu xóa dữ liệu",
+        "description": "Hướng dẫn gửi yêu cầu xóa tài khoản, dữ liệu cá nhân và dữ liệu liên quan theo quy trình bảo mật của CardioGuard AI.",
+        "image_url": "https://giatky.site/og-data-deletion.png",
+    },
+}
 
 
 def _is_within_directory(base_dir: str, candidate_path: str) -> bool:
@@ -235,17 +292,27 @@ def build_public_domain_link_image_url(request: Request, file_name: str) -> str:
 
 
 def domain_links_default_payload(path: Optional[str], full_url: Optional[str] = None) -> dict[str, Any]:
+    """Build fallback preview metadata for a public domain link.
+
+    Args:
+        path: Browser route path to resolve.
+        full_url: Optional full URL override used by callers with a canonical URL.
+
+    Returns:
+        Domain link preview payload using route-specific metadata when available.
+    """
     normalized_path = normalize_domain_path(path)
     target_url = full_url or f"https://giatky.site{normalized_path}"
     parsed = urlparse(target_url)
+    preview = DOMAIN_LINKS_ROUTE_PREVIEWS.get(normalized_path, DOMAIN_LINKS_DEFAULT_PREVIEW)
     return {
         "id": None,
         "path": normalized_path,
         "url": target_url,
         "domain": parsed.netloc or "giatky.site",
-        "title": DOMAIN_LINKS_DEFAULT_PREVIEW["title"],
-        "description": DOMAIN_LINKS_DEFAULT_PREVIEW["description"],
-        "image_url": DOMAIN_LINKS_DEFAULT_PREVIEW["image_url"],
+        "title": preview["title"],
+        "description": preview["description"],
+        "image_url": preview["image_url"],
         "is_active": True,
         "cache_version": 1,
         "resolved_from": "fallback",
