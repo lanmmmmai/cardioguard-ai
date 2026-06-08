@@ -13,6 +13,9 @@ interface Article {
   created_at: string;
 }
 
+const SUPPORT_PHONE = '0382683221';
+const SUPPORT_EMAIL = 'lanmmmmai@gmail.com';
+
 export const AboutUs: React.FC = () => {
   const { locale } = useLocale();
   const [articles, setArticles] = useState<Article[]>([]);
@@ -111,7 +114,7 @@ export const AboutUs: React.FC = () => {
                   {isVi ? 'Số điện thoại hỗ trợ' : 'Customer Hotline'}
                 </strong>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                  024.1234.5678 (24/7 Support)
+                  {SUPPORT_PHONE} (24/7 Support)
                 </span>
               </div>
             </div>
@@ -130,7 +133,7 @@ export const AboutUs: React.FC = () => {
                   {isVi ? 'Hòm thư điện tử' : 'Email Inquiry'}
                 </strong>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                  support@cardioguard.ai
+                  {SUPPORT_EMAIL}
                 </span>
               </div>
             </div>

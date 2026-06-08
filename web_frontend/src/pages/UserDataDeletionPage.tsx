@@ -1,10 +1,13 @@
 import React from 'react';
-import { ArrowLeft, Trash2, Mail, FileText, ShieldCheck, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Trash2, Mail, FileText, ShieldCheck, HelpCircle, Phone } from 'lucide-react';
 import { useLocale } from '../i18n/locale';
 
 interface UserDataDeletionPageProps {
   onBack?: () => void;
 }
+
+const SUPPORT_PHONE = '0382683221';
+const SUPPORT_EMAIL = 'lanmmmmai@gmail.com';
 
 export const UserDataDeletionPage: React.FC<UserDataDeletionPageProps> = ({ onBack }) => {
   const { locale } = useLocale();
@@ -20,8 +23,8 @@ export const UserDataDeletionPage: React.FC<UserDataDeletionPageProps> = ({ onBa
   const isVi = locale === 'vi';
 
   return (
-    <div className="role-page-stack">
-      <div className="page-header">
+    <div className="role-page-stack" style={{ width: '100%', maxWidth: '980px', margin: '2rem auto', padding: '0 1.5rem' }}>
+      <div className="page-header" style={{ textAlign: 'center', justifyContent: 'center' }}>
         <div>
           <h1 className="page-title">
             {isVi ? 'Hướng dẫn xóa dữ liệu' : 'User Data Deletion Guide'}
@@ -34,7 +37,7 @@ export const UserDataDeletionPage: React.FC<UserDataDeletionPageProps> = ({ onBa
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '800px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%', maxWidth: '860px', margin: '0 auto' }}>
         
         {/* Intro Alert Box */}
         <div className="alert-strip medium" style={{ marginBottom: '0.5rem' }}>
@@ -106,11 +109,21 @@ export const UserDataDeletionPage: React.FC<UserDataDeletionPageProps> = ({ onBa
           </p>
 
           <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>{isVi ? 'Gửi email đến:' : 'Send email to:'}</span>
-              <strong style={{ color: 'var(--color-spo2)' }}>lanmmmmai@gmail.com</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', gap: '12px', flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Mail size={14} />
+                {isVi ? 'Gửi email đến:' : 'Send email to:'}
+              </span>
+              <strong style={{ color: 'var(--color-spo2)' }}>{SUPPORT_EMAIL}</strong>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--glass-border)', paddingTop: '8px', fontSize: '0.9rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--glass-border)', paddingTop: '8px', marginBottom: '8px', fontSize: '0.9rem', gap: '12px', flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Phone size={14} />
+                {isVi ? 'Điện thoại hỗ trợ:' : 'Support phone:'}
+              </span>
+              <strong style={{ color: 'var(--color-primary)' }}>{SUPPORT_PHONE}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--glass-border)', paddingTop: '8px', fontSize: '0.9rem', gap: '12px', flexWrap: 'wrap' }}>
               <span style={{ color: 'var(--text-muted)' }}>{isVi ? 'Tiêu đề email:' : 'Email subject:'}</span>
               <strong>{isVi ? 'Yêu cầu xóa dữ liệu CardioGuard AI' : 'CardioGuard AI Data Deletion Request'}</strong>
             </div>
