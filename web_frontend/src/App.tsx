@@ -61,6 +61,47 @@ import { Patient, Alert, SensorData } from './types';
 import { LocaleProvider, getPageMeta, useLocale } from './i18n/locale';
 import { NotificationProvider } from './components/notifications/NotificationProvider';
 
+type PublicLegalPageKey = 'about' | 'privacy' | 'terms' | 'dataDeletion';
+
+const PUBLIC_LEGAL_ROUTES: Record<string, PublicLegalPageKey> = {
+  '/about': 'about',
+  '/gioi-thieu': 'about',
+  '/privacy': 'privacy',
+  '/privacy-policy': 'privacy',
+  '/chinh-sach-bao-mat': 'privacy',
+  '/terms': 'terms',
+  '/terms-of-service': 'terms',
+  '/dieu-khoan-dich-vu': 'terms',
+  '/data-deletion': 'dataDeletion',
+  '/data-deletion-request': 'dataDeletion',
+  '/yeu-cau-xoa-du-lieu': 'dataDeletion',
+};
+
+/**
+ * Render public legal and product information pages by browser path.
+ *
+ * @param currentPath - Current browser pathname
+ * @returns Public page element when the path is a legal route, otherwise null
+ */
+const renderPublicLegalPage = (currentPath: string): React.ReactNode | null => {
+  const pageKey = PUBLIC_LEGAL_ROUTES[currentPath];
+
+  if (pageKey === 'about') {
+    return <AboutUs />;
+  }
+  if (pageKey === 'privacy') {
+    return <PrivacyPolicy />;
+  }
+  if (pageKey === 'terms') {
+    return <TermsOfService />;
+  }
+  if (pageKey === 'dataDeletion') {
+    return <UserDataDeletionPage />;
+  }
+
+  return null;
+};
+
 /**
  * Thành phần bên trong có thể tiêu thụ AuthContext một cách an toàn. Điều phối tất cả
  * trạng thái cấp ứng dụng, tìm nạp dữ liệu, nhắn tin thời gian thực và hiển thị tuyến đường.
@@ -111,6 +152,8 @@ const AppContent: React.FC = () => {
 
   const normalizedPath = path === '/' ? (role ? defaultRouteByRole[role] : getLastLoginRoute()) : path;
   const routeRole = privateRouteRole(normalizedPath);
+  const publicLegalPage = renderPublicLegalPage(path);
+  const isPublicLegalPath = publicLegalPage !== null;
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -124,6 +167,10 @@ const AppContent: React.FC = () => {
       '/forgot-password', '/forgot-password-doctor', '/forgot-password-admin',
       '/reset-password', '/reset-password-doctor', '/reset-password-admin'
     ];
+
+    if (isPublicLegalPath) {
+      return;
+    }
 
     if (path === '/' || !routeRole) {
       if (path === '/' || (!authPaths.includes(path) && path !== '/change-password')) {
@@ -147,7 +194,7 @@ const AppContent: React.FC = () => {
         navigate(defaultRouteByRole[role], true);
       }
     }
-  }, [loading, path, role, isAuthenticated, routeRole, requiresPasswordChange, locale]);
+  }, [loading, path, role, isAuthenticated, routeRole, requiresPasswordChange, locale, isPublicLegalPath]);
 
   const fetchPatients = useCallback(async () => {
     const isVerifiedDoctor = role === 'doctor' && Boolean(user?.profile_completed && user?.is_verified);
@@ -550,22 +597,12 @@ const AppContent: React.FC = () => {
     }
   }, [alerts, latestTelemetry, normalizedPath, patients, routeRole, selectedPatientId, doctors, isConnected, navigate, renderPatientList, locale]);
 
-  if (loading) {
-    return <div className="route-loading">Đang khôi phục phiên đăng nhập...</div>;
+  if (publicLegalPage) {
+    return <>{publicLegalPage}</>;
   }
 
-  // Xử lý các trang pháp lý công khai (không yêu cầu xác thực)
-  if (path === '/privacy') {
-    return <PrivacyPolicy />;
-  }
-  if (path === '/terms') {
-    return <TermsOfService />;
-  }
-  if (path === '/data-deletion') {
-    return <UserDataDeletionPage />;
-  }
-  if (path === '/about') {
-    return <AboutUs />;
+  if (loading) {
+    return <div className="route-loading">Đang khôi phục phiên đăng nhập...</div>;
   }
 
   // Xử lý các trang Register
