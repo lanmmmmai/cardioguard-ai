@@ -2,7 +2,8 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("org.jetbrains.kotlin.android")
+    // Flutter Gradle Plugin must be applied after Android + Kotlin plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -26,20 +27,25 @@ val hasReleaseSigning = !releaseStoreFile.isNullOrBlank()
     && !releaseKeyPassword.isNullOrBlank()
 
 android {
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
     namespace = "com.cardioguard.heartmonitor"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "28.2.13676358"
 
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
+    }
+
+    // Belt-and-suspenders: set Kotlin JVM target inside the android block as well.
+    // The tasks.withType block below also handles this, but some plugin hooks
+    // read kotlinOptions before task-level overrides take effect.
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.cardioguard.heartmonitor"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -48,8 +54,10 @@ android {
 
     buildTypes {
         release {
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Use release keystore in CI/production, fallback to debug for local manual testing.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = if (hasReleaseSigning) {
                 signingConfigs.create("release") {
                     storeFile = file(releaseStoreFile!!)
@@ -68,8 +76,15 @@ flutter {
     source = "../.."
 }
 
+// Task-level override — catches any KotlinCompile task registered after
+// the android {} block is evaluated (e.g. by the Flutter Gradle Plugin).
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
+}
+
+dependencies {
+    // Required when isCoreLibraryDesugaringEnabled = true
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

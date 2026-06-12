@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - main
+      - feat/flutter-mobile-app
 
 jobs:
   build-apk:
@@ -22,20 +23,28 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      # Java 17 MUST be set up before Flutter so Gradle picks up the right JDK.
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           flutter-version: '3.44.0'
+          cache: true
 
-      - name: Check Flutter version
-        run: flutter --version
+      - name: Show versions
+        run: |
+          java -version
+          flutter --version
+          flutter doctor -v
+
+      - name: Grant Gradle executable permission
+        run: chmod +x android/gradlew
 
       - name: Clean project
         run: flutter clean
@@ -43,23 +52,25 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Analyze Dart code
+        run: flutter analyze --no-fatal-infos
+
       - name: Inject Facebook credentials into strings.xml
         env:
           FACEBOOK_APP_ID: "${{ secrets.FACEBOOK_APP_ID }}"
           FACEBOOK_CLIENT_TOKEN: "${{ secrets.FACEBOOK_CLIENT_TOKEN }}"
         run: |
-          # Thay thế placeholder trong strings.xml bằng giá trị từ secrets.
-          # Nếu secrets chưa được cấu hình, giữ nguyên placeholder (build vẫn compile được,
-          # nhưng Facebook Login sẽ không hoạt động trên runtime cho đến khi cấu hình đúng).
+          FILE="android/app/src/main/res/values/strings.xml"
           if [ -n "$FACEBOOK_APP_ID" ]; then
-            sed -i "s/YOUR_FACEBOOK_APP_ID/${FACEBOOK_APP_ID}/g" android/app/src/main/res/values/strings.xml
-            echo "Facebook App ID injected."
+            # Replace both the App ID placeholder AND the protocol scheme
+            sed -i "s/YOUR_FACEBOOK_APP_ID/${FACEBOOK_APP_ID}/g" "$FILE"
+            echo "✅ Facebook App ID + protocol scheme injected."
           else
-            echo "FACEBOOK_APP_ID secret not set — build will compile but Facebook Login will not work at runtime."
+            echo "⚠️  FACEBOOK_APP_ID secret not set — Facebook Login will not work at runtime."
           fi
           if [ -n "$FACEBOOK_CLIENT_TOKEN" ]; then
-            sed -i "s/YOUR_FACEBOOK_CLIENT_TOKEN/${FACEBOOK_CLIENT_TOKEN}/g" android/app/src/main/res/values/strings.xml
-            echo "Facebook Client Token injected."
+            sed -i "s/YOUR_FACEBOOK_CLIENT_TOKEN/${FACEBOOK_CLIENT_TOKEN}/g" "$FILE"
+            echo "✅ Facebook Client Token injected."
           fi
 
       - name: Prepare Android release keystore (optional)
@@ -69,22 +80,30 @@ jobs:
           ANDROID_KEY_ALIAS: "${{ secrets.ANDROID_KEY_ALIAS }}"
           ANDROID_KEY_PASSWORD: "${{ secrets.ANDROID_KEY_PASSWORD }}"
         run: |
-          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && \
+             [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && \
+             [ -n "$ANDROID_KEY_ALIAS" ] && \
+             [ -n "$ANDROID_KEY_PASSWORD" ]; then
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
-            echo "storeFile=release-keystore.jks" > android/key.properties
-            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD" >> android/key.properties
-            echo "keyAlias=$ANDROID_KEY_ALIAS" >> android/key.properties
-            echo "keyPassword=$ANDROID_KEY_PASSWORD" >> android/key.properties
-            echo "Release keystore configured."
+            cat > android/key.properties <<EOF
+          storeFile=release-keystore.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+            echo "✅ Release keystore configured."
           else
-            echo "Release keystore secrets are missing. CI will fallback to debug signing."
+            echo "⚠️  Release keystore secrets missing — fallback to debug signing."
           fi
 
       - name: Build release APK
-        run: flutter build apk --release --dart-define=API_BASE_URL="${{ secrets.API_BASE_URL || 'https://cardioguard-ai-backend.onrender.com' }}"
+        run: |
+          flutter build apk --release \
+            --dart-define=API_BASE_URL="${{ secrets.API_BASE_URL || 'https://cardioguard-ai-backend.onrender.com' }}"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cardioguard-release-apk
+          name: cardioguard-ai-release-apk
           path: mobile_app/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30

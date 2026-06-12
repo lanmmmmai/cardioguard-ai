@@ -5,14 +5,15 @@
   IMPORTANT: Thay "YOUR_FACEBOOK_APP_ID" và "YOUR_FACEBOOK_CLIENT_TOKEN"
   bằng giá trị thực từ Facebook Developer Console trước khi release.
 
-  Các giá trị này cần được đặt trong file này vì flutter_facebook_auth
-  yêu cầu chúng trong AndroidManifest.xml.
-  Không commit App Secret lên Git.
+  Trong GitHub Actions, 2 values này được inject từ secrets tự động.
+  Không commit App Secret lên Git — App Secret chỉ dùng ở backend.
 -->
 <resources>
     <string name="app_name">CardioGuard AI</string>
     <!-- Facebook App ID: lấy từ https://developers.facebook.com/apps/ -->
     <string name="facebook_app_id">YOUR_FACEBOOK_APP_ID</string>
-    <!-- Facebook Client Token: App Settings > Advanced > Client Token -->
+    <!-- fb_login_protocol_scheme = "fb" + App ID (dùng cho deep link callback) -->
+    <string name="fb_login_protocol_scheme">fbYOUR_FACEBOOK_APP_ID</string>
+    <!-- Facebook Client Token: App Settings → Advanced → Client Token -->
     <string name="facebook_client_token">YOUR_FACEBOOK_CLIENT_TOKEN</string>
 </resources>
