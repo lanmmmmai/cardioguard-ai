@@ -99,6 +99,124 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  void _showLogoutModal(BuildContext ctx, AuthProvider authProvider) {
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    showDialog(
+      context: ctx,
+      barrierColor: Colors.black54,
+      builder: (dialogCtx) {
+        bool isLoggingOut = false;
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              backgroundColor:
+                  isDark ? const Color(0xFF1A2235) : Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: CgColors.critical.withValues(alpha: 0.12),
+                      ),
+                      child: const Icon(LucideIcons.logOut,
+                          color: CgColors.critical, size: 30),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Đăng xuất?',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Bạn sẽ cần đăng nhập lại để tiếp tục sử dụng CardioGuard AI.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark
+                            ? const Color(0xFF9EA5B4)
+                            : const Color(0xFF6B7280),
+                        height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isLoggingOut
+                                ? null
+                                : () => Navigator.pop(dialogCtx),
+                            style: OutlinedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('Hủy'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isLoggingOut
+                                ? null
+                                : () async {
+                                    setDialogState(
+                                        () => isLoggingOut = true);
+                                    await authProvider.logout();
+                                    if (dialogCtx.mounted) {
+                                      Navigator.pop(dialogCtx);
+                                    }
+                                    if (ctx.mounted) {
+                                      Navigator.pushNamedAndRemoveUntil(
+                                          ctx,
+                                          '/role-select',
+                                          (route) => false);
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: CgColors.critical,
+                              foregroundColor: Colors.white,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: isLoggingOut
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white))
+                                : const Text('Đăng xuất',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _changePassword() async {
     if (!_passwordFormKey.currentState!.validate()) return;
     setState(() {
@@ -914,19 +1032,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               width: double.infinity,
               height: 52,
               child: OutlinedButton.icon(
-                onPressed: () async {
-                  await authProvider.logout();
-                  if (context.mounted) {
-                    Navigator.pushNamedAndRemoveUntil(
-                        context, '/login', (route) => false);
-                  }
-                },
-                icon: const Icon(LucideIcons.logOut, color: CgColors.accent),
+                onPressed: () => _showLogoutModal(context, authProvider),
+                icon: const Icon(LucideIcons.logOut, color: CgColors.critical),
                 label: const Text('Đăng xuất tài khoản',
                     style: TextStyle(
-                        color: CgColors.accent, fontWeight: FontWeight.bold)),
+                        color: CgColors.critical, fontWeight: FontWeight.bold)),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: CgColors.accent),
+                  side: const BorderSide(color: CgColors.critical),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),

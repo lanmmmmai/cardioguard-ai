@@ -19,6 +19,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'core/app_logger.dart';
 
 import 'screens/splash_screen.dart';
+import 'screens/role_select_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/forgot_password_screen.dart';
@@ -29,6 +30,9 @@ import 'screens/appointments_screen.dart';
 import 'screens/chat_ai_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/policy_screen.dart';
+import 'screens/doctor_pending_screen.dart';
+import 'screens/doctor_rejected_screen.dart';
+import 'screens/profile_screen.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/patient_provider.dart';
@@ -132,22 +136,25 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
         }),
       ],
       child: MaterialApp(
-        title: 'Smart Heart Patient Monitoring',
+        title: 'CardioGuard AI',
         debugShowCheckedModeBanner: false,
         themeMode: _isDarkTheme ? ThemeMode.dark : ThemeMode.light,
         theme: buildCgTheme(Brightness.light),
         darkTheme: buildCgTheme(Brightness.dark),
 
-        // Bắt đầu tại màn hình splash để xác thực phiên trước khi điều hướng tiếp.
         initialRoute: '/splash',
         routes: {
           '/splash': (context) => const SplashScreen(),
+          '/role-select': (context) => const RoleSelectScreen(),
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
           '/forgot-password': (context) => const ForgotPasswordScreen(),
           '/privacy': (context) => const PolicyScreen(type: 'privacy'),
           '/terms': (context) => const PolicyScreen(type: 'terms'),
           '/data-deletion': (context) => const PolicyScreen(type: 'data-deletion'),
+          '/doctor-pending': (context) => const DoctorPendingScreen(),
+          '/doctor-rejected': (context) => const DoctorRejectedScreen(),
+          '/profile': (context) => ProfileScreen(isDarkTheme: _isDarkTheme),
           '/dashboard': (context) => MainTabWrapper(
                 isDarkTheme: _isDarkTheme,
                 onToggleTheme: _toggleTheme,

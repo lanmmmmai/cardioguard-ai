@@ -171,9 +171,8 @@ class AuthProvider extends ChangeNotifier {
         if (token != null && userJson != null) {
           _currentUser = User.fromJson(userJson);
           _isAuthenticated = true;
-          AppLogger.log('login success | email=$email isAuthenticated=$_isAuthenticated');
+          AppLogger.log('login success | email=$email role=${_currentUser?.role}');
 
-          // Lưu vào bộ nhớ an toàn
           await _secureStorage.saveToken(token);
           await _secureStorage.saveUser(userJson);
 
@@ -187,7 +186,8 @@ class AuthProvider extends ChangeNotifier {
         }
       }
       _setLoading(false);
-      _setError('Email hoặc mật khẩu không hợp lệ.');
+      final detail = response.data?['detail'];
+      _setError(detail?.toString() ?? 'Email hoặc mật khẩu không hợp lệ.');
       AppLogger.log('login failed | email=$email status=${response.statusCode}');
       return false;
     } catch (e) {
@@ -241,6 +241,51 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       _setError('Lỗi kết nối máy chủ khi đăng nhập Google.');
       AppLogger.log('loginWithGoogle error | error=$e');
+      return false;
+    }
+  }
+
+  // Đăng nhập bằng Facebook access_token (từ flutter_facebook_auth SDK).
+  Future<bool> loginWithFacebook({
+    required String accessToken,
+    String role = 'patient',
+    String? avatarUrl,
+  }) async {
+    AppLogger.log('loginWithFacebook entered | role=$role');
+    _setLoading(true);
+    _setError(null);
+    try {
+      final response = await _apiClient.post(
+        AppConfig.facebookLoginEndpoint,
+        data: {
+          'access_token': accessToken,
+          'role': role,
+          'avatar_url': avatarUrl,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = response.data;
+        final token = data['access_token'];
+        final userJson = data['user'];
+
+        if (token != null && userJson != null) {
+          _currentUser = User.fromJson(userJson);
+          _isAuthenticated = true;
+          await _secureStorage.saveToken(token);
+          await _secureStorage.saveUser(userJson);
+          _setLoading(false);
+          return true;
+        }
+      }
+      _setLoading(false);
+      final detail = response.data?['detail'] ?? 'Đăng nhập Facebook thất bại.';
+      _setError(detail.toString());
+      return false;
+    } catch (e) {
+      _setLoading(false);
+      _setError('Lỗi kết nối máy chủ khi đăng nhập Facebook.');
+      AppLogger.log('loginWithFacebook error | $e');
       return false;
     }
   }

@@ -39,9 +39,21 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     if (autoLoginSuccess) {
+      final user = authProvider.currentUser;
+      if (user?.role == 'doctor') {
+        final status = user?.verificationStatus ?? 'active';
+        if (status == 'pending') {
+          Navigator.pushReplacementNamed(context, '/doctor-pending');
+          return;
+        } else if (status == 'rejected') {
+          Navigator.pushReplacementNamed(context, '/doctor-rejected',
+              arguments: {'reason': user?.rejectionReason});
+          return;
+        }
+      }
       Navigator.pushReplacementNamed(context, '/dashboard');
     } else {
-      Navigator.pushReplacementNamed(context, '/login');
+      Navigator.pushReplacementNamed(context, '/role-select');
     }
   }
 

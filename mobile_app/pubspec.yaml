@@ -1,5 +1,5 @@
-name: heart_monitor_app
-description: "Smart Heart Patient Monitoring Mobile App with Live Telemetry and 3D Heart Visuals"
+name: cardioguard_ai
+description: "CardioGuard AI — Smart Heart Patient Monitoring Mobile App"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -20,6 +20,10 @@ dependencies:
   google_sign_in: ^6.2.1
   shared_preferences: ^2.2.3
   permission_handler: ^11.3.1
+  image_picker: ^1.1.2
+  cached_network_image: ^3.3.1
+  intl: ^0.19.0
+  flutter_facebook_auth: ^7.1.1
 
 dev_dependencies:
   flutter_test:

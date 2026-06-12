@@ -28,8 +28,14 @@ class User {
   // Liệu người dùng có bắt buộc phải thay đổi mật khẩu ở lần đăng nhập tiếp theo hay không.
   final bool mustChangePassword;
   final String? avatarUrl;
+  final String? phone;
+  final String? specialty;
+  final String? department;
+  // Trạng thái xác minh bác sĩ: 'pending' | 'active' | 'rejected'
+  final String? verificationStatus;
+  final String? rejectionReason;
+  final String? provider;
 
-  // Tạo một User với tất cả các trường bắt buộc.
   User({
     required this.id,
     required this.fullName,
@@ -38,9 +44,14 @@ class User {
     required this.status,
     required this.mustChangePassword,
     this.avatarUrl,
+    this.phone,
+    this.specialty,
+    this.department,
+    this.verificationStatus,
+    this.rejectionReason,
+    this.provider,
   });
 
-  // Giải mã một User từ bản đồ JSON được trả về bởi API.
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id'] ?? '',
@@ -50,10 +61,15 @@ class User {
       status: (json['status'] ?? 'active').toString(),
       mustChangePassword: json['must_change_password'] == true,
       avatarUrl: json['avatar_url'],
+      phone: json['phone'],
+      specialty: json['specialty'],
+      department: json['department'],
+      verificationStatus: json['verification_status'] ?? json['doctor_status'],
+      rejectionReason: json['rejection_reason'],
+      provider: json['provider'] ?? 'email',
     );
   }
 
-  // Mã hóa User này thành bản đồ JSON cho các yêu cầu API.
   Map<String, dynamic> toJson() => {
         'id': id,
         'full_name': fullName,
@@ -62,6 +78,12 @@ class User {
         'status': status,
         'must_change_password': mustChangePassword,
         'avatar_url': avatarUrl,
+        'phone': phone,
+        'specialty': specialty,
+        'department': department,
+        'verification_status': verificationStatus,
+        'rejection_reason': rejectionReason,
+        'provider': provider,
       };
 }
 

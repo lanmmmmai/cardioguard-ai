@@ -80,6 +80,9 @@ class AppConfig {
   static const String chatSessionsEndpoint = '/chat/sessions';
   static const String chatHistoryEndpoint = '/chat/history';
   static const String chatSendEndpoint = '/chat/send';
+  static const String facebookLoginEndpoint = '/auth/facebook-login';
+  static const String changePasswordEndpoint = '/auth/change-password';
+  static const String profileEndpoint = '/profile';
 
   // Khóa lưu trữ an toàn
   static const String keyToken = 'jwt_access_token';
@@ -87,6 +90,9 @@ class AppConfig {
 
   // Google OAuth client IDs được truyền qua `--dart-define` khi build.
   static const String googleServerClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+
+  // Facebook App ID — truyền qua `--dart-define=FACEBOOK_APP_ID=...`
+  static const String facebookAppId = String.fromEnvironment('FACEBOOK_APP_ID');
 
   // Cài đặt mạng
   static const int connectTimeoutMs = 45000; // 45 giây (tăng cho thời gian khởi động nguội Render)
