@@ -43,7 +43,7 @@ from app.core.rate_limit import check_rate_limit, get_client_ip
 from app.schemas.auth_schema import (
     RegisterRequest, LoginRequest, RegisterOtpRequest,
     ForgotPasswordRequest, ForgotPasswordVerifyRequest, ChangePasswordRequest,
-    GoogleLoginRequest
+    GoogleLoginRequest, FacebookLoginRequest
 )
 from app.services.otp_service import (
     OTP_PURPOSE_FORGOT_PASSWORD,
@@ -1022,6 +1022,274 @@ async def google_login(data: GoogleLoginRequest, request: Request):
             "profile_completed": bool(user["profile_completed"]),
             "is_verified": bool(user["is_verified"]),
             "avatar_url": user["avatar_url"]
+        }
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Facebook Login
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _verify_facebook_access_token(access_token: str) -> dict:
+    """Xác minh Facebook access_token qua Graph API và trả về thông tin user."""
+    app_id = (settings.FACEBOOK_APP_ID if hasattr(settings, "FACEBOOK_APP_ID") else None) or os.getenv("FACEBOOK_APP_ID", "")
+    app_secret = (settings.FACEBOOK_APP_SECRET if hasattr(settings, "FACEBOOK_APP_SECRET") else None) or os.getenv("FACEBOOK_APP_SECRET", "")
+
+    if not app_id or not app_secret:
+        raise HTTPException(status_code=500, detail="Facebook login chưa được cấu hình")
+
+    # Bước 1: Xác minh token hợp lệ qua debug_token
+    debug_url = (
+        f"https://graph.facebook.com/debug_token"
+        f"?input_token={access_token}"
+        f"&access_token={app_id}|{app_secret}"
+    )
+    try:
+        debug_resp = requests.get(debug_url, timeout=10)
+        debug_data = debug_resp.json().get("data", {})
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Không thể xác minh token Facebook") from exc
+
+    if not debug_data.get("is_valid"):
+        raise HTTPException(status_code=401, detail="Token Facebook không hợp lệ hoặc đã hết hạn")
+
+    if str(debug_data.get("app_id", "")) != str(app_id):
+        raise HTTPException(status_code=401, detail="Token Facebook không thuộc ứng dụng này")
+
+    # Bước 2: Lấy thông tin user
+    user_url = (
+        f"https://graph.facebook.com/me"
+        f"?fields=id,name,email,picture.type(large)"
+        f"&access_token={access_token}"
+    )
+    try:
+        user_resp = requests.get(user_url, timeout=10)
+        user_data = user_resp.json()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Không thể lấy thông tin người dùng từ Facebook") from exc
+
+    if "error" in user_data:
+        raise HTTPException(status_code=401, detail="Không thể xác thực với Facebook")
+
+    return user_data
+
+
+@router.post("/auth/facebook-login")
+async def facebook_login(data: FacebookLoginRequest, request: Request):
+    """Đăng nhập hoặc tự động đăng ký tài khoản bằng Facebook.
+
+    - Xác minh access_token với Facebook Graph API.
+    - Nếu email chưa tồn tại: tạo tài khoản mới theo role.
+    - Nếu email đã tồn tại: kiểm tra role và đăng nhập.
+    - Admin: chỉ được đăng nhập nếu email đã tồn tại và có role admin.
+    """
+    ip_addr = request.client.host if request.client else "-"
+
+    fb_data = _verify_facebook_access_token(data.access_token)
+
+    email = (fb_data.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(
+            status_code=400,
+            detail="Không thể lấy email từ Facebook. Vui lòng cấp quyền email hoặc dùng phương thức đăng nhập khác."
+        )
+
+    requested_role = (data.role or "patient").strip().lower()
+    if requested_role not in {"patient", "doctor", "admin"}:
+        raise HTTPException(status_code=400, detail="Vai trò không hợp lệ")
+
+    facebook_id = str(fb_data.get("id") or "").strip()
+    display_name = (
+        (fb_data.get("name") or "").strip()
+        or (data.full_name or "").strip()
+        or email.split("@", 1)[0]
+    )
+    avatar_url = (
+        fb_data.get("picture", {}).get("data", {}).get("url")
+        or data.avatar_url
+        or None
+    )
+
+    logger.debug("facebook_login: email=%s role=%s", mask_email(email), requested_role)
+
+    # Lấy thông tin cột bảng users
+    user_columns = await get_users_columns()
+
+    select_cols = "id::text as id, full_name, email, role"
+    select_cols += ", must_change_password" if "must_change_password" in user_columns else ", FALSE as must_change_password"
+    select_cols += ", status" if "status" in user_columns else ", NULL::text as status"
+    select_cols += ", profile_completed" if "profile_completed" in user_columns else ", FALSE as profile_completed"
+    select_cols += ", is_verified" if "is_verified" in user_columns else ", FALSE as is_verified"
+    select_cols += ", avatar_url" if "avatar_url" in user_columns else ", NULL::text as avatar_url"
+    select_cols += ", facebook_id" if "facebook_id" in user_columns else ", NULL::text as facebook_id"
+
+    query = f"SELECT {select_cols} FROM users WHERE email = :email"
+    user = await database.fetch_one(query=query, values={"email": email})
+
+    if user:
+        # ── Tài khoản đã tồn tại ─────────────────────────────────────────────
+        status_val = (user["status"] or "").strip().lower()
+        if status_val in {"inactive", "disabled", "deleted"}:
+            raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
+
+        db_role = normalize_role(user["role"])
+
+        # Admin: chỉ cho đăng nhập nếu role khớp
+        if requested_role == "admin" and db_role != "admin":
+            raise HTTPException(
+                status_code=403,
+                detail="Tài khoản Facebook này không có quyền truy cập trang quản trị."
+            )
+
+        if db_role != requested_role:
+            raise HTTPException(
+                status_code=403,
+                detail="Tài khoản Facebook này không khớp với vai trò đăng nhập hiện tại"
+            )
+
+        # Cập nhật facebook_id và avatar_url nếu thiếu
+        update_fields = []
+        update_values: dict = {"id": user["id"]}
+        if "facebook_id" in user_columns and facebook_id and (not user["facebook_id"] or user["facebook_id"] != facebook_id):
+            update_fields.append("facebook_id = :facebook_id")
+            update_values["facebook_id"] = facebook_id
+        if "avatar_url" in user_columns and avatar_url and not user["avatar_url"]:
+            update_fields.append("avatar_url = :avatar_url")
+            update_values["avatar_url"] = avatar_url
+        if update_fields:
+            await database.execute(
+                f"UPDATE users SET {', '.join(update_fields)} WHERE id = :id",
+                update_values
+            )
+            user = await database.fetch_one(query=query, values={"email": email})
+
+    else:
+        # ── Tài khoản chưa tồn tại — tự động đăng ký ────────────────────────
+        if requested_role == "admin":
+            raise HTTPException(
+                status_code=403,
+                detail="Tài khoản Facebook này không có quyền truy cập trang quản trị."
+            )
+
+        random_pw = secrets.token_hex(16)
+        status_value = "active" if requested_role == "patient" else "pending_profile"
+        profile_completed = requested_role == "patient"
+
+        insert_query = """
+        INSERT INTO users(full_name, email, password_hash, role, status, profile_completed,
+                          is_verified, avatar_url, facebook_id)
+        VALUES (:full_name, :email, :password_hash, :role, :status, :profile_completed,
+                FALSE, :avatar_url, :facebook_id)
+        """
+
+        try:
+            async with database.transaction():
+                await database.execute(
+                    query=insert_query,
+                    values={
+                        "full_name": display_name,
+                        "email": email,
+                        "password_hash": hash_password(random_pw),
+                        "role": requested_role,
+                        "status": status_value,
+                        "profile_completed": profile_completed,
+                        "avatar_url": avatar_url,
+                        "facebook_id": facebook_id or None,
+                    }
+                )
+
+                user = await database.fetch_one(query=query, values={"email": email})
+                if not user:
+                    raise RuntimeError("Không thể tạo tài khoản mới qua Facebook")
+
+                user_id = user["id"]
+
+                if requested_role == "patient":
+                    patient_cols_rows = await database.fetch_all(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_schema='public' AND table_name='patients'"
+                    )
+                    patient_col_set = {r["column_name"] for r in patient_cols_rows}
+                    patient_vals: dict = {"id": user_id, "full_name": display_name}
+                    if "user_id" in patient_col_set:
+                        patient_vals["user_id"] = user_id
+                    ins_cols = ", ".join(patient_vals.keys())
+                    ins_binds = ", ".join(f":{k}" for k in patient_vals.keys())
+                    await database.execute(
+                        f"INSERT INTO patients ({ins_cols}) VALUES ({ins_binds}) ON CONFLICT DO NOTHING",
+                        patient_vals
+                    )
+
+                elif requested_role == "doctor":
+                    doctor_cols_rows = await database.fetch_all(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_schema='public' AND table_name='doctor_profiles'"
+                    )
+                    doctor_col_set = {r["column_name"] for r in doctor_cols_rows}
+                    doctor_vals: dict = {"user_id": user_id, "full_name": display_name}
+                    if "avatar_url" in doctor_col_set:
+                        doctor_vals["avatar_url"] = avatar_url
+                    if "status" in doctor_col_set:
+                        doctor_vals["status"] = "pending_profile"
+                    if "is_verified" in doctor_col_set:
+                        doctor_vals["is_verified"] = False
+                    ins_cols = ", ".join(doctor_vals.keys())
+                    ins_binds = ", ".join(f":{k}" for k in doctor_vals.keys())
+                    await database.execute(
+                        f"INSERT INTO doctor_profiles ({ins_cols}) VALUES ({ins_binds}) ON CONFLICT DO NOTHING",
+                        doctor_vals
+                    )
+
+        except Exception:
+            logger.exception("Facebook auto-registration failed for email=%s", mask_email(email))
+            raise HTTPException(
+                status_code=500,
+                detail="Không thể đăng ký tự động bằng Facebook. Vui lòng thử lại sau."
+            )
+
+        try:
+            await log_activity(
+                user_id=user["id"],
+                action="USER_REGISTER_SUCCESS",
+                entity_type="users",
+                entity_id=user["id"],
+                ip_address=ip_addr,
+                details={"method": "facebook"}
+            )
+        except Exception:
+            logger.warning("Failed to log Facebook registration for user_id=%s", user["id"])
+
+        db_role = requested_role
+
+    # ── Tạo JWT và trả về ────────────────────────────────────────────────────
+    db_role = normalize_role(user["role"])
+    token = create_access_token({"sub": user["id"], "role": db_role})
+
+    try:
+        await log_activity(
+            user_id=user["id"],
+            action="USER_LOGIN_SUCCESS",
+            entity_type="users",
+            entity_id=user["id"],
+            ip_address=ip_addr,
+            details={"method": "facebook"}
+        )
+    except Exception:
+        logger.warning("Failed to log Facebook login for user_id=%s", user["id"])
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "full_name": user["full_name"],
+            "email": user["email"],
+            "role": db_role,
+            "status": user["status"],
+            "must_change_password": bool(user["must_change_password"]),
+            "profile_completed": bool(user["profile_completed"]),
+            "is_verified": bool(user["is_verified"]),
+            "avatar_url": user["avatar_url"],
         }
     }
 

@@ -7,14 +7,16 @@
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { Activity, ArrowLeft, CheckCircle2, Lock, Mail, ShieldCheck, User, Loader2, Phone, Stethoscope, Building } from 'lucide-react';
-import { API_URL, GOOGLE_CLIENT_ID } from '../config';
+import { API_URL, GOOGLE_CLIENT_ID, FACEBOOK_APP_ID } from '../config';
 import { isStrongPassword, getPasswordPolicyMessage } from '../utils/passwordPolicy';
 import { UserRole } from '../auth/roles';
 import { useLocale } from '../i18n/locale';
 import { readJsonResponse } from '../utils/response';
 import { LegalFooterLinks } from './LegalFooterLinks';
 import { GoogleLoginButton } from './GoogleLoginButton';
+import { FacebookLoginButton } from './FacebookLoginButton';
 import { exchangeGoogleIdToken, type GoogleAuthUser } from '../lib/googleAuth';
+import { exchangeFacebookToken } from '../lib/facebookAuth';
 
 interface RegisterProps {
   role: UserRole;
@@ -48,7 +50,8 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
   const [agreed, setAgreed] = useState(false);
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const timerRef = useRef<any>(null);
-  const showGoogleRegister = role === 'patient' && Boolean(GOOGLE_CLIENT_ID);
+  const showGoogleRegister = role !== 'admin' && Boolean(GOOGLE_CLIENT_ID);
+  const showFacebookRegister = role !== 'admin' && Boolean(FACEBOOK_APP_ID);
 
   useEffect(() => {
     return () => {
@@ -150,12 +153,25 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
     setError(null);
     setSuccess(null);
     setIsLoading(true);
-
     try {
       const data = await exchangeGoogleIdToken(idToken, role);
       onGoogleAuthSuccess(data.access_token, data.user);
     } catch (err: any) {
       setError(err?.message || 'Đăng nhập Google thất bại.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFacebookToken = async (accessToken: string) => {
+    setError(null);
+    setSuccess(null);
+    setIsLoading(true);
+    try {
+      const data = await exchangeFacebookToken(accessToken, role);
+      onGoogleAuthSuccess(data.access_token, data.user as GoogleAuthUser);
+    } catch (err: any) {
+      setError(err?.message || 'Đăng ký Facebook thất bại.');
     } finally {
       setIsLoading(false);
     }
@@ -311,22 +327,35 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
           <span>Bấm Đăng Ký để nhận OTP, sau đó nhập mã trong form xác minh hiện lên.</span>
         </div>
 
-        {showGoogleRegister && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', margin: '1rem 0 1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              <span style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }} />
-              <span>Hoặc</span>
-              <span style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }} />
+        {(showGoogleRegister || showFacebookRegister) && (
+          <>
+            <div className="social-login-divider" style={{ margin: '1rem 0 0' }}>
+              <span />
+              <span className="divider-label">Đăng ký nhanh với</span>
+              <span />
             </div>
-            <GoogleLoginButton
-              clientId={GOOGLE_CLIENT_ID}
-              disabled={isLoading}
-              buttonText="signup_with"
-              caption="Đăng ký nhanh bằng tài khoản Google"
-              successLabel="Đang xác thực với Google..."
-              onCredential={handleGoogleCredential}
-            />
-          </div>
+            <div className="social-login-buttons" style={{ marginBottom: '1.25rem' }}>
+              {showGoogleRegister && (
+                <GoogleLoginButton
+                  clientId={GOOGLE_CLIENT_ID}
+                  disabled={isLoading}
+                  buttonText="signup_with"
+                  caption="Tiếp tục với Google"
+                  successLabel="Đang xác thực với Google..."
+                  onCredential={handleGoogleCredential}
+                />
+              )}
+              {showFacebookRegister && (
+                <FacebookLoginButton
+                  appId={FACEBOOK_APP_ID}
+                  role={role}
+                  disabled={isLoading}
+                  caption="Tiếp tục với Facebook"
+                  onAccessToken={handleFacebookToken}
+                />
+              )}
+            </div>
+          </>
         )}
 
         <form onSubmit={handleSubmit} className="register-form">

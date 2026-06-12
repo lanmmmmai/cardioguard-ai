@@ -128,6 +128,12 @@ export const WS_URL = getResolvedWsUrl() as string;
 /** Google OAuth client ID dùng cho Google Sign-In trên web */
 export const GOOGLE_CLIENT_ID = typeof bakedGoogleClientId === 'string' ? bakedGoogleClientId.trim() : '';
 
+/** Facebook App ID dùng cho Facebook Login */
+export const FACEBOOK_APP_ID = (() => {
+  const raw = import.meta.env.VITE_FACEBOOK_APP_ID;
+  return typeof raw === 'string' ? raw.trim() : '';
+})();
+
 export const buildApiUrl = (path: string) => {
   if (path.startsWith('http://') || path.startsWith('https://')) {
     return path;

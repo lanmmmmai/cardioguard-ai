@@ -205,3 +205,18 @@ class GoogleLoginRequest(BaseModel):
     google_id: Optional[str] = None
     avatar_url: Optional[str] = None
     role: Optional[str] = "patient"
+
+
+class FacebookLoginRequest(BaseModel):
+    """Thông tin xác thực cho đăng nhập bằng Facebook.
+
+    Thuộc tính:
+        access_token: Access token do Facebook JS SDK trả về sau khi người dùng đăng nhập.
+        role: Vai trò đăng nhập mong muốn ('patient' | 'doctor' | 'admin').
+        full_name: Tên đầy đủ tùy chọn (từ client, không tin tưởng hoàn toàn).
+        avatar_url: URL ảnh đại diện tùy chọn.
+    """
+    access_token: str
+    role: Optional[str] = "patient"
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
