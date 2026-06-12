@@ -1,7 +1,5 @@
+```yaml
 name: Build Flutter APK
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 on:
   workflow_dispatch:
@@ -19,11 +17,13 @@ jobs:
       run:
         working-directory: mobile_app
 
+    env:
+      API_BASE_URL: ${{ secrets.API_BASE_URL || 'https://cardioguard-ai-backend.onrender.com' }}
+
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # Java 17 MUST be set up before Flutter so Gradle picks up the right JDK.
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
@@ -53,54 +53,67 @@ jobs:
         run: flutter pub get
 
       - name: Analyze Dart code
-        continue-on-error: true
         run: flutter analyze --no-fatal-infos
 
       - name: Inject Facebook credentials into strings.xml
         env:
-          FACEBOOK_APP_ID: "${{ secrets.FACEBOOK_APP_ID }}"
-          FACEBOOK_CLIENT_TOKEN: "${{ secrets.FACEBOOK_CLIENT_TOKEN }}"
+          FACEBOOK_APP_ID: ${{ secrets.FACEBOOK_APP_ID }}
+          FACEBOOK_CLIENT_TOKEN: ${{ secrets.FACEBOOK_CLIENT_TOKEN }}
         run: |
           FILE="android/app/src/main/res/values/strings.xml"
-          if [ -n "$FACEBOOK_APP_ID" ]; then
-            # Replace both the App ID placeholder AND the protocol scheme
-            sed -i "s/YOUR_FACEBOOK_APP_ID/${FACEBOOK_APP_ID}/g" "$FILE"
-            echo "✅ Facebook App ID + protocol scheme injected."
-          else
-            echo "⚠️  FACEBOOK_APP_ID secret not set — Facebook Login will not work at runtime."
+
+          if [ ! -f "$FILE" ]; then
+            echo "❌ strings.xml not found at $FILE"
+            exit 1
           fi
+
+          if [ -n "$FACEBOOK_APP_ID" ]; then
+            sed -i "s/YOUR_FACEBOOK_APP_ID/${FACEBOOK_APP_ID}/g" "$FILE"
+            echo "✅ Facebook App ID and protocol scheme injected."
+          else
+            echo "⚠️ FACEBOOK_APP_ID secret not set. Facebook Login may not work at runtime."
+          fi
+
           if [ -n "$FACEBOOK_CLIENT_TOKEN" ]; then
             sed -i "s/YOUR_FACEBOOK_CLIENT_TOKEN/${FACEBOOK_CLIENT_TOKEN}/g" "$FILE"
             echo "✅ Facebook Client Token injected."
+          else
+            echo "⚠️ FACEBOOK_CLIENT_TOKEN secret not set. Facebook Login may not work at runtime."
           fi
 
-      - name: Prepare Android release keystore (optional)
+          echo "✅ strings.xml after injection:"
+          grep -E "facebook_app_id|fb_login_protocol_scheme|facebook_client_token" "$FILE" || true
+
+      - name: Prepare Android release keystore optional
         env:
-          ANDROID_KEYSTORE_BASE64: "${{ secrets.ANDROID_KEYSTORE_BASE64 }}"
-          ANDROID_KEYSTORE_PASSWORD: "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
-          ANDROID_KEY_ALIAS: "${{ secrets.ANDROID_KEY_ALIAS }}"
-          ANDROID_KEY_PASSWORD: "${{ secrets.ANDROID_KEY_PASSWORD }}"
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -n "$ANDROID_KEYSTORE_BASE64" ] && \
              [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && \
              [ -n "$ANDROID_KEY_ALIAS" ] && \
              [ -n "$ANDROID_KEY_PASSWORD" ]; then
+
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
+
             cat > android/key.properties <<EOF
           storeFile=release-keystore.jks
           storePassword=$ANDROID_KEYSTORE_PASSWORD
           keyAlias=$ANDROID_KEY_ALIAS
           keyPassword=$ANDROID_KEY_PASSWORD
           EOF
+
             echo "✅ Release keystore configured."
           else
-            echo "⚠️  Release keystore secrets missing — fallback to debug signing."
+            echo "⚠️ Release keystore secrets missing. APK will use fallback signing if configured in Gradle."
           fi
 
       - name: Build release APK
         run: |
           flutter build apk --release \
-            --dart-define=API_BASE_URL="${{ secrets.API_BASE_URL || 'https://cardioguard-ai-backend.onrender.com' }}"
+            --dart-define=API_BASE_URL="$API_BASE_URL"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -108,3 +121,4 @@ jobs:
           name: cardioguard-ai-release-apk
           path: mobile_app/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
+```
