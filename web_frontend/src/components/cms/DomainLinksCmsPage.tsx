@@ -33,10 +33,13 @@ interface DomainLinkRow {
   id: string;
   path: string;
   url: string;
+  target_url?: string;
   domain: string;
+  role?: string;
   title: string;
   description: string;
   image_url: string;
+  og_type?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -44,15 +47,27 @@ interface DomainLinkRow {
   cache_version?: number;
 }
 
+type DomainRole = 'patient' | 'doctor' | 'admin' | 'public';
+
 interface DomainLinkFormState {
   path: string;
   url: string;
+  target_url: string;
   domain: string;
+  role: DomainRole;
   title: string;
   description: string;
   image_url: string;
+  og_type: string;
   is_active: boolean;
 }
+
+const DOMAIN_ROLE_OPTIONS: { value: DomainRole; label: string }[] = [
+  { value: 'public', label: 'Public (trang công khai)' },
+  { value: 'patient', label: 'Patient (bệnh nhân)' },
+  { value: 'doctor', label: 'Doctor (bác sĩ)' },
+  { value: 'admin', label: 'Admin (quản trị viên)' },
+];
 
 const LIMIT = 12;
 const DEFAULT_SITE_URL = 'https://giatky.site';
@@ -61,10 +76,13 @@ const DEFAULT_LEGAL_PATH = '/about';
 const blankForm = (): DomainLinkFormState => ({
   path: DEFAULT_LEGAL_PATH,
   url: `${DEFAULT_SITE_URL}${DEFAULT_LEGAL_PATH}`,
+  target_url: `${DEFAULT_SITE_URL}${DEFAULT_LEGAL_PATH}`,
   domain: 'giatky.site',
+  role: 'public',
   title: 'CardioGuard AI - Giới thiệu',
   description: 'Tìm hiểu về nền tảng CardioGuard AI, hệ thống giám sát tim mạch, SpO2, huyết áp và cảnh báo lâm sàng thời gian thực.',
   image_url: `${DEFAULT_SITE_URL}/og-about.png`,
+  og_type: 'website',
   is_active: true,
 });
 
@@ -206,18 +224,23 @@ export const DomainLinksCmsPage: React.FC<DomainLinksCmsPageProps> = ({ embedded
     setEditorOpen(true);
   };
 
+  const itemToForm = (item: DomainLinkRow): DomainLinkFormState => ({
+    path: item.path || '/',
+    url: item.url || item.target_url || '',
+    target_url: item.target_url || item.url || '',
+    domain: item.domain || '',
+    role: (item.role as DomainRole) || 'public',
+    title: item.title || '',
+    description: item.description || '',
+    image_url: item.image_url || '',
+    og_type: item.og_type || 'website',
+    is_active: Boolean(item.is_active),
+  });
+
   const openView = (item: DomainLinkRow) => {
     setEditingItem(item);
     setEditorMode('view');
-    setForm({
-      path: item.path || '/',
-      url: item.url || '',
-      domain: item.domain || '',
-      title: item.title || '',
-      description: item.description || '',
-      image_url: item.image_url || '',
-      is_active: Boolean(item.is_active),
-    });
+    setForm(itemToForm(item));
     setSelectedPreview(null);
     setUploadWarning(null);
     setEditorOpen(true);
@@ -226,15 +249,7 @@ export const DomainLinksCmsPage: React.FC<DomainLinksCmsPageProps> = ({ embedded
   const openEdit = (item: DomainLinkRow) => {
     setEditingItem(item);
     setEditorMode('edit');
-    setForm({
-      path: item.path || '/',
-      url: item.url || '',
-      domain: item.domain || '',
-      title: item.title || '',
-      description: item.description || '',
-      image_url: item.image_url || '',
-      is_active: Boolean(item.is_active),
-    });
+    setForm(itemToForm(item));
     setSelectedPreview(null);
     setUploadWarning(null);
     setEditorOpen(true);
@@ -243,12 +258,14 @@ export const DomainLinksCmsPage: React.FC<DomainLinksCmsPageProps> = ({ embedded
   const handlePathChange = (value: string) => {
     setForm((prev) => {
       const nextPath = value.startsWith('/') ? value : `/${value}`;
+      const derivedUrl = deriveUrlFromPath(nextPath);
       const shouldAutoUrl = !prev.url || prev.url === deriveUrlFromPath(prev.path);
       return {
         ...prev,
         path: nextPath,
-        url: shouldAutoUrl ? deriveUrlFromPath(nextPath) : prev.url,
-        domain: shouldAutoUrl ? new URL(deriveUrlFromPath(nextPath)).hostname : prev.domain,
+        url: shouldAutoUrl ? derivedUrl : prev.url,
+        target_url: shouldAutoUrl ? derivedUrl : prev.target_url,
+        domain: shouldAutoUrl ? new URL(derivedUrl).hostname : prev.domain,
       };
     });
   };
@@ -257,6 +274,7 @@ export const DomainLinksCmsPage: React.FC<DomainLinksCmsPageProps> = ({ embedded
     setForm((prev) => ({
       ...prev,
       url: value,
+      target_url: value,
       domain: (() => {
         try {
           return new URL(value).hostname;
@@ -315,21 +333,29 @@ export const DomainLinksCmsPage: React.FC<DomainLinksCmsPageProps> = ({ embedded
       return;
     }
 
+    const resolvedUrl = form.url.trim() || form.target_url.trim();
+    if (!resolvedUrl) {
+      setError('Vui lòng nhập URL đích');
+      return;
+    }
     const payload = {
       path: form.path.trim().startsWith('/') ? form.path.trim() : `/${form.path.trim()}`,
-      url: form.url.trim(),
+      url: resolvedUrl,
+      target_url: form.target_url.trim() || resolvedUrl,
       domain: (() => {
         const fallback = form.domain.trim();
         if (fallback) return fallback;
         try {
-          return new URL(form.url.trim()).hostname;
+          return new URL(resolvedUrl).hostname;
         } catch {
           return 'giatky.site';
         }
       })(),
+      role: form.role || 'public',
       title: form.title.trim(),
       description: form.description.trim(),
       image_url: form.image_url.trim(),
+      og_type: form.og_type || 'website',
       is_active: form.is_active,
     };
 
@@ -561,6 +587,20 @@ export const DomainLinksCmsPage: React.FC<DomainLinksCmsPageProps> = ({ embedded
                     placeholder="https://giatky.site/about"
                     disabled={editorMode === 'view'}
                   />
+                </div>
+
+                <div className="form-group">
+                  <label>Vai trò (role)</label>
+                  <select
+                    className="form-control"
+                    value={form.role}
+                    onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value as DomainRole }))}
+                    disabled={editorMode === 'view'}
+                  >
+                    {DOMAIN_ROLE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="form-group">

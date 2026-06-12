@@ -1,4 +1,4 @@
-export type EmailFunctionGroupKey = 'auth' | 'account' | 'doctor_account' | 'appointment' | 'health' | 'report' | 'custom';
+export type EmailFunctionGroupKey = 'auth' | 'account' | 'doctor_account' | 'appointment' | 'health' | 'report' | 'device' | 'custom';
 export type EmailTargetRole = 'patient' | 'doctor' | 'admin' | 'all';
 
 export interface EmailFunctionOption {
@@ -38,6 +38,10 @@ export const SYSTEM_EMAIL_FUNCTIONS: EmailFunctionOption[] = [
   { email_type: 'doctor_verified', cms_email_id: 'EMAIL_DOCTOR_VERIFIED', name: 'Bác sĩ đã xác thực', group_key: 'account', target_role: 'doctor', description: 'Thông báo hồ sơ bác sĩ đã được xác thực.', required_variables: ['full_name'], optional_variables: ['login_url', 'login_button_text'], is_system: true, is_active: true },
   { email_type: 'doctor_rejected', cms_email_id: 'EMAIL_DOCTOR_REJECTED', name: 'Bác sĩ bị từ chối', group_key: 'account', target_role: 'doctor', description: 'Thông báo hồ sơ bị từ chối.', required_variables: ['full_name', 'verification_note'], optional_variables: [], is_system: true, is_active: true },
   { email_type: 'doctor_need_update', cms_email_id: 'EMAIL_DOCTOR_NEED_UPDATE', name: 'Bác sĩ cần bổ sung hồ sơ', group_key: 'doctor_account', target_role: 'doctor', description: 'Yêu cầu bổ sung hồ sơ bác sĩ.', required_variables: ['full_name', 'verification_note'], optional_variables: ['update_profile_url', 'support_email'], is_system: true, is_active: true },
+  { email_type: 'new_password', cms_email_id: 'EMAIL_NEW_PASSWORD', name: 'Mật khẩu mới', group_key: 'auth', target_role: 'all', description: 'Gửi mật khẩu mới sau khi đặt lại thành công.', required_variables: ['full_name', 'new_password'], optional_variables: ['login_url'], is_system: true, is_active: true },
+  { email_type: 'appointment_confirmed', cms_email_id: 'EMAIL_APPOINTMENT_CONFIRMED', name: 'Xác nhận lịch hẹn', group_key: 'appointment', target_role: 'all', description: 'Thông báo lịch hẹn đã được xác nhận.', required_variables: ['full_name', 'appointment_time', 'doctor_name'], optional_variables: ['clinic_address', 'appointment_note'], is_system: true, is_active: true },
+  { email_type: 'appointment_cancelled', cms_email_id: 'EMAIL_APPOINTMENT_CANCELLED', name: 'Hủy lịch hẹn', group_key: 'appointment', target_role: 'all', description: 'Thông báo lịch hẹn đã bị hủy.', required_variables: ['full_name', 'appointment_time', 'doctor_name'], optional_variables: ['cancel_reason', 'support_email'], is_system: true, is_active: true },
+  { email_type: 'iot_disconnected', cms_email_id: 'EMAIL_IOT_DISCONNECTED', name: 'Thiết bị IoT mất kết nối', group_key: 'device', target_role: 'patient', description: 'Thông báo thiết bị theo dõi sức khỏe mất kết nối.', required_variables: ['full_name', 'device_name'], optional_variables: ['last_seen', 'support_email'], is_system: true, is_active: true },
 ];
 
 export const CUSTOM_TEMPLATE_HINTS = [
@@ -65,6 +69,10 @@ export const EMAIL_TEMPLATE_LABEL_MAP: Record<string, string> = {
   doctor_verified_success: 'Bác sĩ đã được xác thực',
   doctor_verified_rejected: 'Bác sĩ bị từ chối xác thực',
   doctor_profile_require_update: 'Bác sĩ cần bổ sung hồ sơ',
+  new_password: 'Mật khẩu mới',
+  appointment_confirmed: 'Xác nhận lịch hẹn',
+  appointment_cancelled: 'Hủy lịch hẹn',
+  iot_disconnected: 'Thiết bị IoT mất kết nối',
 };
 
 export const EMAIL_GROUP_LABEL_MAP: Record<EmailFunctionGroupKey, string> = {
@@ -74,6 +82,7 @@ export const EMAIL_GROUP_LABEL_MAP: Record<EmailFunctionGroupKey, string> = {
   appointment: 'Nhóm hệ thống: Lịch hẹn',
   health: 'Nhóm hệ thống: Sức khỏe',
   report: 'Nhóm hệ thống: Báo cáo',
+  device: 'Nhóm hệ thống: Thiết bị IoT',
   custom: 'Nhóm tùy chỉnh',
 };
 
@@ -124,6 +133,7 @@ export const buildGroupedEmailFunctionOptions = (customFunctions: EmailFunctionO
     appointment: [],
     health: [],
     report: [],
+    device: [],
     custom: [],
   };
 

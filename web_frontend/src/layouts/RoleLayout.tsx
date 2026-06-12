@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Activity, LogOut, Menu, Moon, Sun, MoreHorizontal, X, ChevronDown, ChevronRight, Bell } from 'lucide-react';
+import { Activity, AlertTriangle, LogOut, Loader2, Menu, Moon, Sun, MoreHorizontal, X, ChevronDown, ChevronRight, Bell } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { type UserRole } from '../auth/roles';
 import { roleMenus } from '../navigation/roleMenus';
@@ -59,6 +59,9 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
   const menuItems = roleMenus[role];
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isBellDropdownOpen, setIsBellDropdownOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
   // Phân nhóm động các mục menu theo trường group
   const groupedMenuItems = useMemo(() => {
@@ -103,30 +106,35 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
     return `${API_URL}${path}?token=${accessToken}`;
   };
 
-  const confirmLogout = () => {
-    return window.confirm(locale === 'en' ? 'Do you want to log out?' : 'Bạn muốn đăng xuất?');
-  };
-
   // Đóng drawer di động khi nhấn phím Escape để hỗ trợ trợ năng
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsMobileMenuOpen(false);
+        if (!loggingOut) setShowLogoutModal(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [loggingOut]);
 
   const handleLogout = () => {
-    if (!confirmLogout()) return;
-    logout();
-    if (role === 'admin') {
-      navigate('/login-admin', true);
-    } else if (role === 'doctor') {
-      navigate('/login-doctor', true);
-    } else {
-      navigate('/login', true);
+    setLogoutError(null);
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogoutAction = async () => {
+    setLoggingOut(true);
+    setLogoutError(null);
+    try {
+      logout();
+      setShowLogoutModal(false);
+      if (role === 'admin') navigate('/login-admin', true);
+      else if (role === 'doctor') navigate('/login-doctor', true);
+      else navigate('/login', true);
+    } catch {
+      setLogoutError(locale === 'en' ? 'Logout failed. Please try again.' : 'Đăng xuất thất bại. Vui lòng thử lại.');
+      setLoggingOut(false);
     }
   };
 
@@ -593,6 +601,61 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
             </div>
           </div>
         </>
+      )}
+
+      {/* ── Modal xác nhận đăng xuất ── */}
+      {showLogoutModal && (
+        <div
+          className="modal-overlay logout-modal-overlay"
+          onClick={() => { if (!loggingOut) setShowLogoutModal(false); }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="logout-modal-title"
+        >
+          <div
+            className="modal-content logout-modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="logout-modal-icon-wrap">
+              <div className="logout-modal-icon">
+                <AlertTriangle size={28} />
+              </div>
+            </div>
+            <h3 id="logout-modal-title" className="logout-modal-title">
+              {locale === 'en' ? 'Confirm Logout' : 'Xác nhận đăng xuất'}
+            </h3>
+            <p className="logout-modal-body">
+              {locale === 'en'
+                ? 'Are you sure you want to log out of CardioGuard AI?'
+                : 'Bạn có chắc chắn muốn đăng xuất khỏi CardioGuard AI không?'}
+            </p>
+            {logoutError && (
+              <div className="logout-modal-error">{logoutError}</div>
+            )}
+            <div className="logout-modal-actions">
+              <button
+                type="button"
+                className="btn btn-secondary logout-cancel-btn"
+                onClick={() => setShowLogoutModal(false)}
+                disabled={loggingOut}
+              >
+                {locale === 'en' ? 'Cancel' : 'Hủy'}
+              </button>
+              <button
+                type="button"
+                className="btn logout-confirm-btn"
+                onClick={confirmLogoutAction}
+                disabled={loggingOut}
+              >
+                {loggingOut ? (
+                  <><Loader2 size={15} className="spin-icon" /> {locale === 'en' ? 'Logging out...' : 'Đang đăng xuất...'}</>
+                ) : (
+                  <><LogOut size={15} /> {locale === 'en' ? 'Log out' : 'Đăng xuất'}</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

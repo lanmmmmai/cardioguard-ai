@@ -28,7 +28,7 @@ interface AuthContextValue {
   authError: string | null;
   requiresPasswordChange: boolean;
   login: (token: string, user: AuthUser) => AuthUser;
-  logout: () => void;
+  logout: () => Promise<void>;
   refreshUser: () => Promise<AuthUser | null>;
 }
 
@@ -105,19 +105,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  /** Xóa tất cả trạng thái xác thực, thông báo cho server và chuyển hướng đến trang đăng nhập */
-  const logout = () => {
+  /** Xóa tất cả trạng thái xác thực, thông báo server và ngăn quay lại bằng nút Back */
+  const logout = async () => {
     if (accessToken) {
-      fetch(`${API_URL}/auth/logout`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }).catch(() => undefined);
+      try {
+        await fetch(`${API_URL}/auth/logout`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+      } catch {
+        // bỏ qua lỗi mạng — vẫn xóa session cục bộ
+      }
     }
     storage.removeItem(USER_KEY);
     storage.removeItem(TOKEN_KEY);
+    storage.removeItem('last_role');
     setAccessToken(null);
     setUser(null);
     setAuthError(null);
+    // Xóa history stack để nút Back không quay lại dashboard
+    if (typeof window !== 'undefined' && window.history?.replaceState) {
+      window.history.replaceState(null, '', window.location.href);
+    }
   };
 
   /** Lưu trữ thông tin đăng nhập vào sessionStorage và đặt trạng thái trong bộ nhớ */
