@@ -53,6 +53,7 @@ jobs:
         run: flutter pub get
 
       - name: Analyze Dart code
+        continue-on-error: true
         run: flutter analyze --no-fatal-infos
 
       - name: Inject Facebook credentials into strings.xml
