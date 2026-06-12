@@ -33,6 +33,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _addressController = TextEditingController();
   final _historyController = TextEditingController();
 
+  final _macController = TextEditingController();
+  final _deviceNameController = TextEditingController();
+
   bool _isChangingPassword = false;
   bool _isSavingProfile = false;
   String? _profileError;
@@ -68,6 +71,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _phoneController.dispose();
     _addressController.dispose();
     _historyController.dispose();
+    _macController.dispose();
+    _deviceNameController.dispose();
     super.dispose();
   }
 
@@ -79,6 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (authProvider.currentUser?.role == 'patient') {
         final patientProvider =
             Provider.of<PatientProvider>(context, listen: false);
+        patientProvider.fetchPairedDevice(authProvider.currentUser!.id);
         patientProvider.fetchMyProfile().then((_) {
           final profile = patientProvider.currentPatientProfile;
           if (profile != null) {
@@ -132,6 +138,162 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() => _isChangingPassword = false);
       }
     }
+  }
+
+  void _showChangePasswordBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: widget.isDarkTheme ? const Color(0xFF11151D) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 20,
+                right: 20,
+                top: 20,
+              ),
+              child: SingleChildScrollView(
+                child: Form(
+                  key: _passwordFormKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Đổi Mật Khẩu Mới',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          IconButton(
+                            icon: const Icon(LucideIcons.x, size: 20),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                      const Divider(),
+                      const SizedBox(height: 10),
+                      if (_passwordError != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: CgColors.critical.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            _passwordError!,
+                            style: const TextStyle(color: CgColors.critical, fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      TextFormField(
+                        controller: _currentPasswordController,
+                        decoration: const InputDecoration(labelText: 'Mật khẩu hiện tại'),
+                        obscureText: true,
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Vui lòng nhập mật khẩu hiện tại'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _newPasswordController,
+                        decoration: const InputDecoration(labelText: 'Mật khẩu mới'),
+                        obscureText: true,
+                        validator: _validatePasswordPolicy,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _confirmPasswordController,
+                        decoration: const InputDecoration(labelText: 'Xác nhận mật khẩu mới'),
+                        obscureText: true,
+                        validator: (v) {
+                          if (v == null || v.isEmpty) {
+                            return 'Vui lòng xác nhận mật khẩu';
+                          }
+                          if (v != _newPasswordController.text) {
+                            return 'Mật khẩu xác nhận không khớp';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: _isChangingPassword
+                              ? null
+                              : () async {
+                                  if (!_passwordFormKey.currentState!.validate()) return;
+                                  setModalState(() {
+                                    _isChangingPassword = true;
+                                    _passwordError = null;
+                                  });
+                                  
+                                  try {
+                                    final client = ApiClient();
+                                    final response = await client.put(
+                                      '/users/me/password',
+                                      data: {
+                                        'current_password': _currentPasswordController.text,
+                                        'new_password': _newPasswordController.text,
+                                        'confirm_password': _confirmPasswordController.text,
+                                      },
+                                    );
+
+                                    if (response.statusCode == 200) {
+                                      _currentPasswordController.clear();
+                                      _newPasswordController.clear();
+                                      _confirmPasswordController.clear();
+                                      if (mounted) {
+                                        Navigator.pop(context);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Đổi mật khẩu thành công!'),
+                                            backgroundColor: Colors.green,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  } catch (e) {
+                                    setModalState(() {
+                                      _passwordError = 'Mật khẩu hiện tại không đúng hoặc yêu cầu không hợp lệ.';
+                                    });
+                                  } finally {
+                                    setModalState(() {
+                                      _isChangingPassword = false;
+                                    });
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: CgColors.primary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: _isChangingPassword
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text('Cập nhật mật khẩu',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _savePatientProfile() async {
@@ -218,10 +380,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   CircleAvatar(
                     radius: 30,
-                    backgroundColor:
-                        const Color(0xFFFF3366).withValues(alpha: 0.1),
-                    child: const Icon(LucideIcons.user,
-                        color: Color(0xFFFF3366), size: 30),
+                    backgroundColor: Colors.transparent,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [CgColors.accent, Color(0xFFE11D48)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: Center(
+                        child: currentUser.avatarUrl != null && currentUser.avatarUrl!.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(30),
+                                child: Image.network(
+                                  currentUser.avatarUrl!,
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Text(
+                                    currentUser.fullName.isNotEmpty
+                                        ? currentUser.fullName.substring(0, 1).toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                currentUser.fullName.isNotEmpty
+                                    ? currentUser.fullName.substring(0, 1).toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -244,13 +444,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color:
-                                const Color(0xFFFF3366).withValues(alpha: 0.1),
+                                CgColors.accent.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             currentUser.role.toUpperCase(),
                             style: const TextStyle(
-                              color: Color(0xFFFF3366),
+                              color: CgColors.accent,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
@@ -270,7 +470,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFFFF3366))),
+                      color: CgColors.accent)),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(16),
@@ -312,12 +512,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             : null,
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _genderController,
-                        decoration:
-                            const InputDecoration(labelText: 'Giới tính'),
+                      DropdownButtonFormField<String>(
+                        value: ['Nam', 'Nữ', 'Khác'].contains(_genderController.text) ? _genderController.text : null,
+                        decoration: const InputDecoration(labelText: 'Giới tính'),
+                        items: ['Nam', 'Nữ', 'Khác']
+                            .map((label) => DropdownMenuItem(
+                                  value: label,
+                                  child: Text(label),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            _genderController.text = value;
+                          }
+                        },
                         validator: (v) => (v == null || v.isEmpty)
-                            ? 'Vui lòng nhập giới tính'
+                            ? 'Vui lòng chọn giới tính'
                             : null,
                       ),
                       const SizedBox(height: 12),
@@ -371,6 +581,229 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+              const Text('Thiết bị y tế IoT (Phần cứng)',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: CgColors.accent)),
+              const SizedBox(height: 12),
+              Consumer<PatientProvider>(
+                builder: (context, provider, child) {
+                  final device = provider.pairedDevice;
+                  final isLoading = provider.isLoadingDevice;
+
+                  if (isLoading) {
+                    return Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.07)
+                              : Colors.black.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  if (device != null) {
+                    // Đã liên kết thiết bị
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.07)
+                              : Colors.black.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(LucideIcons.cpu, color: CgColors.accent, size: 20),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    device.deviceName,
+                                    style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: device.status == 'online'
+                                      ? Colors.green.withValues(alpha: 0.1)
+                                      : Colors.red.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  device.status.toUpperCase(),
+                                  style: TextStyle(
+                                    color: device.status == 'online'
+                                        ? Colors.green
+                                        : Colors.red,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Divider(),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Địa chỉ MAC:', style: TextStyle(color: textMuted, fontSize: 13)),
+                              Text(
+                                device.deviceMac,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Loại thiết bị:', style: TextStyle(color: textMuted, fontSize: 13)),
+                              Text(
+                                device.deviceType,
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                final result = await provider.unclaimDevice(deviceMac: device.deviceMac);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(result['message'] ?? ''),
+                                      backgroundColor: result['success'] ? Colors.green : Colors.red,
+                                    ),
+                                  );
+                                }
+                              },
+                              icon: const Icon(LucideIcons.trash2, color: Colors.white, size: 16),
+                              label: const Text('Hủy liên kết thiết bị', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: CgColors.critical,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // Chưa liên kết thiết bị
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.07)
+                            : Colors.black.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Liên kết thiết bị đeo CardioGuard bằng địa chỉ MAC.',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _macController,
+                          decoration: const InputDecoration(
+                            labelText: 'Địa chỉ MAC thiết bị',
+                            hintText: 'Ví dụ: ac:27:6e:b1:0a:18',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _deviceNameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Tên thiết bị (Tùy chọn)',
+                            hintText: 'Ví dụ: ESP32 Wearable',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              final mac = _macController.text.trim();
+                              if (mac.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Vui lòng nhập địa chỉ MAC'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
+                              final name = _deviceNameController.text.trim();
+                              final result = await provider.claimDevice(
+                                deviceMac: mac,
+                                deviceName: name.isNotEmpty ? name : null,
+                              );
+                              if (result['success']) {
+                                _macController.clear();
+                                _deviceNameController.clear();
+                              }
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(result['message'] ?? ''),
+                                    backgroundColor: result['success'] ? Colors.green : Colors.red,
+                                  ),
+                                );
+                              }
+                            },
+                            icon: const Icon(LucideIcons.plusCircle, color: Colors.white, size: 16),
+                            label: const Text('Liên kết thiết bị', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: CgColors.primary,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
             ],
 
             // Theme Options
@@ -378,7 +811,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFFF3366))),
+                    color: CgColors.accent)),
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
@@ -394,21 +827,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: const Text('Chế độ tối (Dark Mode)',
                     style: TextStyle(fontWeight: FontWeight.w600)),
                 value: widget.isDarkTheme,
-                activeThumbColor: const Color(0xFFFF3366),
+                activeThumbColor: CgColors.accent,
                 onChanged: (_) => widget.onToggleTheme(),
               ),
             ),
             const SizedBox(height: 24),
 
-            // Change Password Form
+            // Change Password Button
             const Text('Đổi mật khẩu',
                 style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFFF3366))),
+                    color: CgColors.accent)),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _showChangePasswordBottomSheet,
+                icon: const Icon(LucideIcons.keyRound, color: Colors.white, size: 18),
+                label: const Text('Đổi mật khẩu tài khoản',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: CgColors.primary,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Policies section
+            const Text('Điều khoản & Chính sách',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: CgColors.accent)),
             const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: cardBg,
                 borderRadius: BorderRadius.circular(16),
@@ -418,81 +876,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       : Colors.black.withValues(alpha: 0.08),
                 ),
               ),
-              child: Form(
-                key: _passwordFormKey,
-                child: Column(
-                  children: [
-                    if (_passwordError != null) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: CgColors.critical.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          _passwordError!,
-                          style: const TextStyle(
-                              color: CgColors.critical, fontSize: 12),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    TextFormField(
-                      controller: _currentPasswordController,
-                      decoration:
-                          const InputDecoration(labelText: 'Mật khẩu hiện tại'),
-                      obscureText: true,
-                      validator: (v) => (v == null || v.isEmpty)
-                          ? 'Vui lòng nhập mật khẩu hiện tại'
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _newPasswordController,
-                      decoration:
-                          const InputDecoration(labelText: 'Mật khẩu mới'),
-                      obscureText: true,
-                      validator: _validatePasswordPolicy,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _confirmPasswordController,
-                      decoration: const InputDecoration(
-                          labelText: 'Xác nhận mật khẩu mới'),
-                      obscureText: true,
-                      validator: (v) {
-                        if (v == null || v.isEmpty) {
-                          return 'Vui lòng xác nhận mật khẩu';
-                        }
-                        if (v != _newPasswordController.text) {
-                          return 'Mật khẩu xác nhận không khớp';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: _isChangingPassword ? null : _changePassword,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: CgColors.primary,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: _isChangingPassword
-                            ? const CircularProgressIndicator(
-                                color: Colors.white)
-                            : const Text('Cập nhật mật khẩu',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(LucideIcons.shieldCheck, color: CgColors.accent, size: 20),
+                    title: const Text('Chính sách bảo mật', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    trailing: const Icon(Icons.chevron_right, size: 20),
+                    onTap: () => Navigator.pushNamed(context, '/privacy'),
+                  ),
+                  Divider(
+                    height: 1,
+                    color: isDark ? Colors.white10 : Colors.black12,
+                  ),
+                  ListTile(
+                    leading: const Icon(LucideIcons.fileText, color: CgColors.accent, size: 20),
+                    title: const Text('Điều khoản dịch vụ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    trailing: const Icon(Icons.chevron_right, size: 20),
+                    onTap: () => Navigator.pushNamed(context, '/terms'),
+                  ),
+                  Divider(
+                    height: 1,
+                    color: isDark ? Colors.white10 : Colors.black12,
+                  ),
+                  ListTile(
+                    leading: const Icon(LucideIcons.trash2, color: CgColors.accent, size: 20),
+                    title: const Text('Yêu cầu xóa dữ liệu', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    trailing: const Icon(Icons.chevron_right, size: 20),
+                    onTap: () => Navigator.pushNamed(context, '/data-deletion'),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 32),
@@ -509,12 +921,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         context, '/login', (route) => false);
                   }
                 },
-                icon: const Icon(LucideIcons.logOut, color: Color(0xFFFF3366)),
+                icon: const Icon(LucideIcons.logOut, color: CgColors.accent),
                 label: const Text('Đăng xuất tài khoản',
                     style: TextStyle(
-                        color: Color(0xFFFF3366), fontWeight: FontWeight.bold)),
+                        color: CgColors.accent, fontWeight: FontWeight.bold)),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFFF3366)),
+                  side: const BorderSide(color: CgColors.accent),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),

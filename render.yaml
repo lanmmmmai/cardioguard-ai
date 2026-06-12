@@ -1,0 +1,60 @@
+# ============================================================
+# CardioGuard AI — Render Auto-Deploy Configuration
+# ============================================================
+# This file tells Render how to build and deploy the backend.
+# Render reads this file automatically when connected to the repo.
+#
+# To use: Connect your GitHub repo to Render, and Render will
+#         auto-deploy on every push to the configured branch.
+# ============================================================
+
+services:
+  # ── Backend (FastAPI) ──────────────────────────────────────
+  - type: web
+    name: cardioguard-backend
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: .
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false  # Set manually in Render dashboard
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+      - key: EXPOSE_DEV_OTP
+        value: "false"
+      - key: FRONTEND_ORIGINS
+        value: "https://cardioguard-dashboard.vercel.app,https://cardioguard-ai.vercel.app,https://giatky.site"
+      - key: OPENAI_API_KEY
+        sync: false  # Set manually
+      - key: BREVO_API_KEY
+        sync: false  # Set manually
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: cardioguard-redis
+          property: connectionString
+    plan: free
+    # Auto-deploy triggers:
+    # - Push to 'main' branch (production)
+    # - Render dashboard manual deploy
+    # - API deploy hook (optional)
+
+  # ── Redis Service ──────────────────────────────────────────
+  - type: redis
+    name: cardioguard-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+
+  # ── Frontend (Vercel handles this, not Render) ─────────────
+  # Frontend is deployed via Vercel, not Render.
+  # See DEPLOYMENT.md for Vercel configuration.
+

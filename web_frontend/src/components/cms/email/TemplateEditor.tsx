@@ -1,3 +1,12 @@
+/**
+ * Mục đích: Trình chỉnh sửa template email HTML toàn màn hình với xem trước trực tiếp và chèn biến động.
+ * Luồng xử lý: Tải chi tiết template hiện có từ API khi khởi tạo (hoặc sử dụng HTML mặc định cho template mới);
+ *              cung cấp bố cục chia đôi: bên trái cho các trường biểu mẫu/trình soạn thảo HTML, bên phải cho
+ *              xem trước trực tiếp với nút chuyển đổi desktop/mobile. Hỗ trợ chèn {{variables}} tại vị trí con trỏ.
+ *              Tự động lưu qua xem trước trực tiếp có debounce (400ms).
+ * Quan hệ: Được sử dụng bởi EmailCmsPage; ủy quyền cho EmailVariables cho bảng điều khiển biến động;
+ *          Gọi /email/templates/:id để lấy chi tiết, PUT/POST để lưu.
+ */
 import React, { useEffect, useRef, useState } from 'react';
 import { Eye, EyeOff, Loader2, Monitor, Save, Smartphone, X } from 'lucide-react';
 import { API_URL } from '../../../config';
@@ -5,6 +14,7 @@ import { useAuth } from '../../../auth/AuthContext';
 import { EmailVariables } from './EmailVariables';
 import {
   CUSTOM_TEMPLATE_HINTS,
+  type EmailFunctionOption,
   EMAIL_GROUP_LABEL_MAP,
   EMAIL_TARGET_ROLE_LABEL_MAP,
   SYSTEM_EMAIL_FUNCTIONS,
@@ -39,6 +49,10 @@ type CustomFunctionDraft = {
   optional_variables: string[];
 };
 
+type PersistedEmailFunction = EmailFunctionOption & {
+  id: string;
+};
+
 interface TemplateEditorProps {
   template: Template | null;  // null = tạo mới
   onClose: () => void;
@@ -46,24 +60,32 @@ interface TemplateEditorProps {
   readOnly?: boolean;
 }
 
+/**
+ * Component TemplateEditor — hộp thoại chỉnh sửa template email toàn màn hình với xem trước trực tiếp,
+ * chèn biến động và nút chuyển đổi responsive desktop/mobile.
+ */
 export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClose, onSaved, readOnly = false }) => {
   const { accessToken } = useAuth();
-  const [form, setForm] = useState<Template>({
+  const buildFallbackForm = (): Template => ({
     id: template?.id,
     function_id: template?.function_id,
     cms_email_id: template?.cms_email_id ?? '',
-    email_type: template?.email_type ?? SYSTEM_EMAIL_FUNCTIONS[0].email_type,
+    email_type: normalizeEmailType(template?.email_type ?? SYSTEM_EMAIL_FUNCTIONS[0].email_type),
     target_role: template?.target_role ?? 'all',
     name: template?.name ?? '',
     subject: template?.subject ?? '',
-    html_content: template?.id ? '' : DEFAULT_HTML,
+    html_content: template?.html_content ?? DEFAULT_HTML,
     text_content: template?.text_content ?? '',
     variables: template?.variables ?? ['full_name', 'otp'],
     is_active: template?.is_active ?? true,
   });
+  const [form, setForm] = useState<Template>({
+    ...buildFallbackForm(),
+    html_content: template?.id ? (template?.html_content ?? DEFAULT_HTML) : DEFAULT_HTML,
+  });
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [customFunctions, setCustomFunctions] = useState<Array<(typeof SYSTEM_EMAIL_FUNCTIONS)[number]>>([]);
+  const [customFunctions, setCustomFunctions] = useState<PersistedEmailFunction[]>([]);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [draftFunction, setDraftFunction] = useState<CustomFunctionDraft>({
     email_type: '',
@@ -126,17 +148,26 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
           },
         });
 
-        const data = await res.json();
-
         if (!res.ok) {
-          throw new Error(data.detail || 'Không thể tải chi tiết template');
+          const fallbackForm = buildFallbackForm();
+          setForm(fallbackForm);
+          setPreviewHtml(fallbackForm.html_content);
+          return;
+        }
+
+        const data = await res.json();
+        if (!data || typeof data !== 'object') {
+          const fallbackForm = buildFallbackForm();
+          setForm(fallbackForm);
+          setPreviewHtml(fallbackForm.html_content);
+          return;
         }
 
         const nextForm: Template = {
-          id: data.id,
+          id: data.id ?? template.id,
           function_id: data.function_id,
           cms_email_id: data.cms_email_id || '',
-          email_type: data.email_type || data.type || SYSTEM_EMAIL_FUNCTIONS[0].email_type,
+          email_type: normalizeEmailType(data.email_type || data.type || SYSTEM_EMAIL_FUNCTIONS[0].email_type),
           target_role: data.target_role || 'all',
           name: data.name || '',
           subject: data.subject || '',
@@ -162,7 +193,11 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
           });
         }
       } catch (err: any) {
-        setError(err.message || 'Không thể tải template');
+        const fallbackForm = buildFallbackForm();
+        setForm(fallbackForm);
+        setPreviewHtml(fallbackForm.html_content);
+        setError(null);
+        console.warn('Không thể tải chi tiết template, dùng dữ liệu hiện có:', err);
       } finally {
         setIsLoadingTemplate(false);
       }
@@ -171,7 +206,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
     loadTemplateDetail();
   }, [template?.id, accessToken]);
 
-  // Live preview: debounce 400ms
+  // Xem trước trực tiếp: debounce 400ms
   useEffect(() => {
     if (previewTimer.current) clearTimeout(previewTimer.current);
     previewTimer.current = setTimeout(() => {
@@ -214,7 +249,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
     const end = ta.selectionEnd;
     const newValue = form.html_content.slice(0, start) + syntax + form.html_content.slice(end);
     set('html_content', newValue);
-    // Restore caret position
+    // Khôi phục vị trí con trỏ
     requestAnimationFrame(() => {
       ta.selectionStart = ta.selectionEnd = start + syntax.length;
       ta.focus();
@@ -237,6 +272,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
     setError(null);
     setIsSaving(true);
     try {
+      const resolvedTemplateId = form.id || template?.id || null;
       let functionId = form.function_id;
       let emailType = form.email_type;
       let cmsEmailId = normalizeCmsEmailId(form.cms_email_id || '');
@@ -260,16 +296,57 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
           body: JSON.stringify(functionPayload),
         });
         const fnData = await fnRes.json();
-        if (!fnRes.ok) throw new Error(fnData.detail || 'Không thể lưu loại template tùy chỉnh');
-        functionId = fnData.id;
-        emailType = fnData.email_type;
-        cmsEmailId = fnData.cms_email_id;
+        if (!fnRes.ok) {
+          if (fnRes.status === 409 && !form.function_id) {
+            try {
+              const lookupRes = await fetch(
+                `${API_URL}/cms/email-functions?q=${encodeURIComponent(functionPayload.email_type)}&is_active=true`,
+                {
+                  headers: { Authorization: `Bearer ${accessToken}` },
+                }
+              );
+              const lookupData = await lookupRes.json();
+              const matchedFunction = (Array.isArray(lookupData.items) ? lookupData.items : [])
+                .find((item: any) =>
+                  item.email_type === functionPayload.email_type ||
+                  item.cms_email_id === functionPayload.cms_email_id
+                );
+              if (matchedFunction?.id) {
+                functionId = matchedFunction.id;
+                emailType = matchedFunction.email_type;
+                cmsEmailId = matchedFunction.cms_email_id;
+                setForm((prev) => ({
+                  ...prev,
+                  function_id: matchedFunction.id,
+                  email_type: matchedFunction.email_type,
+                  cms_email_id: matchedFunction.cms_email_id,
+                }));
+              } else {
+                throw new Error(fnData.detail || 'Loại template tùy chỉnh đã tồn tại');
+              }
+            } catch {
+              throw new Error(fnData.detail || 'Loại template tùy chỉnh đã tồn tại');
+            }
+          } else {
+            throw new Error(fnData.detail || 'Không thể lưu loại template tùy chỉnh');
+          }
+        } else {
+          functionId = fnData.id;
+          emailType = fnData.email_type;
+          cmsEmailId = fnData.cms_email_id;
+          setForm((prev) => ({
+            ...prev,
+            function_id: fnData.id,
+            email_type: fnData.email_type || prev.email_type,
+            cms_email_id: fnData.cms_email_id || prev.cms_email_id,
+          }));
+        }
       }
 
-      const url = template?.id
-        ? `${API_URL}/cms/email-templates/${template.id}`
+      const url = resolvedTemplateId
+        ? `${API_URL}/cms/email-templates/${resolvedTemplateId}`
         : `${API_URL}/cms/email-templates`;
-      const method = template?.id ? 'PUT' : 'POST';
+      const method = resolvedTemplateId ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
         method,
@@ -296,7 +373,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
   return (
     <div className="email-editor-overlay">
       <div className="email-editor-modal">
-        {/* Header */}
+        {/* Tiêu đề */}
         <div className="email-editor-header">
           <div>
             <h2 className="email-editor-title">
@@ -345,9 +422,9 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
           </div>
         )}
 
-        {/* Body */}
+        {/* Nội dung */}
         <div className="email-editor-body">
-          {/* LEFT: Config form */}
+          {/* BÊN TRÁI: Biểu mẫu cấu hình */}
           <div className="email-editor-left">
             {showVariables && (
               <div className="email-editor-variables-drawer">
@@ -438,7 +515,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
                         email_type: normalizeEmailType(e.target.value),
                         cms_email_id: prev.cms_email_id || suggestCmsEmailId(normalizeEmailType(e.target.value)),
                       }))}
-                      placeholder="doctor_profile_require_update"
+                      placeholder="doctor_need_update"
                       disabled={readOnly}
                     />
                   </div>
@@ -448,7 +525,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
                       className="form-control"
                       value={draftFunction.cms_email_id}
                       onChange={(e) => setDraftFunction((prev) => ({ ...prev, cms_email_id: normalizeCmsEmailId(e.target.value) }))}
-                      placeholder="EMAIL_DOCTOR_PROFILE_REQUIRE_UPDATE"
+                      placeholder="EMAIL_DOCTOR_NEED_UPDATE"
                       disabled={readOnly}
                     />
                   </div>
@@ -561,10 +638,10 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
             </div>
           </div>
 
-          {/* RIGHT: Live preview */}
+          {/* BÊN PHẢI: Xem trước trực tiếp */}
           <div className="email-editor-right">
             <div className="email-preview-toolbar">
-              <span className="email-preview-label">Live Preview</span>
+              <span className="email-preview-label">Xem trước trực tiếp</span>
               <div className="email-preview-mode-btns">
                 <button
                   type="button"
@@ -587,9 +664,9 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onClos
             <div className={`email-preview-frame-wrap ${previewMode}`}>
               <iframe
                 className="email-preview-iframe"
-                title="Email Preview"
+                title="Xem trước Email"
                 srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#f9fafb;padding:20px;font-family:sans-serif}</style></head><body>${previewHtml}</body></html>`}
-                sandbox="allow-same-origin"
+                sandbox="allow-same-origin allow-scripts"
               />
             </div>
           </div>

@@ -1,3 +1,22 @@
+/// Central real-time health monitoring dashboard (Giám Sát Trung Tâm).
+///
+/// Workflow:
+/// 1. On init, generates 3D heart point cloud, starts a 60 FPS animation ticker
+///    for heart rotation/pulse, connects WebSocket, and loads patient data.
+/// 2. Listens to `health_metrics` events to update live vitals (HR, SpO2, BP)
+///    and ECG waveform buffer; listens to `emergency_alerts` for banner flash.
+/// 3. The animation ticker drives heart rotation/beat simulation and mock ECG
+///    generation when no live telemetry is available.
+/// 4. Adapts layout: 2-column split-view on tablets (>=600 dp), single-column
+///    vertical scroll on phones.
+///    Admin sees summary KPI cards; Patient sees SOS button;
+///    Doctor/Admin see simulation controls for abnormal/normal vitals.
+///
+/// Relationships:
+/// - Owns: [AuthProvider], [PatientProvider], [AlertProvider], [WebSocketService].
+/// - Uses: [EcgPainter], [Heart3dPainter], [CgMetricValue], [CgInlineState].
+/// - Connected to: [WebSocketService] for live telemetry and emergency events.
+/// - Controls: [PatientProvider.triggerSimulation] for demo mode.
 import 'dart:async';
 import 'dart:collection';
 import 'dart:math' as math;
@@ -9,14 +28,19 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 import '../providers/auth_provider.dart';
 import '../providers/patient_provider.dart';
 import '../providers/alert_provider.dart';
+import '../providers/notification_provider.dart';
+import 'stats_screen.dart';
 import '../services/websocket_service.dart';
 import '../widgets/ecg_painter.dart';
 import '../widgets/heart_3d_painter.dart';
 import '../widgets/cg_widgets.dart';
 import '../ui/cg_tokens.dart';
 
+/// Main real-time monitoring dashboard with live vitals, ECG, 3D heart, and SOS.
 class DashboardScreen extends StatefulWidget {
+  /// Callback invoked when the user toggles dark/light theme.
   final VoidCallback onToggleTheme;
+  /// Whether the dashboard is rendered in dark mode.
   final bool isDarkTheme;
 
   const DashboardScreen({
@@ -31,34 +55,45 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
-  // Local ECG point buffer
+  /// Circular buffer holding the last 240 ECG data points for the waveform.
   final ListQueue<double> _ecgPoints = ListQueue<double>.from(List.filled(240, 0.0));
 
-  // Animation controller for 3D Heart
+  /// 60 FPS ticker driving heart rotation animation and pulse simulation.
   late AnimationController _tickerController;
+  /// Pre-generated point cloud for the 3D heart rendering.
   late List<Point3D> _heartPoints;
+  /// Accumulated Y-axis rotation angle (radians) for the 3D heart.
   double _angleY = 0.0;
+  /// X-axis tilt angle (radians) based on elapsed time sine wave.
   double _angleX = 0.0;
+  /// Current pulse expansion factor (0.0–0.22) derived from heart rate cycle.
   double _pulse = 0.0;
 
-  // Selected Patient for Doctor/Admin
+  /// Currently selected patient ID (doctor/admin view).
   String? _selectedPatientId;
 
-  // SOS state
+  /// Whether the SOS countdown is active.
   bool _isSosCounting = false;
+  /// Remaining seconds before SOS alert is sent.
   int _sosCountdown = 3;
+  /// Periodic timer for SOS countdown ticks.
   Timer? _sosTimer;
 
-  // Banner alert
+  /// Active banner warning message (shown at top of screen).
   String? _activeBannerMessage;
+  /// Whether the banner is in flashing state (alternating colours).
   bool _isBannerFlash = false;
+  /// Timer to auto-dismiss the banner after 8 seconds.
   Timer? _bannerTimer;
+  /// Random source for mock ECG noise.
   final _random = math.Random();
+  /// Cached reference to [PatientProvider] for use inside animation callbacks.
   PatientProvider? _cachedPatientProvider;
 
   @override
   void initState() {
     super.initState();
+    _cachedPatientProvider = Provider.of<PatientProvider>(context, listen: false);
     _heartPoints = Heart3dPainter.generateHeartPoints();
 
     // 60FPS animation ticker for heart rotation and beat pulse
@@ -77,16 +112,24 @@ class _DashboardScreenState extends State<DashboardScreen>
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final patientProvider =
           Provider.of<PatientProvider>(context, listen: false);
+      final notifProvider =
+          Provider.of<NotificationProvider>(context, listen: false);
+      notifProvider.fetchNotifications();
 
       if (authProvider.currentUser?.role == 'patient') {
         _selectedPatientId = authProvider.currentUser?.id;
-        patientProvider.fetchMyProfile();
+        patientProvider.fetchMyProfile().then((_) {
+          if (_selectedPatientId != null) {
+            patientProvider.fetchLatestSensorData(_selectedPatientId!);
+          }
+        });
       } else {
         patientProvider.fetchPatients().then((_) {
           if (patientProvider.patients.isNotEmpty) {
             setState(() {
               _selectedPatientId = patientProvider.patients.first.id;
             });
+            patientProvider.fetchLatestSensorData(_selectedPatientId!);
           }
         });
       }
@@ -108,6 +151,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.dispose();
   }
 
+  /// Handles incoming WebSocket events: `health_metrics` updates live vitals
+  /// and ECG buffer; `emergency_alerts` triggers a warning banner.
   void _onWebSocketEvent(Map<String, dynamic> event) {
     if (!mounted) return;
 
@@ -147,9 +192,16 @@ class _DashboardScreenState extends State<DashboardScreen>
         });
         _triggerBannerFlash();
       }
+    } else if (type == 'notifications') {
+      final notifData = event['data'] as Map<String, dynamic>?;
+      if (notifData != null) {
+        Provider.of<NotificationProvider>(context, listen: false)
+            .addOrUpdateRealtimeNotification(notifData);
+      }
     }
   }
 
+  /// Shows the emergency banner and schedules auto-dismiss after 8 seconds.
   void _triggerBannerFlash() {
     _bannerTimer?.cancel();
     setState(() {
@@ -167,6 +219,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     });
   }
 
+  /// Called every frame by the animation ticker to update 3D heart rotation,
+  /// pulse physics, and generate mock ECG data when no live telemetry exists.
+  /// NOTE: Does NOT call setState — the [AnimatedBuilder] widgets handle repainting.
   void _onAnimationTick() {
     final elapsedMs = DateTime.now().millisecondsSinceEpoch;
     final double hr = _cachedPatientProvider?.liveMetrics['heart_rate']?.toDouble() ?? 75.0;
@@ -176,7 +231,11 @@ class _DashboardScreenState extends State<DashboardScreen>
       _angleY += 0.015;
       _angleX = 0.2 * math.sin(elapsedMs * 0.0005);
 
-      // Pulse physics
+      // Pulse physics — models the cardiac cycle in 4 phases:
+      // 0-10%  : rapid contraction (atrial kick)
+      // 15-22% : main ventricular contraction (QRS complex)
+      // 22-38% : relaxation / repolarisation (T wave)
+      // rest   : diastole (flat)
       final cycleDuration = (60 / math.max(hr, 40)) * 1000;
       final t = (elapsedMs % cycleDuration) / cycleDuration;
 
@@ -190,12 +249,13 @@ class _DashboardScreenState extends State<DashboardScreen>
         _pulse = 0.0;
       }
 
-      // If no live telemetry, generate mock ECG
+      // If no live telemetry, generate mock ECG using piecewise waveform
       final hasLiveWS = (_cachedPatientProvider?.liveMetrics['ecg_value'] ?? 0.0) != 0.0;
       if (!hasLiveWS) {
         double simEcg = 0.0;
         final tSim = (elapsedMs % cycleDuration) / cycleDuration;
 
+        // P-wave (atrial depolarisation)
         if (tSim > 0.1 && tSim < 0.15) {
           simEcg = 0.15 * math.sin((tSim - 0.1) * math.pi / 0.05);
         } else if (tSim >= 0.18 && tSim < 0.2) {
@@ -218,6 +278,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
 
+  /// Begins the SOS countdown: haptic feedback + 3-second timer before sending.
   void _triggerSos() {
     HapticFeedback.heavyImpact();
     setState(() {
@@ -240,6 +301,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     });
   }
 
+  /// Cancels an active SOS countdown and shows a cancellation snackbar.
   void _cancelSos() {
     _sosTimer?.cancel();
     setState(() {
@@ -251,6 +313,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// Sends the SOS alert to the server and shows a success/failure snackbar.
   Future<void> _sendSosAlert() async {
     final alertProvider = Provider.of<AlertProvider>(context, listen: false);
     final success = await alertProvider
@@ -370,7 +433,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 value: _selectedPatientId,
                                 dropdownColor: cardBg,
                                 style: const TextStyle(
-                                    color: Color(0xFFFF3366),
+                                    color: CgColors.accent,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14),
                                 underline: const SizedBox(),
@@ -385,6 +448,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       _ecgPoints.clear();
                                       _ecgPoints.addAll(List.filled(240, 0.0));
                                     });
+                                    patientProvider.fetchLatestSensorData(id);
                                   }
                                 },
                               ),
@@ -398,6 +462,76 @@ class _DashboardScreenState extends State<DashboardScreen>
                             maxLines: 1,
                           ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Consumer<NotificationProvider>(
+                    builder: (context, notifProvider, child) {
+                      final count = notifProvider.unreadCount;
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          IconButton(
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/notifications');
+                            },
+                            icon: const Icon(
+                              LucideIcons.bell,
+                              color: Color(0xFF00F2FE),
+                            ),
+                            style: IconButton.styleFrom(
+                              backgroundColor: cardBg,
+                              shape: const CircleBorder(),
+                              side: BorderSide(color: borderColor),
+                            ),
+                          ),
+                          if (count > 0)
+                            Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 16,
+                                  minHeight: 16,
+                                ),
+                                child: Text(
+                                  count > 99 ? '99+' : count.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => StatsScreen(isDarkTheme: widget.isDarkTheme),
+                        ),
+                      );
+                    },
+                    icon: const Icon(
+                      LucideIcons.barChart2,
+                      color: Color(0xFF00F2FE),
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: cardBg,
+                      shape: const CircleBorder(),
+                      side: BorderSide(color: borderColor),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -423,44 +557,39 @@ class _DashboardScreenState extends State<DashboardScreen>
             final leftWidgetsList = [
               // System Dashboard Cards (Admin Only)
               if (role == 'admin') ...[
-                GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 2.8,
+                Row(
                   children: [
-                    _buildSummaryCard(
-                        'Bệnh nhân',
-                        '${patientProvider.patients.length}',
-                        LucideIcons.users,
-                        Colors.blue,
-                        cardBg,
-                        textColor,
-                        textMuted,
-                        borderColor),
-                    _buildSummaryCard(
-                        'Cảnh báo hoạt động',
-                        '${alertProvider.activeAlertCount}',
-                        LucideIcons.bell,
-                        Colors.red,
-                        cardBg,
-                        textColor,
-                        textMuted,
-                        borderColor),
+                    Expanded(
+                      child: _buildSummaryCard(
+                          'Bệnh nhân',
+                          '${patientProvider.patients.length}',
+                          LucideIcons.users,
+                          Colors.blue,
+                          cardBg,
+                          textColor,
+                          textMuted,
+                          borderColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildSummaryCard(
+                          'Cảnh báo hoạt động',
+                          '${alertProvider.activeAlertCount}',
+                          LucideIcons.bell,
+                          Colors.red,
+                          cardBg,
+                          textColor,
+                          textMuted,
+                          borderColor),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
               ],
 
               // Vitals Grid
-              GridView.count(
-                crossAxisCount: 1,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                childAspectRatio: isTablet ? 3.0 : 2.8,
+              // Vitals List
+              Column(
                 children: [
                   _buildMetricCard(
                       'NHỊP TIM',
@@ -473,6 +602,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       textColor,
                       textMuted,
                       borderColor),
+                  const SizedBox(height: 12),
                   _buildMetricCard(
                       'NỒNG ĐỘ OXY (SPO2)',
                       '$spo2Val',
@@ -484,6 +614,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       textColor,
                       textMuted,
                       borderColor),
+                  const SizedBox(height: 12),
                   _buildMetricCard(
                       'HUYẾT ÁP (BP)',
                       '$sysBp/$diaBp',
@@ -636,7 +767,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       patientProvider.triggerSimulation(
                                           _selectedPatientId!, true),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFF3366),
+                                backgroundColor: CgColors.accent,
                                 shape: RoundedRectangleBorder(
                                     borderRadius:
                                         BorderRadius.circular(12)),
@@ -754,7 +885,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       child: Text(
                         'TRỰC QUAN TIM PHỔI (${hrVal.toInt()} BPM)',
                         style: const TextStyle(
-                            color: Color(0xFFFF3366),
+                            color: CgColors.accent,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 1),
@@ -836,6 +967,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// Builds a small summary KPI card (used in admin dashboard grid).
   Widget _buildSummaryCard(
       String title,
       String value,
@@ -883,6 +1015,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// Builds a vital-sign metric card with accent colour, critical-state border, and unit.
   Widget _buildMetricCard(
     String title,
     String value,

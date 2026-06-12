@@ -187,7 +187,7 @@ export const PatientCompleteProfile: React.FC = () => {
   const getAvatarSrc = () => {
     if (!avatarUrl) return '';
     if (avatarUrl.startsWith('http')) return avatarUrl;
-    return `${API_URL}${avatarUrl}?token=${accessToken}`;
+    return `${API_URL}${avatarUrl}`;
   };
 
   return (
@@ -352,10 +352,6 @@ export const PatientCompleteProfile: React.FC = () => {
                 onChange={(e) => setBloodType(e.target.value)}
               >
                 <option value="">Không rõ</option>
-                <option value="A">A</option>
-                <option value="B">B</option>
-                <option value="O">O</option>
-                <option value="AB">AB</option>
                 <option value="A+">A+</option>
                 <option value="A-">A-</option>
                 <option value="B+">B+</option>

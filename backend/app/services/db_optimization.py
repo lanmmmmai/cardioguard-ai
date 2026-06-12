@@ -1,3 +1,22 @@
+"""Dịch vụ đồng bộ hóa chỉ mục cơ sở dữ liệu cho CardioGuard.
+
+Mục đích:
+    Đọc một tệp SQL di chuyển (008_optimize_performance_indexes.sql), phân tích ra
+    các câu lệnh CREATE INDEX riêng lẻ và thực thi từng câu lệnh với cơ sở dữ liệu.
+    Điều này đảm bảo tất cả các chỉ mục quan trọng về hiệu suất tồn tại mà không yêu cầu chạy
+    di chuyển đầy đủ.
+
+Luồng công việc:
+    ensure_performance_indexes() định vị tệp SQL tương đối với thư mục gốc của gói
+    phần mềm, chia nội dung trên dấu chấm phẩy, loại bỏ các dòng chú thích và
+    khoảng trắng, sau đó thực thi từng câu lệnh không rỗng một cách tuần tự.
+
+Quan hệ:
+    - app.core.database.database: Được sử dụng để thực thi các câu lệnh SQL thô.
+    - Tệp di chuyển nằm dưới backend/migrations/ và được kiểm soát phiên bản.
+    - Thường được gọi trong khi khởi động ứng dụng hoặc như một phần của tác vụ bảo trì.
+"""
+
 import os
 import json
 import logging
@@ -8,6 +27,12 @@ logger = logging.getLogger(__name__)
 
 async def ensure_user_account_timestamps() -> None:
     """Keep account timestamps available and server-driven for admin screens."""
+    existing = await database.fetch_val(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='created_at' AND column_default IS NOT NULL)"
+    )
+    if existing:
+        logger.info("Users account timestamp columns already exist, skipping DDL")
+        return
     logger.info("Synchronizing users account timestamp columns")
     statements = [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()",
@@ -45,20 +70,77 @@ async def ensure_user_account_timestamps() -> None:
 
 async def ensure_profile_schema() -> None:
     """Ensure role profile tables/columns exist before profile update flows run."""
-    logger.info("Synchronizing role profile schema")
+    # Check if user columns and consents table already exist to avoid redundant DDL
+    try:
+        columns_rows = await database.fetch_all(
+            "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users'"
+        )
+        existing_cols = {row["column_name"] for row in columns_rows}
+        user_cols_to_check = {
+            "phone", "specialty", "department", "status", "is_verified",
+            "profile_completed", "avatar_url", "google_id", "privacy_accepted_at",
+            "terms_accepted_at", "consent_version"
+        }
+        has_all_user_cols = user_cols_to_check.issubset(existing_cols)
+
+        consents_table_exists = await database.fetch_val(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'user_consents')"
+        )
+        
+        needs_user_ddl = not has_all_user_cols or not consents_table_exists
+    except Exception:
+        logger.warning("Failed to check existing profile schema columns, forcing DDL execution", exc_info=True)
+        needs_user_ddl = True
+
+    if needs_user_ddl:
+        user_column_statements = [
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS specialty TEXT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS department TEXT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id TEXT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMPTZ",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version TEXT",
+        ]
+        try:
+            for stmt in user_column_statements:
+                await database.execute(stmt)
+            # Ensure user_consents table is also always created on startup
+            await database.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_consents (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    consent_type TEXT NOT NULL,
+                    consent_version TEXT NOT NULL,
+                    accepted_at TIMESTAMPTZ DEFAULT NOW(),
+                    ip_address TEXT,
+                    user_agent TEXT
+                )
+                """
+            )
+            await database.execute("CREATE INDEX IF NOT EXISTS idx_user_consents_user_id ON user_consents(user_id)")
+        except Exception:
+            logger.exception("Failed to synchronize users profile columns or consents table")
+            raise
+
+    existing = await database.fetch_val(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name='doctor_profiles')"
+    )
+    if existing:
+        logger.info("Role profile schema tables already exist, skipping table DDL")
+        return
+    logger.info("Synchronizing role profile schema tables")
     try:
         await database.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
     except Exception:
         logger.warning("Could not ensure pgcrypto extension; continuing if gen_random_uuid is available", exc_info=True)
 
     statements = [
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS specialty TEXT",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS department TEXT",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN DEFAULT FALSE",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT",
         """
         CREATE TABLE IF NOT EXISTS patients (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -194,6 +276,21 @@ async def ensure_profile_schema() -> None:
         FOR EACH ROW
         EXECUTE FUNCTION update_profile_updated_at()
         """,
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMPTZ",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version TEXT",
+        """
+        CREATE TABLE IF NOT EXISTS user_consents (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            consent_type TEXT NOT NULL,
+            consent_version TEXT NOT NULL,
+            accepted_at TIMESTAMPTZ DEFAULT NOW(),
+            ip_address TEXT,
+            user_agent TEXT
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_user_consents_user_id ON user_consents(user_id)",
     ]
 
     try:
@@ -207,6 +304,127 @@ async def ensure_profile_schema() -> None:
 
 async def ensure_email_cms_schema() -> None:
     """Ensure the email CMS schema supports cms_email_id/email_type lookups."""
+    required_email_function_columns = (
+        "email_type",
+        "cms_email_id",
+        "name",
+        "group_key",
+        "target_role",
+        "description",
+        "required_variables",
+        "optional_variables",
+        "is_system",
+        "is_active",
+        "created_at",
+        "updated_at",
+    )
+    required_email_template_columns = (
+        "function_id",
+        "target_role",
+        "sample_variables",
+        "deleted_at",
+        "cms_email_id",
+        "email_type",
+        "text_content",
+        "variables",
+        "type",
+        "is_active",
+        "created_at",
+        "updated_at",
+    )
+    required_email_log_columns = (
+        "id",
+        "template_id",
+        "receiver_email",
+        "subject",
+        "status",
+        "error_message",
+        "sent_at",
+        "created_by",
+        "created_at",
+    )
+    required_email_function_indexes = (
+        "idx_cms_email_functions_group_role",
+    )
+    required_email_template_indexes = (
+        "idx_email_templates_cms_email_id",
+        "idx_email_templates_email_type_active",
+        "idx_email_templates_function_id",
+        "idx_email_templates_target_role",
+    )
+    required_email_log_indexes = (
+        "idx_email_logs_status",
+        "idx_email_logs_receiver",
+        "idx_email_logs_created_at",
+        "idx_email_logs_template_id",
+    )
+    required_email_function_triggers = ("trg_email_functions_updated_at",)
+    required_email_template_triggers = ("trg_email_templates_updated_at",)
+
+    missing_items: list[str] = []
+    try:
+        for table_name, required_columns in (
+            ("cms_email_functions", required_email_function_columns),
+            ("email_templates", required_email_template_columns),
+            ("email_logs", required_email_log_columns),
+        ):
+            for column_name in required_columns:
+                exists = await database.fetch_val(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = :table_name
+                          AND column_name = :column_name
+                    )
+                    """,
+                    {"table_name": table_name, "column_name": column_name},
+                )
+                if not exists:
+                    missing_items.append(f"{table_name}.{column_name}")
+
+        for index_name in (
+            *required_email_function_indexes,
+            *required_email_template_indexes,
+            *required_email_log_indexes,
+        ):
+            exists = await database.fetch_val(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM pg_indexes
+                    WHERE schemaname = 'public'
+                      AND indexname = :index_name
+                )
+                """,
+                {"index_name": index_name},
+            )
+            if not exists:
+                missing_items.append(f"index:{index_name}")
+
+        for trigger_name in (*required_email_function_triggers, *required_email_template_triggers):
+            exists = await database.fetch_val(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.triggers
+                    WHERE event_object_schema = 'public'
+                      AND trigger_name = :trigger_name
+                )
+                """,
+                {"trigger_name": trigger_name},
+            )
+            if not exists:
+                missing_items.append(f"trigger:{trigger_name}")
+    except Exception:
+        logger.warning("Failed to check existing email CMS schema, forcing synchronization", exc_info=True)
+        missing_items.append("forced_sync")
+
+    if not missing_items:
+        logger.info("Email CMS schema already exists, skipping DDL")
+        return
+
     logger.info("Synchronizing email CMS schema")
     try:
         await database.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
@@ -302,6 +520,23 @@ async def ensure_email_cms_schema() -> None:
         FOR EACH ROW
         EXECUTE FUNCTION update_email_templates_updated_at()
         """,
+        """
+        CREATE TABLE IF NOT EXISTS email_logs (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            template_id UUID REFERENCES email_templates(id) ON DELETE SET NULL,
+            receiver_email TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            error_message TEXT,
+            sent_at TIMESTAMPTZ,
+            created_by TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_email_logs_status ON email_logs(status)",
+        "CREATE INDEX IF NOT EXISTS idx_email_logs_receiver ON email_logs(receiver_email)",
+        "CREATE INDEX IF NOT EXISTS idx_email_logs_created_at ON email_logs(created_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_email_logs_template_id ON email_logs(template_id)",
     ]
 
     try:
@@ -309,79 +544,6 @@ async def ensure_email_cms_schema() -> None:
             await database.execute(statement)
     except Exception:
         logger.exception("Failed to synchronize email CMS schema")
-        raise
-
-
-async def ensure_domain_links_schema() -> None:
-    """Ensure domain_links supports preview routing, soft delete and public SEO images."""
-    logger.info("Synchronizing domain_links schema")
-    try:
-        await database.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
-    except Exception:
-        logger.warning("Could not ensure pgcrypto extension for domain_links schema", exc_info=True)
-
-    statements = [
-        "ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS path TEXT DEFAULT ''",
-        "ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
-        "ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ",
-        "ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS cache_version INTEGER DEFAULT 1",
-        "ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()",
-        "UPDATE domain_links SET path = COALESCE(path, '') WHERE path IS NULL",
-        """
-        UPDATE domain_links
-        SET path = CASE
-            WHEN path IS NOT NULL AND BTRIM(path) <> '' THEN path
-            WHEN url IS NOT NULL AND POSITION('://' IN url) > 0 THEN
-                '/' || REGEXP_REPLACE(SPLIT_PART(url, '://', 2), '^([^/]+)', '')
-            ELSE path
-        END
-        WHERE path IS NULL OR BTRIM(path) = ''
-        """,
-        "UPDATE domain_links SET is_active = COALESCE(is_active, TRUE)",
-        "UPDATE domain_links SET cache_version = COALESCE(cache_version, 1)",
-        """
-        CREATE OR REPLACE FUNCTION update_domain_links_updated_at()
-        RETURNS TRIGGER AS $$
-        BEGIN
-            NEW.updated_at = NOW();
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql
-        """,
-        "DROP TRIGGER IF EXISTS trg_domain_links_updated_at ON domain_links",
-        """
-        CREATE TRIGGER trg_domain_links_updated_at
-        BEFORE UPDATE ON domain_links
-        FOR EACH ROW
-        EXECUTE FUNCTION update_domain_links_updated_at()
-        """,
-        """
-        UPDATE domain_links
-        SET path = '/' || LTRIM(path, '/')
-        WHERE path IS NOT NULL AND BTRIM(path) <> ''
-        """,
-        """
-        UPDATE domain_links
-        SET deleted_at = NOW()
-        WHERE id IN (
-            SELECT id FROM (
-                SELECT id, ROW_NUMBER() OVER (PARTITION BY LOWER(path) ORDER BY updated_at DESC) as rn
-                FROM domain_links
-                WHERE deleted_at IS NULL AND BTRIM(path) <> ''
-            ) t WHERE t.rn > 1
-        )
-        """,
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_links_path_unique ON domain_links (LOWER(path)) WHERE deleted_at IS NULL AND BTRIM(path) <> ''",
-        "CREATE INDEX IF NOT EXISTS idx_domain_links_is_active ON domain_links (is_active)",
-        "CREATE INDEX IF NOT EXISTS idx_domain_links_deleted_at ON domain_links (deleted_at)",
-    ]
-
-    try:
-        for statement in statements:
-            await database.execute(statement)
-        logger.info("domain_links schema synchronized")
-    except Exception:
-        logger.exception("Failed to synchronize domain_links schema")
         raise
 
     default_functions = [
@@ -397,10 +559,7 @@ async def ensure_domain_links_schema() -> None:
         {"email_type": "doctor_pending_verification", "cms_email_id": "EMAIL_DOCTOR_PENDING_VERIFICATION", "name": "Bác sĩ chờ duyệt", "group_key": "account", "target_role": "doctor", "description": "Thông báo hồ sơ đang chờ xác thực.", "required_variables": ["full_name"], "optional_variables": [], "is_system": True},
         {"email_type": "doctor_verified", "cms_email_id": "EMAIL_DOCTOR_VERIFIED", "name": "Bác sĩ đã xác thực", "group_key": "account", "target_role": "doctor", "description": "Thông báo hồ sơ bác sĩ đã được xác thực.", "required_variables": ["full_name"], "optional_variables": ["login_url", "login_button_text"], "is_system": True},
         {"email_type": "doctor_rejected", "cms_email_id": "EMAIL_DOCTOR_REJECTED", "name": "Bác sĩ bị từ chối", "group_key": "account", "target_role": "doctor", "description": "Thông báo hồ sơ bị từ chối.", "required_variables": ["full_name", "verification_note"], "optional_variables": [], "is_system": True},
-        {"email_type": "doctor_need_update", "cms_email_id": "EMAIL_DOCTOR_NEED_UPDATE", "name": "Bác sĩ cần bổ sung hồ sơ", "group_key": "doctor_account", "target_role": "doctor", "description": "Yêu cầu bổ sung hồ sơ bác sĩ.", "required_variables": ["full_name", "verification_note"], "optional_variables": ["update_profile_url", "support_email"], "is_system": True},
-        {"email_type": "doctor_verified_success", "cms_email_id": "EMAIL_DOCTOR_VERIFIED", "name": "Bác sĩ đã được xác thực", "group_key": "account", "target_role": "doctor", "description": "Alias xác thực thành công.", "required_variables": ["full_name"], "optional_variables": ["login_url", "login_button_text"], "is_system": True},
-        {"email_type": "doctor_verified_rejected", "cms_email_id": "EMAIL_DOCTOR_REJECTED", "name": "Bác sĩ bị từ chối xác thực", "group_key": "account", "target_role": "doctor", "description": "Alias từ chối xác thực.", "required_variables": ["full_name", "verification_note"], "optional_variables": [], "is_system": True},
-        {"email_type": "doctor_profile_require_update", "cms_email_id": "EMAIL_DOCTOR_NEED_UPDATE", "name": "Bác sĩ cần bổ sung hồ sơ", "group_key": "doctor_account", "target_role": "doctor", "description": "Gửi email yêu cầu bác sĩ bổ sung hồ sơ.", "required_variables": ["full_name", "verification_note"], "optional_variables": ["update_profile_url", "support_email"], "is_system": True},
+        {"email_type": "doctor_need_update", "cms_email_id": "EMAIL_DOCTOR_NEED_UPDATE", "name": "Bác sĩ cần bổ sung hồ sơ", "group_key": "doctor_account", "target_role": "doctor", "description": "Gửi email yêu cầu bác sĩ bổ sung hồ sơ.", "required_variables": ["full_name", "verification_note"], "optional_variables": ["update_profile_url", "support_email"], "is_system": True},
     ]
 
     try:
@@ -666,37 +825,174 @@ async def ensure_domain_links_schema() -> None:
                 "SELECT id, target_role FROM cms_email_functions WHERE lower(email_type) = lower(:email_type) LIMIT 1",
                 {"email_type": template["email_type"]},
             )
-            function_id = str(function_row["id"]) if function_row else None
-            template_target_role = str(function_row["target_role"]) if function_row and function_row["target_role"] else "all"
             await database.execute(
                 """
                 INSERT INTO email_templates (
                     function_id, target_role, cms_email_id, email_type, name, subject, html_content, text_content, variables, type, is_active
-                )
-                VALUES (
+                ) VALUES (
                     :function_id, :target_role, :cms_email_id, :email_type, :name, :subject, :html_content, :text_content, CAST(:variables AS jsonb), :type, TRUE
                 )
                 ON CONFLICT (cms_email_id) DO NOTHING
                 """,
                 {
-                    "function_id": function_id,
-                    "target_role": template_target_role,
+                    "function_id": function_row["id"] if function_row else None,
+                    "target_role": function_row["target_role"] if function_row else "all",
                     "cms_email_id": template["cms_email_id"],
                     "email_type": template["email_type"],
                     "name": template["name"],
                     "subject": template["subject"],
-                    "html_content": template["html_content"].strip(),
-                    "text_content": template["text_content"].strip(),
+                    "html_content": template["html_content"],
+                    "text_content": template["text_content"],
                     "variables": json.dumps(template["variables"]),
                     "type": template["email_type"],
                 },
             )
     except Exception:
-        logger.exception("Failed to seed default email CMS templates")
+        logger.exception("Failed to seed default email templates")
+        raise
+
+    logger.info("Email CMS schema synchronized")
+
+
+async def ensure_domain_links_schema() -> None:
+    """Ensure domain_links supports preview routing, soft delete and public SEO images."""
+    required_columns = ("path", "is_active", "deleted_at", "cache_version", "updated_at")
+    missing_columns = []
+    
+    try:
+        for column_name in required_columns:
+            exists = await database.fetch_val(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'domain_links'
+                      AND column_name = :column_name
+                )
+                """,
+                {"column_name": column_name},
+            )
+            if not exists:
+                missing_columns.append(column_name)
+
+        index_exists = await database.fetch_val(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM pg_indexes
+                WHERE schemaname = 'public'
+                  AND tablename = 'domain_links'
+                  AND indexname = 'idx_domain_links_path_unique'
+            )
+            """
+        )
+
+        trigger_exists = await database.fetch_val(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.triggers
+                WHERE event_object_schema = 'public'
+                  AND event_object_table = 'domain_links'
+                  AND trigger_name = 'trg_domain_links_updated_at'
+            )
+            """
+        )
+    except Exception:
+        logger.warning("Failed to check domain_links schema, forcing DDL execution", exc_info=True)
+        missing_columns = list(required_columns)
+        index_exists = False
+        trigger_exists = False
+
+    if not missing_columns and index_exists and trigger_exists:
+        logger.info("Domain_links schema already exists, skipping DDL")
+        return
+
+    logger.info("Synchronizing domain_links schema")
+    try:
+        await database.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+    except Exception:
+        logger.warning("Could not ensure pgcrypto extension for domain_links schema", exc_info=True)
+
+    statements = [
+        "ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS path TEXT DEFAULT ''",
+        "ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE",
+        "ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ",
+        "ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS cache_version INTEGER DEFAULT 1",
+        "ALTER TABLE domain_links ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()",
+        "UPDATE domain_links SET path = COALESCE(path, '') WHERE path IS NULL",
+        """
+        UPDATE domain_links
+        SET path = CASE
+            WHEN path IS NOT NULL AND BTRIM(path) <> '' THEN path
+            WHEN url IS NOT NULL AND POSITION('://' IN url) > 0 THEN
+                '/' || REGEXP_REPLACE(SPLIT_PART(url, '://', 2), '^([^/]+)', '')
+            ELSE path
+        END
+        WHERE path IS NULL OR BTRIM(path) = ''
+        """,
+        "UPDATE domain_links SET is_active = COALESCE(is_active, TRUE)",
+        "UPDATE domain_links SET cache_version = COALESCE(cache_version, 1)",
+        """
+        CREATE OR REPLACE FUNCTION update_domain_links_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+        """,
+        "DROP TRIGGER IF EXISTS trg_domain_links_updated_at ON domain_links",
+        """
+        CREATE TRIGGER trg_domain_links_updated_at
+        BEFORE UPDATE ON domain_links
+        FOR EACH ROW
+        EXECUTE FUNCTION update_domain_links_updated_at()
+        """,
+        """
+        UPDATE domain_links
+        SET path = '/' || LTRIM(path, '/')
+        WHERE path IS NOT NULL AND BTRIM(path) <> ''
+        """,
+        """
+        UPDATE domain_links
+        SET deleted_at = NOW()
+        WHERE id IN (
+            SELECT id FROM (
+                SELECT id, ROW_NUMBER() OVER (PARTITION BY LOWER(path) ORDER BY updated_at DESC) as rn
+                FROM domain_links
+                WHERE deleted_at IS NULL AND BTRIM(path) <> ''
+            ) t WHERE t.rn > 1
+        )
+        """,
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_domain_links_path_unique ON domain_links (LOWER(path)) WHERE deleted_at IS NULL AND BTRIM(path) <> ''",
+        "CREATE INDEX IF NOT EXISTS idx_domain_links_is_active ON domain_links (is_active)",
+        "CREATE INDEX IF NOT EXISTS idx_domain_links_deleted_at ON domain_links (deleted_at)",
+    ]
+
+    try:
+        for statement in statements:
+            await database.execute(statement)
+        logger.info("domain_links schema synchronized")
+    except Exception:
+        logger.exception("Failed to synchronize domain_links schema")
         raise
 
 
 async def ensure_performance_indexes() -> None:
+    """Đồng bộ hóa các chỉ mục hiệu suất cơ sở dữ liệu từ tệp SQL di chuyển.
+
+    Đọc file di chuyển 008_optimize_performance_indexes.sql, trích xuất mọi
+    câu lệnh không phải chú thích, không trống và thực thi nó. Điều này đảm bảo rằng
+    các chỉ mục được sử dụng bởi các truy vấn tần suất cao (ví dụ: trên sensor_data, alerts và
+    audit_logs) tồn tại ngay cả khi quá trình di chuyển chưa được chạy trong một khung
+    di chuyển truyền thống.
+
+    Ngoại lệ:
+        Không có ngoại lệ nào được truyền lên; các lỗi được ghi nhật ký và hàm
+        trả về một cách im lặng.
+    """
     migration_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
         "migrations",
@@ -706,6 +1002,49 @@ async def ensure_performance_indexes() -> None:
     if not os.path.exists(migration_path):
         logger.warning("Performance index migration file not found: %s", migration_path)
         return
+
+    # Check if all indexes already exist to avoid redundant queries
+    expected_indexes = {
+        "idx_sensor_data_patient_created_at",
+        "idx_appointments_patient_id",
+        "idx_appointments_doctor_id",
+        "idx_medical_records_patient_id",
+        "idx_medical_records_doctor_id",
+        "idx_prescriptions_patient_id",
+        "idx_prescriptions_doctor_id",
+        "idx_devices_patient_id",
+        "idx_reports_user_id",
+        "idx_chat_messages_session_id",
+        "idx_audit_logs_user_id",
+        "idx_cameras_assigned_patient_id"
+    }
+
+    try:
+        rows = await database.fetch_all(
+            """
+            SELECT indexname FROM pg_indexes 
+            WHERE schemaname = 'public' AND indexname IN (
+                'idx_sensor_data_patient_created_at',
+                'idx_appointments_patient_id',
+                'idx_appointments_doctor_id',
+                'idx_medical_records_patient_id',
+                'idx_medical_records_doctor_id',
+                'idx_prescriptions_patient_id',
+                'idx_prescriptions_doctor_id',
+                'idx_devices_patient_id',
+                'idx_reports_user_id',
+                'idx_chat_messages_session_id',
+                'idx_audit_logs_user_id',
+                'idx_cameras_assigned_patient_id'
+            )
+            """
+        )
+        existing_indexes = {row["indexname"] for row in rows}
+        if expected_indexes.issubset(existing_indexes):
+            logger.info("All performance indexes already exist, skipping DDL")
+            return
+    except Exception:
+        logger.warning("Failed to check existing performance indexes, forcing DDL execution", exc_info=True)
 
     logger.info("Synchronizing performance indexes")
     try:
@@ -733,3 +1072,41 @@ async def ensure_performance_indexes() -> None:
         logger.info("Performance indexes synchronized: count=%s", executed_count)
     except Exception as e:
         logger.exception("Failed to synchronize performance indexes")
+
+
+async def ensure_articles_schema() -> None:
+    """Ensure articles table exists for CMS medical articles."""
+    existing = await database.fetch_val(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='articles')"
+    )
+    if existing:
+        logger.info("Articles schema already exists, skipping DDL")
+        return
+    logger.info("Synchronizing articles schema")
+    try:
+        await database.execute(
+            """
+            CREATE TABLE IF NOT EXISTS articles (
+                id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                title      TEXT NOT NULL,
+                slug       TEXT UNIQUE NOT NULL,
+                content    TEXT NOT NULL,
+                summary    TEXT,
+                author_id  UUID REFERENCES users(id) ON DELETE SET NULL,
+                category   TEXT DEFAULT 'general',
+                is_active  BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+            """
+        )
+        await database.execute(
+            "CREATE INDEX IF NOT EXISTS idx_articles_is_active ON articles(is_active)"
+        )
+        await database.execute(
+            "CREATE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug)"
+        )
+        logger.info("Articles schema created successfully")
+    except Exception:
+        logger.exception("Failed to create articles schema")
+        raise

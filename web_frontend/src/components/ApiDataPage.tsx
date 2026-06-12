@@ -1,3 +1,15 @@
+/**
+ * @purpose Component bảng dữ liệu động đa năng. Tải dữ liệu từ một endpoint API bất kỳ
+ *          và hiển thị dưới dạng bảng có phản hồi với tiêu đề cột tiếng Việt và định dạng
+ *          giá trị thông minh.
+ * @workflow  1. Tải dữ liệu từ prop `endpoint` khi mount → 2. Tự động phát hiện cột từ
+ *            khóa của bản ghi → 3. Hiển thị bảng với tiêu đề và ô đã được định dạng →
+ *            4. Người dùng có thể làm mới dữ liệu thủ công.
+ * @relationships
+ *   - App.tsx (khối switch routeContent cho camera, báo cáo, v.v.)
+ *   - AuthContext cho mã truy cập
+ *   - Hằng số cấu hình API_URL
+ */
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Database, RefreshCw, ExternalLink } from 'lucide-react';
 import { API_URL } from '../config';
@@ -9,11 +21,25 @@ interface ApiDataPageProps {
   endpoint: string;
 }
 
+/**
+ * Hiển thị bảng dữ liệu được lấy từ endpoint API backend. Xử lý các trạng thái
+ * đang tải, lỗi và trống.
+ */
 export const ApiDataPage: React.FC<ApiDataPageProps> = ({ title, subtitle, endpoint }) => {
   const { accessToken } = useAuth();
   const [rows, setRows] = useState<Array<Record<string, any>>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const normalizeRows = (data: any): Array<Record<string, any>> => {
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (Array.isArray(data?.items)) {
+      return data.items;
+    }
+    return data && typeof data === 'object' ? [data] : [];
+  };
 
   const fetchRows = async () => {
     if (!accessToken) return;
@@ -35,7 +61,7 @@ export const ApiDataPage: React.FC<ApiDataPageProps> = ({ title, subtitle, endpo
 
       }
       if (!response.ok) throw new Error(data.detail || 'Không lấy được dữ liệu');
-      setRows(Array.isArray(data) ? data : [data]);
+      setRows(normalizeRows(data));
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
     } finally {
@@ -53,7 +79,6 @@ export const ApiDataPage: React.FC<ApiDataPageProps> = ({ title, subtitle, endpo
     return keys.filter((key) => key !== 'updated_at').slice(0, 7);
   }, [rows]);
 
-  // Helper dịch tiêu đề cột sang tiếng Việt chuyên nghiệp
   const formatHeader = (col: string) => {
     const dict: Record<string, string> = {
       id: 'ID',
@@ -81,11 +106,9 @@ export const ApiDataPage: React.FC<ApiDataPageProps> = ({ title, subtitle, endpo
     return dict[col] || col.charAt(0).toUpperCase() + col.slice(1).replace(/_/g, ' ');
   };
 
-  // Helper định dạng hiển thị giá trị lâm sàng/hệ thống thông minh
   const formatValue = (col: string, val: any) => {
     if (val === null || val === undefined) return '-';
     
-    // 1. Định dạng Ngày tháng năm tiếng Việt
     if (col === 'created_at' || col === 'updated_at') {
       try {
         return (
@@ -105,7 +128,6 @@ export const ApiDataPage: React.FC<ApiDataPageProps> = ({ title, subtitle, endpo
       }
     }
     
-    // 2. Huy hiệu Trạng thái sinh động
     if (col === 'status') {
       const statusStr = String(val).toLowerCase();
       if (statusStr === 'online' || statusStr === 'active' || statusStr === 'success') {
@@ -124,7 +146,6 @@ export const ApiDataPage: React.FC<ApiDataPageProps> = ({ title, subtitle, endpo
       }
     }
     
-    // 3. Rút ngắn mã UUID phức tạp kèm tooltip
     if (String(val).length > 30 && /^[0-9a-fA-F-]{36}$/.test(String(val))) {
       return (
         <span title={String(val)} className="tabular-nums" style={{ fontFamily: 'monospace', opacity: 0.85, fontSize: '0.82rem', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
@@ -133,7 +154,6 @@ export const ApiDataPage: React.FC<ApiDataPageProps> = ({ title, subtitle, endpo
       );
     }
     
-    // 4. Định dạng siêu liên kết cho Video / Web link
     if (typeof val === 'string' && (val.startsWith('http://') || val.startsWith('https://'))) {
       return (
         <a href={val} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none', fontWeight: 600 }}>
@@ -142,7 +162,6 @@ export const ApiDataPage: React.FC<ApiDataPageProps> = ({ title, subtitle, endpo
       );
     }
     
-    // 5. Định dạng dữ liệu phức tạp JSON
     if (typeof val === 'object') {
       return (
         <pre style={{ margin: 0, fontSize: '0.76rem', background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: '6px', fontFamily: 'monospace', overflowX: 'auto', maxWidth: '220px' }}>

@@ -116,16 +116,16 @@ INSERT INTO email_templates (
     TRUE
 ),
 (
-    (SELECT id FROM cms_email_functions WHERE email_type = 'doctor_profile_require_update' LIMIT 1),
+    (SELECT id FROM cms_email_functions WHERE email_type = 'doctor_need_update' LIMIT 1),
     'doctor',
     'EMAIL_DOCTOR_NEED_UPDATE',
-    'doctor_profile_require_update',
+    'doctor_need_update',
     'Bác sĩ cần bổ sung hồ sơ',
     'CardioGuard AI - Yêu cầu bổ sung hồ sơ bác sĩ',
     '<div style="font-family:sans-serif;max-width:480px;margin:auto;padding:32px;border:1px solid #e2e8f0;border-radius:12px"><h2 style="color:#d97706;margin-bottom:8px">CardioGuard AI</h2><p style="color:#374151">Xin chào Bác sĩ <strong>{{full_name}}</strong>,</p><p style="color:#374151">Hồ sơ bác sĩ cần bổ sung thông tin.</p><p style="color:#374151;padding:12px;background-color:#fffbeb;border-left:4px solid #f59e0b;margin:16px 0"><strong>Nội dung cần bổ sung:</strong> {{verification_note}}</p></div>',
     'Xin chào {{full_name}}, vui lòng cập nhật hồ sơ: {{verification_note}}.',
     '["full_name","verification_note","update_profile_url","support_email"]'::jsonb,
-    'doctor_profile_require_update',
+    'doctor_need_update',
     TRUE
 )
 ON CONFLICT DO NOTHING;

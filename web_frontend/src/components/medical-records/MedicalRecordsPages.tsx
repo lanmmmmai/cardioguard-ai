@@ -1,3 +1,18 @@
+/**
+ * Tệp: CardioGuard AI – Quản lý Bệnh án Điện tử (EMR) dựa trên vai trò
+ * Mục đích: Hiển thị giao diện danh sách, chi tiết, tạo mới và sửa đổi bệnh án điện tử
+ *           cho các vai trò: Bác sĩ (Doctor), Bệnh nhân (Patient), và Quản trị viên (Admin).
+ * Luồng xử lý: 
+ *   - Bác sĩ: Có quyền xem danh sách bệnh án, tạo mới từ mẫu chuyên khoa, lưu nháp (draft),
+ *             ký xác nhận (sign), và tạo bản bổ sung sửa đổi (amendment).
+ *   - Bệnh nhân: Chỉ xem các bệnh án đã được bác sĩ ký xác nhận (status !== draft).
+ *   - Quản trị viên: Xem toàn bộ danh sách và chi tiết bệnh án dưới quyền đọc (read-only) phục vụ mục đích kiểm toán.
+ * Quan hệ:
+ *   - Tiêu thụ: medicalRecordsService để giao tiếp với backend/Supabase.
+ *   - Sử dụng: MedicalRecordForm để hiển thị form nhập liệu/xem chi tiết,
+ *               MedicalRecordConfirmSignModal để xác nhận ký số.
+ */
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, FileText, Filter, Plus, RefreshCw, Search, Shield, Upload } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
@@ -144,13 +159,13 @@ export const DoctorMedicalRecordsPage: React.FC<{
     setLoading(true);
     setError(null);
     try {
-      const assignedIds = await medicalRecordsService.getDoctorAssignedPatients({ accessToken, currentUserId }, currentUserId);
+      const assignedIds = await medicalRecordsService.getDoctorAssignedPatients({ accessToken, currentUserId, role: 'doctor' }, currentUserId);
       const assigned = patients.filter((patient) => assignedIds.includes(patient.id));
       setAssignedPatients(assigned.length ? assigned.map(toPatientOption) : patients.map(toPatientOption));
-      const rows = await medicalRecordsService.getDoctorMedicalRecords({ accessToken, currentUserId }, currentUserId);
+      const rows = await medicalRecordsService.getDoctorMedicalRecords({ accessToken, currentUserId, role: 'doctor' }, currentUserId);
       setRecords(rows);
       if (recordId && !isNew) {
-        const found = rows.find((row) => row.id === recordId) || await medicalRecordsService.getMedicalRecordById({ accessToken, currentUserId }, recordId);
+        const found = rows.find((row) => row.id === recordId) || await medicalRecordsService.getMedicalRecordById({ accessToken, currentUserId, role: 'doctor' }, recordId);
         setSelectedRecord(found);
       } else {
         setSelectedRecord(null);
@@ -164,7 +179,6 @@ export const DoctorMedicalRecordsPage: React.FC<{
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, currentUserId, recordId, path]);
 
   const filteredRecords = useMemo(() => {
@@ -186,7 +200,7 @@ export const DoctorMedicalRecordsPage: React.FC<{
   };
 
   const openRecord = async (id: string) => {
-    const found = records.find((row) => row.id === id) || await medicalRecordsService.getMedicalRecordById({ accessToken, currentUserId }, id);
+    const found = records.find((row) => row.id === id) || await medicalRecordsService.getMedicalRecordById({ accessToken, currentUserId, role: 'doctor' }, id);
     setSelectedRecord(found);
     const suffix = found.status === 'draft' ? '/edit' : '';
     navigate(`/doctor/medical-records/${id}${suffix}`);
@@ -196,10 +210,10 @@ export const DoctorMedicalRecordsPage: React.FC<{
     setSaving(true);
     try {
       if (selectedRecord) {
-        await medicalRecordsService.updateMedicalRecord({ accessToken, currentUserId }, selectedRecord.id, payload);
+        await medicalRecordsService.updateMedicalRecord({ accessToken, currentUserId, role: 'doctor' }, selectedRecord.id, payload);
         setToast({ message: 'Đã lưu nháp bệnh án', tone: 'success' });
       } else {
-        await medicalRecordsService.createMedicalRecord({ accessToken, currentUserId }, payload);
+        await medicalRecordsService.createMedicalRecord({ accessToken, currentUserId, role: 'doctor' }, payload);
         setToast({ message: 'Đã tạo bệnh án mới', tone: 'success' });
       }
       await loadData();
@@ -216,7 +230,7 @@ export const DoctorMedicalRecordsPage: React.FC<{
     if (!selectedRecord) return;
     setSaving(true);
     try {
-      await medicalRecordsService.signMedicalRecord({ accessToken, currentUserId }, selectedRecord.id);
+      await medicalRecordsService.signMedicalRecord({ accessToken, currentUserId, role: 'doctor' }, selectedRecord.id);
       setToast({ message: 'Đã ký xác nhận bệnh án', tone: 'success' });
       setConfirmSignOpen(false);
       await loadData();
@@ -231,7 +245,7 @@ export const DoctorMedicalRecordsPage: React.FC<{
   const handleCreateAmendment = async () => {
     if (!selectedRecord) return;
     try {
-      const amended = await medicalRecordsService.createMedicalRecordAmendment({ accessToken, currentUserId }, selectedRecord.id);
+      const amended = await medicalRecordsService.createMedicalRecordAmendment({ accessToken, currentUserId, role: 'doctor' }, selectedRecord.id);
       setToast({ message: 'Đã tạo bản bổ sung', tone: 'success' });
       await loadData();
       setSelectedRecord(amended);
@@ -373,10 +387,10 @@ export const PatientMedicalRecordsPage: React.FC<{
     if (!user?.id) return;
     setLoading(true);
     try {
-      const rows = await medicalRecordsService.getPatientMedicalRecords({ accessToken, currentUserId: user.id }, user.id);
+      const rows = await medicalRecordsService.getPatientMedicalRecords({ accessToken, currentUserId: user.id, role: 'patient' }, user.id);
       setRecords(rows);
       if (recordId) {
-        setSelectedRecord(rows.find((row) => row.id === recordId) || await medicalRecordsService.getMedicalRecordById({ accessToken, currentUserId: user.id }, recordId));
+        setSelectedRecord(rows.find((row) => row.id === recordId) || await medicalRecordsService.getMedicalRecordById({ accessToken, currentUserId: user.id, role: 'patient' }, recordId));
       } else {
         setSelectedRecord(null);
       }
@@ -389,7 +403,6 @@ export const PatientMedicalRecordsPage: React.FC<{
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, user?.id, path]);
 
   if (loading) return <div className="route-loading">Đang tải bệnh án...</div>;
@@ -462,10 +475,10 @@ export const AdminMedicalRecordsPage: React.FC<{
   const loadData = async () => {
     setLoading(true);
     try {
-      const rows = await medicalRecordsService.getAdminMedicalRecords({ accessToken, currentUserId: user?.id || null });
+      const rows = await medicalRecordsService.getAdminMedicalRecords({ accessToken, currentUserId: user?.id || null, role: 'admin' });
       setRecords(rows);
       if (recordId) {
-        setSelectedRecord(rows.find((row) => row.id === recordId) || await medicalRecordsService.getMedicalRecordById({ accessToken, currentUserId: user?.id || null }, recordId));
+        setSelectedRecord(rows.find((row) => row.id === recordId) || await medicalRecordsService.getMedicalRecordById({ accessToken, currentUserId: user?.id || null, role: 'admin' }, recordId));
       } else {
         setSelectedRecord(null);
       }
@@ -478,7 +491,6 @@ export const AdminMedicalRecordsPage: React.FC<{
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, recordId, path]);
 
   const filtered = useMemo(() => {

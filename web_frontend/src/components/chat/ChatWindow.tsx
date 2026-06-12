@@ -1,3 +1,10 @@
+/**
+ * Mục đích: Cửa sổ chat AI với lịch sử tin nhắn, biểu mẫu gửi, hiệu ứng gõ chữ và mô phỏng streaming.
+ * Luồng xử lý: Gửi tin nhắn người dùng đến /api/chat/send; nhận phản hồi AI và mô phỏng streaming
+ *              từng từ với cập nhật trạng thái theo lô (sửa lỗi FE-14); tự động cuộn đến tin nhắn mới nhất.
+ * Quan hệ: Sử dụng MessageBubble để hiển thị từng tin nhắn; sử dụng AuthContext để lấy token;
+ *          Có thể nhận contextData cho ngữ cảnh cụ thể của bệnh nhân.
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Loader2, Sparkles } from 'lucide-react';
 import { buildApiUrl } from '../../config';
@@ -10,14 +17,26 @@ interface ChatWindowProps {
   placeholder?: string;
 }
 
+/**
+ * Component ChatWindow — giao diện chat AI đầy đủ với danh sách tin nhắn, biểu mẫu nhập,
+ * cập nhật UI lạc quan và hiển thị phản hồi streaming mô phỏng.
+ */
 export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, placeholder = "Hỏi trợ lý AI..." }) => {
   const { accessToken } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const scrollToBottom = () => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -27,7 +46,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
     scrollToBottom();
   }, [messages]);
 
-  // Load existing session history if needed (simplified: start fresh for now unless explicit)
+  // Tải lịch sử phiên làm việc nếu cần (đơn giản hóa: bắt đầu mới trừ khi có yêu cầu rõ ràng)
   
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -35,8 +54,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
 
     const userText = input.trim();
     setInput('');
+    setChatError(null);
     
-    // Optimistic add user message
+    // Thêm tin nhắn người dùng một cách lạc quan (optimistic)
     const tempUserId = `u-${Date.now()}`;
     setMessages(prev => [...prev, { id: tempUserId, sender: 'user', message: userText }]);
     setLoading(true);
@@ -63,22 +83,25 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
         setSessionId(data.session_id);
       }
 
-      // Simulated typing effect for AI response
+      // Hiệu ứng gõ chữ mô phỏng cho phản hồi AI — tách văn bản thành các từ và stream chúng
       const aiResponseText = data.ai_message.message;
       const aiMsgId = data.ai_message.id;
       
       setMessages(prev => [...prev, { id: aiMsgId, sender: 'ai', message: '', isStreaming: true }]);
       
-      // Simulate streaming chunks
+      // Mô phỏng các đoạn stream
       const chunks = aiResponseText.split(' ');
       let currentText = '';
       
       let batchUpdateCount = 0;
       for (let i = 0; i < chunks.length; i++) {
+        if (!isMountedRef.current) {
+          return;
+        }
         currentText += (i === 0 ? '' : ' ') + chunks[i];
         batchUpdateCount++;
         
-        // Batch state updates to prevent excessive re-renders (FE-14 fix)
+        // Cập nhật trạng thái theo lô để ngăn render quá nhiều lần (sửa lỗi FE-14)
         if (batchUpdateCount >= 4 || i === chunks.length - 1) {
           setMessages(prev => 
             prev.map(m => m.id === aiMsgId ? { ...m, message: currentText } : m)
@@ -93,9 +116,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
       );
 
     } catch (err: any) {
+      if (!isMountedRef.current) {
+        return;
+      }
+      setChatError('Không thể gửi tin nhắn tới trợ lý AI. Vui lòng thử lại.');
       setMessages(prev => [...prev, { id: `err-${Date.now()}`, sender: 'ai', message: '⚠️ Lỗi kết nối AI. Vui lòng thử lại.' }]);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -127,6 +156,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ role, contextData, place
       </div>
 
       <div className="chat-input-area">
+        {chatError && <div className="form-error mb-2">{chatError}</div>}
         <form onSubmit={handleSend} className="chat-input-form">
           <input
             className="chat-input"

@@ -1,29 +1,53 @@
+// Điểm vào và cây widget gốc cho ứng dụng di động CardioGuard AI.
+// Quy trình làm việc:
+//   1. main() khởi chạy HeartMonitorApp bọc MultiProvider với tất cả
+//      các provider trạng thái (auth, patient, alert, chat, appointment).
+//   2. MaterialApp sử dụng các route có tên bắt đầu từ /splash. Việc chuyển đổi
+//      chủ đề tối/sáng được quản lý bởi _HeartMonitorAppState.
+//   3. Sau xác thực, MainTabWrapper hiển thị thanh điều hướng dưới dựa trên vai trò với
+//      IndexedStack để giữ trạng thái tab khi điều hướng.
+// Mối quan hệ:
+//   - Phụ thuộc vào providers/*, screens/*, ui/cg_theme.dart, ui/cg_tokens.dart.
+//   - AuthProvider xác định vai trò hoạt động và trạng thái
+//      buộc đổi mật khẩu, giúp cấu hình lại bố cục tab một cách động.
+//   - MainTabWrapper nhận callback chuyển đổi chủ đề từ trạng thái cha.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'core/app_logger.dart';
 
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/forgot_password_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/patients_screen.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/appointments_screen.dart';
-import 'screens/icu_camera_screen.dart';
+import 'screens/chat_ai_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/policy_screen.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/patient_provider.dart';
 import 'providers/alert_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/appointment_provider.dart';
+import 'providers/notification_provider.dart';
+import 'screens/notifications_screen.dart';
 import 'ui/cg_theme.dart';
 import 'ui/cg_tokens.dart';
 
+// Điểm vào chính của ứng dụng. Tạo widget HeartMonitorApp gốc.
 void main() {
+  AppLogger.info('[CardioGuard] App starting...');
   runApp(const HeartMonitorApp());
 }
 
+// Widget ứng dụng gốc. Bọc cây widget trong MultiProvider và
+// cấu hình MaterialApp với các route có tên và hỗ trợ chủ đề.
 class HeartMonitorApp extends StatefulWidget {
   const HeartMonitorApp({super.key});
 
@@ -32,23 +56,80 @@ class HeartMonitorApp extends StatefulWidget {
 }
 
 class _HeartMonitorAppState extends State<HeartMonitorApp> {
+  // Theo dõi xem ứng dụng có đang sử dụng bảng màu tối hay không.
   bool _isDarkTheme = true;
 
-  void _toggleTheme() {
+  @override
+  void initState() {
+    super.initState();
+    _loadThemePreference();
+    _requestNotificationPermission();
+  }
+
+  Future<void> _loadThemePreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _isDarkTheme = prefs.getBool('is_dark_theme') ?? true;
+      });
+    } catch (e) {
+      AppLogger.error('Failed to load theme preference: $e');
+    }
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    try {
+      final status = await Permission.notification.status;
+      if (status.isDenied || status.isPermanentlyDenied) {
+        await Permission.notification.request();
+      }
+    } catch (e) {
+      AppLogger.error('Failed to request notification permission: $e');
+    }
+  }
+
+  // Chuyển đổi giữa chủ đề tối và sáng, kích hoạt xây dựng lại giao diện.
+  Future<void> _toggleTheme() async {
     setState(() {
       _isDarkTheme = !_isDarkTheme;
     });
+    AppLogger.info('[CardioGuard] Theme toggled: ${_isDarkTheme ? "dark" : "light"}');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('is_dark_theme', _isDarkTheme);
+    } catch (e) {
+      AppLogger.error('Failed to save theme preference: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
-        ChangeNotifierProvider(create: (_) => PatientProvider()),
-        ChangeNotifierProvider(create: (_) => AlertProvider()),
-        ChangeNotifierProvider(create: (_) => ChatProvider()),
-        ChangeNotifierProvider(create: (_) => AppointmentProvider()),
+        ChangeNotifierProvider(create: (_) {
+          AppLogger.info('[CardioGuard] Initializing AuthProvider');
+          return AuthProvider()..init();
+        }),
+        ChangeNotifierProvider(create: (_) {
+          AppLogger.info('[CardioGuard] Initializing PatientProvider');
+          return PatientProvider();
+        }),
+        ChangeNotifierProvider(create: (_) {
+          AppLogger.info('[CardioGuard] Initializing AlertProvider');
+          return AlertProvider();
+        }),
+        ChangeNotifierProvider(create: (_) {
+          AppLogger.info('[CardioGuard] Initializing ChatProvider');
+          return ChatProvider();
+        }),
+        ChangeNotifierProvider(create: (_) {
+          AppLogger.info('[CardioGuard] Initializing AppointmentProvider');
+          return AppointmentProvider();
+        }),
+        ChangeNotifierProvider(create: (_) {
+          AppLogger.info('[CardioGuard] Initializing NotificationProvider');
+          return NotificationProvider();
+        }),
       ],
       child: MaterialApp(
         title: 'Smart Heart Patient Monitoring',
@@ -57,24 +138,34 @@ class _HeartMonitorAppState extends State<HeartMonitorApp> {
         theme: buildCgTheme(Brightness.light),
         darkTheme: buildCgTheme(Brightness.dark),
 
-        // Initial route is splash for session verification
+        // Bắt đầu tại màn hình splash để xác thực phiên trước khi điều hướng tiếp.
         initialRoute: '/splash',
         routes: {
           '/splash': (context) => const SplashScreen(),
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
+          '/forgot-password': (context) => const ForgotPasswordScreen(),
+          '/privacy': (context) => const PolicyScreen(type: 'privacy'),
+          '/terms': (context) => const PolicyScreen(type: 'terms'),
+          '/data-deletion': (context) => const PolicyScreen(type: 'data-deletion'),
           '/dashboard': (context) => MainTabWrapper(
                 isDarkTheme: _isDarkTheme,
                 onToggleTheme: _toggleTheme,
               ),
+          '/notifications': (context) => const NotificationsScreen(),
         },
       ),
     );
   }
 }
 
+// Bọc điều hướng dưới dựa trên vai trò. Hiển thị IndexedStack gồm các màn hình
+// và một thanh dưới tùy chỉnh, với các tab được cấu hình động theo vai trò người dùng.
 class MainTabWrapper extends StatefulWidget {
+  // Xem chủ đề hiện tại có phải tối hay không; được chuyển tiếp từ HeartMonitorApp.
   final bool isDarkTheme;
+
+  // Callback được gọi khi người dùng chuyển đổi chủ đề.
   final VoidCallback onToggleTheme;
 
   const MainTabWrapper({
@@ -88,6 +179,7 @@ class MainTabWrapper extends StatefulWidget {
 }
 
 class _MainTabWrapperState extends State<MainTabWrapper> {
+  // Chỉ số của tab điều hướng dưới hiện đang được chọn.
   int _currentIndex = 0;
 
   @override
@@ -106,7 +198,8 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
     final role = authProvider.currentUser?.role ?? 'patient';
     final forcePasswordChange = authProvider.requiresPasswordChange;
 
-    // Configure items and screens dynamically based on the active role
+    // Cấu hình động các mục tab và màn hình dựa trên vai trò đang hoạt động
+    // và liệu có yêu cầu thay đổi mật khẩu bắt buộc hay không.
     final List<Widget> screens;
     final List<Map<String, dynamic>> tabConfig;
 
@@ -120,7 +213,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
       tabConfig = [
         {'icon': LucideIcons.lock, 'label': 'Đổi mật khẩu'},
       ];
-    } else if (role == 'admin' || role == 'doctor') {
+    } else if (role == 'admin') {
       screens = [
         DashboardScreen(
           isDarkTheme: widget.isDarkTheme,
@@ -129,7 +222,6 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
         PatientsScreen(isDarkTheme: widget.isDarkTheme),
         AlertsScreen(isDarkTheme: widget.isDarkTheme),
         AppointmentsScreen(isDarkTheme: widget.isDarkTheme),
-        IcuCameraScreen(isDarkTheme: widget.isDarkTheme),
         SettingsScreen(
           isDarkTheme: widget.isDarkTheme,
           onToggleTheme: widget.onToggleTheme,
@@ -140,11 +232,33 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
         {'icon': LucideIcons.users, 'label': 'Bệnh nhân'},
         {'icon': LucideIcons.bell, 'label': 'Cảnh báo'},
         {'icon': LucideIcons.calendar, 'label': 'Lịch hẹn'},
-        {'icon': LucideIcons.video, 'label': 'Phòng ICU'},
+        {'icon': LucideIcons.user, 'label': 'Cá nhân'},
+      ];
+    } else if (role == 'doctor') {
+      screens = [
+        DashboardScreen(
+          isDarkTheme: widget.isDarkTheme,
+          onToggleTheme: widget.onToggleTheme,
+        ),
+        PatientsScreen(isDarkTheme: widget.isDarkTheme),
+        AlertsScreen(isDarkTheme: widget.isDarkTheme),
+        AppointmentsScreen(isDarkTheme: widget.isDarkTheme),
+        ChatAiScreen(isDarkTheme: widget.isDarkTheme),
+        SettingsScreen(
+          isDarkTheme: widget.isDarkTheme,
+          onToggleTheme: widget.onToggleTheme,
+        ),
+      ];
+      tabConfig = [
+        {'icon': LucideIcons.layoutDashboard, 'label': 'Giám sát'},
+        {'icon': LucideIcons.users, 'label': 'Bệnh nhân'},
+        {'icon': LucideIcons.bell, 'label': 'Cảnh báo'},
+        {'icon': LucideIcons.calendar, 'label': 'Lịch hẹn'},
+        {'icon': LucideIcons.bot, 'label': 'Chat AI'},
         {'icon': LucideIcons.user, 'label': 'Cá nhân'},
       ];
     } else {
-      // Patient Role Specific Tabbed Screen Views
+      // Chế độ xem tab dành riêng cho vai trò bệnh nhân
       screens = [
         DashboardScreen(
           isDarkTheme: widget.isDarkTheme,
@@ -152,6 +266,7 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
         ),
         AlertsScreen(isDarkTheme: widget.isDarkTheme),
         AppointmentsScreen(isDarkTheme: widget.isDarkTheme),
+        ChatAiScreen(isDarkTheme: widget.isDarkTheme),
         SettingsScreen(
           isDarkTheme: widget.isDarkTheme,
           onToggleTheme: widget.onToggleTheme,
@@ -161,11 +276,12 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
         {'icon': LucideIcons.heart, 'label': 'Chỉ số'},
         {'icon': LucideIcons.bellRing, 'label': 'Cảnh báo'},
         {'icon': LucideIcons.calendar, 'label': 'Lịch hẹn'},
+        {'icon': LucideIcons.bot, 'label': 'Chat AI'},
         {'icon': LucideIcons.user, 'label': 'Cá nhân'},
       ];
     }
 
-    // Wrap in Safe Index Boundaries
+    // Kẹp chỉ số hiện tại để nó không vượt quá số lượng màn hình có sẵn
     final safeIndex = _currentIndex >= screens.length ? 0 : _currentIndex;
     if (_currentIndex >= screens.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -204,6 +320,9 @@ class _MainTabWrapperState extends State<MainTabWrapper> {
     );
   }
 
+  // Xây dựng một mục điều hướng dưới dạng biểu tượng và nhãn.
+  // index là vị trí tab, icon và label xác định hình ảnh trực quan,
+  // activeColor / inactiveColor phản ánh trạng thái chọn.
   Widget _buildNavItem(int index, IconData icon, String label,
       Color activeColor, Color inactiveColor) {
     final isSelected = _currentIndex == index;

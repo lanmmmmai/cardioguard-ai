@@ -1,5 +1,9 @@
 #include "state_machine.h"
 
+// Ghi chú: Logging được ủy quyền cho caller (main.cpp). File này là pure lookup utility,
+// không chứa I/O hay logic nghiệp vụ cần log.
+
+// Trả về trạng thái tiếp theo dựa trên trạng thái hiện tại của máy trạng thái
 RuntimeState NextState(RuntimeState current_state) {
   switch (current_state) {
     case RuntimeState::boot:
@@ -19,6 +23,7 @@ RuntimeState NextState(RuntimeState current_state) {
   }
 }
 
+// Chuyển đổi giá trị RuntimeState thành chuỗi ký tự để in ra màn hình
 const char *StateToString(RuntimeState state) {
   switch (state) {
     case RuntimeState::boot:

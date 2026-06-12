@@ -1,4 +1,14 @@
+/**
+ * @purpose Trang hồ sơ cá nhân để xem/chỉnh sửa thông tin tài khoản người dùng,
+ *          hồ sơ bệnh nhân và đổi mật khẩu.
+ * @workflow Tải /auth/me và /patients/me khi mount; quản lý ba biểu mẫu (tài khoản,
+ *           bệnh nhân, mật khẩu) với xác thực phía máy khách; gửi yêu cầu PUT để
+ *           cập nhật dữ liệu.
+ * @relationships Sử dụng AuthContext để lấy accessToken; Gọi refreshUser sau các thay đổi;
+ *                Sử dụng passwordPolicy util để kiểm tra độ mạnh mật khẩu.
+ */
 import React, { useEffect, useMemo, useState } from 'react';
+import { SecureImage } from './SecureImage';
 import { 
   AlertTriangle, 
   CheckCircle2, 
@@ -18,7 +28,8 @@ import { API_URL } from '../config';
 import { useAuth } from '../auth/AuthContext';
 import { roleLabel, type UserRole } from '../auth/roles';
 import { getRequestErrorMessage } from '../utils/apiErrors';
-import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
+import { isStrongPassword, getPasswordPolicyMessage } from '../utils/passwordPolicy';
+import { useLocale } from '../i18n/locale';
 
 interface ProfilePageProps {
   role: UserRole;
@@ -53,8 +64,13 @@ const getErrorMessage = async (response: Response, fallback: string) => {
   }
 };
 
+/**
+ * Component ProfilePage — quản lý thông tin tài khoản, hồ sơ bệnh nhân và biểu mẫu
+ * đổi mật khẩu. Hiển thị có điều kiện phần bệnh nhân chỉ khi role === 'patient'.
+ */
 export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
   const { accessToken, user, refreshUser } = useAuth();
+  const { locale } = useLocale();
   const [activeTab, setActiveTab] = useState<'account' | 'profile' | 'password'>('account');
   
   // Loading states
@@ -192,7 +208,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
         }
       }
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Lỗi kết nối khi tải hồ sơ'));
+      setError(getRequestErrorMessage(err, 'Lỗi kết nối khi tải hồ sơ', locale));
     } finally {
       setLoading(false);
     }
@@ -260,7 +276,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       }
       setTimeout(() => setSuccess(null), 4000);
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Lỗi tải tài liệu lên.'));
+      setError(getRequestErrorMessage(err, 'Lỗi tải tài liệu lên.', locale));
     } finally {
       setUploading(false);
     }
@@ -298,7 +314,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       setSuccess('Cập nhật thông tin tài khoản thành công.');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Không cập nhật được tài khoản'));
+      setError(getRequestErrorMessage(err, 'Không cập nhật được tài khoản', locale));
     } finally {
       setSaving(false);
     }
@@ -330,7 +346,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       setSuccess('Cập nhật hồ sơ bệnh nhân thành công.');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Lỗi cập nhật hồ sơ bệnh nhân'));
+      setError(getRequestErrorMessage(err, 'Lỗi cập nhật hồ sơ bệnh nhân', locale));
     } finally {
       setSaving(false);
     }
@@ -370,7 +386,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       setSuccess('Gửi hồ sơ cập nhật thành công! Trạng thái tài khoản đổi về Chờ duyệt.');
       setTimeout(() => setSuccess(null), 4000);
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Lỗi cập nhật hồ sơ bác sĩ'));
+      setError(getRequestErrorMessage(err, 'Lỗi cập nhật hồ sơ bác sĩ', locale));
     } finally {
       setSaving(false);
     }
@@ -380,7 +396,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passwordForm.current_password) return setError('Vui lòng nhập mật khẩu hiện tại.');
-    if (!isStrongPassword(passwordForm.new_password)) return setError(passwordPolicyMessage);
+    if (!isStrongPassword(passwordForm.new_password)) return setError(getPasswordPolicyMessage(locale));
     if (passwordForm.new_password !== passwordForm.confirm_password) return setError('Xác nhận mật khẩu không khớp.');
 
     setSaving(true);
@@ -400,17 +416,17 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
       setSuccess('Đổi mật khẩu đăng nhập thành công.');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Lỗi đổi mật khẩu'));
+      setError(getRequestErrorMessage(err, 'Lỗi đổi mật khẩu', locale));
     } finally {
       setSaving(false);
     }
   };
 
-  // Resolve media download URL with token
+  // Resolve media download URL (public for avatar, base URL for secure fetch)
   const getMediaUrl = (path?: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    return `${API_URL}${path}?token=${accessToken}`;
+    return `${API_URL}${path}`;
   };
 
   const getAvatarSource = () => {
@@ -662,10 +678,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
                       onChange={(e) => setPatientForm(prev => ({ ...prev, blood_type: e.target.value }))}
                     >
                       <option value="">Không rõ</option>
-                      <option value="A">A</option>
-                      <option value="B">B</option>
-                      <option value="O">O</option>
-                      <option value="AB">AB</option>
                       <option value="A+">A+</option>
                       <option value="A-">A-</option>
                       <option value="B+">B+</option>
@@ -917,7 +929,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
                       <span className="doc-title required-field">Ảnh Chứng chỉ y khoa</span>
                       <div className="doc-preview-zone">
                         {doctorForm.license_certificate_url ? (
-                          <img src={getMediaUrl(doctorForm.license_certificate_url)} alt="License Doc" className="doc-preview-img" />
+                          <SecureImage src={getMediaUrl(doctorForm.license_certificate_url)} accessToken={accessToken} alt="License Doc" className="doc-preview-img" />
                         ) : (
                           <div className="doc-placeholder">
                             <FileText size={24} />
@@ -942,7 +954,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
                       <span className="doc-title required-field">CCCD Mặt trước</span>
                       <div className="doc-preview-zone">
                         {doctorForm.cccd_front_url ? (
-                          <img src={getMediaUrl(doctorForm.cccd_front_url)} alt="CCCD Front Doc" className="doc-preview-img" />
+                          <SecureImage src={getMediaUrl(doctorForm.cccd_front_url)} accessToken={accessToken} alt="CCCD Front Doc" className="doc-preview-img" />
                         ) : (
                           <div className="doc-placeholder">
                             <User size={24} />
@@ -967,7 +979,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ role }) => {
                       <span className="doc-title required-field">CCCD Mặt sau</span>
                       <div className="doc-preview-zone">
                         {doctorForm.cccd_back_url ? (
-                          <img src={getMediaUrl(doctorForm.cccd_back_url)} alt="CCCD Back Doc" className="doc-preview-img" />
+                          <SecureImage src={getMediaUrl(doctorForm.cccd_back_url)} accessToken={accessToken} alt="CCCD Back Doc" className="doc-preview-img" />
                         ) : (
                           <div className="doc-placeholder">
                             <User size={24} />

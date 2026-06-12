@@ -1,9 +1,21 @@
+// Màn hình đăng ký bệnh nhân với xác thực OTP qua email.
+// Quy trình làm việc:
+// 1. Người dùng điền tên, email, mật khẩu (với xác thực mật khẩu mạnh).
+// 2. Bước 1: nhấn "Nhận mã OTP" -> AuthProvider.requestRegisterOtp gửi OTP đến email.
+// 3. Bước 2: nhập mã OTP 6 chữ số và nhấn "Hoàn tất đăng ký"
+//    -> AuthProvider.registerPatient tạo tài khoản.
+// 4. Khi thành công, tự động quay lại đăng nhập sau 2 giây.
+// Mối quan hệ:
+// - Sở hữu: AuthProvider cho yêu cầu OTP và đăng ký.
+// - Sử dụng: CgCard cho thẻ biểu mẫu.
+// - Điều hướng: quay lại /login (pop sau khi thành công).
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../widgets/cg_widgets.dart';
 
+// Màn hình đăng ký bệnh nhân với quy trình xác thực OTP qua email.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -18,8 +30,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _otpController = TextEditingController();
 
+  // Liệu OTP đã được gửi hay chưa (chuyển biểu mẫu sang chế độ nhập OTP).
   bool _isOtpSent = false;
+  bool _agreedToTerms = false;
+  // Thông báo lỗi được quản lý cục bộ.
   String? _localError;
+  // Thông báo thành công hiển thị sau khi OTP được gửi hoặc đăng ký hoàn tất.
   String? _successMessage;
 
   @override
@@ -31,8 +47,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  // Xác thực độ mạnh mật khẩu: >= 8 ký tự, chữ hoa, chữ cái, chữ số, ký tự đặc biệt.
   String? _validatePassword(String? value) {
-    final v = (value ?? '').trim();
+    final v = value ?? '';
     if (v.length < 8) return 'Mật khẩu phải từ 8 ký tự';
     if (!RegExp(r'[A-Z]').hasMatch(v)) return 'Mật khẩu cần ít nhất 1 chữ hoa';
     if (!RegExp(r'[a-zA-Z]').hasMatch(v)) return 'Mật khẩu cần chứa chữ cái';
@@ -43,6 +60,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
+  // Gửi OTP đến email đã cung cấp qua AuthProvider.requestRegisterOtp.
   Future<void> _requestOtp() async {
     setState(() {
       _localError = null;
@@ -64,6 +82,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  // Hoàn tất đăng ký với xác thực OTP qua AuthProvider.registerPatient.
   Future<void> _handleRegister() async {
     setState(() {
       _localError = null;
@@ -80,8 +99,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final success = await authProvider.registerPatient(
       email: _emailController.text.trim(),
       fullName: _nameController.text.trim(),
-      password: _passwordController.text.trim(),
+      password: _passwordController.text,
       otp: otp,
+      agreePrivacy: _agreedToTerms,
+      agreeTerms: _agreedToTerms,
+      consentVersion: '1.0',
     );
 
     if (success && mounted) {
@@ -195,6 +217,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               const InputDecoration(labelText: 'Mã OTP (6 số)'),
                         ),
                       ],
+                      const SizedBox(height: 12),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: _agreedToTerms,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        onChanged: authProvider.isLoading
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  _agreedToTerms = value ?? false;
+                                });
+                              },
+                        title: const Text(
+                          'Tôi đồng ý với Chính sách quyền riêng tư và Điều khoản dịch vụ',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        subtitle: const Text(
+                          'Bắt buộc để tạo tài khoản.',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
                       const SizedBox(height: 18),
                       SizedBox(
                         width: double.infinity,
@@ -202,7 +245,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: ElevatedButton(
                           onPressed: authProvider.isLoading
                               ? null
-                              : (_isOtpSent ? _handleRegister : _requestOtp),
+                              : (_isOtpSent
+                                  ? () {
+                                      if (!_agreedToTerms) {
+                                        setState(() {
+                                          _localError =
+                                              'Bạn phải đồng ý với chính sách quyền riêng tư và điều khoản dịch vụ.';
+                                        });
+                                        return;
+                                      }
+                                      _handleRegister();
+                                    }
+                                  : _requestOtp),
                           child: authProvider.isLoading
                               ? const SizedBox(
                                   width: 20,
@@ -221,6 +275,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('Đã có tài khoản? Đăng nhập'),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/privacy'),
+                      child: const Text(
+                        'Bảo mật',
+                        style: TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('|', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/terms'),
+                      child: const Text(
+                        'Điều khoản',
+                        style: TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('|', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    ),
+                    GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/data-deletion'),
+                      child: const Text(
+                        'Xóa dữ liệu',
+                        style: TextStyle(fontSize: 11, color: Colors.grey, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

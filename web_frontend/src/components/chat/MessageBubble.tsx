@@ -1,5 +1,12 @@
+/**
+ * Mục đích: Hiển thị một bong bóng tin nhắn chat đơn lẻ (người dùng hoặc AI) với hỗ trợ markdown.
+ * Luồng xử lý: Phân biệt tin nhắn AI và người dùng để tạo kiểu; hiển thị nội dung AI qua ReactMarkdown
+ *              với plugin GFM; hiển thị con trỏ nhấp nháy khi đang stream.
+ * Quan hệ: Là component con của ChatWindow; xuất interface ChatMessage được component cha sử dụng.
+ */
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { Bot, User } from 'lucide-react';
 
@@ -15,6 +22,23 @@ interface MessageBubbleProps {
   msg: ChatMessage;
 }
 
+const safeUrlTransform = (url: string) => {
+  const normalized = url.trim().toLowerCase();
+  if (
+    normalized.startsWith('http://') ||
+    normalized.startsWith('https://') ||
+    normalized.startsWith('mailto:') ||
+    normalized.startsWith('tel:')
+  ) {
+    return url;
+  }
+  return '#';
+};
+
+/**
+ * Component MessageBubble — hiển thị markdown cho tin nhắn AI, văn bản thuần cho tin nhắn người dùng,
+ * và hiển thị con trỏ streaming khi phản hồi AI đang được xử lý.
+ */
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ msg }) => {
   const isAI = msg.sender === 'ai';
 
@@ -26,7 +50,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ msg }) => {
       <div className="chat-message-bubble">
         {isAI ? (
           <div className="markdown-body">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeSanitize]}
+              urlTransform={safeUrlTransform}
+            >
               {msg.message}
             </ReactMarkdown>
             {msg.isStreaming && <span className="typing-cursor"></span>}

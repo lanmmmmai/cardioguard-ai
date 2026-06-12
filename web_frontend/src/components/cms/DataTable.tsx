@@ -1,3 +1,9 @@
+/**
+ * Mục đích: Bảng dữ liệu có sắp xếp tái sử dụng cho các bản ghi module CMS với các nút hành động.
+ * Luồng xử lý: Sắp xếp các cột hiển thị theo cột ưu tiên sau đó là cột còn lại; hiển thị cột hình ảnh
+ *              nội tuyến khi phát hiện; cung cấp các hành động Xem/Sửa/Xóa (và Phân công tùy chọn) cho mỗi dòng.
+ * Quan hệ: Được sử dụng bởi CmsPage; nhận siêu dữ liệu cột từ cmsApi; hiển thị biểu tượng hành động Lucide.
+ */
 import React from 'react';
 import { ArrowDownAZ, ArrowUpAZ, Eye, Pencil, Trash2 } from 'lucide-react';
 import type { CmsColumn } from '../../services/cmsApi';
@@ -23,6 +29,10 @@ const displayValue = (value: any) => {
   return text.length > 90 ? `${text.slice(0, 90)}...` : text;
 };
 
+/**
+ * Component DataTable — hiển thị bảng có sắp xếp với tối đa 7 cột hiển thị,
+ * hỗ trợ xem trước hình ảnh và các nút hành động (xem, sửa, xóa, phân công).
+ */
 export const DataTable: React.FC<DataTableProps> = ({
   rows,
   columns,
@@ -84,9 +94,10 @@ export const DataTable: React.FC<DataTableProps> = ({
                 return (
                   <td key={column}>
                     {isImg ? (
+                      // Hiển thị hình ảnh nội tuyến cho các cột khớp với image/avatar/logo/photo
                       <img 
                         src={val} 
-                        alt="Preview" 
+                        alt="Xem trước" 
                         style={{ maxWidth: '80px', maxHeight: '50px', borderRadius: '6px', objectFit: 'cover', border: '1px solid rgba(255, 255, 255, 0.1)' }}
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=200&auto=format&fit=crop';
@@ -111,11 +122,11 @@ export const DataTable: React.FC<DataTableProps> = ({
                   {onAssignPatient && (
                     <button 
                       type="button" 
-                      title="Assign patient" 
+                      title="Phân công bệnh nhân" 
                       onClick={() => onAssignPatient(row)}
                       aria-label={`Phân công bệnh nhân cho bản ghi ID ${row.id || ''}`}
                     >
-                      Assign
+                      Phân công
                     </button>
                   )}
                   <button 

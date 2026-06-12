@@ -1,20 +1,23 @@
-# =============================================================================
-# CardioGuard AI - API Dự Đoán Nguy Cơ Bệnh Tim
-# File: app.py
-# Mô tả: FastAPI server cung cấp endpoint dự đoán nguy cơ bệnh tim
-#        dựa trên model RandomForest đã được huấn luyện.
-#
-# Hướng dẫn chạy trên macOS (Terminal):
-#   1. Cài thư viện (nếu chưa có):
-#      pip install fastapi uvicorn joblib scikit-learn
-#
-#   2. Chạy server:
-#      cd /path/to/cardioguard-ai/ai_model
-#      uvicorn app:app --reload --port 8001
-#
-#   3. Truy cập tài liệu API tự động:
-#      http://localhost:8001/docs
-# =============================================================================
+"""
+CardioGuard AI - API dự đoán nguy cơ bệnh tim
+
+Mục đích:
+    Máy chủ FastAPI cung cấp điểm cuối REST để dự đoán nguy cơ bệnh tim
+    sử dụng mô hình RandomForest đã được huấn luyện trước.
+
+Luồng xử lý:
+    1. Tải mô hình đã huấn luyện (heart_disease_model.pkl) và siêu dữ liệu khi khởi động.
+    2. Kiểm tra tính tương thích phiên bản scikit-learn giữa lúc huấn luyện và lúc phục vụ.
+    3. Cung cấp điểm cuối POST /predict-heart-risk nhận 13 đặc trưng sức khỏe
+       và trả về kết quả dự đoán (0/1), xác suất, và mức độ nguy cơ.
+    4. Bao gồm cơ chế giới hạn tần suất trong bộ nhớ (10 yêu cầu/phút/IP) để ngăn chặn lạm dụng.
+    5. Cung cấp điểm cuối GET / và GET /health để kiểm tra trạng thái dịch vụ.
+
+Mối quan hệ:
+    - ai_model/train_model.py: Tạo ra file mô hình .pkl và siêu dữ liệu được tiêu thụ ở đây.
+    - Frontend (React/Vite): Gửi yêu cầu POST với dữ liệu sức khỏe; hiển thị kết quả dự đoán.
+    - MongoDB: Không liên kết trực tiếp, nhưng frontend lưu trữ lịch sử dự đoán.
+"""
 
 import os
 import joblib
@@ -38,7 +41,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Cho phép frontend gọi API (CORS)
+# Cho phép frontend gọi API thông qua CORS
 allowed_origins_raw = os.getenv(
     "AI_ALLOWED_ORIGINS",
     "http://localhost:5173,http://127.0.0.1:5173,https://cardioguard-ai.vercel.app",
@@ -54,7 +57,7 @@ app.add_middleware(
 )
 
 # -----------------------------------------------------------
-# Bộ giới hạn tần suất (Rate Limiter) bộ nhớ trong
+# Bộ giới hạn tần suất (Rate Limiter) trong bộ nhớ
 # -----------------------------------------------------------
 import time
 from collections import defaultdict
@@ -63,39 +66,56 @@ from fastapi import Request
 _rate_limits = defaultdict(list)
 
 def check_rate_limit(ip: str, endpoint: str, max_requests: int = 10, window_seconds: int = 60):
+    """
+    Áp dụng giới hạn tần suất cho từng địa chỉ IP sử dụng bộ lưu trữ dấu thời gian
+    dạng cửa sổ trượt trong bộ nhớ.
+
+    Tham số:
+        ip: Địa chỉ IP của máy khách cần theo dõi.
+        endpoint: Đường dẫn điểm cuối API để giới hạn phạm vi.
+        max_requests: Số lượng yêu cầu tối đa được phép trong cửa sổ (mặc định 10).
+        window_seconds: Thời gian cửa sổ tính bằng giây (mặc định 60).
+
+    Ngoại lệ:
+        HTTPException 429: Nếu máy khách đã gửi nhiều hơn max_requests trong cửa sổ.
+    """
     now = time.time()
     key = (ip, endpoint)
-    
+
+    # Lấy danh sách dấu thời gian yêu cầu hiện có cho tổ hợp IP và điểm cuối này
     timestamps = _rate_limits[key]
+    # Loại bỏ các dấu thời gian nằm ngoài cửa sổ trượt hiện tại
     timestamps = [t for t in timestamps if now - t < window_seconds]
-    
+
     if len(timestamps) >= max_requests:
+        # Tính thời gian chờ còn lại trước khi yêu cầu sớm nhất hết hạn
         wait_time = int(window_seconds - (now - timestamps[0]))
         raise HTTPException(
             status_code=429,
             detail=f"Quá nhiều yêu cầu gửi tới {endpoint}. Vui lòng thử lại sau {wait_time} giây."
         )
+    # Ghi lại dấu thời gian của yêu cầu hiện tại và lưu trở lại
     timestamps.append(now)
     _rate_limits[key] = timestamps
 
 # -----------------------------------------------------------
-# Load model khi server khởi động
+# Tải mô hình khi máy chủ khởi động
 # -----------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "heart_disease_model.pkl")
 
-# Kiểm tra file model có tồn tại không
+# Kiểm tra xem file mô hình có tồn tại hay không
 if not os.path.exists(MODEL_PATH):
     raise RuntimeError(
-        f"Không tìm thấy file model tại '{MODEL_PATH}'. "
-        "Vui lòng chạy 'python train_model.py' trước để huấn luyện model."
+        f"Không tìm thấy file mô hình tại '{MODEL_PATH}'. "
+        "Vui lòng chạy 'python train_model.py' trước để huấn luyện mô hình."
     )
 
-# Nạp model vào bộ nhớ một lần duy nhất khi server khởi động
+# Nạp mô hình vào bộ nhớ một lần duy nhất khi máy chủ khởi động
 model = joblib.load(MODEL_PATH)
 print(f"✅ Model đã được nạp thành công từ: {MODEL_PATH}")
 
-# Kiểm tra phiên bản scikit-learn
+# Kiểm tra tính tương thích phiên bản scikit-learn
 METADATA_PATH = os.path.join(BASE_DIR, "model_metadata.json")
 if os.path.exists(METADATA_PATH):
     import json
@@ -113,7 +133,7 @@ if os.path.exists(METADATA_PATH):
     except Exception as err:
         logger.error(f"Không thể đọc model metadata: {err}")
 
-# Thứ tự cột đầu vào phải khớp với lúc huấn luyện
+# Thứ tự các cột đầu vào phải khớp với thứ tự lúc huấn luyện
 FEATURE_COLUMNS = [
     "age", "sex", "cp", "trestbps", "chol",
     "fbs", "restecg", "thalach", "exang",
@@ -122,7 +142,7 @@ FEATURE_COLUMNS = [
 
 
 # -----------------------------------------------------------
-# Schema dữ liệu đầu vào (Pydantic Model)
+# Lược đồ dữ liệu đầu vào (Mô hình Pydantic)
 # -----------------------------------------------------------
 class HeartRiskInput(BaseModel):
     """Dữ liệu sức khỏe đầu vào để dự đoán nguy cơ bệnh tim."""
@@ -142,7 +162,7 @@ class HeartRiskInput(BaseModel):
     thal: float = Field(..., ge=3, le=7, description="Kết quả thalassemia: 3=Bình thường, 6=Khiếm khuyết cố định, 7=Có thể hồi phục")
 
     class Config:
-        # Ví dụ mẫu hiển thị trong /docs
+        # Ví dụ mẫu hiển thị trong tài liệu /docs
         json_schema_extra = {
             "example": {
                 "age": 55,
@@ -163,7 +183,7 @@ class HeartRiskInput(BaseModel):
 
 
 # -----------------------------------------------------------
-# Schema dữ liệu đầu ra (Response)
+# Lược đồ dữ liệu đầu ra (Phản hồi)
 # -----------------------------------------------------------
 class HeartRiskOutput(BaseModel):
     """Kết quả dự đoán nguy cơ bệnh tim."""
@@ -174,14 +194,19 @@ class HeartRiskOutput(BaseModel):
 
 
 # -----------------------------------------------------------
-# Hàm phân loại mức độ nguy cơ theo xác suất
+# Hàm phân loại mức độ nguy cơ dựa trên xác suất
 # -----------------------------------------------------------
 def classify_risk_level(probability: float) -> str:
     """
-    Phân loại mức độ nguy cơ dựa trên xác suất dự đoán.
-    - Thấp    : xác suất < 30%
-    - Trung bình: 30% <= xác suất < 65%
-    - Cao     : xác suất >= 65%
+    Phân loại mức độ nguy cơ dựa trên ngưỡng xác suất dự đoán.
+
+    Tham số:
+        probability: Xác suất nguy cơ từ 0.0 đến 1.0.
+
+    Kết quả trả về:
+        "Thấp" nếu probability < 0.30,
+        "Trung bình" nếu 0.30 <= probability < 0.65,
+        "Cao" nếu probability >= 0.65.
     """
     if probability < 0.30:
         return "Thấp"
@@ -192,7 +217,7 @@ def classify_risk_level(probability: float) -> str:
 
 
 # -----------------------------------------------------------
-# Endpoint chính: Dự đoán nguy cơ bệnh tim
+# Điểm cuối chính: Dự đoán nguy cơ bệnh tim
 # -----------------------------------------------------------
 @app.post(
     "/predict-heart-risk",
@@ -204,13 +229,24 @@ def predict_heart_risk(data: HeartRiskInput, request: Request):
     """
     Nhận các chỉ số sức khỏe và trả về kết quả dự đoán nguy cơ bệnh tim.
 
-    **Lưu ý:** Kết quả chỉ mang tính tham khảo hỗ trợ bác sĩ,
-    không thay thế chẩn đoán y khoa chính thức.
+    Bị giới hạn tần suất 10 yêu cầu/phút/IP. Kết quả chỉ mang tính tham khảo
+    và không thay thế chẩn đoán y tế chuyên nghiệp.
+
+    Tham số:
+        data: Các chỉ số sức khỏe đã được xác thực (13 đặc trưng) thông qua lược đồ HeartRiskInput.
+        request: Đối tượng Yêu cầu FastAPI để trích xuất địa chỉ IP của máy khách.
+
+    Kết quả trả về:
+        HeartRiskOutput với prediction (0/1), risk_probability, risk_level, và tuyên bố miễn trừ y tế.
+
+    Ngoại lệ:
+        HTTPException 429: Vượt quá giới hạn tần suất.
+        HTTPException 500: Lỗi nội bộ trong quá trình suy luận mô hình.
     """
     ip = request.client.host if request.client else "unknown"
     check_rate_limit(ip, "/predict-heart-risk", max_requests=10, window_seconds=60)
     try:
-        # Chuyển dữ liệu đầu vào thành mảng numpy theo đúng thứ tự cột
+        # Chuyển đổi dữ liệu đầu vào thành mảng numpy theo đúng thứ tự cột
         input_data = np.array([[
             data.age,
             data.sex,
@@ -230,12 +266,12 @@ def predict_heart_risk(data: HeartRiskInput, request: Request):
         # Dự đoán nhãn (0 hoặc 1)
         prediction = int(model.predict(input_data)[0])
 
-        # Lấy xác suất dự đoán của từng nhãn
-        # predict_proba trả về [[prob_class_0, prob_class_1]]
+        # Lấy xác suất dự đoán cho từng nhãn
+        # predict_proba trả về [[xác_suất_nhãn_0, xác_suất_nhãn_1]]
         probabilities = model.predict_proba(input_data)[0]
         risk_probability = float(round(probabilities[1], 4))  # Xác suất có nguy cơ
 
-        # Phân loại mức độ nguy cơ
+        # Phân loại mức độ nguy cơ dựa trên xác suất
         risk_level = classify_risk_level(risk_probability)
 
         return HeartRiskOutput(
@@ -246,7 +282,7 @@ def predict_heart_risk(data: HeartRiskInput, request: Request):
         )
 
     except Exception as exc:
-        # Trả về lỗi 500 nếu có sự cố trong quá trình dự đoán
+        # Ghi nhật ký lỗi và trả về lỗi 500 nếu có sự cố trong quá trình dự đoán
         logger.exception("Error during model prediction")
         raise HTTPException(
             status_code=500,
@@ -255,11 +291,16 @@ def predict_heart_risk(data: HeartRiskInput, request: Request):
 
 
 # -----------------------------------------------------------
-# Endpoint kiểm tra trạng thái server
+# Điểm cuối kiểm tra trạng thái máy chủ
 # -----------------------------------------------------------
 @app.get("/", summary="Kiểm tra server", tags=["Health Check"])
 async def root():
-    """Kiểm tra server AI đang hoạt động."""
+    """
+    Điểm cuối kiểm tra sức khỏe trả về siêu dữ liệu dịch vụ cơ bản.
+
+    Kết quả trả về:
+        dict: Tên dịch vụ, trạng thái, phiên bản, điểm cuối khả dụng, và URL tài liệu.
+    """
     return {
         "service": "CardioGuard AI - Heart Risk Prediction",
         "status": "running",
@@ -271,7 +312,12 @@ async def root():
 
 @app.get("/health", summary="Health check", tags=["Health Check"])
 async def health_check():
-    """Kiểm tra trạng thái model đã được nạp chưa."""
+    """
+    Kiểm tra sức khỏe chi tiết xác nhận trạng thái tải mô hình.
+
+    Kết quả trả về:
+        dict: Trạng thái, cờ model_loaded, tên file mô hình, và danh sách cột đặc trưng.
+    """
     return {
         "status": "healthy",
         "model_loaded": model is not None,

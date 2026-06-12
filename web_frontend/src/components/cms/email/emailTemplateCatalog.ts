@@ -14,6 +14,16 @@ export interface EmailFunctionOption {
   is_active: boolean;
 }
 
+export const EMAIL_TYPE_ALIASES: Record<string, string> = {
+  password_reset: 'reset_password',
+  alert_critical: 'emergency_alert',
+  doctor_assigned: 'doctor_assignment',
+  health_warning: 'health_alert',
+  doctor_verified_success: 'doctor_verified',
+  doctor_verified_rejected: 'doctor_rejected',
+  doctor_profile_require_update: 'doctor_need_update',
+};
+
 export const SYSTEM_EMAIL_FUNCTIONS: EmailFunctionOption[] = [
   { email_type: 'otp_register', cms_email_id: 'EMAIL_OTP_REGISTER', name: 'OTP Đăng ký', group_key: 'auth', target_role: 'patient', description: 'Gửi OTP khi đăng ký tài khoản bệnh nhân.', required_variables: ['full_name', 'otp'], optional_variables: ['hospital_name', 'current_date'], is_system: true, is_active: true },
   { email_type: 'otp_login', cms_email_id: 'EMAIL_OTP_LOGIN', name: 'OTP Đăng nhập', group_key: 'auth', target_role: 'all', description: 'Gửi OTP khi đăng nhập.', required_variables: ['full_name', 'otp'], optional_variables: ['hospital_name', 'current_date'], is_system: true, is_active: true },
@@ -24,6 +34,10 @@ export const SYSTEM_EMAIL_FUNCTIONS: EmailFunctionOption[] = [
   { email_type: 'doctor_assignment', cms_email_id: 'EMAIL_DOCTOR_ASSIGNMENT', name: 'Phân công bác sĩ', group_key: 'appointment', target_role: 'all', description: 'Thông báo bác sĩ phụ trách.', required_variables: ['full_name', 'doctor_name'], optional_variables: [], is_system: true, is_active: true },
   { email_type: 'health_alert', cms_email_id: 'EMAIL_HEALTH_ALERT', name: 'Cảnh báo sức khỏe', group_key: 'health', target_role: 'patient', description: 'Cảnh báo sức khỏe theo dõi định kỳ.', required_variables: ['full_name', 'alert_message'], optional_variables: [], is_system: true, is_active: true },
   { email_type: 'monthly_report', cms_email_id: 'EMAIL_MONTHLY_REPORT', name: 'Báo cáo tháng', group_key: 'report', target_role: 'all', description: 'Báo cáo sức khỏe tháng.', required_variables: ['full_name', 'current_date'], optional_variables: [], is_system: true, is_active: true },
+  { email_type: 'doctor_pending_verification', cms_email_id: 'EMAIL_DOCTOR_PENDING_VERIFICATION', name: 'Bác sĩ chờ duyệt', group_key: 'account', target_role: 'doctor', description: 'Thông báo hồ sơ đang chờ xác thực.', required_variables: ['full_name'], optional_variables: [], is_system: true, is_active: true },
+  { email_type: 'doctor_verified', cms_email_id: 'EMAIL_DOCTOR_VERIFIED', name: 'Bác sĩ đã xác thực', group_key: 'account', target_role: 'doctor', description: 'Thông báo hồ sơ bác sĩ đã được xác thực.', required_variables: ['full_name'], optional_variables: ['login_url', 'login_button_text'], is_system: true, is_active: true },
+  { email_type: 'doctor_rejected', cms_email_id: 'EMAIL_DOCTOR_REJECTED', name: 'Bác sĩ bị từ chối', group_key: 'account', target_role: 'doctor', description: 'Thông báo hồ sơ bị từ chối.', required_variables: ['full_name', 'verification_note'], optional_variables: [], is_system: true, is_active: true },
+  { email_type: 'doctor_need_update', cms_email_id: 'EMAIL_DOCTOR_NEED_UPDATE', name: 'Bác sĩ cần bổ sung hồ sơ', group_key: 'doctor_account', target_role: 'doctor', description: 'Yêu cầu bổ sung hồ sơ bác sĩ.', required_variables: ['full_name', 'verification_note'], optional_variables: ['update_profile_url', 'support_email'], is_system: true, is_active: true },
 ];
 
 export const CUSTOM_TEMPLATE_HINTS = [
@@ -79,15 +93,20 @@ export const normalizeCmsEmailId = (value: string) =>
     .replace(/^_|_$/g, '');
 
 export const normalizeEmailType = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '');
+  (() => {
+    const normalized = value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+    return EMAIL_TYPE_ALIASES[normalized] || normalized;
+  })();
 
 export const suggestCmsEmailId = (emailType: string) => {
-  const found = SYSTEM_EMAIL_FUNCTIONS.find((item) => item.email_type === emailType);
+  const normalized = normalizeEmailType(emailType);
+  const canonical = EMAIL_TYPE_ALIASES[normalized] || normalized;
+  const found = SYSTEM_EMAIL_FUNCTIONS.find((item) => item.email_type === canonical);
   return found?.cms_email_id || '';
 };
 

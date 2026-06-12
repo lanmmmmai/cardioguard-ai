@@ -1,21 +1,38 @@
+/**
+ * @purpose Đăng ký bệnh nhân hai bước: bước biểu mẫu sau đó bước xác minh OTP.
+ * @workflow Bước 1 xác thực các trường (họ tên, Gmail, quy tắc mật khẩu) sau đó yêu cầu
+ *           OTP qua /auth/register/request-otp. Bước 2 thu thập OTP 6 chữ số với các ô
+ *           nhập riêng lẻ và gửi đến /auth/register. Khi thành công, điều hướng đến đăng nhập.
+ * @relationships Component cha: App (gọi onRegisterSuccess/onNavigateToLogin); Sử dụng: passwordPolicy util.
+ */
 import React, { useRef, useState, useEffect } from 'react';
 import { Activity, ArrowLeft, CheckCircle2, Lock, Mail, ShieldCheck, User, Loader2, Phone, Stethoscope, Building } from 'lucide-react';
-import { API_URL } from '../config';
-import { isStrongPassword, passwordPolicyMessage } from '../utils/passwordPolicy';
+import { API_URL, GOOGLE_CLIENT_ID } from '../config';
+import { isStrongPassword, getPasswordPolicyMessage } from '../utils/passwordPolicy';
 import { UserRole } from '../auth/roles';
+import { useLocale } from '../i18n/locale';
 import { readJsonResponse } from '../utils/response';
+import { LegalFooterLinks } from './LegalFooterLinks';
+import { GoogleLoginButton } from './GoogleLoginButton';
+import { exchangeGoogleIdToken, type GoogleAuthUser } from '../lib/googleAuth';
 
 interface RegisterProps {
   role: UserRole;
   onRegisterSuccess: () => void;
   onNavigateToLogin: () => void;
+  onGoogleAuthSuccess: (token: string, user: GoogleAuthUser) => void;
 }
 
 const fullNamePattern = /^[A-Za-zÀ-ỹ]+(?:[ '-][A-Za-zÀ-ỹ]+)+$/;
 
 const normalizeName = (value: string) => value.trim().replace(/\s+/g, ' ');
 
-export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onNavigateToLogin }) => {
+/**
+ * Component Register — đăng ký hai bước với xác minh OTP qua email.
+ * Quản lý trạng thái biểu mẫu và OTP riêng biệt; xử lý nhập OTP từng chữ số với tự động lấy tiêu điểm.
+ */
+export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onNavigateToLogin, onGoogleAuthSuccess }) => {
+  const { locale } = useLocale();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,8 +45,10 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const timerRef = useRef<any>(null);
+  const showGoogleRegister = role === 'patient' && Boolean(GOOGLE_CLIENT_ID);
 
   useEffect(() => {
     return () => {
@@ -48,6 +67,10 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
 
   const validateForm = () => {
     const normalizedName = normalizeName(fullName);
+
+    if (!agreed) {
+      return 'Bạn phải đồng ý với Chính sách bảo mật và Điều khoản dịch vụ để đăng ký tài khoản';
+    }
 
     if (!normalizedName || !email || !password || !confirmPassword) {
       return 'Vui lòng nhập đầy đủ họ tên, Gmail và mật khẩu';
@@ -68,7 +91,7 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
     }
 
     if (!isStrongPassword(password)) {
-      return passwordPolicyMessage;
+      return getPasswordPolicyMessage(locale);
     }
 
     if (password !== confirmPassword) {
@@ -118,6 +141,21 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
       );
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = async (idToken: string) => {
+    setError(null);
+    setSuccess(null);
+    setIsLoading(true);
+
+    try {
+      const data = await exchangeGoogleIdToken(idToken, role);
+      onGoogleAuthSuccess(data.access_token, data.user);
+    } catch (err: any) {
+      setError(err?.message || 'Đăng nhập Google thất bại.');
     } finally {
       setIsLoading(false);
     }
@@ -177,6 +215,9 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
           phone: role === 'doctor' ? phone : undefined,
           specialty: role === 'doctor' ? specialty : undefined,
           department: role === 'doctor' ? department : undefined,
+          agree_privacy: agreed,
+          agree_terms: agreed,
+          consent_version: '1.0',
         }),
       });
 
@@ -216,9 +257,10 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
   };
 
   return (
-    <div className="auth-container register-auth-shell">
-      <div className="panel auth-panel register-panel">
-        <div className="register-card-topline" />
+    <div className="auth-container register-auth-shell" style={{ flexDirection: 'column', justifyContent: 'space-between', minHeight: '100vh', padding: '42px 20px 20px' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+        <div className="panel auth-panel register-panel">
+          <div className="register-card-topline" />
 
         <div className="brand register-brand">
           <div className="brand-icon register-brand-icon">
@@ -268,6 +310,24 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
           <ShieldCheck size={18} />
           <span>Bấm Đăng Ký để nhận OTP, sau đó nhập mã trong form xác minh hiện lên.</span>
         </div>
+
+        {showGoogleRegister && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', margin: '1rem 0 1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              <span style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }} />
+              <span>Hoặc</span>
+              <span style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }} />
+            </div>
+            <GoogleLoginButton
+              clientId={GOOGLE_CLIENT_ID}
+              disabled={isLoading}
+              buttonText="signup_with"
+              caption="Đăng ký nhanh bằng tài khoản Google"
+              successLabel="Đang xác thực với Google..."
+              onCredential={handleGoogleCredential}
+            />
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="register-form">
           <div className="form-group">
@@ -408,11 +468,33 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
             </div>
           </div>
 
+          <div className="consent-checkbox-wrapper" style={{ margin: '1.5rem 0', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+            <input
+              id="consent"
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              style={{ marginTop: '3px', width: '16px', height: '16px', accentColor: 'var(--color-primary)', cursor: 'pointer' }}
+              disabled={isLoading}
+            />
+            <label htmlFor="consent" style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.4, cursor: 'pointer', userSelect: 'none', textAlign: 'left' }}>
+              Tôi đã đọc và đồng ý với{' '}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+                Chính sách bảo mật
+              </a>{' '}
+              và{' '}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+                Điều khoản dịch vụ
+              </a>{' '}
+              của CardioGuard AI.
+            </label>
+          </div>
+
           <button
             type="submit"
             className="btn btn-primary"
             style={{ width: '100%', justifyContent: 'center', height: '46px' }}
-            disabled={isLoading}
+            disabled={isLoading || !agreed}
           >
             {isLoading ? (
               <>
@@ -433,6 +515,7 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
             Đăng nhập ngay
           </span>
         </div>
+      </div>
       </div>
 
       {step === 'otp' && (
@@ -517,6 +600,10 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
           </div>
         </div>
       )}
+      <footer style={{ marginTop: '2rem', padding: '1rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)', width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.03)' }}>
+        <LegalFooterLinks />
+        <div>© 2026 CardioGuard AI. All rights reserved.</div>
+      </footer>
     </div>
   );
 };

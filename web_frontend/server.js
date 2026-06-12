@@ -2,7 +2,6 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
 import {
   buildPublicUrl,
   getSeoByPath,
@@ -11,7 +10,12 @@ import {
 } from './seo-injector.js';
 
 // Load environment variables for local testing
-dotenv.config();
+try {
+  const dotenv = await import('dotenv');
+  dotenv.config();
+} catch (e) {
+  console.log('dotenv not found or not required in this environment.');
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -61,7 +65,7 @@ app.get('*', async (req, res) => {
     const fullUrl = buildPublicUrl(req, pagePath);
 
     const seo = await getSeoByPath(pagePath, fullUrl);
-    const finalHtml = injectSeoIntoHtml(html, seo);
+    const finalHtml = injectSeoIntoHtml(html, seo, req);
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');

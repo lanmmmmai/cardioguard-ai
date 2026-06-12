@@ -1,20 +1,38 @@
+/**
+ * @purpose Trình xem nhật ký cảnh báo thời gian thực. Hiển thị, lọc và xác nhận xử lý
+ *          các cảnh báo bệnh nhân (nguy kịch/nghiêm trọng/trung bình/thấp). Hỗ trợ tìm
+ *          kiếm theo tên bệnh nhân và lọc theo mức độ cũng như trạng thái xử lý.
+ * @workflow  1. Nhận dữ liệu cảnh báo từ component cha (App.tsx) → 2. Áp dụng tiêu chí
+ *            tìm kiếm và lọc → 3. Hiển thị danh sách dạng thời gian với huy hiệu mức độ →
+ *            4. Bác sĩ/quản trị viên có thể đánh dấu đã xử lý qua API PATCH.
+ * @relationships
+ *   - App.tsx (truyền dữ liệu cảnh báo)
+ *   - AuthContext (kiểm tra quyền xác nhận xử lý)
+ *   - severity utility để lấy màu sắc và biểu tượng huy hiệu
+ *   - Kiểu Alert từ types.ts
+ */
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, ShieldCheck, Calendar, CheckCircle, Loader2 } from 'lucide-react';
 import { getSeverityMeta } from '../utils/severity';
 import { useAuth } from '../auth/AuthContext';
 import { API_URL } from '../config';
 import { Alert } from '../types';
+import { readJsonResponse } from '../utils/response';
 
 interface AlertsProps {
   alerts: Alert[];
 }
 
+/**
+ * Component quản lý cảnh báo. Hiển thị danh sách cảnh báo có thể tìm kiếm và lọc,
+ * cho phép bác sĩ/quản trị viên đánh dấu đã xử lý.
+ */
 export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
   const { accessToken, role } = useAuth();
   const [localAlerts, setLocalAlerts] = useState<Alert[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('unresolved'); // mặc định xem chưa xử lý
+  const [statusFilter, setStatusFilter] = useState('unresolved');
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,19 +53,9 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
       if (response.ok) {
         setLocalAlerts(prev => prev.map(a => a.id === alertId ? { ...a, is_resolved: true } : a));
       } else {
-        let data;
-
-        try {
-
-          data = await response.json();
-
-        } catch (e) {
-
-          throw new Error("Lỗi định dạng phản hồi từ server");
-
-        }
+        const data = await readJsonResponse<{ detail?: string }>(response);
         setError(data.detail || 'Không thể xác nhận xử lý cảnh báo');
-      setTimeout(() => setError(null), 5000);
+        setTimeout(() => setError(null), 5000);
       }
     } catch (err) {
       setError('Lỗi kết nối máy chủ khi xử lý cảnh báo');
@@ -57,7 +65,6 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
     }
   };
 
-  // Filter alerts
   const filteredAlerts = localAlerts.filter(a => {
     const matchesSearch = (a.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                           a.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -91,10 +98,8 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
       <div className="panel" style={{ marginBottom: '1.5rem', padding: '16px 20px', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         
-        {/* Search */}
         <div style={{ position: 'relative', flex: 1, minWidth: '240px', display: 'flex', alignItems: 'center' }}>
           <Search size={18} style={{ position: 'absolute', left: '14px', color: 'var(--text-muted)' }} />
           <input
@@ -107,7 +112,6 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
           />
         </div>
 
-        {/* Severity Filter */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Filter size={16} style={{ color: 'var(--text-muted)' }} />
           <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Mức độ:</span>
@@ -125,7 +129,6 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
           </select>
         </div>
 
-        {/* Status Filter */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Trạng thái:</span>
           <select
@@ -141,7 +144,6 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
         </div>
       </div>
 
-      {/* Alerts Timeline List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {filteredAlerts.length === 0 ? (
           <div className="panel" style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
@@ -211,7 +213,6 @@ export const Alerts: React.FC<AlertsProps> = ({ alerts }) => {
                     {alert.message}
                   </div>
 
-                  {/* Nút Resolve cảnh báo dành cho bác sĩ/admin */}
                   {!alert.is_resolved && (role === 'doctor' || role === 'admin') && (
                     <button 
                       className="btn btn-secondary" 

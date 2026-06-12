@@ -1,8 +1,25 @@
-# =============================================================================
-# CardioGuard AI — Email Service
-# File: backend/app/services/email_service.py
-# Dịch vụ gửi email động sử dụng template từ DB và SMTP/Brevo
-# =============================================================================
+"""Dịch vụ gửi email cho CardioGuard.
+
+Mục đích:
+    Gửi email giao dịch (OTP đăng ký, đặt lại mật khẩu, cảnh báo hệ thống)
+    thông qua API REST Brevo (Sendinblue) hoặc kết nối SMTP trực tiếp.
+    Các mẫu được lấy từ bảng email_templates trong cơ sở dữ liệu, hiển thị với
+    các biến dành riêng cho người dùng và vai trò, và việc gửi được ghi lại trong email_logs.
+
+Luồng công việc:
+    1. send_system_email() tra cứu một mẫu hoạt động theo email_type trong DB.
+    2. Dự phòng vào subject/html do người gọi cung cấp khi không tìm thấy mẫu.
+    3. Các biến như {{full_name}}, {{otp}}, {{role_label}} được thay thế
+       bởi render_template().
+    4. Việc gửi được thực hiện qua Brevo trước (nếu BREVO_API_KEY được đặt), sau đó
+       qua SMTP (nếu SMTP_HOST được cấu hình). Trong chế độ phát triển, việc gửi được bỏ qua.
+    5. Mọi lần thử đều được ghi lại trong bảng email_logs.
+
+Quan hệ:
+    - app.core.config.settings: Thông tin xác thực SMTP và Brevo.
+    - app.core.database.database: Được sử dụng để đọc mẫu và ghi nhật ký.
+    - Được gọi từ các tuyến xác thực, bộ xử lý cảnh báo và luồng thông báo quản trị.
+"""
 
 import asyncio
 import json
@@ -18,11 +35,21 @@ from email.mime.text import MIMEText
 from typing import Any, Optional
 
 from fastapi import HTTPException
-from fastapi.concurrency import run_in_threadpool
 from app.core.config import settings
 from app.core.database import database
 
 logger = logging.getLogger(__name__)
+
+
+def mask_email(email: str) -> str:
+    if not email or "@" not in email:
+        return "***"
+    parts = email.split("@", 1)
+    local = parts[0]
+    domain = parts[1]
+    if len(local) <= 2:
+        return f"{local[0]}***@{domain}"
+    return f"{local[0]}***{local[-1]}@{domain}"
 
 ROLE_EMAIL_MAP = {
     "patient": {
@@ -109,6 +136,20 @@ DOCTOR_STATUS_TEMPLATE_MAP = {
 
 
 def get_role_email_context(role: Optional[str]) -> dict[str, str]:
+    """Trả về nhãn vai trò và mô tả đã được bản địa hóa cho các mẫu email.
+
+    Ánh xạ một chuỗi vai trò (ví dụ: "patient", "doctor", "admin") thành một
+    nhãn hiển thị tiếng Việt và một mô tả ngắn được sử dụng trong các biến mẫu
+    {{role_label}} và {{role_description}}.
+
+    Args:
+        role: Chuỗi vai trò thô từ bản ghi người dùng. Có thể là None hoặc
+            chứa khoảng trắng — hàm chuẩn hóa bằng cách cắt và chuyển thành chữ thường.
+            Các vai trò không xác định mặc định là "Người dùng".
+
+    Trả về:
+        Một dict với các khóa "role_label" (str) và "role_description" (str).
+    """
     role_key = (role or "").strip().lower()
 
     return ROLE_EMAIL_MAP.get(
@@ -228,6 +269,7 @@ async def find_email_template(
     cms_email_id: Optional[str] = None,
 ) -> Optional[dict[str, Any]]:
     canonical_type, canonical_cms_id = resolve_template_identifier(email_type, cms_email_id)
+    logger.debug("Entry: find_email_template(email_type=%s, cms_email_id=%s)", canonical_type, canonical_cms_id)
     query = """
         SELECT id::text as id, function_id, cms_email_id, email_type, target_role, name, subject, html_content, text_content,
                variables, is_active, created_at, updated_at
@@ -260,8 +302,21 @@ async def find_email_template(
 
 
 def render_template(html: str, variables: dict[str, str]) -> str:
-    """Thay thế các biến động dạng {{variable_name}} trong template HTML."""
-    # Làm giàu biến để tương thích chéo giữa otp, otp_code và new_password
+    """Thay thế các chỗ giữ chỗ {{variable_name}} trong một mẫu email HTML.
+
+    Thực hiện làm giàu tương thích chéo để "otp", "otp_code" và
+    "new_password" đều phân giải thành cùng một giá trị bất kể khóa nào
+    mẫu sử dụng. Cũng tiêm nhãn / mô tả vai trò, tên bệnh viện,
+    ngày hiện tại và tên đầy đủ của người dùng làm mặc định.
+
+    Args:
+        html: Chuỗi mẫu HTML thô chứa các điểm đánh dấu {{...}}.
+        variables: Dict các cặp tên biến → giá trị do người gọi cung cấp.
+
+    Trả về:
+        HTML đã được hiển thị với tất cả các chỗ giữ chỗ được nhận dạng đã được thay thế.
+    """
+    # Làm giàu biến để otp / otp_code / new_password có thể thay thế cho nhau
     enriched = dict(variables)
     if "otp" in enriched:
         enriched["otp_code"] = enriched["otp"]
@@ -318,17 +373,40 @@ def send_smtp_email_sync(
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
 ) -> bool:
-    """Gửi email đồng bộ qua máy chủ SMTP Gmail hoặc cấu hình khác trong .env."""
+    """Gửi email đồng bộ qua SMTP.
+
+    Xây dựng một tin nhắn MIME multipart/alternative, tùy chọn thêm người nhận CC/BCC,
+    và kết nối với máy chủ SMTP đã cấu hình (thường hoặc SSL).
+    Hỗ trợ STARTTLS trên cổng 587 và SSL trực tiếp trên cổng 465.
+
+    Args:
+        to_email: Địa chỉ email người nhận chính.
+        to_name: Tên hiển thị cho người nhận chính.
+        subject: Dòng chủ đề email.
+        html_body: Nội dung HTML đã được hiển thị.
+        cc: Địa chỉ CC phân cách bằng dấu phẩy hoặc None.
+        bcc: Địa chỉ BCC phân cách bằng dấu phẩy hoặc None.
+
+    Trả về:
+        True nếu tin nhắn được máy chủ SMTP chấp nhận.
+
+    Ngoại lệ:
+        smtplib.SMTPException (hoặc lớp con): Được ném lại sau khi ghi nhật ký nếu
+            quá trình hội thoại SMTP thất bại.
+    """
     host = settings.SMTP_HOST
     port = int(settings.SMTP_PORT or 587)
     user = settings.SMTP_USERNAME
     password = settings.SMTP_PASSWORD
-    from_email = settings.SMTP_FROM_EMAIL or settings.EMAIL_FROM_EMAIL or "noreply@cardioguard.ai"
+    from_email = settings.SMTP_FROM_EMAIL or settings.EMAIL_FROM_EMAIL or "noreply@giatky.site"
     from_name = settings.SMTP_FROM_NAME or settings.EMAIL_FROM_NAME or "CardioGuard AI"
 
     if not host:
         logger.warning("SMTP_HOST is not configured; SMTP send skipped")
         return False
+
+    logger.debug("Entry: send_smtp_email_sync(to_email=%s)", mask_email(to_email))
+    logger.info("Sending email via SMTP to=%s host=%s:%s", mask_email(to_email), host, port)
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = Header(subject, "utf-8")
@@ -366,6 +444,7 @@ def send_smtp_email_sync(
 
         server.sendmail(from_email, recipients, msg.as_string())
         server.quit()
+        logger.info("SMTP email sent successfully to=%s", to_email)
         return True
     except Exception as e:
         logger.exception("SMTP send failed")
@@ -381,8 +460,21 @@ async def send_smtp_email(
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
 ) -> bool:
-    """Gửi email bất đồng bộ qua SMTP bằng cách chạy trong threadpool."""
-    return await run_in_threadpool(
+    """Gửi email không đồng bộ qua SMTP sử dụng nhóm luồng.
+
+    Bao bọc hàm send_smtp_email_sync đồng bộ trong run_in_threadpool để
+    tránh chặn vòng lặp sự kiện không đồng bộ trong quá trình hội thoại SMTP.
+
+    Args:
+        Giống như send_smtp_email_sync.
+
+    Trả về:
+        True nếu tin nhắn được máy chủ SMTP chấp nhận.
+
+    Ngoại lệ:
+        Giống như send_smtp_email_sync.
+    """
+    return await asyncio.to_thread(
         send_smtp_email_sync, to_email, to_name, subject, html_body, text_body, cc, bcc
     )
 
@@ -396,9 +488,29 @@ def send_brevo_email_sync(
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
 ) -> bool:
-    """Gửi email đồng bộ qua Brevo API."""
+    """Gửi email đồng bộ qua API REST Brevo (Sendinblue).
+
+    POST đến https://api.brevo.com/v3/smtp/email với người gửi, người nhận,
+    chủ đề và nội dung HTML. Danh sách CC/BCC tùy chọn được bao gồm khi được cung cấp.
+
+    Args:
+        to_email: Địa chỉ email người nhận chính.
+        to_name: Tên hiển thị cho người nhận chính.
+        subject: Dòng chủ đề email.
+        html_body: Nội dung HTML đã được hiển thị.
+        cc: Địa chỉ CC phân cách bằng dấu phẩy hoặc None.
+        bcc: Địa chỉ BCC phân cách bằng dấu phẩy hoặc None.
+
+    Trả về:
+        True khi có phản hồi HTTP 2xx. Nếu Brevo từ chối do auth hoặc gặp lỗi
+        mạng/HTTP, hàm ghi log cảnh báo và trả về False để lớp gọi có thể
+        chuyển sang SMTP dự phòng.
+    """
     if not settings.BREVO_API_KEY:
         return False
+
+    logger.debug("Entry: send_brevo_email_sync(to_email=%s)", mask_email(to_email))
+    logger.info("Sending email via Brevo API to=%s subject=%s", mask_email(to_email), subject)
 
     payload: dict[str, Any] = {
         "sender": {
@@ -416,18 +528,40 @@ def send_brevo_email_sync(
     if bcc:
         payload["bcc"] = [{"email": addr.strip()} for addr in bcc.split(",") if addr.strip()]
 
-    response = requests.post(
-        "https://api.brevo.com/v3/smtp/email",
-        headers={
-            "accept": "application/json",
-            "api-key": settings.BREVO_API_KEY,
-            "content-type": "application/json",
-        },
-        json=payload,
-        timeout=15,
-    )
-    response.raise_for_status()
-    return True
+    logger.info("Executing Brevo API POST to=%s", mask_email(to_email))
+    try:
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={
+                "accept": "application/json",
+                "api-key": settings.BREVO_API_KEY,
+                "content-type": "application/json",
+            },
+            json=payload,
+            timeout=15,
+        )
+        response.raise_for_status()
+        logger.info("Brevo API email sent successfully to=%s", mask_email(to_email))
+        return True
+    except requests.HTTPError as exc:
+        status_code = getattr(exc.response, "status_code", None)
+        body = ""
+        if getattr(exc.response, "text", None):
+            body = exc.response.text[:500]
+        logger.warning(
+            "Brevo API rejected email to=%s status=%s; falling back when possible",
+            mask_email(to_email),
+            status_code,
+            extra={"brevo_status_code": status_code, "brevo_response": body},
+        )
+        return False
+    except requests.RequestException as exc:
+        logger.warning(
+            "Brevo API request failed for to=%s; falling back when possible: %s",
+            mask_email(to_email),
+            exc,
+        )
+        return False
 
 
 async def render_and_deliver_email(
@@ -443,7 +577,7 @@ async def render_and_deliver_email(
     cc: Optional[str] = None,
     bcc: Optional[str] = None,
     created_by: str = "system",
-) -> tuple[str, Optional[str], Optional[datetime], bool]:
+) -> tuple[str, Optional[str], Optional[datetime], bool, str]:
     rendered_subject = render_template(subject, variables)
     rendered_html = render_template(html_content, variables)
     rendered_text = render_template(text_content, variables) if text_content else None
@@ -454,7 +588,8 @@ async def render_and_deliver_email(
 
     try:
         if settings.BREVO_API_KEY:
-            email_sent = await run_in_threadpool(
+            logger.info("Delivery path: Brevo API for email_type=%s to=%s", email_type, mask_email(to_email))
+            email_sent = await asyncio.to_thread(
                 send_brevo_email_sync,
                 to_email,
                 to_name,
@@ -464,9 +599,31 @@ async def render_and_deliver_email(
                 cc,
                 bcc,
             )
-            status = "sent" if email_sent else "failed"
-            sent_at = datetime.now(timezone.utc)
+            if email_sent:
+                status = "sent"
+                sent_at = datetime.now(timezone.utc)
+            elif settings.SMTP_HOST:
+                logger.info(
+                    "Falling back to SMTP for email_type=%s to=%s after Brevo failure",
+                    email_type,
+                    mask_email(to_email),
+                )
+                email_sent = await send_smtp_email(
+                    to_email,
+                    to_name,
+                    rendered_subject,
+                    rendered_html,
+                    rendered_text,
+                    cc,
+                    bcc,
+                )
+                status = "sent" if email_sent else "failed"
+                sent_at = datetime.now(timezone.utc)
+            else:
+                status = "failed"
+                error_message = "Brevo delivery failed and SMTP fallback is not configured"
         elif settings.SMTP_HOST:
+            logger.info("Delivery path: SMTP for email_type=%s to=%s", email_type, mask_email(to_email))
             email_sent = await send_smtp_email(
                 to_email,
                 to_name,
@@ -479,7 +636,7 @@ async def render_and_deliver_email(
             status = "sent" if email_sent else "failed"
             sent_at = datetime.now(timezone.utc)
         else:
-            logger.info("Email delivery skipped in dev mode: type=%s", email_type)
+            logger.info("Delivery path: dev mode (skipped) for email_type=%s", email_type)
             status = "sent"
             sent_at = datetime.now(timezone.utc)
     except Exception as exc:
@@ -524,6 +681,7 @@ async def send_system_email(
     Gửi email hệ thống bằng template CMS.
     fallback_* được giữ lại để tương thích ngược, nhưng template CMS phải tồn tại.
     """
+    logger.debug("Entry: send_system_email(email_type=%s, to_email=%s)", email_type, mask_email(to_email))
     template = await find_email_template(email_type=email_type)
     if not template:
         raise HTTPException(status_code=404, detail="Không tìm thấy mẫu email CMS cho chức năng này")

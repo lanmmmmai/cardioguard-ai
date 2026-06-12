@@ -1,7 +1,12 @@
+// Một widget cột tiêu đề + phụ đề tùy chọn được sử dụng trong tiêu đề CgScreenScaffold.
+// Tiêu đề sử dụng kiểu văn bản titleLarge của Theme; phụ đề sử dụng bodySmall với
+// màu mờ.
 import 'package:flutter/material.dart';
 
 class CgSectionTitle extends StatelessWidget {
+  // Văn bản tiêu đề chính.
   final String title;
+  // Văn bản phụ tùy chọn hiển thị bên dưới tiêu đề.
   final String? subtitle;
 
   const CgSectionTitle({super.key, required this.title, this.subtitle});

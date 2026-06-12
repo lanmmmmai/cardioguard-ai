@@ -1,13 +1,28 @@
+// Màn hình thống kê hệ thống với thẻ KPI, biểu đồ donut mức độ nghiêm trọng và xu hướng hàng tuần.
+// Quy trình làm việc:
+// 1. Khi khởi tạo, thực hiện các lời gọi API song song đến /patients, /alerts và
+//    điểm cuối thống kê hàng tuần từ AppConfig.
+// 2. Hiển thị 3 thẻ KPI (tổng bệnh nhân, tổng cảnh báo, số lượng nguy kịch).
+// 3. Biểu đồ tròn PieChart hiển thị phân bố mức độ nghiêm trọng của cảnh báo (cao/trung bình/thấp).
+// 4. Biểu đồ đường LineChart hiển thị xu hướng tần suất cảnh báo trong 7 ngày với nhãn ngày trong tuần.
+// 5. Nút làm mới tải lại tất cả dữ liệu qua _loadStatsData.
+// Mối quan hệ:
+// - Sử dụng: ApiClient, AppConfig, CgScreenScaffold, CgInlineState.
+// - Biểu đồ: fl_chart (PieChart, LineChart).
+// - Sử dụng các Providers để quản lý trạng thái dữ liệu.
 import 'package:flutter/material.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../core/api_client.dart';
+import 'package:provider/provider.dart';
 import '../core/app_logger.dart';
-import '../config/app_config.dart';
 import '../widgets/cg_widgets.dart';
 import '../ui/cg_tokens.dart';
+import '../providers/patient_provider.dart';
+import '../providers/alert_provider.dart';
 
+// Màn hình thống kê hệ thống với thẻ KPI, donut mức độ nghiêm trọng và xu hướng đường hàng tuần.
 class StatsScreen extends StatefulWidget {
+  // Liệu màn hình có sử dụng màu chủ đề tối hay không.
   final bool isDarkTheme;
   const StatsScreen({super.key, required this.isDarkTheme});
 
@@ -21,10 +36,13 @@ class _StatsScreenState extends State<StatsScreen> {
   int _criticalCount = 0;
   bool _isLoading = false;
 
-  // Pie chart variables (không dùng fallback giả)
+  // Giá trị cho số lượng cảnh báo mức độ cao (critical/high) trong biểu đồ donut.
   double _highAlertsVal = 0.0;
+  // Giá trị cho số lượng cảnh báo mức độ trung bình (warning) trong biểu đồ donut.
   double _medAlertsVal = 0.0;
+  // Giá trị cho số lượng cảnh báo mức độ thấp (info/low) trong biểu đồ donut.
   double _lowAlertsVal = 0.0;
+  // Các điểm dữ liệu tần suất cảnh báo hàng tuần cho biểu đồ đường (khởi tạo thưa thớt).
   List<FlSpot> _weeklyAlertSpots = const [
     FlSpot(0, 0),
     FlSpot(1, 0),
@@ -34,6 +52,7 @@ class _StatsScreenState extends State<StatsScreen> {
     FlSpot(5, 0),
     FlSpot(6, 0),
   ];
+  // Nhãn cho mỗi ngày trong biểu đồ hàng tuần.
   List<String> _weeklyLabels = const ['-', '-', '-', '-', '-', '-', '-'];
 
   @override
@@ -42,34 +61,33 @@ class _StatsScreenState extends State<StatsScreen> {
     _loadStatsData();
   }
 
+  // Tìm nạp số lượng bệnh nhân, danh sách cảnh báo và thống kê hàng tuần song song từ API thông qua providers.
   void _loadStatsData() async {
     setState(() {
       _isLoading = true;
     });
     try {
-      final client = ApiClient();
-      final responses = await Future.wait([
-        client.get('/patients'),
-        client.get('/alerts'),
-        client.get(AppConfig.alertsWeeklyStatsEndpoint),
+      final patientProvider = Provider.of<PatientProvider>(context, listen: false);
+      final alertProvider = Provider.of<AlertProvider>(context, listen: false);
+
+      await Future.wait([
+        patientProvider.fetchPatients(),
+        alertProvider.fetchAlerts(),
+        alertProvider.fetchWeeklyStats(),
       ]);
-      final patients = (responses[0].data as List<dynamic>? ?? const []);
-      final alerts = (responses[1].data as List<dynamic>? ?? const []);
-      final weeklyStats = (responses[2].data as List<dynamic>? ?? const []);
 
       if (!mounted) return;
       setState(() {
-        _totalPatients = patients.length;
-        _totalAlerts = alerts.length;
+        _totalPatients = patientProvider.patients.length;
+        _totalAlerts = alertProvider.alerts.length;
 
-        // Group alerts by severity
+        // Nhóm cảnh báo theo mức độ nghiêm trọng
         int high = 0;
         int med = 0;
         int low = 0;
 
-        for (final a in alerts) {
-          final row = a as Map<String, dynamic>? ?? const {};
-          final severity = (row['severity'] as String? ?? '').toLowerCase();
+        for (final a in alertProvider.alerts) {
+          final severity = a.severity.toLowerCase();
           if (severity == 'high' || severity == 'critical') {
             high++;
           } else if (severity == 'medium' || severity == 'warning') {
@@ -82,6 +100,8 @@ class _StatsScreenState extends State<StatsScreen> {
         _highAlertsVal = high.toDouble();
         _medAlertsVal = med.toDouble();
         _lowAlertsVal = low.toDouble();
+        
+        final weeklyStats = alertProvider.weeklyStats;
         if (weeklyStats.isNotEmpty) {
           _weeklyLabels = weeklyStats
               .map((e) =>
@@ -105,12 +125,12 @@ class _StatsScreenState extends State<StatsScreen> {
           ];
         }
 
-        // Count critical cases
+        // Đếm số ca nguy kịch
         _criticalCount = high;
         _isLoading = false;
       });
     } catch (e) {
-      AppLogger.log('Stats load error: $e');
+      AppLogger.log('Lỗi tải thống kê: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -152,7 +172,7 @@ class _StatsScreenState extends State<StatsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 children: [
-                  // KPI widgets
+                  // Widget KPI
                   GridView.count(
                     crossAxisCount: 3,
                     shrinkWrap: true,
@@ -189,7 +209,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Donut severity distribution panel
+                  // Bảng phân bố donut mức độ nghiêm trọng
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -218,7 +238,7 @@ class _StatsScreenState extends State<StatsScreen> {
                               centerSpaceRadius: 40,
                               sections: [
                                 PieChartSectionData(
-                                  color: const Color(0xFFFF3366),
+                                  color: CgColors.accent,
                                   value: _highAlertsVal,
                                   title: 'Nguy kịch',
                                   radius: 30,
@@ -229,7 +249,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                   ),
                                 ),
                                 PieChartSectionData(
-                                  color: const Color(0xFFFFB606),
+                                  color: CgColors.warning,
                                   value: _medAlertsVal,
                                   title: 'Cảnh báo',
                                   radius: 30,
@@ -240,7 +260,7 @@ class _StatsScreenState extends State<StatsScreen> {
                                   ),
                                 ),
                                 PieChartSectionData(
-                                  color: const Color(0xFF39FF14),
+                                  color: CgColors.normal,
                                   value: _lowAlertsVal,
                                   title: 'Ổn định',
                                   radius: 30,
@@ -255,16 +275,16 @@ class _StatsScreenState extends State<StatsScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        // Legend
+                        // Chú thích
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
                             _buildLegendItem(
-                                'Cao', const Color(0xFFFF3366), textMuted),
+                                'Cao', CgColors.accent, textMuted),
                             _buildLegendItem('Trung bình',
-                                const Color(0xFFFFB606), textMuted),
+                                CgColors.warning, textMuted),
                             _buildLegendItem(
-                                'Thấp', const Color(0xFF39FF14), textMuted),
+                                'Thấp', CgColors.normal, textMuted),
                           ],
                         ),
                       ],
@@ -272,7 +292,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Alarms line chart panel
+                  // Bảng biểu đồ đường cảnh báo
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -346,12 +366,12 @@ class _StatsScreenState extends State<StatsScreen> {
                                 LineChartBarData(
                                   spots: _weeklyAlertSpots,
                                   isCurved: true,
-                                  color: const Color(0xFFFF3366),
+                                  color: CgColors.accent,
                                   barWidth: 3,
                                   dotData: const FlDotData(show: true),
                                   belowBarData: BarAreaData(
                                     show: true,
-                                    color: const Color(0xFFFF3366)
+                                    color: CgColors.accent
                                         .withValues(alpha: 0.1),
                                   ),
                                 ),
@@ -369,6 +389,7 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
+  // Xây dựng một thẻ tóm tắt KPI hiển thị giá trị số liệu và biểu tượng.
   Widget _buildKpiCard(String label, String value, IconData icon, Color color,
       Color cardBg, Color textColor, Color textMuted) {
     return Container(
@@ -407,6 +428,7 @@ class _StatsScreenState extends State<StatsScreen> {
     );
   }
 
+  // Xây dựng một hàng chấm chú thích màu + nhãn cho chú thích biểu đồ donut.
   Widget _buildLegendItem(String label, Color color, Color textMuted) {
     return Row(
       children: [

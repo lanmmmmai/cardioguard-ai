@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { API_URL } from '../config';
 import { ShieldCheck, FileText, Search, UserCheck, UserX, AlertTriangle, Eye, X, Mail, Phone, Calendar, MapPin, Award } from 'lucide-react';
+import { SecureImage } from './SecureImage';
 
 interface DoctorData {
   id: string;
@@ -61,7 +62,8 @@ export const AdminDoctorVerification: React.FC = () => {
       });
       if (!response.ok) throw new Error('Không thể tải danh sách bác sĩ.');
       const data = await response.json();
-      setDoctors(data);
+      const items = Array.isArray(data) ? data : (data.items || []);
+      setDoctors(items);
     } catch (err: any) {
       setErrorMsg(err.message || 'Lỗi tải danh sách bác sĩ');
     } finally {
@@ -139,7 +141,7 @@ export const AdminDoctorVerification: React.FC = () => {
   const getMediaUrl = (path?: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    return `${API_URL}${path}?token=${accessToken}`;
+    return `${API_URL}${path}`;
   };
 
   const getStatusBadge = (status: string) => {
@@ -179,10 +181,10 @@ export const AdminDoctorVerification: React.FC = () => {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      <div className="admin-verif-grid">
         
         {/* Left pane: Doctor list */}
-        <div style={{ flex: '1 1 500px', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '12px', padding: '16px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid var(--color-border)' }}>
+        <div className="panel" style={{ padding: '16px' }}>
           
           {/* Filters Bar */}
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '16px', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -277,7 +279,7 @@ export const AdminDoctorVerification: React.FC = () => {
 
         {/* Right pane: Drawer detail */}
         {selectedDoctor ? (
-          <div style={{ flex: '1 1 500px', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '12px', padding: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)', border: '1px solid var(--color-border)' }}>
+          <div className="panel" style={{ padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
                 Chi tiết hồ sơ xác thực
@@ -294,8 +296,9 @@ export const AdminDoctorVerification: React.FC = () => {
             {/* Doctor Info Grid */}
             <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', alignItems: 'center' }}>
               {selectedDoctor.license_certificate_url ? (
-                <img 
+                <SecureImage
                   src={getMediaUrl(selectedDoctor.license_certificate_url)} 
+                  accessToken={accessToken}
                   alt="Doctor" 
                   style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--color-border)' }} 
                 />
@@ -349,10 +352,15 @@ export const AdminDoctorVerification: React.FC = () => {
                 <div style={{ flex: '1 1 120px', textAlign: 'center' }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Chứng chỉ y khoa</span>
                   <div 
-                    style={{ height: '90px', borderRadius: '8px', border: '1px solid var(--color-border)', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
+                    className="verif-doc-card-preview"
                     onClick={() => setPreviewImage(getMediaUrl(selectedDoctor.license_certificate_url))}
                   >
-                    <img src={getMediaUrl(selectedDoctor.license_certificate_url)} alt="License" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <SecureImage
+                      src={getMediaUrl(selectedDoctor.license_certificate_url)}
+                      accessToken={accessToken}
+                      alt="License"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
                   </div>
                 </div>
               ) : (
@@ -367,10 +375,15 @@ export const AdminDoctorVerification: React.FC = () => {
                 <div style={{ flex: '1 1 120px', textAlign: 'center' }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>CCCD Mặt trước</span>
                   <div 
-                    style={{ height: '90px', borderRadius: '8px', border: '1px solid var(--color-border)', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
+                    className="verif-doc-card-preview"
                     onClick={() => setPreviewImage(getMediaUrl(selectedDoctor.cccd_front_url))}
                   >
-                    <img src={getMediaUrl(selectedDoctor.cccd_front_url)} alt="CCCD Front" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <SecureImage
+                      src={getMediaUrl(selectedDoctor.cccd_front_url)}
+                      accessToken={accessToken}
+                      alt="CCCD Front"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
                   </div>
                 </div>
               ) : (
@@ -385,10 +398,15 @@ export const AdminDoctorVerification: React.FC = () => {
                 <div style={{ flex: '1 1 120px', textAlign: 'center' }}>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>CCCD Mặt sau</span>
                   <div 
-                    style={{ height: '90px', borderRadius: '8px', border: '1px solid var(--color-border)', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
+                    className="verif-doc-card-preview"
                     onClick={() => setPreviewImage(getMediaUrl(selectedDoctor.cccd_back_url))}
                   >
-                    <img src={getMediaUrl(selectedDoctor.cccd_back_url)} alt="CCCD Back" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <SecureImage
+                      src={getMediaUrl(selectedDoctor.cccd_back_url)}
+                      accessToken={accessToken}
+                      alt="CCCD Back"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
                   </div>
                 </div>
               ) : (
@@ -450,7 +468,7 @@ export const AdminDoctorVerification: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div style={{ flex: '1 1 500px', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '12px', padding: '40px', textAlign: 'center', color: 'var(--text-secondary)', border: '1px dashed var(--color-border)', height: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="panel" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px', textAlign: 'center', color: 'var(--text-secondary)', border: '1px dashed var(--color-border)', height: '300px' }}>
             <Award size={48} style={{ color: 'var(--text-muted)', marginBottom: '12px' }} />
             <span>Chọn một bác sĩ từ danh sách để xem chi tiết hồ sơ xác thực và thực hiện phê duyệt.</span>
           </div>
@@ -482,8 +500,9 @@ export const AdminDoctorVerification: React.FC = () => {
           >
             <X size={32} />
           </button>
-          <img 
+          <SecureImage
             src={previewImage} 
+            accessToken={accessToken}
             alt="Preview" 
             style={{ maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', borderRadius: '8px' }} 
             onClick={(e) => e.stopPropagation()}

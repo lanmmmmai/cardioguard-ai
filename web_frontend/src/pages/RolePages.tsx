@@ -1,40 +1,27 @@
+/**
+ * Mục đích: Các trang dashboard theo vai trò cho Quản trị viên, Bác sĩ và Bệnh nhân.
+ *           Mỗi dashboard hiển thị dữ liệu tổng hợp thực (bệnh nhân, cảnh báo, bác sĩ)
+ *           cùng với thẻ hành động nhanh và tóm tắt trạng thái hệ thống.
+ * Luồng xử lý: Props được truyền từ App.tsx routeContent. Các component tính toán
+ *           bộ đếm thống kê, xây dựng thanh biểu đồ và hiển thị cơ chế nhấn giữ SOS
+ *           cho bệnh nhân.
+ * Quan hệ:
+ *   - App.tsx (khối switch routeContent)
+ *   - AuthContext (cho định danh phiên bệnh nhân)
+ *   - Các interface kiểu Patient, Alert, SensorData
+ */
 import React, { useState, useEffect } from 'react';
 import { Activity, AlertTriangle, BarChart3, CalendarDays, Cpu, HeartPulse, MessageCircle, Pill, ShieldAlert, Stethoscope, Users, Radio, WifiOff } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { useBrowserPath } from '../hooks/useBrowserPath';
 import { API_URL } from '../config';
+import { Alert, Patient, SensorData } from '../types';
+import { readJsonResponse } from '../utils/response';
 
-interface Patient {
-  id: string;
-  full_name: string;
-  age: number;
-  gender: string;
-  phone: string;
-  address: string;
-  medical_history: string;
-}
-
-interface Alert {
-  id?: string;
-  patient_id: string;
-  full_name?: string;
-  alert_type: string;
-  message: string;
-  severity: string;
-  is_resolved?: boolean;
-  created_at?: string;
-}
-
-interface SensorData {
-  patient_id: string;
-  heart_rate: number;
-  spo2: number;
-  systolic_bp: number;
-  diastolic_bp: number;
-  ecg_value: number;
-  is_abnormal: boolean;
-  alerts: Array<{ alert_type: string; message: string; severity: string }>;
-}
-
+/**
+ * Thẻ thống kê tái sử dụng hiển thị biểu tượng, nhãn/giá trị chỉ số và gợi ý.
+ * Props `tone` tùy chọn áp dụng bổ sung trực quan (ví dụ: 'danger').
+ */
 const Card: React.FC<{ icon: React.ReactNode; label: string; value: string | number; hint: string; tone?: string }> = ({ icon, label, value, hint, tone }) => (
   <div className={`role-stat-card ${tone || ''}`}>
     <div className="role-stat-icon">{icon}</div>
@@ -46,10 +33,25 @@ const Card: React.FC<{ icon: React.ReactNode; label: string; value: string | num
   </div>
 );
 
+/**
+ * Dashboard tổng quan quản trị viên. Hiển thị số lượng bệnh nhân/bác sĩ/thiết bị/IoT,
+ * biểu đồ cột so sánh các chỉ số đó và hoạt động hệ thống gần đây.
+ */
 export const AdminDashboard: React.FC<{ patients: Patient[]; alerts: Alert[]; doctors?: unknown[] }> = ({ patients, alerts, doctors = [] }) => {
+  const { navigate } = useBrowserPath();
   const highAlerts = alerts.filter((alert) => alert.severity === 'high').length;
-  const chartValues = [patients.length, alerts.length, highAlerts, doctors.length, 0, 0, 0];
-  const maxChartValue = Math.max(...chartValues, 1);
+  
+  // Custom Chart Data
+  const chartData = [
+    { label: 'Bệnh nhân', value: patients.length, colorClass: 'accent-green' },
+    { label: 'Bác sĩ', value: doctors.length, colorClass: 'accent-blue' },
+    { label: 'Cảnh báo', value: alerts.length, colorClass: 'accent-warning' },
+    { label: 'Cảnh báo cao', value: highAlerts, colorClass: '' }
+  ];
+  const maxVal = Math.max(...chartData.map(d => d.value), 1);
+
+  // Mảng hiển thị hoạt động gần đây
+  const recentAlerts = alerts.slice(0, 4);
 
   return (
     <div className="role-page-stack">
@@ -61,37 +63,196 @@ export const AdminDashboard: React.FC<{ patients: Patient[]; alerts: Alert[]; do
       </div>
 
       <div className="role-stat-grid">
-        <Card icon={<Users size={22} />} label="Tổng số bệnh nhân" value={patients.length} hint="Đang được quản lý" />
-        <Card icon={<Stethoscope size={22} />} label="Tổng số bác sĩ" value={doctors.length} hint="Đang hoạt động" />
-        <Card icon={<Cpu size={22} />} label="Thiết bị IoT" value="0" hint="Chưa có thiết bị thật được liên kết" />
-        <Card icon={<ShieldAlert size={22} />} label="Cảnh báo" value={alerts.length} hint={`${highAlerts} cảnh báo mức cao`} tone="danger" />
+        <div 
+          className="role-stat-card admin-stat-card-link" 
+          onClick={() => navigate('/admin/patients')}
+        >
+          <div className="role-stat-icon"><Users size={22} /></div>
+          <div>
+            <div className="role-stat-label">Tổng số bệnh nhân</div>
+            <div className="role-stat-value">{patients.length}</div>
+            <div className="role-stat-hint">Đang được quản lý</div>
+          </div>
+        </div>
+
+        <div 
+          className="role-stat-card admin-stat-card-link" 
+          onClick={() => navigate('/admin/doctors')}
+        >
+          <div className="role-stat-icon"><Stethoscope size={22} /></div>
+          <div>
+            <div className="role-stat-label">Tổng số bác sĩ</div>
+            <div className="role-stat-value">{doctors.length}</div>
+            <div className="role-stat-hint">Đang hoạt động</div>
+          </div>
+        </div>
+
+        <div 
+          className="role-stat-card admin-stat-card-link" 
+          onClick={() => navigate('/admin/devices')}
+        >
+          <div className="role-stat-icon"><Cpu size={22} /></div>
+          <div>
+            <div className="role-stat-label">Thiết bị IoT</div>
+            <div className="role-stat-value">0</div>
+            <div className="role-stat-hint">Chưa liên kết thiết bị</div>
+          </div>
+        </div>
+
+        <div 
+          className="role-stat-card danger admin-stat-card-link" 
+          onClick={() => navigate('/admin/alerts')}
+        >
+          <div className="role-stat-icon"><ShieldAlert size={22} /></div>
+          <div>
+            <div className="role-stat-label">Cảnh báo hệ thống</div>
+            <div className="role-stat-value">{alerts.length}</div>
+            <div className="role-stat-hint">{highAlerts} cảnh báo mức cao</div>
+          </div>
+        </div>
       </div>
 
       <div className="role-page-grid">
-        <section className="panel">
+        <section className="panel" style={{ display: 'flex', flexDirection: 'column' }}>
           <h3 className="metric-title"><BarChart3 size={18} /> Biểu đồ thống kê</h3>
-          <div className="real-chart-bars">
-            {chartValues.map((value, index) => (
-              <span key={index} style={{ height: `${Math.max(8, (value / maxChartValue) * 100)}%` }} title={`${value}`} />
+          
+          <div className="admin-chart-wrapper">
+            {/* Trục Y */}
+            <div className="admin-chart-y-axis">
+              <span>{maxVal}</span>
+              <span>{Math.round(maxVal * 0.75)}</span>
+              <span>{Math.round(maxVal * 0.5)}</span>
+              <span>{Math.round(maxVal * 0.25)}</span>
+              <span>0</span>
+            </div>
+
+            {/* Khung chứa các cột */}
+            <div className="admin-chart-bars-container">
+              {/* Đường vạch đứt nền */}
+              <div className="admin-chart-grid-lines">
+                <div className="admin-chart-grid-line" />
+                <div className="admin-chart-grid-line" />
+                <div className="admin-chart-grid-line" />
+                <div className="admin-chart-grid-line" />
+                <div className="admin-chart-grid-line" style={{ borderTopStyle: 'solid' }} />
+              </div>
+
+              {chartData.map((item, index) => {
+                const percentage = (item.value / maxVal) * 100;
+                return (
+                  <div key={index} className="admin-chart-bar-col">
+                    <div 
+                      className={`admin-chart-bar-pillar ${item.colorClass}`}
+                      style={{ height: `${Math.max(6, percentage)}%` }}
+                    >
+                      <div className="admin-chart-bar-tooltip">
+                        {item.label}: {item.value}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Trục X */}
+          <div className="admin-chart-x-axis-labels">
+            {chartData.map((item, index) => (
+              <div key={index} className="admin-chart-x-label">{item.label}</div>
             ))}
           </div>
-          <p className="role-muted">Biểu đồ chỉ dùng dữ liệu thật hiện có, không tạo bệnh nhân ảo.</p>
+
+          <p className="role-muted" style={{ marginTop: '1rem' }}>
+            Biểu đồ hiển thị số lượng bản ghi thực tế đang được lưu trữ trên cơ sở dữ liệu.
+          </p>
         </section>
 
         <section className="panel">
           <h3 className="metric-title"><Activity size={18} /> Hoạt động hệ thống gần đây</h3>
-          <div className="activity-list">
-            <div>Đồng bộ telemetry realtime thành công.</div>
-            <div>WebSocket `/ws/realtime` đang sẵn sàng.</div>
-            <div>AI risk assistant ở chế độ hỗ trợ tham khảo, cần bác sĩ xác nhận.</div>
-            <div>Audit log ghi nhận phiên đăng nhập mới.</div>
+          <div className="activity-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {recentAlerts.length > 0 ? (
+              recentAlerts.map((alert, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', borderBottom: '1px solid var(--glass-border)', paddingBottom: '8px' }}>
+                  <span className={`connection-status-dot ${alert.severity === 'high' ? 'disconnected' : 'connected'}`} style={{ marginTop: '5px' }} />
+                  <div>
+                    <strong style={{ fontSize: '0.85rem' }}>{alert.full_name || 'Bệnh nhân'}</strong>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{alert.message}</div>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {alert.created_at ? new Date(alert.created_at).toLocaleString('vi-VN') : 'Vừa xong'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span className="connection-status-dot connected" />
+                  <span>Đồng bộ telemetry realtime thành công.</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span className="connection-status-dot connected" />
+                  <span>WebSocket `/ws/realtime` đang sẵn sàng.</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span className="connection-status-dot connected" />
+                  <span>AI risk assistant đang hoạt động ở chế độ tham khảo.</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span className="connection-status-dot connected" />
+                  <span>Audit log ghi nhận phiên làm việc của quản trị viên.</span>
+                </div>
+              </>
+            )}
           </div>
         </section>
       </div>
+
+      {/* Quick Actions Panel */}
+      <section className="panel">
+        <h3 className="metric-title"><Cpu size={18} /> Phím tắt tác vụ nhanh</h3>
+        <div className="admin-quick-actions-panel">
+          <button type="button" className="admin-quick-action-btn" onClick={() => navigate('/admin/doctor-verification')}>
+            <div className="admin-quick-action-icon"><ShieldAlert size={16} /></div>
+            <div>
+              <div>Xác thực Bác sĩ</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Phê duyệt hồ sơ bác sĩ mới</div>
+            </div>
+          </button>
+
+          <button type="button" className="admin-quick-action-btn" onClick={() => navigate('/admin/users')}>
+            <div className="admin-quick-action-icon"><Users size={16} /></div>
+            <div>
+              <div>Quản lý tài khoản</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Thêm, sửa, xóa, phân quyền</div>
+            </div>
+          </button>
+
+          <button type="button" className="admin-quick-action-btn" onClick={() => navigate('/admin/settings')}>
+            <div className="admin-quick-action-icon"><Stethoscope size={16} /></div>
+            <div>
+              <div>Cài đặt hệ thống</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Cấu hình ngưỡng lâm sàng & AI</div>
+            </div>
+          </button>
+
+          <button type="button" className="admin-quick-action-btn" onClick={() => navigate('/admin/cms')}>
+            <div className="admin-quick-action-icon"><Activity size={16} /></div>
+            <div>
+              <div>CMS Dữ liệu</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Nhập xuất & quản trị database</div>
+            </div>
+          </button>
+        </div>
+      </section>
     </div>
   );
 };
 
+/**
+ * Dashboard tổng quan bác sĩ. Làm nổi bật số lượng bệnh nhân được phân công,
+ * lịch hẹn hôm nay, cảnh báo mức cao chưa xử lý và các thẻ truy cập nhanh
+ * cho hồ sơ bệnh án, đơn thuốc, chat và phân tích AI.
+ */
 export const DoctorDashboard: React.FC<{ patients: Patient[]; alerts: Alert[] }> = ({ patients, alerts }) => (
   <div className="role-page-stack">
     <div className="page-header">
@@ -126,20 +287,30 @@ export const DoctorDashboard: React.FC<{ patients: Patient[]; alerts: Alert[] }>
   </div>
 );
 
+/**
+ * Trang chủ bệnh nhân. Hiển thị các chỉ số sinh tồn thời gian thực (HR, SpO2, BP, ECG)
+ * từ WebSocket telemetry, nút nhấn giữ SOS và danh sách cảnh báo cá nhân.
+ * Hiển thị cảnh báo dữ liệu cũ khi telemetry trễ hơn 30 giây.
+ */
 export const PatientHome: React.FC<{
   latestTelemetry: SensorData | null;
   alerts: Alert[];
   isConnected?: boolean;
 }> = ({ latestTelemetry, alerts, isConnected = false }) => {
   const { accessToken, user } = useAuth();
+  const accessTokenRef = React.useRef(accessToken);
   const [lastTelemetryTime, setLastTelemetryTime] = useState<Date | null>(null);
   const [isStale, setIsStale] = useState(true);
   const [isSendingSos, setIsSendingSos] = useState(false);
   const [showSosConfirm, setShowSosConfirm] = useState(false);
 
-  // SOS Long Press States
+  // Trạng thái nhấn giữ SOS
   const [countdown, setCountdown] = useState(3);
   const [isHolding, setIsHolding] = useState(false);
+
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
 
   useEffect(() => {
     let interval: any = null;
@@ -179,15 +350,20 @@ export const PatientHome: React.FC<{
     updatedAt: null
   });
 
+  /**
+   * Gửi cảnh báo khẩn cấp SOS đến backend. Được gọi sau khi
+   * đếm ngược nhấn giữ xác nhận kết thúc hoặc qua hộp thoại xác nhận.
+   */
   const handleTriggerSos = async () => {
-    if (!accessToken) return;
+    const token = accessTokenRef.current;
+    if (!token) return;
     setIsSendingSos(true);
     try {
       const response = await fetch(`${API_URL}/alerts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({ message: 'Bệnh nhân yêu cầu hỗ trợ khẩn cấp (SOS)' })
       });
@@ -195,17 +371,7 @@ export const PatientHome: React.FC<{
         alert('Cảnh báo SOS khẩn cấp đã được phát đi thành công tới hệ thống và các bác sĩ phụ trách!');
         setShowSosConfirm(false);
       } else {
-        let data;
-
-        try {
-
-          data = await response.json();
-
-        } catch (e) {
-
-          throw new Error("Lỗi định dạng phản hồi từ server");
-
-        }
+        const data = await readJsonResponse<{ detail?: string }>(response);
         alert(data.detail || 'Lỗi gửi yêu cầu SOS khẩn cấp');
       }
     } catch (err) {
@@ -216,7 +382,7 @@ export const PatientHome: React.FC<{
   };
 
   useEffect(() => {
-    // Only update if latestTelemetry matches logged in user or we are in patient session
+    // Chỉ cập nhật nếu latestTelemetry khớp với người dùng đã đăng nhập hoặc đang trong phiên bệnh nhân
     if (latestTelemetry && (!user?.id || latestTelemetry.patient_id === user.id)) {
       setCurrentMetrics({
         heartRate: latestTelemetry.heart_rate,
@@ -321,7 +487,7 @@ export const PatientHome: React.FC<{
         </div>
       </div>
 
-      {/* WebSocket Connection / Vitals Stale Status Banner */}
+      {/* Biểu ngữ trạng thái kết nối WebSocket / Cảnh báo dữ liệu sinh tồn cũ */}
       {!isConnected ? (
         <div className="alert-strip danger" style={{ marginBottom: '1.5rem' }}>
           <WifiOff size={16} className="alert-strip-icon pulse-animated" />
@@ -338,7 +504,7 @@ export const PatientHome: React.FC<{
       ) : null}
 
       <div className="role-stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-        {/* Heart Rate Card */}
+        {/* Thẻ Nhịp Tim */}
         {(() => {
           const isCritical = currentMetrics.heartRate !== null && (currentMetrics.heartRate > 120 || currentMetrics.heartRate < 50);
           const hrStatus = currentMetrics.heartRate === null ? 'normal' : isCritical ? 'high' : 'normal';
@@ -372,7 +538,7 @@ export const PatientHome: React.FC<{
           );
         })()}
 
-        {/* SpO2 Card */}
+        {/* Thẻ SpO2 */}
         {(() => {
           const isCritical = currentMetrics.spo2 !== null && currentMetrics.spo2 < 92;
           const o2Status = currentMetrics.spo2 === null ? 'normal' : isCritical ? 'high' : 'normal';
@@ -406,7 +572,7 @@ export const PatientHome: React.FC<{
           );
         })()}
 
-        {/* Huyết áp Card */}
+        {/* Thẻ Huyết áp */}
         {(() => {
           const isCritical = currentMetrics.systolicBp !== null && (currentMetrics.systolicBp > 140 || currentMetrics.diastolicBp! > 90);
           const bpStatus = currentMetrics.systolicBp === null ? 'normal' : isCritical ? 'high' : 'normal';
@@ -440,7 +606,7 @@ export const PatientHome: React.FC<{
           );
         })()}
 
-        {/* ECG Card */}
+        {/* Thẻ ECG */}
         {(() => {
           return (
             <div className="panel metric-card ecg" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '16px', borderRadius: '16px' }}>
@@ -496,7 +662,7 @@ export const PatientHome: React.FC<{
         </section>
       </div>
 
-      {/* SOS Confirmation Modal */}
+      {/* Hộp thoại xác nhận SOS */}
       {showSosConfirm && (
         <div className="modal-overlay">
           <div className="modal-content panel" style={{ maxWidth: '440px', textAlign: 'center' }}>
@@ -528,6 +694,10 @@ export const PatientHome: React.FC<{
   );
 };
 
+/**
+ * Trang giữ chỗ chung cho các route có tính năng chưa được hỗ trợ
+ * bởi dữ liệu thực. Cung cấp trạng thái trống nhất quán với hướng dẫn ngữ cảnh.
+ */
 export const PlaceholderPage: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
   <div className="role-page-stack">
     <div className="page-header">

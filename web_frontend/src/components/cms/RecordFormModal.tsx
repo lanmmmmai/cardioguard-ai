@@ -1,3 +1,10 @@
+/**
+ * Mục đích: Hộp thoại biểu mẫu để tạo hoặc chỉnh sửa một bản ghi CMS.
+ * Luồng xử lý: Lọc ra các cột chỉ đọc; xây dựng trạng thái biểu mẫu động từ siêu dữ liệu cột;
+ *              xác thực các trường phổ biến (email, điện thoại, tuổi, pin); gửi qua callback onSubmit.
+ * Quan hệ: Được sử dụng bởi CmsPage; nhận định nghĩa cột từ cmsApi;
+ *          đóng khi nhấn phím Escape hoặc bấm vào nền phía sau.
+ */
 import React, { useEffect, useState } from 'react';
 import { Save, X } from 'lucide-react';
 import type { CmsColumn } from '../../services/cmsApi';
@@ -12,6 +19,10 @@ interface RecordFormModalProps {
 
 const shouldUseTextarea = (column: string) => ['message', 'summary', 'content', 'medical_history', 'notes', 'instructions', 'stream_url'].includes(column);
 
+/**
+ * Component RecordFormModal — tạo biểu mẫu động từ siêu dữ liệu cột CMS,
+ * xử lý xác thực (email, điện thoại, tuổi, pin) và gọi onSubmit với dữ liệu.
+ */
 export const RecordFormModal: React.FC<RecordFormModalProps> = ({ title, columns, record, onClose, onSubmit }) => {
   const editableColumns = columns.filter((column) => !column.readonly);
   const [form, setForm] = useState<Record<string, any>>({});
@@ -22,7 +33,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({ title, columns
     setForm(Object.fromEntries(editableColumns.map((column) => [column.name, record?.[column.name] ?? ''])));
   }, [record, columns]);
 
-  // Accessibility: Dismiss modal on Escape key press
+  // Hỗ trợ tiếp cận: Đóng hộp thoại khi nhấn phím Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -63,7 +74,7 @@ export const RecordFormModal: React.FC<RecordFormModalProps> = ({ title, columns
       <form 
         className="modal-content cms-modal" 
         onSubmit={submit}
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking modal content
+        onClick={(e) => e.stopPropagation()} // Ngăn đóng khi bấm vào nội dung hộp thoại
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"

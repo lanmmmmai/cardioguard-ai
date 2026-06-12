@@ -1,8 +1,9 @@
-import { createSupabaseClient } from '../lib/supabase';
+import { buildApiUrl } from '../config';
 import type {
   MedicalRecordFormState,
   MedicalRecordProfile,
   MedicalRecordRow,
+  MedicalRecordRole,
   MedicalRecordStatus,
 } from '../components/medical-records/medicalRecordTypes';
 
@@ -19,6 +20,7 @@ type QueryFilters = {
 type ServiceContext = {
   accessToken?: string | null;
   currentUserId?: string | null;
+  role?: MedicalRecordRole | null;
 };
 
 const nowIso = () => new Date().toISOString();
@@ -32,12 +34,58 @@ const buildWhereTextSearch = (q?: string) => {
   return term;
 };
 
+const authHeaders = (token?: string | null): Record<string, string> => (
+  token ? { Authorization: `Bearer ${token}` } : {}
+);
+
+const jsonHeaders = (token?: string | null): Record<string, string> => ({
+  'Content-Type': 'application/json',
+  ...authHeaders(token),
+});
+
+const requestJson = async <T = any>(path: string, token?: string | null, init: RequestInit = {}) => {
+  const response = await fetch(buildApiUrl(path), {
+    ...init,
+    headers: {
+      ...(init.headers || {}),
+      ...authHeaders(token),
+    },
+  });
+
+  const body = await response.text();
+  if (!response.ok) {
+    if (!body) {
+      throw new Error(`Yêu cầu thất bại (${response.status})`);
+    }
+    try {
+      const data = JSON.parse(body);
+      if (Array.isArray(data.detail)) {
+        throw new Error(data.detail.map((item: any) => item.msg || item).join(', '));
+      }
+      throw new Error(data.detail || data.message || data.error || `Yêu cầu thất bại (${response.status})`);
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error(body);
+      }
+      throw error;
+    }
+  }
+
+  if (!body) return {} as T;
+  try {
+    return JSON.parse(body) as T;
+  } catch {
+    throw new Error('Lỗi định dạng phản hồi từ server');
+  }
+};
+
 const toProfileMap = (rows: any[] | null | undefined) => {
   const map = new Map<string, MedicalRecordProfile>();
   (rows || []).forEach((row) => {
-    if (!row?.user_id) return;
-    map.set(String(row.user_id), {
-      user_id: String(row.user_id),
+    const userId = row?.id;
+    if (!userId) return;
+    map.set(String(userId), {
+      user_id: row.user_id ? String(row.user_id) : String(row.id),
       full_name: row.full_name || row.name || null,
       phone: row.phone || null,
       gender: row.gender || null,
@@ -49,32 +97,74 @@ const toProfileMap = (rows: any[] | null | undefined) => {
   return map;
 };
 
-const fetchProfiles = async (client: ReturnType<typeof createSupabaseClient>, table: 'patient_profiles' | 'doctor_profiles', userIds: string[]) => {
-  if (userIds.length === 0) return new Map<string, MedicalRecordProfile>();
-  const { data, error } = await client
-    .from(table)
-    .select('user_id, full_name, phone, gender, avatar_url, specialty, status')
-    .in('user_id', userIds);
-  if (error) {
+const fetchProfileMap = async (context: ServiceContext, path: string) => {
+  if (!context.accessToken) return new Map<string, MedicalRecordProfile>();
+  try {
+    const response = await requestJson<any>(path, context.accessToken);
+    const items = Array.isArray(response) ? response : Array.isArray(response?.items) ? response.items : [response];
+    return toProfileMap(items);
+  } catch (error) {
+    console.warn('[fetchProfileMap] path=%s failed: %s', path, error instanceof Error ? error.message : String(error));
     return new Map<string, MedicalRecordProfile>();
   }
-  return toProfileMap(data);
 };
 
-const enrichRecords = async (client: ReturnType<typeof createSupabaseClient>, rows: MedicalRecordRow[]) => {
-  const patientIds = Array.from(new Set(rows.map((row) => row.patient_id).filter(Boolean) as string[]));
-  const doctorIds = Array.from(new Set(rows.map((row) => row.doctor_id).filter(Boolean) as string[]));
+const fetchPatientProfiles = async (context: ServiceContext) => {
+  if (!context.accessToken) return new Map<string, MedicalRecordProfile>();
+  if (context.role === 'patient') {
+    const profile = await requestJson<any>('/patient/profile', context.accessToken);
+    if (!context.currentUserId) return new Map<string, MedicalRecordProfile>();
+    return new Map([[String(context.currentUserId), {
+      user_id: String(context.currentUserId),
+      full_name: profile.full_name || null,
+      phone: profile.phone || null,
+      gender: profile.gender || null,
+      avatar_url: profile.avatar_url || null,
+      specialty: profile.specialty || null,
+      status: profile.status || null,
+    }]]);
+  }
 
+  return fetchProfileMap(context, '/patients?limit=500&offset=0');
+};
+
+const fetchDoctorProfiles = async (context: ServiceContext) => {
+  if (!context.accessToken) return new Map<string, MedicalRecordProfile>();
+  if (context.role === 'doctor') {
+    const profile = await requestJson<any>('/doctor/profile', context.accessToken);
+    if (!context.currentUserId) return new Map<string, MedicalRecordProfile>();
+    return new Map([[String(context.currentUserId), {
+      user_id: String(context.currentUserId),
+      full_name: profile.full_name || null,
+      phone: profile.phone || null,
+      gender: profile.gender || null,
+      avatar_url: profile.avatar_url || null,
+      specialty: profile.specialty || null,
+      status: profile.status || null,
+    }]]);
+  }
+  if (context.role === 'patient') {
+    return fetchProfileMap(context, '/patients/me/doctors');
+  }
+  return fetchProfileMap(context, '/admin/doctors?limit=500&offset=0');
+};
+
+const enrichRecords = async (context: ServiceContext, rows: MedicalRecordRow[]) => {
+  console.debug('[enrichRecords] rowCount=%d', rows.length);
   const [patientProfiles, doctorProfiles] = await Promise.all([
-    fetchProfiles(client, 'patient_profiles', patientIds),
-    fetchProfiles(client, 'doctor_profiles', doctorIds),
+    fetchPatientProfiles(context),
+    fetchDoctorProfiles(context),
   ]);
 
-  return rows.map((row) => ({
-    ...row,
-    patient_profile: row.patient_id ? patientProfiles.get(row.patient_id) || null : null,
-    doctor_profile: row.doctor_id ? doctorProfiles.get(row.doctor_id) || null : null,
-  }));
+  return rows.map((row) => {
+    const patientProfile = row.patient_id ? patientProfiles.get(row.patient_id) || null : null;
+    const doctorProfile = row.doctor_id ? doctorProfiles.get(row.doctor_id) || null : null;
+    return {
+      ...row,
+      patient_profile: patientProfile,
+      doctor_profile: doctorProfile,
+    };
+  });
 };
 
 const parseRecord = (row: any): MedicalRecordRow => ({
@@ -100,87 +190,99 @@ const parseRecord = (row: any): MedicalRecordRow => ({
   updated_at: row.updated_at ?? null,
 });
 
-const withRows = async (response: { data: any; error: any }, client: ReturnType<typeof createSupabaseClient>) => {
-  if (response.error) throw new Error(response.error.message || 'Không thể lấy dữ liệu bệnh án');
-  const rows = Array.isArray(response.data) ? response.data.map(parseRecord) : [];
-  return enrichRecords(client, rows);
+const withRows = async (data: any, context: ServiceContext) => {
+  if (!data) {
+    return [];
+  }
+  const rows = Array.isArray(data.items) ? data.items.map(parseRecord) : Array.isArray(data) ? data.map(parseRecord) : [];
+  console.debug('[withRows] parsed %d rows', rows.length);
+  return enrichRecords(context, rows);
 };
 
-const applyFilters = (query: any, filters?: QueryFilters) => {
-  if (!filters) return query;
-  if (filters.specialty) query = query.eq('specialty', filters.specialty);
+const applyClientFilters = (rows: MedicalRecordRow[], filters?: QueryFilters) => {
+  if (!filters) return rows;
+  let result = [...rows];
+  if (filters.specialty) result = result.filter((row) => row.specialty === filters.specialty);
   if (filters.status) {
-    if (Array.isArray(filters.status)) query = query.in('status', filters.status);
-    else query = query.eq('status', filters.status);
+    const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
+    result = result.filter((row) => row.status && statuses.includes(row.status as MedicalRecordStatus));
   }
-  if (filters.from) query = query.gte('created_at', filters.from);
-  if (filters.to) query = query.lte('created_at', filters.to);
+  if (filters.from) result = result.filter((row) => (row.created_at || '') >= filters.from!);
+  if (filters.to) result = result.filter((row) => (row.created_at || '') <= filters.to!);
   const search = buildWhereTextSearch(filters.q);
   if (search) {
-    query = query.or([
-      `chief_complaint.ilike.%${search}%`,
-      `symptoms.ilike.%${search}%`,
-      `diagnosis.ilike.%${search}%`,
-      `disease_summary.ilike.%${search}%`,
-      `final_diagnosis_summary.ilike.%${search}%`,
-      `notes.ilike.%${search}%`,
-    ].join(','));
+    const q = search.toLowerCase();
+    result = result.filter((row) =>
+      [
+        row.chief_complaint,
+        row.symptoms,
+        row.diagnosis,
+        row.disease_summary,
+        row.final_diagnosis_summary,
+        row.notes,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(q))
+    );
   }
-  if (filters.limit) query = query.limit(filters.limit);
-  if (filters.offset) query = query.range(filters.offset, filters.offset + (filters.limit || 20) - 1);
-  return query;
+  return result;
 };
 
 export const medicalRecordsService = {
   async getDoctorAssignedPatients(context: ServiceContext, doctorId: string) {
-    const client = createSupabaseClient(context.accessToken);
-    const { data, error } = await client
-      .from('doctor_patient')
-      .select('patient_id')
-      .eq('doctor_id', doctorId);
-
-    if (error) throw new Error(error.message || 'Không thể lấy danh sách bệnh nhân được phân công');
-    return Array.from(new Set((data || []).map((item: any) => String(item.patient_id)).filter(Boolean)));
+    console.debug('[getDoctorAssignedPatients] doctorId=%s', doctorId);
+    try {
+      const response = await requestJson<any>('/patients?limit=500&offset=0', context.accessToken);
+      const items = Array.isArray(response?.items) ? response.items : [];
+      const result = Array.from(new Set(items.map((item: any) => String(item.id)).filter(Boolean)));
+      console.info('[getDoctorAssignedPatients] found %d patients', result.length);
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể lấy danh sách bệnh nhân được phân công';
+      console.error('[getDoctorAssignedPatients] %s', message);
+      throw new Error(message || 'Không thể lấy danh sách bệnh nhân được phân công');
+    }
   },
 
   async getDoctorMedicalRecords(context: ServiceContext, doctorId: string, filters?: QueryFilters) {
-    const client = createSupabaseClient(context.accessToken);
-    let query = client.from('medical_records').select('*').eq('doctor_id', doctorId).order('created_at', { ascending: false });
-    query = applyFilters(query, filters);
-    return withRows(await query, client);
+    console.debug('[getDoctorMedicalRecords] doctorId=%s', doctorId);
+    const response = await requestJson<any>('/medical-records?limit=500&offset=0', context.accessToken);
+    const rows = await withRows(response, context);
+    return applyClientFilters(rows.filter((row) => !doctorId || row.doctor_id === doctorId), filters);
   },
 
   async getPatientMedicalRecords(context: ServiceContext, patientId: string, filters?: QueryFilters) {
-    const client = createSupabaseClient(context.accessToken);
-    let query = client
-      .from('medical_records')
-      .select('*')
-      .eq('patient_id', patientId)
-      .in('status', ['signed', 'locked', 'amended'])
-      .eq('is_visible_to_patient', true)
-      .order('created_at', { ascending: false });
-    query = applyFilters(query, filters);
-    return withRows(await query, client);
+    console.debug('[getPatientMedicalRecords] patientId=%s', patientId);
+    const response = await requestJson<any>('/medical-records?limit=500&offset=0', context.accessToken);
+    const rows = await withRows(response, context);
+    const filtered = rows.filter((row) =>
+      (!patientId || row.patient_id === patientId) &&
+      ['signed', 'locked', 'amended'].includes(String(row.status)) &&
+      row.is_visible_to_patient === true
+    );
+    return applyClientFilters(filtered, filters);
   },
 
   async getAdminMedicalRecords(context: ServiceContext, filters?: QueryFilters) {
-    const client = createSupabaseClient(context.accessToken);
-    let query = client.from('medical_records').select('*').order('created_at', { ascending: false });
-    query = applyFilters(query, filters);
-    return withRows(await query, client);
+    console.debug('[getAdminMedicalRecords] filters=%o', filters);
+    const response = await requestJson<any>('/medical-records?limit=500&offset=0', context.accessToken);
+    const rows = await withRows(response, context);
+    return applyClientFilters(rows, filters);
   },
 
   async getMedicalRecordById(context: ServiceContext, recordId: string) {
-    const client = createSupabaseClient(context.accessToken);
-    const { data, error } = await client.from('medical_records').select('*').eq('id', recordId).maybeSingle();
-    if (error) throw new Error(error.message || 'Không thể tải bệnh án');
-    if (!data) throw new Error('Không tìm thấy bệnh án');
-    const [record] = await enrichRecords(client, [parseRecord(data)]);
+    console.debug('[getMedicalRecordById] recordId=%s', recordId);
+    const data = await requestJson<any>(`/medical-records/${recordId}`, context.accessToken);
+    if (!data) {
+      console.warn('[getMedicalRecordById] record not found: %s', recordId);
+      throw new Error('Không tìm thấy bệnh án');
+    }
+    const [record] = await enrichRecords(context, [parseRecord(data)]);
     return record;
   },
 
   async createMedicalRecord(context: ServiceContext, payload: Partial<MedicalRecordFormState>) {
-    const client = createSupabaseClient(context.accessToken);
+    console.debug('[createMedicalRecord] patientId=%s specialty=%s', payload.patient_id, payload.specialty);
     const insertPayload = {
       patient_id: payload.patient_id || null,
       doctor_id: payload.doctor_id || context.currentUserId || null,
@@ -203,15 +305,21 @@ export const medicalRecordsService = {
       updated_at: nowIso(),
     };
 
-    const { data, error } = await client.from('medical_records').insert(insertPayload).select('*').single();
-    if (error) throw new Error(error.message || 'Không thể tạo bệnh án');
+    console.info('[createMedicalRecord] POST /medical-records');
+    const data = await requestJson<any>('/medical-records', context.accessToken, {
+      method: 'POST',
+      headers: jsonHeaders(context.accessToken),
+      body: JSON.stringify(insertPayload),
+    });
+    console.info('[createMedicalRecord] created id=%s', data.id);
     return parseRecord(data);
   },
 
   async updateMedicalRecord(context: ServiceContext, recordId: string, payload: Partial<MedicalRecordFormState>) {
-    const client = createSupabaseClient(context.accessToken);
+    console.debug('[updateMedicalRecord] recordId=%s', recordId);
     const current = await this.getMedicalRecordById(context, recordId);
     if (!current || !['draft', 'amended'].includes(String(current.status))) {
+      console.warn('[updateMedicalRecord] cannot edit signed record %s (status=%s)', recordId, current?.status);
       throw new Error('Bệnh án đã ký, cần tạo bản bổ sung/chỉnh sửa thay vì sửa trực tiếp.');
     }
 
@@ -231,66 +339,44 @@ export const medicalRecordsService = {
       updated_at: nowIso(),
     };
 
-    const { data, error } = await client.from('medical_records').update(updatePayload).eq('id', recordId).select('*').single();
-    if (error) throw new Error(error.message || 'Không thể cập nhật bệnh án');
+    console.info('[updateMedicalRecord] PATCH /medical-records/%s', recordId);
+    const data = await requestJson<any>(`/medical-records/${recordId}`, context.accessToken, {
+      method: 'PATCH',
+      headers: jsonHeaders(context.accessToken),
+      body: JSON.stringify(updatePayload),
+    });
+    console.info('[updateMedicalRecord] updated id=%s', recordId);
     return parseRecord(data);
   },
 
   async signMedicalRecord(context: ServiceContext, recordId: string) {
-    const client = createSupabaseClient(context.accessToken);
-    let rpcError: any = null;
-    let result: any = null;
-
-    const rpcCandidates = [
-      { record_id: recordId },
-      { record_uuid: recordId },
-    ];
-
-    for (const params of rpcCandidates) {
-      const response = await client.rpc('sign_medical_record', params);
-      if (!response.error) {
-        result = response.data;
-        rpcError = null;
-        break;
-      }
-      rpcError = response.error;
-    }
-
-    if (rpcError) {
-      const fallback = await client
-        .from('medical_records')
-        .update({
-          status: 'signed',
-          is_visible_to_patient: true,
-          signed_by: context.currentUserId || null,
-          signed_at: nowIso(),
-          locked_at: nowIso(),
-          updated_at: nowIso(),
-        })
-        .eq('id', recordId)
-        .select('*')
-        .single();
-
-      if (fallback.error) throw new Error(fallback.error.message || 'Không thể ký bệnh án');
-      result = fallback.data;
-    }
-
-    const signedRecord = result && typeof result === 'object' && 'id' in result ? parseRecord(result) : await this.getMedicalRecordById(context, recordId);
-
-    await this.logMedicalRecordAction(context, {
-      action: 'SIGN',
-      recordId,
-      metadata: { status: 'signed', signed_at: nowIso() },
+    console.debug('[signMedicalRecord] recordId=%s', recordId);
+    const result = await requestJson<any>(`/medical-records/${recordId}`, context.accessToken, {
+      method: 'PATCH',
+      headers: jsonHeaders(context.accessToken),
+      body: JSON.stringify({
+        status: 'signed',
+        is_visible_to_patient: true,
+        signed_by: context.currentUserId || null,
+        signed_at: nowIso(),
+        locked_at: nowIso(),
+        updated_at: nowIso(),
+      }),
     });
 
-    await this.createPatientNotification(context, signedRecord.patient_id, signedRecord.id);
+    const signedRecord = parseRecord(result);
+    console.info('[signMedicalRecord] signed recordId=%s', recordId);
     return signedRecord;
   },
 
   async createMedicalRecordAmendment(context: ServiceContext, recordId: string, note?: string) {
-    const client = createSupabaseClient(context.accessToken);
+    console.debug('[createMedicalRecordAmendment] recordId=%s', recordId);
     const current = await this.getMedicalRecordById(context, recordId);
-    const { data, error } = await client.from('medical_records').insert({
+    console.info('[createMedicalRecordAmendment] POST /medical-records (amendment of %s)', recordId);
+    const data = await requestJson<any>('/medical-records', context.accessToken, {
+      method: 'POST',
+      headers: jsonHeaders(context.accessToken),
+      body: JSON.stringify({
       patient_id: current.patient_id,
       doctor_id: current.doctor_id || context.currentUserId || null,
       chief_complaint: current.chief_complaint,
@@ -310,54 +396,14 @@ export const medicalRecordsService = {
       locked_at: null,
       created_at: nowIso(),
       updated_at: nowIso(),
-    }).select('*').single();
-
-    if (error) throw new Error(error.message || 'Không thể tạo bản bổ sung');
-    await this.logMedicalRecordAction(context, {
-      action: 'AMEND',
-      recordId,
-      metadata: { amended_record_id: data.id },
+      }),
     });
+    console.info('[createMedicalRecordAmendment] created amended id=%s from recordId=%s', data.id, recordId);
     return parseRecord(data);
   },
 
-  async logMedicalRecordAction(context: ServiceContext, input: { action: string; recordId: string; metadata?: Record<string, any> }) {
-    const client = createSupabaseClient(context.accessToken);
-    const payload = {
-      user_id: context.currentUserId || null,
-      action: input.action,
-      target_table: 'medical_records',
-      target_id: input.recordId,
-      created_at: nowIso(),
-      metadata: input.metadata || {},
-    };
-
-    const { error } = await client.from('audit_logs').insert(payload);
-    if (error) {
-      console.warn('Không ghi được audit log medical_records:', error.message);
-    }
-  },
-
-  async createPatientNotification(context: ServiceContext, patientId: string | null, recordId: string) {
-    if (!patientId) return;
-    const client = createSupabaseClient(context.accessToken);
-    const { error } = await client.from('notifications').insert({
-      user_id: patientId,
-      patient_id: patientId,
-      title: 'Bệnh án đã được ký xác nhận',
-      message: 'Bác sĩ đã ký xác nhận bệnh án mới. Bạn có thể xem trong mục Bệnh án điện tử.',
-      type: 'medical_record_signed',
-      is_read: false,
-      created_at: nowIso(),
-      updated_at: nowIso(),
-      metadata: { record_id: recordId },
-    } as any);
-    if (error) {
-      console.warn('Không tạo được notification cho bệnh nhân:', error.message);
-    }
-  },
-
   serializeTemplateExtras(form: MedicalRecordFormState) {
+    console.debug('[serializeTemplateExtras] specialty=%s', form.specialty);
     const blocks: string[] = [];
     if (form.specialty === 'cardiology') {
       const items: Array<[string, string]> = [

@@ -1,3 +1,16 @@
+// Hiển thị dòng thời gian cảnh báo y tế có thể lọc và tìm kiếm (Nhật ký cảnh báo).
+// Quy trình làm việc:
+// 1. Khi khởi tạo, tìm nạp cảnh báo từ AlertProvider qua callback sau khung hình.
+// 2. Người dùng có thể lọc theo mức độ nghiêm trọng (tất cả / cao / trung bình / thấp) và tìm kiếm theo tên,
+//    tin nhắn hoặc loại cảnh báo thông qua TextField và dropdown cục bộ.
+// 3. Mỗi thẻ cảnh báo hiển thị đường viền trái theo màu mức độ, biểu tượng, dấu thời gian,
+//    tên bệnh nhân, loại cảnh báo và tin nhắn.
+// 4. Người dùng bác sĩ/quản trị viên thấy nút "xác nhận xử lý" trên các cảnh báo chưa giải quyết; nhấn vào nó
+//    gọi AlertProvider.resolveAlert và hiển thị snackbar kết quả.
+// Mối quan hệ:
+// - Sở hữu: AlertProvider cho dữ liệu cảnh báo, AuthProvider cho kiểm tra vai trò.
+// - Được sử dụng bởi: Điều hướng tab ứng dụng.
+// - Sử dụng: cg_widgets.dart cho CgScreenScaffold, CgInlineState, CgStatusBadge.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
@@ -6,7 +19,9 @@ import '../providers/auth_provider.dart';
 import '../widgets/cg_widgets.dart';
 import '../ui/cg_tokens.dart';
 
+// Màn hình liệt kê tất cả các cảnh báo y tế với tìm kiếm và lọc mức độ nghiêm trọng.
 class AlertsScreen extends StatefulWidget {
+  // Liệu màn hình có được hiển thị ở chế độ tối hay không.
   final bool isDarkTheme;
   const AlertsScreen({super.key, required this.isDarkTheme});
 
@@ -15,9 +30,13 @@ class AlertsScreen extends StatefulWidget {
 }
 
 class _AlertsScreenState extends State<AlertsScreen> {
+  // Bộ điều khiển cho trường văn bản tìm kiếm.
   final _searchController = TextEditingController();
+  // Truy vấn tìm kiếm đã được chuyển thành chữ thường (cập nhật sau mỗi lần gõ phím).
   String _searchQuery = '';
+  // Giá trị bộ lọc mức độ nghiêm trọng hiện tại: 'all', 'high', 'medium', hoặc 'low'.
   String _severityFilter = 'all';
+  // Tập hợp các ID cảnh báo hiện đang được giải quyết (hiển thị vòng tròn tải trên mỗi thẻ).
   final Set<String> _resolvingIds = <String>{};
 
   @override
@@ -39,6 +58,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
     super.dispose();
   }
 
+  // Định dạng DateTime thành chuỗi HH:mm - dd/MM ngắn theo giờ địa phương.
   String _formatDateTime(DateTime dateTime) {
     final local = dateTime.toLocal();
     final hour = local.hour.toString().padLeft(2, '0');
@@ -64,7 +84,10 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
     final role = authProvider.currentUser?.role ?? 'patient';
 
-    // Apply local search and severity filtering
+    // Áp dụng lọc tìm kiếm và mức độ nghiêm trọng cục bộ:
+    // - Tìm kiếm khớp tên bệnh nhân, tin nhắn hoặc loại cảnh báo (không phân biệt chữ hoa chữ thường).
+    // - Nhóm mức độ nghiêm trọng: high=critical/sos, medium=warning, low=info.
+    // - Các cảnh báo đã giải quyết được giữ trong danh sách nhưng hiển thị màu xám.
     final filtered = alertProvider.alerts.where((a) {
       final name = a.fullName.toLowerCase();
       final msg = a.message.toLowerCase();
@@ -100,7 +123,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
       ),
       body: Column(
         children: [
-          // Search and Filters Bar
+          // Thanh tìm kiếm và bộ lọc
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Container(
@@ -155,7 +178,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                                 borderSide:
-                                    const BorderSide(color: Color(0xFFFF3366)),
+                                    const BorderSide(color: CgColors.accent),
                               ),
                             ),
                             items: const [
@@ -186,7 +209,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Alerts Timeline List
+          // Danh sách dòng thời gian cảnh báo
           Expanded(
             child: alertProvider.isLoading
                 ? const CgInlineState(
@@ -215,7 +238,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                       )
                     : RefreshIndicator(
                         onRefresh: alertProvider.fetchAlerts,
-                        color: const Color(0xFFFF3366),
+                        color: CgColors.accent,
                         child: ListView.builder(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),
@@ -329,7 +352,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                                                   color: textMuted,
                                                   fontSize: 12)),
 
-                                          // Action Resolve Button (Doctor/Admin only)
+                                          // Nút Xác nhận xử lý (chỉ dành cho bác sĩ/quản trị viên)
                                           if ((role == 'doctor' ||
                                                   role == 'admin') &&
                                               !alert.isResolved) ...[

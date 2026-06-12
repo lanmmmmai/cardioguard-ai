@@ -1,8 +1,18 @@
+"""CardioGuard AI — API hồ sơ người dùng và tải tệp xác minh.
+
+Mô-đun này quản lý hồ sơ bệnh nhân/bác sĩ và luồng tải lên tài liệu hỗ trợ.
+Luồng upload được giới hạn theo kích thước, số lượng tệp, tổng dung lượng
+và xác thực nội dung ảnh ở mức byte trước khi ghi xuống đĩa.
+"""
+
+import io
 import os
 import uuid
 import logging
 from datetime import date, datetime
 from typing import Optional
+
+from PIL import Image
 
 from fastapi import APIRouter, File, Header, HTTPException, UploadFile, Depends, Form
 from fastapi.responses import FileResponse
@@ -17,6 +27,133 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 STORAGE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "storage"))
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_UPLOAD_FILES_PER_USER = 12
+MAX_UPLOAD_TOTAL_BYTES_PER_USER = 25 * 1024 * 1024
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+ALLOWED_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
+
+
+def _is_within_directory(base_dir: str, candidate_path: str) -> bool:
+    """Kiểm tra đường dẫn ứng viên có nằm hoàn toàn trong thư mục gốc hay không."""
+    base_real = os.path.realpath(base_dir)
+    candidate_real = os.path.realpath(candidate_path)
+    try:
+        return os.path.commonpath([base_real, candidate_real]) == base_real
+    except ValueError:
+        return False
+
+
+def _resolve_upload_directory(user_id: str, file_type: str) -> str:
+    """Trả về thư mục tương đối lưu trữ theo loại tài liệu.
+
+    Args:
+        user_id: ID người dùng sở hữu tài liệu.
+        file_type: Loại tài liệu do client gửi lên.
+
+    Returns:
+        Đường dẫn thư mục tương đối bên dưới STORAGE_ROOT.
+
+    Raises:
+        HTTPException: Nếu file_type không hợp lệ.
+    """
+    if file_type == "avatar":
+        return f"avatars/{user_id}"
+    if file_type == "doctor_license":
+        return f"doctor-documents/{user_id}/license"
+    if file_type == "cccd_front":
+        return f"identity-documents/{user_id}/cccd-front"
+    if file_type == "cccd_back":
+        return f"identity-documents/{user_id}/cccd-back"
+    raise HTTPException(status_code=400, detail="Loại tệp tin không hợp lệ")
+
+
+def _calculate_user_upload_usage(user_id: str) -> tuple[int, int]:
+    """Đếm số lượng tệp và tổng dung lượng upload hiện có của người dùng.
+
+    Args:
+        user_id: ID người dùng sở hữu tài liệu.
+
+    Returns:
+        tuple[int, int]: `(file_count, total_bytes)`.
+    """
+    file_count = 0
+    total_bytes = 0
+    candidate_dirs = (
+        os.path.join(STORAGE_ROOT, "avatars", user_id),
+        os.path.join(STORAGE_ROOT, "doctor-documents", user_id),
+        os.path.join(STORAGE_ROOT, "identity-documents", user_id),
+    )
+    for candidate_dir in candidate_dirs:
+        if not os.path.isdir(candidate_dir):
+            continue
+        for root, _, files in os.walk(candidate_dir):
+            for filename in files:
+                full_path = os.path.join(root, filename)
+                if not os.path.isfile(full_path):
+                    continue
+                file_count += 1
+                total_bytes += os.path.getsize(full_path)
+    return file_count, total_bytes
+
+
+def _validate_image_payload(content: bytes, ext: str, content_type: str | None) -> None:
+    """Xác thực nội dung ảnh ở mức byte và khớp với định dạng cho phép.
+
+    Args:
+        content: Nội dung nhị phân đã đọc từ file upload.
+        ext: Phần mở rộng tệp.
+        content_type: Content-Type do client khai báo.
+
+    Raises:
+        HTTPException: Nếu ảnh rỗng, sai MIME hoặc không đọc được bằng Pillow.
+    """
+    if not content:
+        raise HTTPException(status_code=400, detail="Tệp tin tải lên đang trống")
+    if not content_type or not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Tệp tin tải lên phải là hình ảnh")
+
+    try:
+        image = Image.open(io.BytesIO(content))
+        image_format = (image.format or "").upper()
+        image.verify()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Nội dung tệp tin không phải ảnh hợp lệ",
+        ) from exc
+
+    expected_formats = {".jpg": "JPEG", ".jpeg": "JPEG", ".png": "PNG", ".webp": "WEBP"}
+    if image_format not in ALLOWED_IMAGE_FORMATS:
+        raise HTTPException(status_code=400, detail="Định dạng ảnh không được hỗ trợ")
+    if expected_formats.get(ext) != image_format:
+        raise HTTPException(
+            status_code=400,
+            detail="Phần mở rộng tệp không khớp với nội dung ảnh",
+        )
+
+
+def _validate_upload_quota(user_id: str, incoming_size: int) -> None:
+    """Chặn upload vượt quá quota số lượng hoặc tổng dung lượng người dùng.
+
+    Args:
+        user_id: ID người dùng sở hữu tài liệu.
+        incoming_size: Kích thước tệp chuẩn bị lưu.
+
+    Raises:
+        HTTPException: Nếu vượt hạn mức số tệp hoặc tổng dung lượng.
+    """
+    file_count, total_bytes = _calculate_user_upload_usage(user_id)
+    if file_count >= MAX_UPLOAD_FILES_PER_USER:
+        raise HTTPException(
+            status_code=400,
+            detail="Bạn đã đạt giới hạn số lượng tệp tải lên",
+        )
+    if total_bytes + incoming_size > MAX_UPLOAD_TOTAL_BYTES_PER_USER:
+        raise HTTPException(
+            status_code=400,
+            detail="Tổng dung lượng tệp tải lên đã vượt hạn mức cho phép",
+        )
 
 @router.get("/patient/profile")
 async def get_patient_profile(authorization: Optional[str] = Header(default=None)):
@@ -261,8 +398,6 @@ async def update_doctor_profile(payload: DoctorProfileUpdate, authorization: Opt
         "cccd_front_url": payload.cccd_front_url,
         "cccd_back_url": payload.cccd_back_url,
         "avatar_url": payload.avatar_url,
-        "is_verified": False,
-        "status": "pending_verification"
     }
     
     async with database.transaction():
@@ -352,45 +487,33 @@ async def upload_file(
 ):
     user = await get_user_from_token(authorization, allow_uncompleted=True, allow_unverified=True)
     user_id = user["id"]
-    
-    file.file.seek(0, 2)
-    size = file.file.tell()
-    file.file.seek(0)
-    if size > 5 * 1024 * 1024:
+
+    content = await file.read()
+    size = len(content)
+    if size > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=400, detail="Kích thước tệp tin tối đa là 5MB")
-        
+
     filename = file.filename or ""
     ext = os.path.splitext(filename)[1].lower()
-    if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Chỉ chấp nhận các định dạng ảnh: .jpg, .jpeg, .png, .webp")
-        
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Tệp tin tải lên phải là hình ảnh")
-        
+
+    _validate_image_payload(content, ext, file.content_type)
+    _validate_upload_quota(user_id, size)
+
     unique_filename = f"{uuid.uuid4()}{ext}"
-    
-    if file_type == "avatar":
-        rel_dir = f"avatars/{user_id}"
-    elif file_type == "doctor_license":
-        rel_dir = f"doctor-documents/{user_id}/license"
-    elif file_type == "cccd_front":
-        rel_dir = f"identity-documents/{user_id}/cccd-front"
-    elif file_type == "cccd_back":
-        rel_dir = f"identity-documents/{user_id}/cccd-back"
-    else:
-        raise HTTPException(status_code=400, detail="Loại tệp tin không hợp lệ")
-        
+    rel_dir = _resolve_upload_directory(user_id, file_type)
     full_dir = os.path.join(STORAGE_ROOT, rel_dir)
     os.makedirs(full_dir, exist_ok=True)
-    
+
     full_path = os.path.join(full_dir, unique_filename)
     try:
-        content = await file.read()
         with open(full_path, "wb") as f:
             f.write(content)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi lưu trữ tệp tin: {str(e)}")
-        
+    except Exception:
+        logger.exception("Không thể lưu tệp upload cho user_id=%s", user_id)
+        raise HTTPException(status_code=500, detail="Không thể lưu tệp tin vào lúc này")
+
     return {"url": f"/files/download/{rel_dir}/{unique_filename}"}
 
 @router.get("/files/download/{file_path:path}")
@@ -401,7 +524,7 @@ async def download_file(
 ):
     full_path = os.path.abspath(os.path.join(STORAGE_ROOT, file_path))
     
-    if not full_path.startswith(STORAGE_ROOT):
+    if not _is_within_directory(STORAGE_ROOT, full_path):
         raise HTTPException(status_code=400, detail="Đường dẫn không hợp lệ")
         
     if not os.path.exists(full_path) or not os.path.isfile(full_path):

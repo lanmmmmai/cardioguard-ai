@@ -3,6 +3,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useBrowserPath } from '../hooks/useBrowserPath';
 import { API_URL } from '../config';
 import { getRequestErrorMessage } from '../utils/apiErrors';
+import { SecureImage } from '../components/SecureImage';
 import { 
   Camera, 
   User, 
@@ -211,7 +212,7 @@ export const DoctorCompleteProfile: React.FC = () => {
   const getMediaSrc = (path: string) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
-    return `${API_URL}${path}?token=${accessToken}`;
+    return `${API_URL}${path}`;
   };
 
   return (
@@ -477,81 +478,81 @@ export const DoctorCompleteProfile: React.FC = () => {
           <div className="document-upload-grid">
             {/* 1. Chứng chỉ hành nghề */}
             <div className="doc-upload-box">
-              <span className="doc-title required-field">Ảnh chứng chỉ hành nghề</span>
-              <div className="doc-preview-zone">
-                {licenseUrl ? (
-                  <img src={getMediaSrc(licenseUrl)} alt="License Certificate" className="doc-preview-img" />
-                ) : (
-                  <div className="doc-placeholder">
-                    <FileText size={28} />
-                    <span>Chưa tải ảnh lên</span>
-                  </div>
-                )}
-                <label className="btn btn-secondary btn-small file-input-label">
-                  Tải lên
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.webp"
-                    onChange={(e) => handleFileUpload(e, 'doctor_license', setUploadingLicense, setLicenseUrl)}
-                    style={{ display: 'none' }}
-                    disabled={uploadingLicense}
-                  />
-                </label>
-              </div>
-              {uploadingLicense && <span className="upload-loader">Đang tải lên...</span>}
-            </div>
-
-            {/* 2. CCCD mặt trước */}
-            <div className="doc-upload-box">
-              <span className="doc-title required-field">CCCD Mặt trước</span>
-              <div className="doc-preview-zone">
-                {cccdFrontUrl ? (
-                  <img src={getMediaSrc(cccdFrontUrl)} alt="CCCD Front" className="doc-preview-img" />
-                ) : (
-                  <div className="doc-placeholder">
-                    <User size={28} />
-                    <span>Chưa tải ảnh lên</span>
-                  </div>
-                )}
-                <label className="btn btn-secondary btn-small file-input-label">
-                  Tải lên
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.webp"
-                    onChange={(e) => handleFileUpload(e, 'cccd_front', setUploadingCccdFront, setCccdFrontUrl)}
-                    style={{ display: 'none' }}
-                    disabled={uploadingCccdFront}
-                  />
-                </label>
-              </div>
-              {uploadingCccdFront && <span className="upload-loader">Đang tải lên...</span>}
-            </div>
-
-            {/* 3. CCCD mặt sau */}
-            <div className="doc-upload-box">
-              <span className="doc-title required-field">CCCD Mặt sau</span>
-              <div className="doc-preview-zone">
-                {cccdBackUrl ? (
-                  <img src={getMediaSrc(cccdBackUrl)} alt="CCCD Back" className="doc-preview-img" />
-                ) : (
-                  <div className="doc-placeholder">
-                    <User size={28} />
-                    <span>Chưa tải ảnh lên</span>
-                  </div>
-                )}
-                <label className="btn btn-secondary btn-small file-input-label">
-                  Tải lên
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.webp"
-                    onChange={(e) => handleFileUpload(e, 'cccd_back', setUploadingCccdBack, setCccdBackUrl)}
-                    style={{ display: 'none' }}
-                    disabled={uploadingCccdBack}
-                  />
-                </label>
-              </div>
-              {uploadingCccdBack && <span className="upload-loader">Đang tải lên...</span>}
-            </div>
+               <span className="doc-title required-field">Ảnh chứng chỉ hành nghề</span>
+               <div className="doc-preview-zone">
+                 {licenseUrl ? (
+                   <SecureImage src={getMediaSrc(licenseUrl)} accessToken={accessToken} alt="License Certificate" className="doc-preview-img" />
+                 ) : (
+                   <div className="doc-placeholder">
+                     <FileText size={28} />
+                     <span>Chưa tải ảnh lên</span>
+                   </div>
+                 )}
+                 <label className="btn btn-secondary btn-small file-input-label">
+                   Tải lên
+                   <input
+                     type="file"
+                     accept=".jpg,.jpeg,.png,.webp"
+                     onChange={(e) => handleFileUpload(e, 'doctor_license', setUploadingLicense, setLicenseUrl)}
+                     style={{ display: 'none' }}
+                     disabled={uploadingLicense}
+                   />
+                 </label>
+               </div>
+               {uploadingLicense && <span className="upload-loader">Đang tải lên...</span>}
+             </div>
+ 
+             {/* 2. CCCD mặt trước */}
+             <div className="doc-upload-box">
+               <span className="doc-title required-field">CCCD Mặt trước</span>
+               <div className="doc-preview-zone">
+                 {cccdFrontUrl ? (
+                   <SecureImage src={getMediaSrc(cccdFrontUrl)} accessToken={accessToken} alt="CCCD Front" className="doc-preview-img" />
+                 ) : (
+                   <div className="doc-placeholder">
+                     <User size={28} />
+                     <span>Chưa tải ảnh lên</span>
+                   </div>
+                 )}
+                 <label className="btn btn-secondary btn-small file-input-label">
+                   Tải lên
+                   <input
+                     type="file"
+                     accept=".jpg,.jpeg,.png,.webp"
+                     onChange={(e) => handleFileUpload(e, 'cccd_front', setUploadingCccdFront, setCccdFrontUrl)}
+                     style={{ display: 'none' }}
+                     disabled={uploadingCccdFront}
+                   />
+                 </label>
+               </div>
+               {uploadingCccdFront && <span className="upload-loader">Đang tải lên...</span>}
+             </div>
+ 
+             {/* 3. CCCD mặt sau */}
+             <div className="doc-upload-box">
+               <span className="doc-title required-field">CCCD Mặt sau</span>
+               <div className="doc-preview-zone">
+                 {cccdBackUrl ? (
+                   <SecureImage src={getMediaSrc(cccdBackUrl)} accessToken={accessToken} alt="CCCD Back" className="doc-preview-img" />
+                 ) : (
+                   <div className="doc-placeholder">
+                     <User size={28} />
+                     <span>Chưa tải ảnh lên</span>
+                   </div>
+                 )}
+                 <label className="btn btn-secondary btn-small file-input-label">
+                   Tải lên
+                   <input
+                     type="file"
+                     accept=".jpg,.jpeg,.png,.webp"
+                     onChange={(e) => handleFileUpload(e, 'cccd_back', setUploadingCccdBack, setCccdBackUrl)}
+                     style={{ display: 'none' }}
+                     disabled={uploadingCccdBack}
+                   />
+                 </label>
+               </div>
+               {uploadingCccdBack && <span className="upload-loader">Đang tải lên...</span>}
+             </div>
           </div>
 
           {/* Actions */}

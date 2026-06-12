@@ -1,10 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { Activity, LogOut, Menu, Moon, Sun, MoreHorizontal, X } from 'lucide-react';
+/**
+ * Tệp: CardioGuard AI – Bố cục shell ứng dụng dựa trên vai trò
+ * Mục đích: Cung cấp vùng sidebar + tiêu đề + nội dung chung cho tất cả
+ *           vai trò đã xác thực. Bao gồm sidebar phản hồi, điều hướng dưới cùng
+ *           trên thiết bị di động, drawer di động, chuyển đổi chủ đề, thẻ người dùng
+ *           và trạng thái kết nối.
+ * Luồng xử lý: 1. Nhận vai trò, đường dẫn, điều hướng, chủ đề và thành phần con.
+ *              2. Hiển thị sidebar dọc (máy tính) + điều hướng dưới cùng (di động).
+ *              3. Trên di động, drawer hiển thị menu rút gọn dạng thu gọn.
+ *              4. Tiêu đề hiển thị nhãn vai trò, tiêu đề trang, nút chủ đề, thẻ người dùng.
+ * Quan hệ:
+ *   - sử dụng: AuthContext (user, logout), roleMenus, routeMeta (pageTitles)
+ *   - xuất AdminLayout, DoctorLayout, PatientLayout cho App.tsx
+ */
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { Activity, LogOut, Menu, Moon, Sun, MoreHorizontal, X, ChevronDown, ChevronRight, Bell } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { type UserRole } from '../auth/roles';
 import { roleMenus } from '../navigation/roleMenus';
 import { API_URL } from '../config';
 import { translateCommonLabel, translateMenuLabel, translateRoleLabel, useLocale } from '../i18n/locale';
+import { useNotifications } from '../components/notifications/NotificationProvider';
 
 interface RoleLayoutProps {
   role: UserRole;
@@ -22,6 +38,12 @@ const layoutTitle: Record<UserRole, string> = {
   patient: 'layout_patient',
 };
 
+/**
+ * RoleLayout – Shell ứng dụng đầy đủ với sidebar, tiêu đề, điều hướng di động
+ * và drawer trượt lên hỗ trợ cơ chế thu gọn/mở rộng nhóm (collapsible accordion).
+ *
+ * @param props - Các thuộc tính cấu hình bao gồm vai trò, đường dẫn hiện tại và hành động điều phối.
+ */
 export const RoleLayout: React.FC<RoleLayoutProps> = ({
   role,
   currentPath,
@@ -33,12 +55,51 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
 }) => {
   const { user, logout, accessToken } = useAuth();
   const { locale, setLocale } = useLocale();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
   const menuItems = roleMenus[role];
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isBellDropdownOpen, setIsBellDropdownOpen] = useState(false);
 
+  // Phân nhóm động các mục menu theo trường group
+  const groupedMenuItems = useMemo(() => {
+    const groups: Record<string, typeof menuItems> = {};
+    menuItems.forEach((item) => {
+      const g = item.group || 'none';
+      if (!groups[g]) {
+        groups[g] = [];
+      }
+      groups[g].push(item);
+    });
+    return groups;
+  }, [menuItems]);
+
+  // Trạng thái theo dõi việc đóng/mở của các nhóm menu
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    menuItems.forEach((item) => {
+      if (item.path === currentPath && item.group) {
+        initial[item.group] = true;
+      }
+    });
+    return initial;
+  });
+
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupKey]: !prev[groupKey],
+    }));
+  };
+
+  /**
+   * Chuẩn hóa đường dẫn media về URL API tuyệt đối.
+   *
+   * @param path - Đường dẫn ảnh thô từ DB.
+   */
   const getMediaUrl = (path?: string | null) => {
     if (!path) return '';
     if (path.startsWith('http')) return path;
+    if (path.includes('avatars/')) return `${API_URL}${path}`;
     return `${API_URL}${path}?token=${accessToken}`;
   };
 
@@ -46,7 +107,7 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
     return window.confirm(locale === 'en' ? 'Do you want to log out?' : 'Bạn muốn đăng xuất?');
   };
 
-  // Close mobile drawer when pressing Escape key for accessibility
+  // Đóng drawer di động khi nhấn phím Escape để hỗ trợ trợ năng
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -83,19 +144,66 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
         </div>
 
         <nav className="role-menu" aria-label={`${translateCommonLabel('all_features', locale)} ${translateRoleLabel(role, locale)}`}>
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentPath === item.path;
+          {Object.entries(groupedMenuItems).map(([groupKey, items]) => {
+            const hasHeader = groupKey !== 'none' && groupKey !== '';
+            
+            // Nếu không có nhóm hoặc nhóm chỉ có 1 mục, hiển thị trực tiếp
+            if (!hasHeader || items.length <= 1) {
+              return items.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentPath === item.path;
+                return (
+                  <button
+                    key={item.path}
+                    type="button"
+                    className={`role-menu-item ${isActive ? 'active' : ''}`}
+                    onClick={() => navigate(item.path)}
+                  >
+                    <Icon size={18} />
+                    <span>{translateMenuLabel(item.label, locale)}</span>
+                  </button>
+                );
+              });
+            }
+
+            const isExpanded = !!expandedGroups[groupKey];
+            const GroupIcon = items[0]?.icon || Activity;
+            const hasActiveChild = items.some((item) => currentPath === item.path);
+
             return (
-              <button
-                key={item.path}
-                type="button"
-                className={`role-menu-item ${isActive ? 'active' : ''}`}
-                onClick={() => navigate(item.path)}
-              >
-                <Icon size={18} />
-                <span>{translateMenuLabel(item.label, locale)}</span>
-              </button>
+              <div key={groupKey} className={`menu-group-container ${hasActiveChild ? 'has-active' : ''}`}>
+                <button
+                  type="button"
+                  className={`menu-group-toggle ${isExpanded ? 'expanded' : ''}`}
+                  onClick={() => toggleGroup(groupKey)}
+                >
+                  <div className="group-toggle-left">
+                    <GroupIcon size={18} />
+                    <span>{translateCommonLabel(groupKey, locale)}</span>
+                  </div>
+                  {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </button>
+                
+                {isExpanded && (
+                  <div className="menu-group-sub-items">
+                    {items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = currentPath === item.path;
+                      return (
+                        <button
+                          key={item.path}
+                          type="button"
+                          className={`role-menu-item sub-item ${isActive ? 'active' : ''}`}
+                          onClick={() => navigate(item.path)}
+                        >
+                          <Icon size={16} />
+                          <span>{translateMenuLabel(item.label, locale)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -139,6 +247,194 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
                 EN
               </button>
             </div>
+            {isBellDropdownOpen && (
+              <div 
+                className="bell-dropdown-overlay" 
+                style={{ position: 'fixed', inset: 0, zIndex: 998 }} 
+                onClick={() => setIsBellDropdownOpen(false)} 
+              />
+            )}
+
+            <div style={{ position: 'relative', display: 'inline-flex' }}>
+              <button
+                type="button"
+                className="notification-bell-container"
+                onClick={() => setIsBellDropdownOpen(!isBellDropdownOpen)}
+                title={locale === 'en' ? 'Notifications' : 'Thông báo'}
+              >
+                <Bell className={`bell-icon ${unreadCount > 0 ? 'has-unread' : ''}`} size={18} />
+                {unreadCount > 0 && (
+                  <span className="notification-badge-count">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {isBellDropdownOpen && (
+                <div
+                  className="bell-dropdown-menu"
+                  style={{
+                    position: 'absolute',
+                    top: '46px',
+                    right: 0,
+                    width: '320px',
+                    background: 'var(--glass-bg, rgba(18, 22, 31, 0.85))',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
+                    border: '1px solid var(--glass-border, rgba(255, 255, 255, 0.08))',
+                    borderRadius: '12px',
+                    boxShadow: 'var(--box-shadow-glow, 0 10px 30px rgba(0,0,0,0.25))',
+                    zIndex: 999,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      borderBottom: '1px solid var(--glass-border)',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      color: 'var(--text-primary)',
+                    }}
+                  >
+                    <span>{locale === 'en' ? 'Recent Notifications' : 'Thông báo gần đây'}</span>
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await markAllAsRead();
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--color-primary, #ef4444)',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {locale === 'en' ? 'Mark all read' : 'Đọc tất cả'}
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                    {notifications.length === 0 ? (
+                      <div
+                        style={{
+                          padding: '24px 16px',
+                          textAlign: 'center',
+                          color: 'var(--text-muted)',
+                          fontSize: '0.8rem',
+                        }}
+                      >
+                        {locale === 'en' ? 'No notifications yet' : 'Chưa có thông báo nào'}
+                      </div>
+                    ) : (
+                      notifications.slice(0, 5).map((notif) => (
+                        <div
+                          key={notif.id}
+                          style={{
+                            padding: '12px 16px',
+                            borderBottom: '1px solid var(--glass-border)',
+                            cursor: 'pointer',
+                            background: notif.is_read ? 'transparent' : 'var(--hover-bg, rgba(255,255,255,0.02))',
+                            position: 'relative',
+                            transition: 'background 0.2s',
+                          }}
+                          onClick={() => {
+                            setIsBellDropdownOpen(false);
+                            if (notif.action_url) {
+                              navigate(notif.action_url);
+                            } else {
+                              navigate(`/${role}/notifications`);
+                            }
+                            if (!notif.is_read) {
+                              markAsRead(notif.id).catch(() => {});
+                            }
+                          }}
+                        >
+                          {!notif.is_read && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                left: '6px',
+                                top: '16px',
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                background: 'var(--color-critical, #ef4444)',
+                              }}
+                            />
+                          )}
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              fontSize: '0.8rem',
+                              color: 'var(--text-primary)',
+                              marginBottom: '2px',
+                              paddingLeft: notif.is_read ? 0 : '4px',
+                            }}
+                          >
+                            {notif.title}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '0.75rem',
+                              color: 'var(--text-secondary)',
+                              lineHeight: '1.3',
+                              paddingLeft: notif.is_read ? 0 : '4px',
+                            }}
+                          >
+                            {notif.message}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '0.65rem',
+                              color: 'var(--text-muted)',
+                              marginTop: '4px',
+                              textAlign: 'right',
+                            }}
+                          >
+                            {new Date(notif.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Ho_Chi_Minh' })}{' '}
+                            {new Date(notif.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' })}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsBellDropdownOpen(false);
+                      navigate(`/${role}/notifications`);
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      background: 'var(--hover-bg, rgba(255,255,255,0.04))',
+                      border: 'none',
+                      borderTop: '1px solid var(--glass-border)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      width: '100%',
+                    }}
+                  >
+                    {locale === 'en' ? 'View All' : 'Xem tất cả thông báo'}
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={onToggleTheme}
@@ -223,23 +519,75 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
                 <X size={16} />
               </button>
             </div>
-            <div className="mobile-drawer-grid">
-              {menuItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = currentPath === item.path;
+            <div className="mobile-drawer-sections">
+              {Object.entries(groupedMenuItems).map(([groupKey, items]) => {
+                const hasHeader = groupKey !== 'none' && groupKey !== '';
+                
+                if (!hasHeader || items.length <= 1) {
+                  return (
+                    <div key={groupKey} className="mobile-drawer-flat-items">
+                      {items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = currentPath === item.path;
+                        return (
+                          <button
+                            key={item.path}
+                            type="button"
+                            className={`mobile-drawer-item ${isActive ? 'active' : ''}`}
+                            onClick={() => {
+                              navigate(item.path);
+                              setIsMobileMenuOpen(false);
+                            }}
+                          >
+                            <Icon size={20} />
+                            <span>{translateMenuLabel(item.label, locale)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+
+                const isExpanded = !!expandedGroups[groupKey];
+                const GroupIcon = items[0]?.icon || Activity;
+
                 return (
-                  <button
-                    key={item.path}
-                    type="button"
-                    className={`mobile-drawer-item ${isActive ? 'active' : ''}`}
-                    onClick={() => {
-                      navigate(item.path);
-                      setIsMobileMenuOpen(false);
-                    }}
-                  >
-                    <Icon size={20} />
-                    <span>{translateMenuLabel(item.label, locale)}</span>
-                  </button>
+                  <div key={groupKey} className="mobile-drawer-section">
+                    <button
+                      type="button"
+                      className="mobile-drawer-section-toggle"
+                      onClick={() => toggleGroup(groupKey)}
+                    >
+                      <div className="group-toggle-left">
+                        <GroupIcon size={18} />
+                        <span>{translateCommonLabel(groupKey, locale)}</span>
+                      </div>
+                      {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </button>
+                    
+                    {isExpanded && (
+                      <div className="mobile-drawer-grid">
+                        {items.map((item) => {
+                          const Icon = item.icon;
+                          const isActive = currentPath === item.path;
+                          return (
+                            <button
+                              key={item.path}
+                              type="button"
+                              className={`mobile-drawer-item ${isActive ? 'active' : ''}`}
+                              onClick={() => {
+                                navigate(item.path);
+                                setIsMobileMenuOpen(false);
+                              }}
+                            >
+                              <Icon size={20} />
+                              <span>{translateMenuLabel(item.label, locale)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -250,6 +598,9 @@ export const RoleLayout: React.FC<RoleLayoutProps> = ({
   );
 };
 
+/** RoleLayout được cấu hình sẵn cho các tuyến đường admin */
 export const AdminLayout = (props: Omit<RoleLayoutProps, 'role'>) => <RoleLayout {...props} role="admin" />;
+/** RoleLayout được cấu hình sẵn cho các tuyến đường bác sĩ */
 export const DoctorLayout = (props: Omit<RoleLayoutProps, 'role'>) => <RoleLayout {...props} role="doctor" />;
+/** RoleLayout được cấu hình sẵn cho các tuyến đường bệnh nhân */
 export const PatientLayout = (props: Omit<RoleLayoutProps, 'role'>) => <RoleLayout {...props} role="patient" />;

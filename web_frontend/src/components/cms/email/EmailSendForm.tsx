@@ -1,3 +1,11 @@
+/**
+ * Mục đích: Soạn và gửi email riêng lẻ với lựa chọn template, thay thế biến động,
+ *           xem trước, hỗ trợ CC/BCC.
+ * Luồng xử lý: Tải danh sách template đang hoạt động khi khởi tạo; người dùng chọn template (tự động điền
+ *              subject), nhập người nhận, CC/BCC và biến động JSON; tải HTML xem trước hoặc gửi trực tiếp
+ *              qua /email/send. Hiển thị xem trước trong iframe.
+ * Quan hệ: Được sử dụng bởi EmailCmsPage tab "send"; gọi /email/templates, /email/preview, /email/send.
+ */
 import React, { useEffect, useState } from 'react';
 import { Loader2, Send } from 'lucide-react';
 import { API_URL } from '../../../config';
@@ -16,6 +24,10 @@ interface EmailSendFormProps {
   onSent?: () => void;
 }
 
+/**
+ * Component EmailSendForm — biểu mẫu soạn email tích hợp template với xem trước trực tiếp,
+ * chỉnh sửa biến JSON và các trường CC/BCC.
+ */
 export const EmailSendForm: React.FC<EmailSendFormProps> = ({ onSent }) => {
   const { accessToken } = useAuth();
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -33,7 +45,7 @@ export const EmailSendForm: React.FC<EmailSendFormProps> = ({ onSent }) => {
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
 
-  // Load danh sách template
+  // Tải danh sách template
   useEffect(() => {
     if (!accessToken) return;
     fetch(`${API_URL}/cms/email-templates?limit=100&is_active=true`, {
@@ -44,7 +56,7 @@ export const EmailSendForm: React.FC<EmailSendFormProps> = ({ onSent }) => {
       .catch(() => {});
   }, [accessToken]);
 
-  // Khi chọn template, tự fill subject
+  // Khi chọn template, tự động điền subject
   const handleSelectTemplate = (id: string) => {
     setTemplateId(id);
     const tpl = templates.find((t) => t.id === id);
@@ -129,7 +141,7 @@ export const EmailSendForm: React.FC<EmailSendFormProps> = ({ onSent }) => {
 
   return (
     <div className="email-send-layout">
-      {/* Form */}
+      {/* Biểu mẫu */}
       <div className="email-send-form-panel panel">
         <h3 className="email-send-title">Soạn & Gửi Email</h3>
         <p className="email-send-subtitle">Chọn template hoặc nhập nội dung tùy chỉnh</p>
@@ -248,11 +260,11 @@ export const EmailSendForm: React.FC<EmailSendFormProps> = ({ onSent }) => {
         </div>
       </div>
 
-      {/* Preview panel */}
+      {/* Bảng xem trước */}
       {showPreview && (
         <div className="email-send-preview-panel panel">
           <div className="email-preview-toolbar">
-            <span className="email-preview-label">Preview trước khi gửi</span>
+            <span className="email-preview-label">Xem trước khi gửi</span>
             <button
               type="button"
               className="btn btn-secondary"
@@ -265,9 +277,9 @@ export const EmailSendForm: React.FC<EmailSendFormProps> = ({ onSent }) => {
           <iframe
             className="email-preview-iframe"
             style={{ height: 500 }}
-            title="Send Preview"
+            title="Xem trước gửi"
             srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;background:#f9fafb;padding:20px;font-family:sans-serif}</style></head><body>${previewHtml}</body></html>`}
-            sandbox="allow-same-origin"
+            sandbox="allow-same-origin allow-scripts"
           />
         </div>
       )}

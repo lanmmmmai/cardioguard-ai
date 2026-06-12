@@ -1,18 +1,49 @@
+"""API Xác thực và Phân quyền.
+
+Mục đích:
+    Xử lý đăng ký người dùng (kèm xác thực OTP qua email), đăng nhập (dựa trên JWT),
+    đăng xuất (thu hồi token), quản lý mật khẩu (quên/đặt lại/thay đổi) và
+    xác thực token. Đóng vai trò là cổng xác thực trung tâm cho tất cả
+    các module API khác.
+
+Luồng xử lý:
+    Đăng ký sử dụng luồng OTP hai bước: request-otp gửi mã đến email của
+    người dùng; register xác thực OTP và tạo tài khoản. Đăng nhập
+    xác thực thông tin đăng nhập và trả về JWT đã ký. Đăng xuất thu hồi JWT
+    bằng cách lưu trữ JTI của nó trong bảng revoked_tokens. Đặt lại mật khẩu
+    sử dụng luồng OTP riêng với tùy chọn tạo mật khẩu ngẫu nhiên.
+    Tất cả các sự kiện xác thực đều được ghi lại qua audit_service.
+
+Quan hệ:
+    - Phụ thuộc vào: core.security để tạo/xác thực JWT và băm
+    - Phụ thuộc vào: core.rate_limit để giới hạn tốc độ các endpoint xác thực
+    - Phụ thuộc vào: services.otp_service cho vòng đời token OTP
+    - Phụ thuộc vào: services.audit_service để ghi nhật ký hoạt động
+    - Phụ thuộc vào: services.email_service để gửi email OTP/mật khẩu
+    - Được sử dụng bởi: Tất cả các module API khác thông qua get_user_from_token
+"""
+
 import asyncio
+from collections import OrderedDict
+import os
 import secrets
 import requests
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Request
 from jose import JWTError, jwt
+from google.auth.transport.requests import Request as GoogleAuthRequest
+from google.oauth2 import id_token as google_id_token
 from app.core.config import settings
 from app.core.database import database
 from app.core.security import ALGORITHM, SECRET_KEY, hash_password, verify_password, create_access_token
 from app.core.rate_limit import check_rate_limit, get_client_ip
 from app.schemas.auth_schema import (
     RegisterRequest, LoginRequest, RegisterOtpRequest,
-    ForgotPasswordRequest, ForgotPasswordVerifyRequest, ChangePasswordRequest
+    ForgotPasswordRequest, ForgotPasswordVerifyRequest, ChangePasswordRequest,
+    GoogleLoginRequest
 )
 from app.services.otp_service import (
     OTP_PURPOSE_FORGOT_PASSWORD,
@@ -25,10 +56,39 @@ from app.services.audit_service import log_activity
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
+def mask_email(email: str) -> str:
+    if not email or "@" not in email:
+        return "***"
+    parts = email.split("@", 1)
+    local = parts[0]
+    domain = parts[1]
+    if len(local) <= 2:
+        return f"{local[0]}***@{domain}"
+    return f"{local[0]}***{local[-1]}@{domain}"
+
+
 VALID_ROLES = {"admin", "doctor", "patient"}
+
+_USER_CACHE_TTL = 30  # 30 seconds - short TTL for auth freshness
+_USER_CACHE_MAX_SIZE = 1024
+_USERS_COLUMNS_CACHE_TTL = 300
+_user_cache: "OrderedDict[str, tuple[dict, float]]" = OrderedDict()
+_user_cache_lock = asyncio.Lock()
 
 
 def normalize_role(role: Optional[str]) -> str:
+    """Xác thực và chuẩn hóa chuỗi vai trò.
+
+    Args:
+        role: Chuỗi vai trò thô (ví dụ: 'Admin', 'DOCTOR').
+
+    Returns:
+        Chuỗi vai trò đã được chuẩn hóa thành chữ thường.
+
+    Raises:
+        HTTPException 403: Nếu vai trò không nằm trong VALID_ROLES.
+    """
     normalized = (role or "").strip().lower()
     if normalized not in VALID_ROLES:
         raise HTTPException(status_code=403, detail="Tài khoản chưa được phân quyền")
@@ -36,6 +96,17 @@ def normalize_role(role: Optional[str]) -> str:
 
 
 def generic_forgot_password_response(email: str) -> dict[str, object]:
+    """Trả về phản hồi chuẩn hóa cho yêu cầu quên mật khẩu.
+
+    Luôn trả về cùng một tin nhắn bất kể email có tồn tại hay không,
+    để ngăn chặn tấn công liệt kê người dùng.
+
+    Args:
+        email: Địa chỉ email do người dùng gửi lên.
+
+    Returns:
+        Dict chứa message, email và cờ email_sent.
+    """
     return {
         "message": "If the email exists, an OTP will be sent.",
         "email": email,
@@ -44,19 +115,107 @@ def generic_forgot_password_response(email: str) -> dict[str, object]:
 
 
 def extract_bearer_token(authorization: Optional[str]) -> str:
+    """Trích xuất chuỗi token JWT từ header Authorization.
+
+    Args:
+        authorization: Giá trị header Authorization thô (ví dụ: 'Bearer <token>').
+
+    Returns:
+        Chuỗi token.
+
+    Raises:
+        HTTPException 401: Nếu header bị thiếu hoặc không phải Bearer token.
+    """
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
     return authorization.split(" ", 1)[1].strip()
 
 
-_users_columns_cache: Optional[set[str]] = None
+_users_columns_cache: Optional[tuple[set[str], float]] = None
 _users_columns_lock = asyncio.Lock()
 
+
+def _purge_expired_user_cache(now: float) -> None:
+    """Xóa cache auth đã hết hạn và chặn tăng trưởng bộ nhớ vô hạn."""
+    expired_user_ids = [
+        user_id
+        for user_id, (_, cached_at) in list(_user_cache.items())
+        if now - cached_at >= _USER_CACHE_TTL
+    ]
+    for user_id in expired_user_ids:
+        _user_cache.pop(user_id, None)
+
+    while len(_user_cache) > _USER_CACHE_MAX_SIZE:
+        _user_cache.popitem(last=False)
+
+
+def _enforce_user_access_rules(
+    result: dict,
+    *,
+    allow_must_change_password: bool = False,
+    allow_uncompleted: bool = False,
+    allow_unverified: bool = False,
+) -> None:
+    """Áp dụng nhất quán các điều kiện truy cập cho người dùng đã xác thực."""
+    status = (result.get("status") or "").strip().lower()
+    if status in {"inactive", "disabled", "deleted"}:
+        raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
+
+    if result.get("must_change_password") and not allow_must_change_password:
+        raise HTTPException(
+            status_code=403,
+            detail="Bạn phải đổi mật khẩu trước khi tiếp tục sử dụng hệ thống",
+        )
+
+    if not result.get("profile_completed") and not allow_uncompleted:
+        if result.get("role") in {"patient", "doctor"}:
+            raise HTTPException(
+                status_code=403,
+                detail="Tài khoản chưa hoàn thiện hồ sơ. Vui lòng hoàn thiện hồ sơ trước khi tiếp tục.",
+            )
+
+    if result.get("role") == "doctor" and not result.get("is_verified") and not allow_unverified:
+        raise HTTPException(
+            status_code=403,
+            detail="Tài khoản bác sĩ chưa được ban quản trị phê duyệt xác thực.",
+        )
+
+
+def _verify_google_id_token(token: str) -> dict:
+    """Xác minh ID token của Google và trả về claims đã tin cậy."""
+    client_id = (settings.GOOGLE_CLIENT_ID or os.getenv("GOOGLE_CLIENT_ID", "") or "").strip()
+    if not client_id:
+        raise HTTPException(status_code=500, detail="Google login is not configured")
+
+    try:
+        claims = google_id_token.verify_oauth2_token(token, GoogleAuthRequest(), client_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="Invalid Google ID token") from exc
+
+    if not isinstance(claims, dict):
+        raise HTTPException(status_code=401, detail="Invalid Google ID token")
+
+    return claims
+
 async def get_users_columns() -> set[str]:
+    """Lấy tập hợp tên cột cho bảng users.
+
+    Kết quả được lưu vào bộ nhớ đệm toàn cục sau truy vấn đầu tiên để tránh
+    tra cứu information_schema lặp đi lặp lại.
+
+    Returns:
+        Tập hợp các chuỗi tên cột cho bảng public.users.
+    """
     global _users_columns_cache
-    if _users_columns_cache is None:
+    cached = _users_columns_cache
+    if cached is not None and time.monotonic() - cached[1] < _USERS_COLUMNS_CACHE_TTL:
+        return cached[0]
+    if _users_columns_cache is None or time.monotonic() - _users_columns_cache[1] >= _USERS_COLUMNS_CACHE_TTL:
         async with _users_columns_lock:
-            if _users_columns_cache is None:
+            cached = _users_columns_cache
+            if cached is not None and time.monotonic() - cached[1] < _USERS_COLUMNS_CACHE_TTL:
+                return cached[0]
+            if _users_columns_cache is None or time.monotonic() - _users_columns_cache[1] >= _USERS_COLUMNS_CACHE_TTL:
                 columns = await database.fetch_all(
                     """
                     SELECT column_name
@@ -64,8 +223,8 @@ async def get_users_columns() -> set[str]:
                     WHERE table_schema = 'public' AND table_name = 'users'
                     """
                 )
-                _users_columns_cache = {column["column_name"] for column in columns}
-    return _users_columns_cache
+                _users_columns_cache = ({column["column_name"] for column in columns}, time.monotonic())
+    return _users_columns_cache[0]
 
 
 
@@ -76,6 +235,25 @@ async def get_user_from_token(
     allow_uncompleted: bool = False,
     allow_unverified: bool = False,
 ):
+    """Xác thực JWT và trả về người dùng đã xác thực.
+
+    Giải mã token, kiểm tra thu hồi, lấy dữ liệu người dùng với lựa chọn
+    cột động, xác thực trạng thái và tùy chọn kiểm tra cờ must_change_password.
+
+    Args:
+        authorization: Chuỗi token Bearer từ header Authorization.
+        allow_must_change_password: Nếu True, bỏ qua kiểm tra must_change_password
+            (được sử dụng cho chính luồng đổi mật khẩu).
+
+    Returns:
+        Dict với các trường người dùng: id, full_name, email, phone, role,
+        created_at, status, must_change_password.
+
+    Raises:
+        HTTPException 401: Nếu token bị thiếu, không hợp lệ, hết hạn hoặc bị thu hồi.
+        HTTPException 401: Nếu không tìm thấy người dùng.
+        HTTPException 403: Nếu tài khoản không hoạt động hoặc phải đổi mật khẩu.
+    """
     token = extract_bearer_token(authorization)
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -92,6 +270,21 @@ async def get_user_from_token(
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
+    # Check user cache first (skip revoked check for cached non-revoked users)
+    async with _user_cache_lock:
+        cache_entry = _user_cache.get(user_id)
+        if cache_entry:
+            cached_user, cached_at = cache_entry
+            if time.monotonic() - cached_at < _USER_CACHE_TTL:
+                _user_cache.move_to_end(user_id)
+                result = dict(cached_user)
+                _enforce_user_access_rules(
+                    result,
+                    allow_must_change_password=allow_must_change_password,
+                    allow_uncompleted=allow_uncompleted,
+                    allow_unverified=allow_unverified,
+                )
+                return result
 
     user_columns = await get_users_columns()
     select_columns = [
@@ -112,16 +305,13 @@ async def get_user_from_token(
         f"""
         SELECT {", ".join(select_columns)}
         FROM users
-        WHERE id::text = :user_id
+        WHERE id = CAST(:user_id AS uuid)
         """,
         {"user_id": user_id}
     )
 
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-
-    if (user["status"] or "").strip().lower() in {"inactive", "disabled", "deleted"}:
-        raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
 
     result = {
         "id": user["id"],
@@ -137,26 +327,19 @@ async def get_user_from_token(
         "avatar_url": user["avatar_url"],
     }
 
-    if result["must_change_password"] and not allow_must_change_password:
-        raise HTTPException(
-            status_code=403,
-            detail="Bạn phải đổi mật khẩu trước khi tiếp tục sử dụng hệ thống",
-        )
+    # Cache user for 30s to avoid repeated DB lookups
+    async with _user_cache_lock:
+        _purge_expired_user_cache(time.monotonic())
+        _user_cache[user_id] = (result, time.monotonic())
+        _user_cache.move_to_end(user_id)
+        _purge_expired_user_cache(time.monotonic())
 
-    # Check profile completion
-    if not result["profile_completed"] and not allow_uncompleted:
-        if result["role"] in {"patient", "doctor"}:
-            raise HTTPException(
-                status_code=403,
-                detail="Tài khoản chưa hoàn thiện hồ sơ. Vui lòng hoàn thiện hồ sơ trước khi tiếp tục."
-            )
-
-    # Check doctor verification
-    if result["role"] == "doctor" and not result["is_verified"] and not allow_unverified:
-        raise HTTPException(
-            status_code=403,
-            detail="Tài khoản bác sĩ chưa được ban quản trị phê duyệt xác thực."
-        )
+    _enforce_user_access_rules(
+        result,
+        allow_must_change_password=allow_must_change_password,
+        allow_uncompleted=allow_uncompleted,
+        allow_unverified=allow_unverified,
+    )
 
     return result
 
@@ -165,6 +348,17 @@ from app.services.email_service import send_system_email
 
 
 async def send_forgot_password_otp_email(email: str, full_name: str, otp: str, role: Optional[str] = None) -> bool:
+    """Gửi email OTP đặt lại mật khẩu đến người dùng.
+
+    Args:
+        email: Địa chỉ email người nhận.
+        full_name: Họ và tên người nhận cho lời chào.
+        otp: Mã OTP 6 chữ số.
+        role: Vai trò người dùng cho ngữ cảnh biến template.
+
+    Returns:
+        True nếu email được gửi thành công, False nếu không.
+    """
     return await send_system_email(
         email_type="password_reset",
         to_email=email,
@@ -174,6 +368,17 @@ async def send_forgot_password_otp_email(email: str, full_name: str, otp: str, r
 
 
 async def send_random_password_email(email: str, full_name: str, new_password: str, role: Optional[str] = None) -> bool:
+    """Gửi mật khẩu được tạo ngẫu nhiên đến người dùng qua email.
+
+    Args:
+        email: Địa chỉ email người nhận.
+        full_name: Họ và tên người nhận cho lời chào.
+        new_password: Mật khẩu tạm thời mới được tạo.
+        role: Vai trò người dùng cho ngữ cảnh biến template.
+
+    Returns:
+        True nếu email được gửi thành công, False nếu không.
+    """
     return await send_system_email(
         email_type="password_reset",
         to_email=email,
@@ -183,6 +388,17 @@ async def send_random_password_email(email: str, full_name: str, new_password: s
 
 
 async def send_register_otp_email(email: str, full_name: str, otp: str, role: Optional[str] = "patient") -> bool:
+    """Gửi email OTP đăng ký đến người dùng.
+
+    Args:
+        email: Địa chỉ email người nhận.
+        full_name: Họ và tên người nhận.
+        otp: Mã OTP 6 chữ số để xác thực đăng ký.
+        role: Vai trò người dùng (mặc định là 'patient').
+
+    Returns:
+        True nếu email được gửi thành công, False nếu không.
+    """
     return await send_system_email(
         email_type="otp_register",
         to_email=email,
@@ -194,11 +410,28 @@ async def send_register_otp_email(email: str, full_name: str, otp: str, role: Op
 
 @router.post("/auth/register/request-otp")
 async def request_register_otp(data: RegisterOtpRequest, request: Request):
+    """Bước 1 của đăng ký: yêu cầu mã OTP qua email.
+
+    Giới hạn tốc độ 5 yêu cầu mỗi 60 giây cho mỗi cặp IP/email.
+    Nếu email đã tồn tại, trả về lỗi để ngăn đăng ký trùng lặp.
+
+    Args:
+        data: RegisterOtpRequest với email và full_name.
+        request: FastAPI Request để trích xuất IP.
+
+    Returns:
+        Xác nhận rằng OTP đã được gửi.
+
+    Raises:
+        HTTPException 400: Nếu email đã tồn tại.
+        HTTPException 502: Nếu gửi email thất bại.
+    """
     ip = get_client_ip(request)
     email = data.email.lower()
-    check_rate_limit(ip, email, "/auth/register/request-otp", max_requests=5, window_seconds=60)
+    await check_rate_limit(ip, email, "/auth/register/request-otp", max_requests=5, window_seconds=60)
 
     reg_role = (data.role or "patient").strip().lower()
+    logger.debug("Entry: request_register_otp(email=%s, role=%s)", mask_email(email), reg_role)
     if reg_role == "admin":
         raise HTTPException(status_code=400, detail="Đăng ký tài khoản Admin không được phép công khai.")
     if reg_role not in VALID_ROLES:
@@ -229,7 +462,7 @@ async def request_register_otp(data: RegisterOtpRequest, request: Request):
         email_sent = await send_register_otp_email(email, data.full_name, otp, role=reg_role)
     except Exception as exc:
         await invalidate_otp_tokens(purpose=OTP_PURPOSE_REGISTER, email=email)
-        logger.exception("Unable to send registration OTP email")
+        logger.exception("Không thể gửi email OTP đăng ký")
         raise HTTPException(status_code=502, detail="Unable to send OTP email. Please try again later.") from exc
 
     response = {"message": "OTP sent to email", "email": email, "email_sent": email_sent}
@@ -238,7 +471,30 @@ async def request_register_otp(data: RegisterOtpRequest, request: Request):
 
 @router.post("/auth/register")
 async def register(data: RegisterRequest, request: Request):
+    """Bước 2 của đăng ký: xác thực OTP và tạo tài khoản.
+
+    Xác thực OTP, sau đó chèn người dùng trong một giao dịch.
+    Tự động tạo một hàng tương ứng trong bảng patients cho
+    tài khoản bệnh nhân mới để tránh hồ sơ null.
+
+    Args:
+        data: RegisterRequest với email, OTP, full_name và password.
+        request: FastAPI Request để trích xuất IP.
+
+    Returns:
+        Tin nhắn thành công.
+
+    Raises:
+        HTTPException 400: Nếu OTP không hợp lệ/hết hạn hoặc email đã tồn tại.
+    """
+    if not data.agree_privacy or not data.agree_terms:
+        raise HTTPException(
+            status_code=400, 
+            detail="Bạn phải đồng ý với Chính sách quyền riêng tư và Điều khoản dịch vụ để đăng ký tài khoản."
+        )
+
     email = data.email.lower()
+    logger.debug("Entry: register(email=%s)", mask_email(email))
     otp_result = await verify_otp_token(
         purpose=OTP_PURPOSE_REGISTER,
         email=email,
@@ -247,12 +503,15 @@ async def register(data: RegisterRequest, request: Request):
 
     if not otp_result.is_valid:
         if otp_result.reason == "expired":
+            logger.info("Register OTP expired for email=%s", mask_email(email))
             raise HTTPException(status_code=400, detail="OTP expired")
+        logger.info("Invalid register OTP for email=%s", mask_email(email))
         raise HTTPException(status_code=400, detail="Invalid OTP")
+    logger.info("Register OTP valid for email=%s", mask_email(email))
 
     insert_query = """
-    INSERT INTO users(full_name, email, password_hash, role, phone, specialty, department, status, profile_completed, is_verified)
-    VALUES (:full_name, :email, :password_hash, :role, :phone, :specialty, :department, 'pending_profile', FALSE, FALSE)
+    INSERT INTO users(full_name, email, password_hash, role, phone, specialty, department, status, profile_completed, is_verified, privacy_accepted_at, terms_accepted_at, consent_version)
+    VALUES (:full_name, :email, :password_hash, :role, :phone, :specialty, :department, 'pending_profile', FALSE, FALSE, NOW(), NOW(), :consent_version)
     """
 
     user_id = None
@@ -285,7 +544,8 @@ async def register(data: RegisterRequest, request: Request):
                     "role": role,
                     "phone": phone,
                     "specialty": specialty,
-                    "department": department
+                    "department": department,
+                    "consent_version": data.consent_version or "1.0"
                 }
             )
 
@@ -295,6 +555,29 @@ async def register(data: RegisterRequest, request: Request):
                 {"email": email},
             )
             user_id = created_user["id"] if created_user else None
+
+            if created_user:
+                # Ghi nhận lịch sử đồng ý vào bảng user_consents
+                ip_addr = request.client.host if request.client else None
+                user_ag = request.headers.get("user-agent") if hasattr(request, "headers") else None
+                consent_v = data.consent_version or "1.0"
+                
+                await database.execute(
+                    """
+                    INSERT INTO user_consents (user_id, consent_type, consent_version, ip_address, user_agent)
+                    VALUES (CAST(:user_id AS uuid), 'privacy', :consent_version, :ip_address, :user_agent)
+                    """,
+                    {"user_id": user_id, "consent_version": consent_v, "ip_address": ip_addr, "user_agent": user_ag}
+                )
+                
+                await database.execute(
+                    """
+                    INSERT INTO user_consents (user_id, consent_type, consent_version, ip_address, user_agent)
+                    VALUES (CAST(:user_id AS uuid), 'terms', :consent_version, :ip_address, :user_agent)
+                    """,
+                    {"user_id": user_id, "consent_version": consent_v, "ip_address": ip_addr, "user_agent": user_ag}
+                )
+
             if created_user and role == "patient":
                 patient_columns = await database.fetch_all(
                     """
@@ -324,6 +607,7 @@ async def register(data: RegisterRequest, request: Request):
         err_msg = str(exc).lower()
         if "unique constraint" in err_msg or "duplicate key" in err_msg:
             raise HTTPException(status_code=400, detail="Email already exists")
+        logger.exception("Registration failed unexpectedly for email=%s", mask_email(email))
         raise
 
     # Ghi nhận log đăng ký thành công
@@ -335,14 +619,35 @@ async def register(data: RegisterRequest, request: Request):
         ip_address=request.client.host if request.client else "-"
     )
 
+    # Vô hiệu hóa OTP sau khi đăng ký thành công
+    await invalidate_otp_tokens(purpose=OTP_PURPOSE_REGISTER, email=email)
+
     return {"message": "Register successfully"}
 
 
 @router.post("/auth/login")
 async def login(data: LoginRequest, request: Request):
+    """Xác thực người dùng và trả về mã thông báo truy cập JWT.
+
+    Giới hạn tốc độ 5 lần thử mỗi 60 giây. Xác thực sự tồn tại của email,
+    tính đúng đắn của mật khẩu và trạng thái tài khoản. Ghi lại tất cả các
+    lần đăng nhập thất bại và thành công qua audit_service.
+
+    Args:
+        data: LoginRequest với email và password.
+        request: FastAPI Request để trích xuất IP.
+
+    Returns:
+        Dict chứa access_token, token_type và thông tin người dùng.
+
+    Raises:
+        HTTPException 401: Nếu email hoặc mật khẩu không hợp lệ.
+        HTTPException 403: Nếu tài khoản không hoạt động.
+    """
     ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
-    check_rate_limit(ip, email, "/auth/login", max_requests=5, window_seconds=60)
+    await check_rate_limit(ip, email, "/auth/login", max_requests=5, window_seconds=60)
+    logger.debug("Entry: login(email=%s)", mask_email(email))
 
     user_columns = await get_users_columns()
     select_cols = "id::text as id, full_name, email, password_hash, role"
@@ -442,9 +747,10 @@ async def login(data: LoginRequest, request: Request):
 
     token = create_access_token({
         "sub": user["id"],
-        "email": user["email"],
         "role": db_role
     })
+
+    logger.info("Login successful: email=%s role=%s", mask_email(email), db_role)
 
     # Ghi nhận đăng nhập thành công
     await log_activity(
@@ -471,8 +777,269 @@ async def login(data: LoginRequest, request: Request):
         }
     }
 
+
+@router.post("/auth/google-login")
+async def google_login(data: GoogleLoginRequest, request: Request):
+    """Đăng nhập bằng tài khoản Google.
+    Nếu email chưa tồn tại, tự động tạo tài khoản mới theo vai trò client yêu cầu
+    (patient hoặc doctor). Nếu email đã tồn tại, liên kết/xác thực tài khoản và đăng nhập.
+    """
+    ip = request.client.host if request.client else "unknown"
+    claims = _verify_google_id_token(data.id_token)
+    email = (claims.get("email") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=401, detail="Google account does not include an email address")
+
+    requested_role = (data.role or "patient").strip().lower()
+    if requested_role not in {"patient", "doctor"}:
+        raise HTTPException(status_code=400, detail="Unsupported Google auth role")
+
+    google_sub = (claims.get("sub") or "").strip()
+    display_name = (
+        (claims.get("name") or "").strip()
+        or (data.full_name or "").strip()
+        or email.split("@", 1)[0]
+    )
+    avatar_url = (claims.get("picture") or data.avatar_url or None)
+    logger.debug("Entry: google_login(email=%s)", mask_email(email))
+
+    # Lấy thông tin cột của bảng users để chắc chắn
+    user_columns = await get_users_columns()
+    
+    # 1. Tìm kiếm người dùng theo email
+    select_cols = "id::text as id, full_name, email, role"
+    if "must_change_password" in user_columns:
+        select_cols += ", must_change_password"
+    else:
+        select_cols += ", FALSE as must_change_password"
+    if "status" in user_columns:
+        select_cols += ", status"
+    else:
+        select_cols += ", NULL::text as status"
+    if "profile_completed" in user_columns:
+        select_cols += ", profile_completed"
+    else:
+        select_cols += ", FALSE as profile_completed"
+    if "is_verified" in user_columns:
+        select_cols += ", is_verified"
+    else:
+        select_cols += ", FALSE as is_verified"
+    if "avatar_url" in user_columns:
+        select_cols += ", avatar_url"
+    else:
+        select_cols += ", NULL::text as avatar_url"
+    if "google_id" in user_columns:
+        select_cols += ", google_id"
+    else:
+        select_cols += ", NULL::text as google_id"
+
+    query = f"""
+    SELECT {select_cols}
+    FROM users
+    WHERE email = :email
+    """
+
+    user = await database.fetch_one(
+        query=query,
+        values={"email": email}
+    )
+
+    ip_addr = request.client.host if request.client else "-"
+
+    if user:
+        # Tài khoản đã tồn tại
+        if (user["status"] or "").strip().lower() in {"inactive", "disabled", "deleted"}:
+            await log_activity(
+                user_id=user["id"],
+                action="USER_LOGIN_FAILED",
+                entity_type="users",
+                entity_id=user["id"],
+                ip_address=ip_addr,
+                details={"email": email, "reason": "Account inactive, disabled or deleted via Google Login"}
+            )
+            raise HTTPException(status_code=403, detail="Tài khoản đã bị vô hiệu hóa")
+
+        # Cập nhật google_id và avatar_url bằng dữ liệu đã xác minh
+        update_fields = []
+        update_values = {"id": user["id"]}
+        if "google_id" in user_columns and google_sub and (not user["google_id"] or user["google_id"] != google_sub):
+            update_fields.append("google_id = :google_id")
+            update_values["google_id"] = google_sub
+        if "avatar_url" in user_columns and avatar_url and not user["avatar_url"]:
+            update_fields.append("avatar_url = :avatar_url")
+            update_values["avatar_url"] = avatar_url
+
+        if update_fields:
+            update_query = f"""
+            UPDATE users
+            SET {", ".join(update_fields)}
+            WHERE id = :id
+            """
+            await database.execute(query=update_query, values=update_values)
+            # Fetch lại user để lấy thông tin mới nhất
+            user = await database.fetch_one(query=query, values={"email": email})
+
+        db_role = normalize_role(user["role"])
+        if db_role != requested_role:
+            raise HTTPException(
+                status_code=403,
+                detail="Tài khoản Google này không khớp với vai trò đăng nhập hiện tại",
+            )
+    else:
+        # Tài khoản chưa tồn tại, tự động đăng ký
+        role = requested_role
+        
+        # Sinh mật khẩu ngẫu nhiên để băm (dành cho OAuth)
+        random_pw = secrets.token_hex(16)
+        
+        status_value = "active" if role == "patient" else "pending_profile"
+        profile_completed = role == "patient"
+        insert_query = """
+        INSERT INTO users(full_name, email, password_hash, role, status, profile_completed, is_verified, avatar_url, google_id)
+        VALUES (:full_name, :email, :password_hash, :role, :status, :profile_completed, FALSE, :avatar_url, :google_id)
+        """
+        
+        try:
+            async with database.transaction():
+                # Thực hiện chèn user
+                await database.execute(
+                    query=insert_query,
+                    values={
+                        "full_name": display_name,
+                        "email": email,
+                        "password_hash": hash_password(random_pw),
+                        "role": role,
+                        "status": status_value,
+                        "profile_completed": profile_completed,
+                        "avatar_url": avatar_url,
+                        "google_id": google_sub,
+                    }
+                )
+
+                # Fetch thông tin user vừa tạo
+                user = await database.fetch_one(query=query, values={"email": email})
+                # Raise RuntimeError (không phải HTTPException) để transaction rollback đúng cách
+                if not user:
+                    raise RuntimeError("Không thể tạo tài khoản mới qua Google")
+
+                user_id = user["id"]
+
+                # Đồng bộ bảng patients / doctor_profiles tùy role
+                if role == "patient":
+                    patient_columns = await database.fetch_all(
+                        """
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = 'patients'
+                        """
+                    )
+                    patient_cols = {row["column_name"] for row in patient_columns}
+                    patient_values = {
+                        "id": user_id,
+                        "full_name": display_name,
+                    }
+                    if "user_id" in patient_cols:
+                        patient_values["user_id"] = user_id
+
+                    insert_columns = ", ".join(patient_values.keys())
+                    bind_columns = ", ".join(f":{key}" for key in patient_values.keys())
+                    await database.execute(
+                        f"INSERT INTO patients ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
+                        patient_values,
+                    )
+                elif role == "doctor":
+                    doctor_columns = await database.fetch_all(
+                        """
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = 'doctor_profiles'
+                        """
+                    )
+                    doctor_cols = {row["column_name"] for row in doctor_columns}
+                    doctor_values = {
+                        "user_id": user_id,
+                        "full_name": display_name,
+                    }
+                    if "avatar_url" in doctor_cols:
+                        doctor_values["avatar_url"] = avatar_url
+                    if "status" in doctor_cols:
+                        doctor_values["status"] = "pending_profile"
+                    if "is_verified" in doctor_cols:
+                        doctor_values["is_verified"] = False
+                    insert_columns = ", ".join(doctor_values.keys())
+                    bind_columns = ", ".join(f":{key}" for key in doctor_values.keys())
+                    await database.execute(
+                        f"INSERT INTO doctor_profiles ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
+                        doctor_values,
+                    )
+
+        except Exception:
+            logger.exception("Google automatic registration failed unexpectedly for email=%s", mask_email(email))
+            raise HTTPException(status_code=500, detail="Không thể đăng ký tự động bằng Google. Vui lòng thử lại sau.")
+
+        # Ghi nhận log đăng ký qua Google thành công — ngoài transaction và ngoài try/except
+        # để lỗi log không che giấu việc tạo user thành công
+        try:
+            await log_activity(
+                user_id=user_id,
+                action="USER_REGISTER_SUCCESS",
+                entity_type="users",
+                entity_id=user_id,
+                ip_address=ip_addr,
+                details={"method": "google"}
+            )
+        except Exception:
+            logger.warning("Failed to log Google registration activity for user_id=%s", user_id)
+
+        db_role = role
+
+    # Tạo JWT Token
+    token = create_access_token({
+        "sub": user["id"],
+        "role": db_role
+    })
+
+    # Ghi nhận đăng nhập thành công
+    await log_activity(
+        user_id=user["id"],
+        action="USER_LOGIN_SUCCESS",
+        entity_type="users",
+        entity_id=user["id"],
+        ip_address=ip_addr,
+        details={"method": "google"}
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user["id"],
+            "full_name": user["full_name"],
+            "email": user["email"],
+            "role": db_role,
+            "status": user["status"],
+            "must_change_password": user["must_change_password"],
+            "profile_completed": bool(user["profile_completed"]),
+            "is_verified": bool(user["is_verified"]),
+            "avatar_url": user["avatar_url"]
+        }
+    }
+
+
 @router.post("/auth/logout")
 async def logout(authorization: Optional[str] = Header(default=None)):
+    """Đăng xuất bằng cách thu hồi token JWT hiện tại.
+
+    Trích xuất JTI từ token và lưu trữ nó trong bảng revoked_tokens
+    để nó không thể được sử dụng lại. Bỏ qua lỗi một cách im lặng (ví dụ: nếu
+    không có token nào được cung cấp hoặc token đã hết hạn).
+
+    Args:
+        authorization: Token Bearer cần thu hồi.
+
+    Returns:
+        Tin nhắn thành công.
+    """
     if not authorization:
         return {"message": "Logged out successfully"}
     try:
@@ -480,22 +1047,41 @@ async def logout(authorization: Optional[str] = Header(default=None)):
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         jti = payload.get("jti")
         exp = payload.get("exp")
+        user_id = payload.get("sub")
         if jti and exp:
             expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
             await database.execute(
                 "INSERT INTO revoked_tokens (jti, expires_at) VALUES (:jti, :exp) ON CONFLICT DO NOTHING",
                 {"jti": jti, "exp": expires_at}
             )
-    except Exception:
-        pass
+        # Invalidate user cache on logout
+        if user_id:
+            async with _user_cache_lock:
+                _user_cache.pop(user_id, None)
+    except Exception as exc:
+        logger.warning("Logout: failed to revoke token: %s", exc)
     return {"message": "Logged out successfully"}
 
 
 @router.post("/auth/forgot-password/request-otp")
 async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Request):
+    """Bước 1 của quên mật khẩu: yêu cầu OTP đặt lại mật khẩu.
+
+    Luôn trả về cùng một phản hồi bất kể email có tồn tại hay không
+    (ngăn chặn liệt kê). Nếu email tồn tại, tạo và gửi OTP.
+    Giới hạn tốc độ 5 yêu cầu mỗi 60 giây.
+
+    Args:
+        data: ForgotPasswordRequest với email.
+        request: FastAPI Request để trích xuất IP.
+
+    Returns:
+        Phản hồi chung cho biết OTP đã được gửi nếu email tồn tại.
+    """
     ip = get_client_ip(request)
     email = data.email.lower()
-    check_rate_limit(ip, email, "/auth/forgot-password/request-otp", max_requests=5, window_seconds=60)
+    await check_rate_limit(ip, email, "/auth/forgot-password/request-otp", max_requests=5, window_seconds=60)
+    logger.debug("Entry: request_forgot_password_otp(email=%s)", mask_email(email))
 
     response = generic_forgot_password_response(email)
     user = await database.fetch_one(
@@ -515,7 +1101,7 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Requ
     try:
         await send_forgot_password_otp_email(email, user["full_name"], otp, role=user["role"])
     except Exception as exc:
-        logger.exception("Unable to send forgot-password OTP email")
+        logger.exception("Không thể gửi email OTP quên mật khẩu")
         if settings.BREVO_API_KEY:
             await invalidate_otp_tokens(purpose=OTP_PURPOSE_FORGOT_PASSWORD, email=email)
 
@@ -533,9 +1119,27 @@ async def request_forgot_password_otp(data: ForgotPasswordRequest, request: Requ
 
 @router.post("/auth/forgot-password/verify-otp")
 async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request: Request):
+    """Bước 2 của quên mật khẩu: xác thực OTP và đặt lại mật khẩu.
+
+    Nếu new_password được cung cấp, sử dụng trực tiếp. Nếu không, tạo
+    mật khẩu ngẫu nhiên 16 ký tự và gửi email cho người dùng, đặt
+    cờ must_change_password để buộc thay đổi ở lần đăng nhập tiếp theo.
+
+    Args:
+        data: ForgotPasswordVerifyRequest với email, OTP và tùy chọn
+              new_password.
+        request: FastAPI Request để trích xuất IP.
+
+    Returns:
+        Tin nhắn thành công, tùy chọn kèm trạng thái email_sent.
+
+    Raises:
+        HTTPException 400: Nếu OTP không hợp lệ hoặc hết hạn.
+    """
     ip = request.client.host if request.client else "unknown"
     email = data.email.lower()
-    check_rate_limit(ip, email, "/auth/forgot-password/verify-otp", max_requests=5, window_seconds=60)
+    await check_rate_limit(ip, email, "/auth/forgot-password/verify-otp", max_requests=5, window_seconds=60)
+    logger.debug("Entry: verify_forgot_password_otp(email=%s)", mask_email(email))
 
     otp_result = await verify_otp_token(
         purpose=OTP_PURPOSE_FORGOT_PASSWORD,
@@ -545,13 +1149,16 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
 
     if not otp_result.is_valid:
         if otp_result.reason == "expired":
+            logger.info("OTP expired for email=%s", mask_email(email))
             raise HTTPException(status_code=400, detail="OTP expired")
+        logger.info("Invalid OTP for email=%s", mask_email(email))
         raise HTTPException(status_code=400, detail="Invalid OTP")
+    logger.info("OTP valid for email=%s", mask_email(email))
 
     user_id = otp_result.metadata.get("user_id")
     if user_id:
         user = await database.fetch_one(
-            "SELECT id, full_name, role FROM users WHERE id::text = :id",
+            "SELECT id, full_name, role FROM users WHERE id = CAST(:id AS uuid)",
             {"id": user_id},
         )
     else:
@@ -569,10 +1176,14 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
         import string
         from app.core.password_policy import PASSWORD_PATTERN
         chars = string.ascii_letters + string.digits + "@!#?$"
-        while True:
+        attempts = 0
+        while attempts < 1000:
             new_password = "".join(secrets.choice(chars) for _ in range(16))
             if PASSWORD_PATTERN.fullmatch(new_password):
                 break
+            attempts += 1
+        else:
+            new_password = "TempPass123!456#"  # Safe compliant fallback
         must_change_password = True
     
     hashed_password = hash_password(new_password)
@@ -607,15 +1218,33 @@ async def verify_forgot_password_otp(data: ForgotPasswordVerifyRequest, request:
 
 @router.post("/auth/change-password")
 async def change_password(data: ChangePasswordRequest, request: Request, authorization: Optional[str] = Header(default=None)):
+    """Thay đổi mật khẩu của người dùng đã xác thực.
+
+    Xác thực mật khẩu cũ, cập nhật sang mật khẩu mới, xóa cờ
+    must_change_password và thu hồi token hiện tại để người dùng
+    phải đăng nhập lại với mật khẩu mới.
+
+    Args:
+        data: ChangePasswordRequest với old_password và new_password.
+        request: FastAPI Request để trích xuất IP.
+        authorization: Token Bearer.
+
+    Returns:
+        Tin nhắn thành công.
+
+    Raises:
+        HTTPException 400: Nếu mật khẩu cũ không chính xác.
+    """
     current_user = await get_user_from_token(
         authorization,
         allow_must_change_password=True,
         allow_uncompleted=True,
         allow_unverified=True,
     )
-    
+    logger.debug("Entry: change_password(user_id=%s)", current_user["id"])
+
     user = await database.fetch_one(
-        "SELECT password_hash FROM users WHERE id::text = :id",
+        "SELECT password_hash FROM users WHERE id = CAST(:id AS uuid)",
         {"id": current_user["id"]}
     )
 
@@ -626,10 +1255,14 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
         """
         UPDATE users 
         SET password_hash = :password_hash, must_change_password = FALSE
-        WHERE id::text = :id
+        WHERE id = CAST(:id AS uuid)
         """,
         {"password_hash": hash_password(data.new_password), "id": current_user["id"]}
     )
+
+    # Invalidate user cache on password change
+    async with _user_cache_lock:
+        _user_cache.pop(current_user["id"], None)
 
     # Ghi nhận log đổi mật khẩu thành công
     await log_activity(
@@ -656,7 +1289,6 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
 
     new_token = create_access_token({
         "sub": current_user["id"],
-        "email": current_user["email"],
         "role": current_user["role"],
     })
     updated_user = {
@@ -675,6 +1307,18 @@ async def change_password(data: ChangePasswordRequest, request: Request, authori
 
 @router.get("/auth/me")
 async def me(authorization: Optional[str] = Header(default=None)):
+    """Lấy hồ sơ của người dùng đã xác thực hiện tại.
+
+    Sử dụng allow_must_change_password=True để những người dùng cần thay đổi
+    mật khẩu vẫn có thể truy cập endpoint này.
+
+    Args:
+        authorization: Token Bearer.
+
+    Returns:
+        Dict chứa đối tượng người dùng đã xác thực.
+    """
+    logger.debug("Entry: me()")
     return {
         "user": await get_user_from_token(
             authorization,

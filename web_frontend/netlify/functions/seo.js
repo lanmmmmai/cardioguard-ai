@@ -53,17 +53,15 @@ export const handler = async (event) => {
   try {
     const rawPath = event.queryStringParameters?.path || event.path || '/';
     const pagePath = normalizePagePath(rawPath);
-    const fullUrl = buildPublicUrl(
-      {
-        headers: event.headers || {},
-        protocol: event.headers?.['x-forwarded-proto'] || 'https',
-        get: (name) => event.headers?.[String(name).toLowerCase()],
-      },
-      pagePath
-    );
+    const mockReq = {
+      headers: event.headers || {},
+      protocol: event.headers?.['x-forwarded-proto'] || 'https',
+      get: (name) => event.headers?.[String(name).toLowerCase()],
+    };
+    const fullUrl = buildPublicUrl(mockReq, pagePath);
     const html = await readIndexHtml(new URL(fullUrl).origin);
     const seo = await getSeoByPath(pagePath, fullUrl);
-    const finalHtml = injectSeoIntoHtml(html, seo);
+    const finalHtml = injectSeoIntoHtml(html, seo, mockReq);
 
     return {
       statusCode: 200,

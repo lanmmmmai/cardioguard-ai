@@ -47,3 +47,22 @@ Muc tieu giai doan nay:
 - `mode critical`
 - `mode poor_signal`
 - `mode offline`
+
+## Chỉ báo LED RGB trạng thái (WS2812 - GPIO 48)
+
+LED RGB tích hợp trên board sẽ tự động đổi màu tương ứng với trạng thái hoạt động:
+
+| Màu sắc | Trạng thái thiết bị | Ý nghĩa |
+| :--- | :--- | :--- |
+| <span style="color:red">●</span> **Đỏ** | **AP Mode (Setup Portal)** | Thiết bị đang phát mạng WiFi `CardioGuard-Setup` (IP `192.168.4.1`) chờ người dùng kết nối cấu hình mạng. |
+| <span style="color:blue">●</span> **Xanh Dương** | **WiFi/NTP Syncing** | Đang trong quá trình kết nối WiFi hoặc đang đồng bộ thời gian thực từ máy chủ NTP. |
+| <span style="color:green">●</span> **Xanh Lá** | **Measuring & Sending** | Đang đo đạc và gửi dữ liệu telemetry lên các server thành công (hoạt động bình thường). |
+| <span style="color:orange">●</span> **Vàng / Cam** | **Offline Buffering** | Mất mạng hoặc backend không khả dụng. Thiết bị tự động ghi đệm dữ liệu đo đạc vào Flash LittleFS. |
+| <span style="color:magenta">●</span> **Tím / Hồng** | **Auth Failed** | Token xác thực thiết bị (`kDeviceToken`) bị backend từ chối (HTTP 401/403). |
+
+---
+
+## Chức năng phím vật lý (BOOT - GPIO 0)
+
+*   **Kích hoạt AP Mode chủ động:** Nhấn và giữ nút **BOOT** trên mạch trong **3 giây**. Thiết bị sẽ tự động chuyển LED sang màu **Đỏ** và khởi chạy mạng WiFi `CardioGuard-Setup` để bạn cấu hình mạng mới ngay lập tức.
+

@@ -1,6 +1,20 @@
+/**
+ * @purpose Quản lý lịch hẹn đa vai trò. Bệnh nhân có thể đặt lịch hẹn mới, trong khi
+ *          bác sĩ hoặc quản trị viên có thể phê duyệt hoặc hủy lịch. Dữ liệu được lấy
+ *          từ backend và lọc theo vai trò của người dùng hiện tại.
+ * @workflow  1. Tải danh sách lịch hẹn và danh sách bác sĩ khi mount → 2. Lọc lịch hẹn
+ *            theo vai trò (bệnh nhân thấy của mình, bác sĩ thấy được phân công, quản trị
+ *            viên thấy tất cả) → 3. Bệnh nhân mở modal đặt lịch để gửi lịch hẹn mới →
+ *            4. Bác sĩ/quản trị viên phê duyệt/hủy lịch hẹn đang chờ qua API PATCH.
+ * @relationships
+ *   - AuthContext để lấy danh tính người dùng và mã thông báo
+ *   - App.tsx (khối switch routeContent)
+ *   - Giao diện Patient để ánh xạ tên
+ *   - URL cấu hình API
+ */
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, Calendar, CalendarDays, CheckCircle2, Clock, Plus, RefreshCw, User, XCircle } from 'lucide-react';
-import { API_URL } from '../config';
+import { API_URL, buildApiUrl } from '../config';
 import { useAuth } from '../auth/AuthContext';
 
 interface Patient {
@@ -15,8 +29,8 @@ interface Appointment {
   patient_id: string;
   doctor_id: string;
   title: string;
-  status: string; // 'pending', 'approved', 'cancelled'
-  channel: string; // 'online', 'offline'
+  status: string;
+  channel: string;
   scheduled_at: string;
   notes: string;
   created_at: string;
@@ -27,6 +41,10 @@ interface AppointmentsProps {
   role: 'patient' | 'doctor' | 'admin';
 }
 
+/**
+ * Danh sách lịch hẹn và biểu mẫu đặt lịch. Nhận biết vai trò: bệnh nhân đặt lịch,
+ * bác sĩ phê duyệt/hủy, quản trị viên quản lý tất cả.
+ */
 export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) => {
   const { accessToken, user } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -34,11 +52,9 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Mappings
   const [doctorNames, setDoctorNames] = useState<Record<string, string>>({});
   const [patientNames, setPatientNames] = useState<Record<string, string>>({});
 
-  // Booking Form State
   const [showBookModal, setShowBookModal] = useState(false);
   const [title, setTitle] = useState('');
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
@@ -47,10 +63,8 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Action Updating States
   const [updatingIds, setUpdatingIds] = useState<string[]>([]);
 
-  // Fetch appointments list
   const fetchAppointments = async () => {
     if (!accessToken) return;
     setLoading(true);
@@ -73,14 +87,12 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
       if (!response.ok) throw new Error(data.detail || 'Không thể lấy dữ liệu lịch hẹn');
       
       const apptList = Array.isArray(data) ? data : [];
-      // Sort: Newest scheduled date first
       apptList.sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
       
-      // Filter list by role
       const filtered = apptList.filter((appt) => {
         if (role === 'patient') return appt.patient_id === user?.id;
         if (role === 'doctor') return appt.doctor_id === user?.id;
-        return true; // Admin views all
+        return true;
       });
 
       setAppointments(filtered);
@@ -91,10 +103,15 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
     }
   };
 
-  // Fetch doctors list for patient booking & mappings
   const fetchDoctors = async () => {
+    if (role === 'doctor') {
+      setDoctors([]);
+      return;
+    }
+
     try {
-      const response = await fetch(`${API_URL}/cms/users?filter=role:doctor&limit=100`, {
+      const endpoint = role === 'admin' ? '/admin/doctors?limit=100&offset=0' : '/patients/me/doctors';
+      const response = await fetch(buildApiUrl(endpoint), {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
       });
       let data;
@@ -108,16 +125,17 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
         throw new Error("Lỗi định dạng phản hồi từ server");
 
       }
-      if (response.ok && data.items) {
-        setDoctors(data.items);
+      const items = Array.isArray(data) ? data : data.items || [];
+      if (response.ok && items) {
+        setDoctors(items);
         const docMap: Record<string, string> = {};
-        data.items.forEach((item: any) => {
+        items.forEach((item: any) => {
           docMap[item.id] = item.full_name;
         });
         setDoctorNames(docMap);
       }
     } catch (err) {
-      console.error('Failed to fetch doctor mappings:', err);
+      console.error('Lỗi tải danh sách bác sĩ:', err);
     }
   };
 
@@ -126,7 +144,6 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
     fetchDoctors();
   }, [accessToken, role, user?.id]);
 
-  // Construct patient names mapping whenever patients list changes
   useEffect(() => {
     const pMap: Record<string, string> = {};
     patients.forEach((p) => {
@@ -135,7 +152,6 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
     setPatientNames(pMap);
   }, [patients]);
 
-  // Handle Book Appointment Submission (Patient only)
   const handleBookSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!accessToken) return;
@@ -191,7 +207,6 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
     }
   };
 
-  // Handle Approval / Cancel Status Updates (Doctor/Admin only)
   const handleUpdateStatus = async (id: string, newStatus: 'approved' | 'cancelled') => {
     if (!accessToken) return;
     setUpdatingIds((prev) => [...prev, id]);
@@ -401,7 +416,6 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
                   </div>
                 </div>
 
-                {/* Actions for Doctor/Admin */}
                 {(role === 'doctor' || role === 'admin') && status === 'pending' && !isExpired && (
                   <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid var(--glass-border)', paddingTop: '12px', marginTop: '4px' }}>
                     <button
@@ -430,7 +444,6 @@ export const Appointments: React.FC<AppointmentsProps> = ({ patients, role }) =>
         </div>
       )}
 
-      {/* Booking Form Modal (Patient only) */}
       {showBookModal && (
         <div className="modal-overlay" style={{ zIndex: 200 }}>
           <div className="modal-content panel" style={{ maxWidth: '520px', width: '100%' }}>

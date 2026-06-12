@@ -1,3 +1,14 @@
+/**
+ * Tệp: CardioGuard AI – Quản lý dịch thuật và ngôn ngữ (locale)
+ * Mục đích: Cung cấp ngữ cảnh dịch thuật tiếng Việt (vi) và tiếng Anh (en) cho các nhãn trong ứng dụng,
+ *           bao gồm siêu dữ liệu trang (PAGE_META), nhãn vai trò, nhãn menu và nhãn dùng chung.
+ * Luồng xử lý: 1. Đọc và khôi phục ngôn ngữ đã lưu hoặc tự động phát hiện ngôn ngữ trình duyệt.
+ *              2. Cung cấp LocaleProvider và hook useLocale để các thành phần con truy xuất hàm t(key).
+ *              3. Lưu cấu hình ngôn ngữ đã thay đổi vào localStorage.
+ * Quan hệ:
+ *   - Được sử dụng bởi các thành phần giao diện chính như RoleLayout, App và các trang quản trị để hiển thị nhãn dịch thuật.
+ */
+
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { UserRole } from '../auth/roles';
 
@@ -25,6 +36,10 @@ const PAGE_META: Record<Locale, Record<string, { title: string; subtitle: string
     '/doctor/messages': { title: 'Nhắn tin tư vấn', subtitle: 'Tư vấn trực tuyến bảo mật giữa bác sĩ và bệnh nhân.' },
     '/doctor/ai-analysis': { title: 'AI phân tích sức khỏe', subtitle: 'Dự đoán nguy cơ tim mạch, phát hiện bất thường và gợi ý chẩn đoán tham khảo.' },
     '/doctor/profile': { title: 'Hồ sơ cá nhân', subtitle: 'Thông tin bác sĩ, chuyên khoa và lịch làm việc.' },
+    '/doctor/settings': { title: 'Cài đặt bác sĩ', subtitle: 'Quản lý ngôn ngữ, thông báo và bảo mật tài khoản bác sĩ.' },
+    '/admin/delete-data': { title: 'Hướng dẫn xóa dữ liệu', subtitle: 'Quy trình tiếp nhận yêu cầu xóa tài khoản và dữ liệu cá nhân CardioGuard AI' },
+    '/doctor/delete-data': { title: 'Hướng dẫn xóa dữ liệu', subtitle: 'Quy trình tiếp nhận yêu cầu xóa tài khoản và dữ liệu cá nhân CardioGuard AI' },
+    '/patient/delete-data': { title: 'Hướng dẫn xóa dữ liệu', subtitle: 'Quy trình tiếp nhận yêu cầu xóa tài khoản và dữ liệu cá nhân CardioGuard AI' },
     '/patient/home': { title: 'Trang chủ bệnh nhân', subtitle: 'Tổng quan chỉ số sức khỏe của bạn.' },
     '/patient/dashboard': { title: 'Trang chủ bệnh nhân', subtitle: 'Tổng quan chỉ số sức khỏe của bạn.' },
     '/patient/health': { title: 'Chỉ số sức khỏe', subtitle: 'Theo dõi nhịp tim, SpO2, huyết áp và ECG realtime.' },
@@ -62,6 +77,10 @@ const PAGE_META: Record<Locale, Record<string, { title: string; subtitle: string
     '/doctor/messages': { title: 'Consultation Messages', subtitle: 'Secure real-time consultation between doctor and patient.' },
     '/doctor/ai-analysis': { title: 'AI Health Analysis', subtitle: 'Estimate cardiac risk and surface reference findings.' },
     '/doctor/profile': { title: 'Profile', subtitle: 'Doctor details, specialty, and schedule.' },
+    '/doctor/settings': { title: 'Doctor Settings', subtitle: 'Manage language, notifications, and doctor account security.' },
+    '/admin/delete-data': { title: 'Data Deletion Guide', subtitle: 'How to request account and personal data deletion through CardioGuard AI.' },
+    '/doctor/delete-data': { title: 'Data Deletion Guide', subtitle: 'How to request account and personal data deletion through CardioGuard AI.' },
+    '/patient/delete-data': { title: 'Data Deletion Guide', subtitle: 'How to request account and personal data deletion through CardioGuard AI.' },
     '/patient/home': { title: 'Patient Home', subtitle: 'Your live health overview.' },
     '/patient/dashboard': { title: 'Patient Home', subtitle: 'Your live health overview.' },
     '/patient/health': { title: 'Health Metrics', subtitle: 'Track heart rate, SpO2, blood pressure, and ECG in real time.' },
@@ -181,6 +200,18 @@ const COMMON_LABELS: Record<Locale, Record<string, string>> = {
     layout_admin: 'Quản trị CardioGuard',
     layout_doctor: 'Không gian bác sĩ',
     layout_patient: 'Trang bệnh nhân',
+    group_overview: 'Tổng quan',
+    group_users: 'Quản lý người dùng',
+    group_devices: 'Giám sát & Phần cứng',
+    group_medical: 'Y tế & Báo cáo',
+    group_system: 'Hệ thống & Cấu hình',
+    group_overview_ai: 'Tổng quan & Trợ lý AI',
+    group_clinical_mgmt: 'Quản lý & Lâm sàng',
+    group_monitoring_reports: 'Giám sát & Báo cáo',
+    group_communication: 'Giao tiếp',
+    group_health_medical: 'Sức khỏe & Y tế',
+    group_comm_notifs: 'Giao tiếp & Thông báo',
+    group_account: 'Tài khoản cá nhân',
   },
   en: {
     logout: 'Log out',
@@ -206,6 +237,18 @@ const COMMON_LABELS: Record<Locale, Record<string, string>> = {
     layout_admin: 'CardioGuard Admin',
     layout_doctor: 'Doctor Workspace',
     layout_patient: 'Patient Portal',
+    group_overview: 'Overview',
+    group_users: 'User Management',
+    group_devices: 'Monitoring & Hardware',
+    group_medical: 'Medical & Reports',
+    group_system: 'System & Config',
+    group_overview_ai: 'Overview & AI',
+    group_clinical_mgmt: 'Clinical Management',
+    group_monitoring_reports: 'Monitoring & Reports',
+    group_communication: 'Communication',
+    group_health_medical: 'Health & Medical',
+    group_comm_notifs: 'Communication & Notifications',
+    group_account: 'Personal Account',
   },
 };
 

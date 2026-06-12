@@ -11,18 +11,19 @@ export function getPublicSiteUrl() {
 }
 
 export function getBackendBaseUrl() {
-  return (
+  const url = (
     process.env.BACKEND_API_URL ||
     process.env.API_URL ||
-    'https://cardioguard-ai-a26e.onrender.com'
+    'https://cardioguard-ai-backend.onrender.com/api'
   ).replace(/\/$/, '');
+  return url.endsWith('/api') ? url : `${url}/api`;
 }
 
 export function getBackendWsUrl() {
   return (
     process.env.BACKEND_WS_URL ||
     process.env.VITE_WS_URL ||
-    'wss://cardioguard-ai-a26e.onrender.com/ws/realtime'
+    'wss://cardioguard-ai-backend.onrender.com/ws/realtime'
   ).replace(/\/$/, '');
 }
 
@@ -90,7 +91,7 @@ function normalizeSeoPayload(data, fullUrl) {
 export async function getSeoByPath(pagePath, fullUrl) {
   try {
     const params = new URLSearchParams({ path: pagePath });
-    const response = await fetch(`${getBackendBaseUrl()}/api/cms/domain-links/resolve?${params.toString()}`);
+    const response = await fetch(`${getBackendBaseUrl()}/cms/domain-links/resolve?${params.toString()}`);
 
     if (!response.ok) {
       return normalizeSeoPayload(null, fullUrl);
@@ -104,9 +105,19 @@ export async function getSeoByPath(pagePath, fullUrl) {
   }
 }
 
-export function injectSeoIntoHtml(html, seo) {
+export function injectSeoIntoHtml(html, seo, req) {
   const seoUrl = seo.url || getPublicSiteUrl();
   const seoImage = seo.image || DEFAULT_SEO.image;
+
+  let clientApiUrl = getBackendBaseUrl();
+  let clientWsUrl = getBackendWsUrl();
+
+  const host = req?.headers?.host || req?.headers?.Host || '';
+  if (host.includes('localhost') || host.includes('127.0.0.1')) {
+    clientApiUrl = 'http://localhost:8000/api';
+    clientWsUrl = 'ws://localhost:8000/ws/realtime';
+  }
+
   const replacements = {
     __SEO_TITLE__: escapeHtml(seo.title || DEFAULT_SEO.title),
     __SEO_DESCRIPTION__: escapeHtml(seo.description || DEFAULT_SEO.description),
@@ -114,8 +125,8 @@ export function injectSeoIntoHtml(html, seo) {
     __SEO_IMAGE_TYPE__: escapeHtml(imageMimeType(seoImage)),
     __SEO_SITE_NAME__: escapeHtml(seo.siteName || DEFAULT_SEO.siteName),
     __SEO_URL__: escapeHtml(seoUrl),
-    __CARDIOGUARD_API_URL_PLACEHOLDER__: escapeHtml(getBackendBaseUrl()),
-    __CARDIOGUARD_WS_URL_PLACEHOLDER__: escapeHtml(getBackendWsUrl()),
+    __CARDIOGUARD_API_URL_PLACEHOLDER__: escapeHtml(clientApiUrl),
+    __CARDIOGUARD_WS_URL_PLACEHOLDER__: escapeHtml(clientWsUrl),
   };
 
   return Object.entries(replacements).reduce(

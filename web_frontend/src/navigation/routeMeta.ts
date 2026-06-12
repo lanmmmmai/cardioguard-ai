@@ -1,5 +1,19 @@
+/**
+ * Tệp: CardioGuard AI – Siêu dữ liệu tuyến đường và phân giải vai trò
+ * Mục đích: Cung cấp ánh xạ từ đường dẫn URL đến UserRole cần thiết và
+ *           bảng tiêu đề/phụ đề trang cho thanh tiêu đề bố cục dựa trên vai trò.
+ * Luồng xử lý: privateRouteRole() kiểm tra tiền tố đường dẫn (/admin, /doctor, /patient)
+ *              để suy ra vai trò sở hữu. pageTitles là một từ điển tĩnh được khóa theo đường dẫn.
+ * Quan hệ:
+ *   - Được sử dụng bởi: App.tsx (logic bảo vệ vai trò), RoleLayout (tiêu đề động)
+ */
+
 import type { UserRole } from "../auth/roles";
 
+/**
+ * Xác định vai trò cần thiết cho một đường dẫn tuyến đường riêng nhất định.
+ * Trả về null nếu đường dẫn không thuộc bất kỳ tiền tố vai trò nào.
+ */
 export const privateRouteRole = (path: string): UserRole | null => {
   if (path.startsWith("/admin")) return "admin";
   if (path.startsWith("/doctor")) return "doctor";
@@ -7,6 +21,7 @@ export const privateRouteRole = (path: string): UserRole | null => {
   return null;
 };
 
+/** Từ điển tiêu đề và phụ đề trang cho thanh tiêu đề bố cục (tiếng Việt) */
 export const pageTitles: Record<string, { title: string; subtitle: string }> = {
   "/admin/email": { title: "Email CMS", subtitle: "Quản lý mẫu email, gửi thông báo và theo dõi lịch sử." },
   "/admin/cms/domain-links": { title: "CMS Domain Links", subtitle: "Quản lý preview link cho Zalo, Messenger, Facebook và OG tags." },
@@ -26,6 +41,10 @@ export const pageTitles: Record<string, { title: string; subtitle: string }> = {
   "/doctor/messages": { title: "Nhắn tin tư vấn", subtitle: "Tư vấn trực tuyến bảo mật giữa bác sĩ và bệnh nhân." },
   "/doctor/ai-analysis": { title: "AI phân tích sức khỏe", subtitle: "Dự đoán nguy cơ tim mạch, phát hiện bất thường và gợi ý chẩn đoán tham khảo." },
   "/doctor/profile": { title: "Hồ sơ cá nhân", subtitle: "Thông tin bác sĩ, chuyên khoa và lịch làm việc." },
+  "/doctor/settings": { title: "Cài đặt bác sĩ", subtitle: "Quản lý ngôn ngữ, thông báo và bảo mật tài khoản bác sĩ." },
+  "/admin/delete-data": { title: "Hướng dẫn xóa dữ liệu", subtitle: "Quy trình tiếp nhận yêu cầu xóa tài khoản và dữ liệu cá nhân CardioGuard AI" },
+  "/doctor/delete-data": { title: "Hướng dẫn xóa dữ liệu", subtitle: "Quy trình tiếp nhận yêu cầu xóa tài khoản và dữ liệu cá nhân CardioGuard AI" },
+  "/patient/delete-data": { title: "Hướng dẫn xóa dữ liệu", subtitle: "Quy trình tiếp nhận yêu cầu xóa tài khoản và dữ liệu cá nhân CardioGuard AI" },
   "/patient/home": { title: "Trang chủ bệnh nhân", subtitle: "Tổng quan chỉ số sức khỏe của bạn." },
   "/patient/dashboard": { title: "Trang chủ bệnh nhân", subtitle: "Tổng quan chỉ số sức khỏe của bạn." },
   "/patient/health": { title: "Chỉ số sức khỏe", subtitle: "Theo dõi nhịp tim, SpO2, huyết áp và ECG realtime." },

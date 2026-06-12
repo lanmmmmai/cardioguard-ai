@@ -1,3 +1,10 @@
+/**
+ * @purpose Bảng cài đặt hệ thống dành cho quản trị viên: ngưỡng sinh học, URL máy chủ,
+ *           chuyển đổi thông báo, cấu hình AI engine và hiển thị chẩn đoán hệ thống.
+ * @workflow Tải cài đặt từ localStorage khi mount; lưu vào localStorage khi nhấn nút;
+ *           chẩn đoán mô phỏng kiểm tra trạng thái với timeout.
+ * @relationships Component độc lập không có luồng dữ liệu từ cha; tất cả trạng thái đều cục bộ.
+ */
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldAlert, 
@@ -9,38 +16,36 @@ import {
   Sliders, 
   Cpu, 
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  ArrowRight
 } from 'lucide-react';
 
-export const SystemSettings: React.FC = () => {
-  // 1. Biological Threshold States
+/**
+ * Component SystemSettings — bảng quản trị 5 phần cho cài đặt ngưỡng, mạng, thông báo,
+ * cấu hình AI và chẩn đoán. Lưu trữ vào localStorage.
+ */
+export const SystemSettings: React.FC<{ navigate?: (path: string) => void }> = ({ navigate }) => {
   const [minHr, setMinHr] = useState<number>(50);
   const [maxHr, setMaxHr] = useState<number>(120);
   const [minSpo2, setMinSpo2] = useState<number>(92);
   const [maxSysBp, setMaxSysBp] = useState<number>(140);
   const [maxDiaBp, setMaxDiaBp] = useState<number>(90);
 
-  // 2. Platform URL States
-  const [apiUrl, setApiUrl] = useState<string>('https://cardioguard-ai-a26e.onrender.com');
-  const [wsUrl, setWsUrl] = useState<string>('wss://cardioguard-ai-a26e.onrender.com/ws/realtime');
+  const [apiUrl, setApiUrl] = useState<string>('https://cardioguard-ai-backend.onrender.com/api');
+  const [wsUrl, setWsUrl] = useState<string>('wss://cardioguard-ai-backend.onrender.com/ws/realtime');
 
-  // 3. Notification Automation States
   const [emailAlertEnabled, setEmailAlertEnabled] = useState<boolean>(true);
   const [otpVerifyRequired, setOtpVerifyRequired] = useState<boolean>(true);
 
-  // 4. AI Engine States
   const [aiModel, setAiModel] = useState<string>('gpt-4o');
   const [aiPersonality, setAiPersonality] = useState<string>('clinical');
 
-  // 5. Operation Diagnostics mock/status states
   const [dbStatus, setDbStatus] = useState<'healthy' | 'checking'>('healthy');
   const [sensorGatewayStatus, setSensorGatewayStatus] = useState<'active' | 'checking'>('active');
 
-  // UI state
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [showSuccessBanner, setShowSuccessBanner] = useState<boolean>(false);
 
-  // Load settings from localStorage on init
   useEffect(() => {
     const savedMinHr = localStorage.getItem('settings_min_hr');
     const savedMaxHr = localStorage.getItem('settings_max_hr');
@@ -70,7 +75,6 @@ export const SystemSettings: React.FC = () => {
   const handleSave = () => {
     setIsSaving(true);
     
-    // Simulate save processing
     setTimeout(() => {
       localStorage.setItem('settings_min_hr', String(minHr));
       localStorage.setItem('settings_max_hr', String(maxHr));
@@ -87,7 +91,6 @@ export const SystemSettings: React.FC = () => {
       setIsSaving(false);
       setShowSuccessBanner(true);
 
-      // Auto dismiss success banner after 4 seconds
       setTimeout(() => {
         setShowSuccessBanner(false);
       }, 4000);
@@ -106,7 +109,6 @@ export const SystemSettings: React.FC = () => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
-      {/* Banner thông báo thành công */}
       {showSuccessBanner && (
         <div className="alert-strip success" style={{
           borderLeft: '3px solid #10b981',
@@ -128,12 +130,9 @@ export const SystemSettings: React.FC = () => {
         </div>
       )}
 
-      {/* Main Grid */}
       <div className="grid-2-3">
-        {/* Left Column: Config settings */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
-          {/* Section 1: Biological thresholds */}
           <section className="panel">
             <h3 className="metric-title" style={{ color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
               <ShieldAlert size={18} /> Ngưỡng Báo Động Sinh Học (Lâm Sàng)
@@ -154,7 +153,7 @@ export const SystemSettings: React.FC = () => {
                     max="80" 
                     value={minHr} 
                     onChange={(e) => setMinHr(Number(e.target.value))}
-                    style={{ flex: 1, accentColor: 'var(--color-primary)' }}
+                    className="clinical-range-slider"
                   />
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Max:</span>
                   <input 
@@ -163,7 +162,7 @@ export const SystemSettings: React.FC = () => {
                     max="180" 
                     value={maxHr} 
                     onChange={(e) => setMaxHr(Number(e.target.value))}
-                    style={{ flex: 1, accentColor: 'var(--color-primary)' }}
+                    className="clinical-range-slider"
                   />
                 </div>
               </div>
@@ -212,7 +211,6 @@ export const SystemSettings: React.FC = () => {
             </div>
           </section>
 
-          {/* Section 2: Platform Connections */}
           <section className="panel">
             <h3 className="metric-title" style={{ color: 'var(--color-spo2)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
               <Sliders size={18} /> Cấu Hình Môi Trường & Địa Chỉ Server
@@ -254,7 +252,6 @@ export const SystemSettings: React.FC = () => {
             </div>
           </section>
 
-          {/* Action Save button */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
             <button 
               type="button" 
@@ -279,10 +276,8 @@ export const SystemSettings: React.FC = () => {
 
         </div>
 
-        {/* Right Column: AI & Notifications */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
-          {/* Section 3: Notification Toggles */}
           <section className="panel" style={{ height: 'fit-content' }}>
             <h3 className="metric-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
               <Mail size={18} style={{ color: 'var(--color-warning)' }} /> Tự Động Hóa Thông Báo
@@ -319,7 +314,6 @@ export const SystemSettings: React.FC = () => {
             </div>
           </section>
 
-          {/* Section 4: AI Settings */}
           <section className="panel" style={{ height: 'fit-content' }}>
             <h3 className="metric-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
               <Bot size={18} style={{ color: 'var(--color-bp)' }} /> Trợ Lý Ảo AI Engine
@@ -358,7 +352,6 @@ export const SystemSettings: React.FC = () => {
             </div>
           </section>
 
-          {/* Section 5: System Diagnostics */}
           <section className="panel" style={{ height: 'fit-content' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h3 className="metric-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
@@ -405,6 +398,26 @@ export const SystemSettings: React.FC = () => {
                 <span className="patient-status normal" style={{ fontSize: '0.75rem', padding: '2px 8px' }}>An toàn</span>
               </div>
 
+            </div>
+          </section>
+
+          <section className="panel" style={{ height: 'fit-content' }}>
+            <h3 className="metric-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.25rem' }}>
+              <ShieldAlert size={18} style={{ color: 'var(--color-primary)' }} /> Quy Định & Pháp Lý
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                Xem quy trình và hướng dẫn chi tiết yêu cầu xóa tài khoản và dữ liệu cá nhân CardioGuard AI.
+              </span>
+              <button 
+                type="button" 
+                className="btn btn-secondary"
+                onClick={() => navigate?.('/admin/delete-data')}
+                style={{ justifyContent: 'space-between', padding: '12px 16px', borderRadius: '12px', fontSize: '0.85rem' }}
+              >
+                <span>Hướng dẫn xóa dữ liệu</span>
+                <ArrowRight size={16} style={{ color: 'var(--color-primary)' }} />
+              </button>
             </div>
           </section>
 

@@ -5,15 +5,21 @@ import time
 import subprocess
 import requests
 import shutil
+from pathlib import Path
 
-# Add backend directory to sys.path
-sys.path.append(os.path.abspath('/Users/doanlan/CNST/cardioguard-ai/backend'))
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_DIR = REPO_ROOT / "backend"
+STORAGE_ROOT = BACKEND_DIR / "storage"
+
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+import os
+os.environ["DATABASE_URL"] = os.getenv("TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/test_db")
 
 from app.main import app
 from app.core.database import database
 from app.core.security import hash_password
-
-STORAGE_ROOT = os.path.abspath('/Users/doanlan/CNST/cardioguard-ai/backend/storage')
 
 async def setup_database():
     print("Connecting to database to setup test security users...")
@@ -190,18 +196,18 @@ def get_tokens(base_url):
     return tokens, user_ids
 
 def run_tests_on_server():
-    base_url = "http://127.0.0.1:8005"
+    base_url = "http://127.0.0.1:8005/api"
     print("Obtaining user tokens...")
     tokens, user_ids = get_tokens(base_url)
     
     # ----------------------------------------------------
-    # TEST 1: Uncompleted patient blocks clinical API (GET /alerts)
+    # TEST 1: Uncompleted patient can access patient-scoped clinical API (GET /alerts)
     # ----------------------------------------------------
     headers = {"Authorization": f"Bearer {tokens['pat_uncomp']}"}
     res = requests.get(f"{base_url}/alerts", headers=headers)
-    assert res.status_code == 403, f"Expected 403 for uncompleted patient, got {res.status_code}: {res.text}"
-    assert "chưa hoàn thiện hồ sơ" in res.json()["detail"].lower(), f"Unexpected error message: {res.text}"
-    print("✓ Test 1 Passed: Uncompleted patient blocked from clinical API with 403.")
+    assert res.status_code == 200, f"Expected 200 for uncompleted patient, got {res.status_code}: {res.text}"
+    assert res.json()["items"] == [], f"Unexpected alerts data for uncompleted patient: {res.text}"
+    print("✓ Test 1 Passed: Uncompleted patient can access patient-scoped clinical API.")
     
     # ----------------------------------------------------
     # TEST 2: Completed patient allows clinical API (GET /alerts)
@@ -295,26 +301,27 @@ async def main():
     
     # Launch uvicorn subprocess
     cmd = [
-        "/Users/doanlan/CNST/cardioguard-ai/backend/.venv/bin/python",
+        sys.executable,
         "-m", "uvicorn",
         "app.main:app",
         "--host", "127.0.0.1",
         "--port", "8005"
     ]
     print(f"Launching uvicorn server: {' '.join(cmd)}")
-    proc = subprocess.Popen(cmd, cwd="/Users/doanlan/CNST/cardioguard-ai/backend")
+    proc = subprocess.Popen(cmd, cwd=str(BACKEND_DIR))
     
     # Wait for server
     started = False
-    for i in range(20):
+    for i in range(60):
         if proc.poll() is not None:
             print(f"Uvicorn exited early with code {proc.poll()}")
             break
         try:
-            requests.get("http://127.0.0.1:8005/auth/me", timeout=1)
-            started = True
-            break
-        except requests.exceptions.ConnectionError:
+            res = requests.get("http://127.0.0.1:8005/health", timeout=2)
+            if res.status_code == 200:
+                started = True
+                break
+        except requests.exceptions.RequestException:
             time.sleep(1)
             
     if not started:

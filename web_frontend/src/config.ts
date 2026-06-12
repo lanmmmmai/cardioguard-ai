@@ -1,3 +1,13 @@
+/**
+ * Tệp: CardioGuard AI – Cấu hình dựa trên môi trường
+ * Mục đích: Tập trung các hằng số runtime được đọc từ biến môi trường Vite
+ *           với giá trị dự phòng an toàn cho phát triển cục bộ.
+ * Luồng xử lý: Các giá trị import.meta.env.VITE_* được Vite inject tại thời điểm
+ *              build; nếu không có, giá trị mặc định cứng trỏ đến backend dev cục bộ.
+ * Quan hệ:
+ *   - Được sử dụng bởi: AuthContext (API_URL), useWebSocket (WS_URL), cmsApi (API_URL)
+ */
+
 declare global {
   interface Window {
     __CARDIOGUARD_API_URL__?: string;
@@ -12,15 +22,27 @@ const isLoopbackUrl = (value?: string) => Boolean(
   value && /^(https?:\/\/|wss?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(value)
 );
 const isRelativeApiPath = (value?: string) => Boolean(value && value.startsWith('/') && !value.startsWith('//'));
+const isDockerInternalUrl = (value?: string) => {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname;
+    return !hostname.includes('.') && hostname !== 'localhost';
+  } catch {
+    return false;
+  }
+};
 const isUsableApiUrl = (value?: string) => Boolean(
   value &&
   !isPlaceholderUrl(value) &&
+  (typeof window === 'undefined' || !isDockerInternalUrl(value)) &&
   (!isRelativeApiPath(value) || typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
   (!isLoopbackUrl(value) || typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
 );
 const isUsableWsUrl = (value?: string) => Boolean(
   value &&
   !isPlaceholderUrl(value) &&
+  (typeof window === 'undefined' || !isDockerInternalUrl(value)) &&
   (!isLoopbackUrl(value) || typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
 );
 const deriveApiUrlFromWsUrl = (wsUrl?: string) => {
@@ -47,38 +69,69 @@ const isLocalhost = typeof window !== 'undefined'
   && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const bakedApiUrl = import.meta.env.VITE_API_URL;
 const bakedWsUrl = import.meta.env.VITE_WS_URL;
-const savedApiUrl = isLocalhost && typeof window !== 'undefined' ? window.localStorage.getItem('settings_api_url') || undefined : undefined;
-const savedWsUrl = isLocalhost && typeof window !== 'undefined' ? window.localStorage.getItem('settings_ws_url') || undefined : undefined;
-const normalizedBakedApiUrl = isUsableApiUrl(bakedApiUrl) ? bakedApiUrl : undefined;
-const normalizedBakedWsUrl = isUsableWsUrl(bakedWsUrl) ? bakedWsUrl : undefined;
-const normalizedSavedApiUrl = isUsableApiUrl(savedApiUrl) ? savedApiUrl : undefined;
-const normalizedSavedWsUrl = isUsableWsUrl(savedWsUrl) ? savedWsUrl : undefined;
-const runtimeDerivedApiUrl = deriveApiUrlFromWsUrl(runtimeWsUrl);
-const bakedDerivedApiUrl = deriveApiUrlFromWsUrl(normalizedBakedWsUrl || normalizedSavedWsUrl);
-const savedDerivedApiUrl = deriveApiUrlFromWsUrl(normalizedSavedWsUrl);
-const runtimeDerivedWsUrl = deriveWsUrlFromApiUrl(runtimeApiUrl);
-const bakedDerivedWsUrl = deriveWsUrlFromApiUrl(normalizedBakedApiUrl || normalizedSavedApiUrl);
-const savedDerivedWsUrl = deriveWsUrlFromApiUrl(normalizedSavedApiUrl);
+const bakedGoogleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const getResolvedApiUrl = (): string => {
+  if (runtimeApiUrl && !isPlaceholderUrl(runtimeApiUrl)) return runtimeApiUrl;
+  if (runtimeWsUrl && !isPlaceholderUrl(runtimeWsUrl)) {
+    const derived = deriveApiUrlFromWsUrl(runtimeWsUrl);
+    if (derived) return derived;
+  }
+  
+  if (isLocalhost && typeof window !== 'undefined') {
+    const saved = window.localStorage.getItem('settings_api_url');
+    if (saved && isUsableApiUrl(saved)) return saved;
+  }
+  
+  if (bakedApiUrl && isUsableApiUrl(bakedApiUrl)) return bakedApiUrl;
+  
+  // For Vercel production deployment, use relative proxy /api (resolved dynamically)
+  if (typeof window !== 'undefined' && !isLocalhost) {
+    return `${window.location.origin}/api`;
+  }
+  
+  return isLocalhost ? 'http://localhost:8000/api' : 'https://cardioguard-ai-backend.onrender.com/api';
+};
 
-export const API_URL =
-  runtimeDerivedApiUrl ||
-  (!isPlaceholderUrl(runtimeApiUrl) && isUsableApiUrl(runtimeApiUrl) ? runtimeApiUrl : undefined) ||
-  normalizedSavedApiUrl ||
-  normalizedBakedApiUrl ||
-  savedDerivedApiUrl ||
-  bakedDerivedApiUrl ||
-  (isLocalhost ? 'http://localhost:8000' : 'https://cardioguard-ai-a26e.onrender.com');
+const getResolvedWsUrl = (): string => {
+  if (runtimeWsUrl && !isPlaceholderUrl(runtimeWsUrl)) return runtimeWsUrl;
+  if (runtimeApiUrl && !isPlaceholderUrl(runtimeApiUrl)) {
+    const derived = deriveWsUrlFromApiUrl(runtimeApiUrl);
+    if (derived) return derived;
+  }
+  
+  if (isLocalhost && typeof window !== 'undefined') {
+    const saved = window.localStorage.getItem('settings_ws_url');
+    if (saved && isUsableWsUrl(saved)) return saved;
+  }
+  
+  if (bakedWsUrl && isUsableWsUrl(bakedWsUrl)) return bakedWsUrl;
+  
+  return isLocalhost ? 'ws://localhost:8000/ws/realtime' : 'wss://cardioguard-ai-backend.onrender.com/ws/realtime';
+};
 
-export const WS_URL =
-  runtimeDerivedWsUrl ||
-  (!isPlaceholderUrl(runtimeWsUrl) && isUsableWsUrl(runtimeWsUrl) ? runtimeWsUrl : undefined) ||
-  normalizedSavedWsUrl ||
-  normalizedBakedWsUrl ||
-  savedDerivedWsUrl ||
-  bakedDerivedWsUrl ||
-  (isLocalhost ? 'ws://localhost:8000/ws/realtime' : 'wss://cardioguard-ai-a26e.onrender.com/ws/realtime');
+const ensureEndsWithApi = (url?: string) => {
+  if (!url) return undefined;
+  if (isPlaceholderUrl(url)) return url;
+  const trimmed = url.replace(/\/$/, '');
+  if (!trimmed.endsWith('/api')) {
+    return `${trimmed}/api`;
+  }
+  return trimmed;
+};
+
+/** URL cơ sở của REST API – dự phòng về localhost:8000 */
+export const API_URL = ensureEndsWithApi(getResolvedApiUrl()) as string;
+
+/** Điểm cuối WebSocket cho dữ liệu telemetry thời gian thực */
+export const WS_URL = getResolvedWsUrl() as string;
+
+/** Google OAuth client ID dùng cho Google Sign-In trên web */
+export const GOOGLE_CLIENT_ID = typeof bakedGoogleClientId === 'string' ? bakedGoogleClientId.trim() : '';
 
 export const buildApiUrl = (path: string) => {
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   const base = API_URL.replace(/\/$/, '');
 

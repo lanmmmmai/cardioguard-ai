@@ -1,23 +1,41 @@
+// Provider trò chuyện — tìm nạp lịch sử, gửi tin nhắn và xử lý
+// cập nhật tin nhắn thời gian thực qua WebSocket.
+// Quy trình làm việc:
+//   1. fetchChatHistory lấy tin nhắn cho một bệnh nhân cụ thể và sắp xếp
+//      cũ nhất trước (thứ tự luồng trò chuyện).
+//   2. sendMessage đăng một tin nhắn mới và thêm nó vào danh sách cục bộ.
+//   3. addRealtimeMessage xử lý các tin nhắn WebSocket đến, ủy quyền
+//      cho _appendMessageIfNotExists để tránh trùng lặp.
+// Mối quan hệ:
+//   - Phụ thuộc vào: ApiClient, AppLogger, ChatMessage model.
+//   - Tin nhắn thời gian thực đến qua callbacks của WebSocketService.
 import 'package:flutter/material.dart';
 import '../core/app_logger.dart';
 import '../core/api_client.dart';
+import '../config/app_config.dart';
 import '../models/models.dart';
 
 class ChatProvider extends ChangeNotifier {
+  // Phiên bản API client dùng chung.
   final ApiClient _apiClient = ApiClient();
 
   bool _isLoading = false;
+
+  // Liệu một yêu cầu mạng có đang được tiến hành hay không.
   bool get isLoading => _isLoading;
 
   List<ChatMessage> _messages = [];
+
+  // Danh sách tin nhắn trò chuyện (sắp xếp cũ nhất trước cho luồng hiển thị).
   List<ChatMessage> get messages => _messages;
 
+  // Cập nhật trạng thái tải và thông báo cho listeners.
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
 
-  // Fetch chat history between a specific doctor and patient
+  // Tìm nạp lịch sử trò chuyện cho patientId đã cho, sắp xếp cũ nhất trước.
   Future<void> fetchChatHistory(String patientId) async {
     _setLoading(true);
     try {
@@ -26,20 +44,19 @@ class ChatProvider extends ChangeNotifier {
         queryParameters: {'patient_id': patientId},
       );
       if (response.statusCode == 200) {
-        if (response.data is! List) throw Exception("Expected a list from server");
-        final List<dynamic> list = response.data as List<dynamic>;
+        final List<dynamic> list = ApiClient.extractListData(response.data);
         _messages = list.map((item) => ChatMessage.fromJson(item)).toList();
-        // Sort oldest first for chat flow
+        // Sắp xếp cũ nhất trước cho luồng trò chuyện
         _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       }
     } catch (e) {
-      AppLogger.log('Fetch chat history error: $e');
+      AppLogger.log('Lỗi tìm nạp lịch sử trò chuyện: $e');
     } finally {
       _setLoading(false);
     }
   }
 
-  // Send message
+  // Gửi tin nhắn trò chuyện qua API và thêm vào danh sách cục bộ.
   Future<bool> sendMessage({
     required String patientId,
     required String doctorId,
@@ -60,28 +77,30 @@ class ChatProvider extends ChangeNotifier {
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // The real-time message will be appended via WebSocket listener or manually if needed
+        // Tin nhắn thời gian thực sẽ được thêm qua bộ lắng nghe WebSocket hoặc thủ công nếu cần
         final msg = ChatMessage.fromJson(response.data);
         _appendMessageIfNotExists(msg);
         return true;
       }
       return false;
     } catch (e) {
-      AppLogger.log('Send message error: $e');
+      AppLogger.log('Lỗi gửi tin nhắn: $e');
       return false;
     }
   }
 
-  // Append websocket-received messages
+  // Xử lý một tin nhắn thời gian thực đến từ WebSocket — thêm vào nếu mới.
   void addRealtimeMessage(Map<String, dynamic> messageJson) {
     try {
       final msg = ChatMessage.fromJson(messageJson);
       _appendMessageIfNotExists(msg);
     } catch (e) {
-      AppLogger.log('Error parsing realtime message: $e');
+      AppLogger.log('Lỗi phân tích tin nhắn thời gian thực: $e');
     }
   }
 
+  // Thêm msg vào danh sách cục bộ chỉ khi nó chưa tồn tại,
+  // sau đó sắp xếp lại theo createdAt (cũ nhất trước).
   void _appendMessageIfNotExists(ChatMessage msg) {
     final index = _messages.indexWhere((m) => m.id == msg.id);
     if (index == -1) {
@@ -90,5 +109,119 @@ class ChatProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-}
 
+  // AI Chatbot State
+  List<AiChatSession> _aiSessions = [];
+  List<AiChatSession> get aiSessions => _aiSessions;
+
+  List<AiChatMessage> _aiMessages = [];
+  List<AiChatMessage> get aiMessages => _aiMessages;
+
+  String? _currentAiSessionId;
+  String? get currentAiSessionId => _currentAiSessionId;
+
+  // Fetch AI chatbot sessions
+  Future<void> fetchAiSessions(String role) async {
+    _setLoading(true);
+    try {
+      final response = await _apiClient.get(
+        AppConfig.chatSessionsEndpoint,
+        queryParameters: {'role': role},
+      );
+      if (response.statusCode == 200) {
+        _aiSessions = ApiClient.extractListData(response.data)
+            .whereType<Map<String, dynamic>>()
+            .map(AiChatSession.fromJson)
+            .toList();
+      }
+    } catch (e) {
+      AppLogger.log('Fetch AI sessions error: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Fetch AI chatbot history for a session
+  Future<void> fetchAiChatHistory(String sessionId) async {
+    _setLoading(true);
+    _currentAiSessionId = sessionId;
+    try {
+      final response = await _apiClient.get(
+        '${AppConfig.chatHistoryEndpoint}/$sessionId',
+      );
+      if (response.statusCode == 200) {
+        _aiMessages = ApiClient.extractListData(response.data)
+            .whereType<Map<String, dynamic>>()
+            .map(AiChatMessage.fromJson)
+            .toList();
+      }
+    } catch (e) {
+      AppLogger.log('Fetch AI history error: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Send message to AI chatbot
+  Future<bool> sendAiMessage({
+    required String messageText,
+    required String role,
+    Map<String, dynamic>? contextData,
+  }) async {
+    // Optimistically add user message to list
+    final tempUserMsg = AiChatMessage(
+      id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      sender: 'user',
+      message: messageText,
+      createdAt: DateTime.now().toUtc(),
+    );
+    _aiMessages.add(tempUserMsg);
+    notifyListeners();
+
+    try {
+      final response = await _apiClient.post(
+        AppConfig.chatSendEndpoint,
+        data: {
+          'message': messageText,
+          'session_id': _currentAiSessionId,
+          'role': role,
+          'context_data': contextData,
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        _currentAiSessionId = data['session_id']?.toString();
+
+        // Remove temp message and add real one, plus AI response
+        _aiMessages.removeWhere((msg) => msg.id == tempUserMsg.id);
+
+        final userRealMsg = AiChatMessage(
+          id: 'user_${DateTime.now().millisecondsSinceEpoch}',
+          sender: 'user',
+          message: messageText,
+          createdAt: DateTime.now().toUtc(),
+        );
+        _aiMessages.add(userRealMsg);
+
+        final aiMessage = data['ai_message'];
+        if (aiMessage is Map<String, dynamic>) {
+          _aiMessages.add(AiChatMessage.fromJson(aiMessage));
+        }
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      AppLogger.log('Send AI message error: $e');
+      _aiMessages.removeWhere((msg) => msg.id == tempUserMsg.id);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void clearAiMessages() {
+    _aiMessages = [];
+    _currentAiSessionId = null;
+    notifyListeners();
+  }
+}

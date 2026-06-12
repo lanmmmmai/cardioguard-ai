@@ -1,3 +1,18 @@
+/**
+ * Mục đích: Thành phần ứng dụng gốc. Xử lý xác thực, định tuyến, thu thập
+ *           dữ liệu telemetry WebSocket, banner cảnh báo thời gian thực và
+ *           hiển thị bố cục theo từng vai trò.
+ * Luồng xử lý: 1. AuthContext khôi phục phiên → 2. Phân giải tuyến đường dựa trên
+ *              đường dẫn → 3. Tìm nạp dữ liệu (bệnh nhân, cảnh báo, bác sĩ) →
+ *              4. Kết nối WebSocket cho telemetry trực tiếp → 5. Banner cảnh báo
+ *              cho các chỉ số bất thường → 6. Bọc nội dung trong bố cục vai trò cụ thể
+ *              (Admin|Doctor|Patient).
+ * Quan hệ:
+ *   - AuthContext, ProtectedRoute, bố cục vai trò (AdminLayout, DoctorLayout, PatientLayout)
+ *   - Tất cả thành phần trang (Dashboard, Alerts, Appointments, Chatbots, v.v.)
+ *   - Hook useWebSocket và kiểu SensorData/Alert cho pipeline thời gian thực
+ *   - pageTitles và routeMeta cho siêu dữ liệu tuyến đường
+ */
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { AlertOctagon } from 'lucide-react';
 import { Login } from './components/Login';
@@ -13,6 +28,8 @@ import { Appointments } from './components/Appointments';
 import { ApiDataPage } from './components/ApiDataPage';
 import { ProfilePage } from './components/ProfilePage';
 import { CmsPage } from './components/cms/CmsPage';
+import { NotificationsPage } from './components/notifications/NotificationsPage';
+import { logger } from './utils/logger';
 import { EmailCmsPage } from './components/cms/EmailCmsPage';
 import { PatientChatbot } from './pages/PatientChatbot';
 import { DoctorChatbot } from './pages/DoctorChatbot';
@@ -29,14 +46,66 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { defaultRouteByRole, normalizeRole, UserRole } from './auth/roles';
 import { AdminLayout, DoctorLayout, PatientLayout } from './layouts/RoleLayout';
 import { AdminDashboard, DoctorDashboard, PatientHome, PlaceholderPage } from './pages/RolePages';
+import { PatientHealthPage } from './pages/PatientHealthPage';
 import { PatientSettingsPage } from './pages/PatientSettingsPage';
+import { DoctorSettingsPage } from './pages/DoctorSettingsPage';
+import { UserDataDeletionPage } from './pages/UserDataDeletionPage';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { TermsOfService } from './pages/TermsOfService';
+import { AboutUs } from './pages/AboutUs';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useBrowserPath } from './hooks/useBrowserPath';
 import { privateRouteRole } from './navigation/routeMeta';
 import { API_URL, WS_URL } from './config';
 import { Patient, Alert, SensorData } from './types';
 import { LocaleProvider, getPageMeta, useLocale } from './i18n/locale';
+import { NotificationProvider } from './components/notifications/NotificationProvider';
 
+type PublicLegalPageKey = 'about' | 'privacy' | 'terms' | 'dataDeletion';
+
+const PUBLIC_LEGAL_ROUTES: Record<string, PublicLegalPageKey> = {
+  '/about': 'about',
+  '/gioi-thieu': 'about',
+  '/privacy': 'privacy',
+  '/privacy-policy': 'privacy',
+  '/chinh-sach-bao-mat': 'privacy',
+  '/terms': 'terms',
+  '/terms-of-service': 'terms',
+  '/dieu-khoan-dich-vu': 'terms',
+  '/data-deletion': 'dataDeletion',
+  '/data-deletion-request': 'dataDeletion',
+  '/yeu-cau-xoa-du-lieu': 'dataDeletion',
+};
+
+/**
+ * Render public legal and product information pages by browser path.
+ *
+ * @param currentPath - Current browser pathname
+ * @returns Public page element when the path is a legal route, otherwise null
+ */
+const renderPublicLegalPage = (currentPath: string): React.ReactNode | null => {
+  const pageKey = PUBLIC_LEGAL_ROUTES[currentPath];
+
+  if (pageKey === 'about') {
+    return <AboutUs />;
+  }
+  if (pageKey === 'privacy') {
+    return <PrivacyPolicy />;
+  }
+  if (pageKey === 'terms') {
+    return <TermsOfService />;
+  }
+  if (pageKey === 'dataDeletion') {
+    return <UserDataDeletionPage />;
+  }
+
+  return null;
+};
+
+/**
+ * Thành phần bên trong có thể tiêu thụ AuthContext một cách an toàn. Điều phối tất cả
+ * trạng thái cấp ứng dụng, tìm nạp dữ liệu, nhắn tin thời gian thực và hiển thị tuyến đường.
+ */
 const AppContent: React.FC = () => {
   const { accessToken, isAuthenticated, loading, role, login, requiresPasswordChange, user } = useAuth();
   const { locale } = useLocale();
@@ -52,10 +121,10 @@ const AppContent: React.FC = () => {
   }, [patients]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
-  // Ref to hold banner timeout ID
+  // Giữ tham chiếu đến timeout của banner hoạt động để có thể xóa khi hủy gắn hoặc thay thế
   const bannerTimeoutRef = useRef<number | null>(null);
 
-  // Cleanup timeout on unmount
+  // Dọn dẹp timeout khi hủy gắn
   useEffect(() => {
     return () => {
       if (bannerTimeoutRef.current !== null) {
@@ -72,7 +141,6 @@ const AppContent: React.FC = () => {
     severity: string;
     timestamp: string;
   } | null>(null);
-  const [showAddPatientModal, setShowAddPatientModal] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
   const getLastLoginRoute = (): string => {
@@ -84,6 +152,8 @@ const AppContent: React.FC = () => {
 
   const normalizedPath = path === '/' ? (role ? defaultRouteByRole[role] : getLastLoginRoute()) : path;
   const routeRole = privateRouteRole(normalizedPath);
+  const publicLegalPage = renderPublicLegalPage(path);
+  const isPublicLegalPath = publicLegalPage !== null;
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -97,6 +167,10 @@ const AppContent: React.FC = () => {
       '/forgot-password', '/forgot-password-doctor', '/forgot-password-admin',
       '/reset-password', '/reset-password-doctor', '/reset-password-admin'
     ];
+
+    if (isPublicLegalPath) {
+      return;
+    }
 
     if (path === '/' || !routeRole) {
       if (path === '/' || (!authPaths.includes(path) && path !== '/change-password')) {
@@ -120,9 +194,28 @@ const AppContent: React.FC = () => {
         navigate(defaultRouteByRole[role], true);
       }
     }
-  }, [loading, path, role, isAuthenticated, routeRole, requiresPasswordChange, locale]);
+  }, [loading, path, role, isAuthenticated, routeRole, requiresPasswordChange, locale, isPublicLegalPath]);
 
   const fetchPatients = useCallback(async () => {
+    const isVerifiedDoctor = role === 'doctor' && Boolean(user?.profile_completed && user?.is_verified);
+    const doctorDataRoutes = new Set([
+      '/doctor',
+      '/doctor/dashboard',
+      '/doctor/patients',
+      '/doctor/medical-records',
+      '/doctor/ai-assistant',
+      '/doctor/chatbot',
+      '/doctor/appointments',
+      '/doctor/reports',
+      '/doctor/realtime-monitoring',
+      '/doctor/chat',
+      '/doctor/messages',
+    ]);
+    const canFetchPatients = role === 'admin' || (isVerifiedDoctor && doctorDataRoutes.has(normalizedPath));
+    if (!canFetchPatients) {
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/patients`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
@@ -130,20 +223,26 @@ const AppContent: React.FC = () => {
       if (response.ok) {
         try {
           const data = await response.json();
-          setPatients(data);
-          console.info('Patients fetched:', data.length, 'records');
+          const items = Array.isArray(data) ? data : (data.items || []);
+          setPatients(items);
+          logger.info('Đã tìm nạp bệnh nhân:', items.length, 'bản ghi');
         } catch(e) {
-          console.error("Invalid JSON format");
+          logger.error("Định dạng JSON không hợp lệ");
         }
       } else {
-        console.warn('Fetch patients failed:', response.status);
+        logger.warn('Tìm nạp bệnh nhân thất bại:', response.status);
       }
     } catch (err) {
-      console.error('Failed to fetch patients:', err);
+      logger.error('Không thể tìm nạp bệnh nhân:', err);
     }
-  }, [accessToken]);
+  }, [accessToken, role, user, normalizedPath]);
 
   const fetchAlerts = useCallback(async () => {
+    const isVerifiedDoctor = role === 'doctor' && Boolean(user?.profile_completed && user?.is_verified);
+    if (role === 'doctor' && !isVerifiedDoctor) {
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/alerts`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
@@ -151,18 +250,19 @@ const AppContent: React.FC = () => {
       if (response.ok) {
         try {
           const data = await response.json();
-          setAlerts(data);
-          console.info('Alerts fetched:', data.length, 'records');
+          const items = Array.isArray(data) ? data : (data.items || []);
+          setAlerts(items);
+          logger.info('Đã tìm nạp cảnh báo:', items.length, 'bản ghi');
         } catch(e) {
-          console.error("Invalid JSON format");
+          logger.error("Định dạng JSON không hợp lệ");
         }
       } else {
-        console.warn('Fetch alerts failed:', response.status);
+        logger.warn('Tìm nạp cảnh báo thất bại:', response.status);
       }
     } catch (err) {
-      console.error('Failed to fetch alerts:', err);
+      logger.error('Không thể tìm nạp cảnh báo:', err);
     }
-  }, [accessToken]);
+  }, [accessToken, role, user]);
 
   const fetchDoctors = useCallback(async () => {
     try {
@@ -172,71 +272,113 @@ const AppContent: React.FC = () => {
       if (response.ok) {
         try {
           const data = await response.json();
-          setDoctors(data);
-          console.info('Doctors fetched:', data.length, 'records');
+          const items = Array.isArray(data) ? data : (data.items || []);
+          setDoctors(items);
+          logger.info('Đã tìm nạp bác sĩ:', items.length, 'bản ghi');
         } catch(e) {
-          console.error("Invalid JSON format");
+          logger.error("Định dạng JSON không hợp lệ");
         }
       } else {
-        console.warn('Fetch doctors failed:', response.status);
+        logger.warn('Tìm nạp bác sĩ thất bại:', response.status);
       }
     } catch (err) {
-      console.error('Failed to fetch doctors:', err);
+      logger.error('Không thể tìm nạp bác sĩ:', err);
     }
   }, [accessToken]);
 
   useEffect(() => {
     if (!accessToken) return;
-    fetchPatients();
-    fetchAlerts();
+    const isVerifiedDoctor = role === 'doctor' && Boolean(user?.profile_completed && user?.is_verified);
+    const canFetchAlerts =
+      role !== 'doctor' || isVerifiedDoctor;
+    const doctorDataRoutes = new Set([
+      '/doctor',
+      '/doctor/dashboard',
+      '/doctor/patients',
+      '/doctor/medical-records',
+      '/doctor/ai-assistant',
+      '/doctor/chatbot',
+      '/doctor/appointments',
+      '/doctor/reports',
+      '/doctor/realtime-monitoring',
+      '/doctor/chat',
+      '/doctor/messages',
+    ]);
+    const canFetchPatients =
+      role === 'admin' || (isVerifiedDoctor && doctorDataRoutes.has(normalizedPath));
+
+    if (canFetchAlerts) {
+      fetchAlerts();
+    }
+    if (canFetchPatients) {
+      fetchPatients();
+    }
     if (role === 'admin') {
       fetchDoctors();
     }
-  }, [accessToken, role, fetchPatients, fetchAlerts, fetchDoctors]);
+  }, [accessToken, role, user, fetchPatients, fetchAlerts, fetchDoctors]);
 
   const handleSensorTelemetry = useCallback((data: SensorData) => {
-    setLatestTelemetry(data);
-    if (!data.is_abnormal || data.alerts.length === 0) return;
+    try {
+      if (!data || typeof data !== 'object') return;
+      setLatestTelemetry(data);
+      if (!data.is_abnormal || !Array.isArray(data.alerts) || data.alerts.length === 0) return;
 
-    const firstAlert = data.alerts[0];
-    const matchingPatient = patientsRef.current.find((patient) => patient.id === data.patient_id);
-    const patientName = matchingPatient?.full_name || 'Bệnh nhân';
+      const firstAlert = data.alerts[0];
+      if (!firstAlert) return;
+      const matchingPatient = patientsRef.current.find((patient) => patient.id === data.patient_id);
+      const patientName = matchingPatient?.full_name || 'Bệnh nhân';
 
-    const severity = firstAlert.severity || 'high';
-    const timestamp = new Date().toLocaleTimeString('vi-VN');
+      const severity = firstAlert.severity || 'high';
+      const timestamp = new Date().toLocaleTimeString('vi-VN');
 
-    setActiveBanner({
-      message: firstAlert.message,
-      patientName,
-      patientId: data.patient_id,
-      severity,
-      timestamp
-    });
+      setActiveBanner({
+        message: firstAlert.message,
+        patientName,
+        patientId: data.patient_id,
+        severity,
+        timestamp
+      });
 
-    const isPersistent = ['critical', 'high'].includes(severity.toLowerCase());
-    if (bannerTimeoutRef.current !== null) {
-      window.clearTimeout(bannerTimeoutRef.current);
+      const isPersistent = ['critical', 'high'].includes(severity.toLowerCase());
+      if (bannerTimeoutRef.current !== null) {
+        window.clearTimeout(bannerTimeoutRef.current);
+      }
+      if (!isPersistent) {
+        bannerTimeoutRef.current = window.setTimeout(() => {
+          setActiveBanner((prev) => prev && prev.patientId === data.patient_id && prev.message === firstAlert.message ? null : prev);
+        }, 7000);
+      }
+
+      setAlerts((prev) => [
+        ...data.alerts.map((alert) => ({
+          patient_id: data.patient_id,
+          full_name: patientName,
+          alert_type: alert.alert_type,
+          message: alert.message,
+          severity: alert.severity,
+          created_at: new Date().toISOString(),
+        })),
+        ...prev,
+      ]);
+    } catch (err) {
+      logger.error('Lỗi khi xử lý thông tin Sensor Telemetry:', err);
     }
-    if (!isPersistent) {
-      bannerTimeoutRef.current = window.setTimeout(() => {
-        setActiveBanner((prev) => prev && prev.patientId === data.patient_id && prev.message === firstAlert.message ? null : prev);
-      }, 7000);
-    }
+  }, [patientsRef]);
 
-    setAlerts((prev) => [
-      ...data.alerts.map((alert) => ({
-        patient_id: data.patient_id,
-        full_name: patientName,
-        alert_type: alert.alert_type,
-        message: alert.message,
-        severity: alert.severity,
-        created_at: new Date().toISOString(),
-      })),
-      ...prev,
-    ]);
-  }, []);
-
+  /**
+   * Phân phối các thông báo WebSocket đến: SensorData thô, tải trọng
+   * health_metrics hoặc emergency_alerts. Cập nhật cả trạng thái
+   * telemetry trực tiếp và banner cảnh báo hoạt động.
+   */
   const handleRealtimeMessage = useCallback((message: any) => {
+    if (message?.type === 'notifications' && message.data) {
+      const event = new CustomEvent('ws-notification', { detail: message.data });
+      window.dispatchEvent(event);
+      return;
+    }
+
+    // Các thông báo không có trường type được coi là SensorData thô
     if (!message?.type) {
       handleSensorTelemetry(message as SensorData);
       return;
@@ -284,19 +426,45 @@ const AppContent: React.FC = () => {
   const { isConnected } = useWebSocket(WS_URL, accessToken ? handleRealtimeMessage : undefined, accessToken);
 
   useEffect(() => {
-    console.info('WebSocket connection:', isConnected ? 'connected' : 'disconnected');
+    logger.info('Kết nối WebSocket:', isConnected ? 'đã kết nối' : 'đã ngắt kết nối');
   }, [isConnected]);
 
-  const handleLoginSuccess = (token: string, userData: { id: string; full_name: string; email: string; role: string; must_change_password?: boolean }) => {
+  /**
+   * Callback sau khi gửi biểu mẫu Đăng nhập thành công. Chuẩn hóa vai trò,
+   * lưu trữ phiên qua AuthContext và điều hướng đến tuyến đường mặc định
+   * thích hợp (hoặc buộc đổi mật khẩu nếu được yêu cầu).
+   */
+  const handleLoginSuccess = (token: string, userData: {
+    id: string;
+    full_name: string;
+    email: string;
+    role: string;
+    must_change_password?: boolean;
+    profile_completed?: boolean;
+    is_verified?: boolean;
+    status?: string;
+  }) => {
     const userRole = normalizeRole(userData.role);
     if (!userRole) {
       throw new Error('Tài khoản chưa được phân quyền');
     }
 
     const normalizedUser = login(token, { ...userData, role: userRole });
-    console.info('Login success: role=%s name=%s', normalizedUser.role, normalizedUser.full_name);
+    logger.info('Đăng nhập thành công: vai_trò=%s tên=%s', normalizedUser.role, normalizedUser.full_name);
     if (normalizedUser.must_change_password) {
       navigate('/change-password', true);
+    } else if (normalizedUser.role === 'doctor') {
+      if (!normalizedUser.profile_completed) {
+        navigate('/doctor/complete-profile', true);
+      } else if (normalizedUser.status === 'rejected') {
+        navigate('/doctor/verification-rejected', true);
+      } else if (!normalizedUser.is_verified) {
+        navigate('/doctor/pending-verification', true);
+      } else {
+        navigate(defaultRouteByRole[normalizedUser.role], true);
+      }
+    } else if (normalizedUser.role === 'patient' && !normalizedUser.profile_completed) {
+      navigate('/patient/complete-profile', true);
     } else {
       navigate(defaultRouteByRole[normalizedUser.role], true);
     }
@@ -320,14 +488,10 @@ const AppContent: React.FC = () => {
     return (
       <Patients
         patients={patients}
-        accessToken={accessToken}
-        onPatientAdded={fetchPatients}
-        showAddModal={showAddPatientModal}
-        setShowAddModal={setShowAddPatientModal}
         onViewPatientDetail={setSelectedPatientId}
       />
     );
-  }, [selectedPatientId, patients, latestTelemetry, alerts, accessToken, fetchPatients, showAddPatientModal]);
+  }, [selectedPatientId, patients, latestTelemetry, alerts, accessToken, fetchPatients]);
 
   const routeContent = useMemo(() => {
     switch (normalizedPath) {
@@ -391,11 +555,19 @@ const AppContent: React.FC = () => {
       case '/patient/chat':
         return <ApiDataPage key={normalizedPath} title={getPageMeta(normalizedPath, locale)?.title || ''} subtitle={getPageMeta(normalizedPath, locale)?.subtitle || ''} endpoint="/chat-messages" />;
       case '/patient/notifications':
-        return <ApiDataPage key={normalizedPath} title={getPageMeta(normalizedPath, locale)?.title || ''} subtitle={getPageMeta(normalizedPath, locale)?.subtitle || ''} endpoint="/notifications" />;
+      case '/doctor/notifications':
+      case '/admin/notifications':
+        return <NotificationsPage key={normalizedPath} />;
       case '/admin/system-logs':
         return <ApiDataPage key={normalizedPath} title={getPageMeta(normalizedPath, locale)?.title || ''} subtitle={getPageMeta(normalizedPath, locale)?.subtitle || ''} endpoint="/audit-logs" />;
       case '/admin/settings':
-        return <SystemSettings />;
+        return <SystemSettings navigate={navigate} />;
+      case '/doctor/settings':
+        return <DoctorSettingsPage navigate={navigate} />;
+      case '/admin/delete-data':
+      case '/doctor/delete-data':
+      case '/patient/delete-data':
+        return <UserDataDeletionPage />;
       case '/admin/profile':
       case '/doctor/profile':
       case '/patient/profile':
@@ -405,6 +577,10 @@ const AppContent: React.FC = () => {
       case '/patient/home':
       case '/patient/dashboard':
         return <PatientHome latestTelemetry={latestTelemetry} alerts={alerts} isConnected={isConnected} />;
+      case '/patient/health':
+      case '/patient/metrics':
+      case '/patient/history':
+        return <PatientHealthPage latestTelemetry={latestTelemetry} alerts={alerts} isConnected={isConnected} navigate={navigate} />;
       default: {
         if (normalizedPath.startsWith('/doctor/medical-records')) {
           return <DoctorMedicalRecordsPage path={normalizedPath} patients={patients.map((patient) => ({ id: patient.id, full_name: patient.full_name }))} navigate={navigate} />;
@@ -419,7 +595,11 @@ const AppContent: React.FC = () => {
         return meta ? <PlaceholderPage title={meta.title} subtitle={meta.subtitle} /> : null;
       }
     }
-  }, [alerts, latestTelemetry, normalizedPath, patients, routeRole, selectedPatientId, showAddPatientModal, doctors, isConnected, navigate, renderPatientList, user, locale]);
+  }, [alerts, latestTelemetry, normalizedPath, patients, routeRole, selectedPatientId, doctors, isConnected, navigate, renderPatientList, locale]);
+
+  if (publicLegalPage) {
+    return <>{publicLegalPage}</>;
+  }
 
   if (loading) {
     return <div className="route-loading">Đang khôi phục phiên đăng nhập...</div>;
@@ -427,10 +607,10 @@ const AppContent: React.FC = () => {
 
   // Xử lý các trang Register
   if (path === '/register') {
-    return <Register role="patient" onRegisterSuccess={() => navigate('/login', true)} onNavigateToLogin={() => navigate('/login')} />;
+    return <Register role="patient" onRegisterSuccess={() => navigate('/login', true)} onNavigateToLogin={() => navigate('/login')} onGoogleAuthSuccess={handleLoginSuccess} />;
   }
   if (path === '/register-doctor') {
-    return <Register role="doctor" onRegisterSuccess={() => navigate('/login-doctor', true)} onNavigateToLogin={() => navigate('/login-doctor')} />;
+    return <Register role="doctor" onRegisterSuccess={() => navigate('/login-doctor', true)} onNavigateToLogin={() => navigate('/login-doctor')} onGoogleAuthSuccess={handleLoginSuccess} />;
   }
   if (path === '/register-admin') {
     navigate('/login-admin', true);
@@ -559,10 +739,16 @@ const AppContent: React.FC = () => {
   );
 };
 
+/**
+ * Xuất gốc. Bọc toàn bộ cây ứng dụng bên trong AuthProvider để
+ * mọi thành phần con có thể tiêu thụ context xác thực.
+ */
 export const App: React.FC = () => (
   <LocaleProvider>
     <AuthProvider>
-      <AppContent />
+      <NotificationProvider>
+        <AppContent />
+      </NotificationProvider>
     </AuthProvider>
   </LocaleProvider>
 );
