@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     EMAIL_FROM_EMAIL: str = "noreply@giatky.site"
     EMAIL_FROM_NAME: str = "CardioGuard AI"
     GOOGLE_CLIENT_ID: str = ""
+    FACEBOOK_APP_ID: str = ""
+    FACEBOOK_APP_SECRET: str = ""
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USERNAME: str = ""
