@@ -5819,3 +5819,454 @@ body {
 }
 
 
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUTH REDESIGN — Login & Register
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Shell wraps the whole page so footer sticks to bottom */
+.auth-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100vw;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 51, 102, 0.07) 0%, transparent 65%);
+}
+
+.auth-shell-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px 24px;
+}
+
+/* Panel override for auth (tighter than default .panel) */
+.auth-panel {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+  padding: 2rem 2rem 1.5rem;
+}
+
+.register-panel {
+  max-width: 480px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Brand row */
+.auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 1.25rem;
+}
+
+/* Overridden title & subtitle sizes */
+.auth-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  line-height: 1.25;
+}
+
+.auth-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+/* Error / success strips */
+.auth-error-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  background: rgba(217, 45, 32, 0.1);
+  border: 1px solid rgba(217, 45, 32, 0.25);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: var(--color-critical);
+  margin-bottom: 1.25rem;
+  text-align: left;
+  line-height: 1.45;
+}
+
+.auth-error-label {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.auth-success-strip {
+  background: rgba(8, 145, 178, 0.1);
+  border: 1px solid rgba(8, 145, 178, 0.25);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: var(--color-spo2);
+  margin-bottom: 1.25rem;
+  text-align: left;
+  line-height: 1.45;
+}
+
+/* Form layout */
+.auth-form {
+  text-align: left;
+}
+
+/* Label row with inline link (e.g. "Mật khẩu" + "Quên mật khẩu?") */
+.auth-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.auth-label-row label {
+  margin-bottom: 0 !important;
+}
+
+.auth-link-sm {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.auth-link-sm:hover { opacity: 1; }
+
+/* Input with left icon */
+.input-icon-wrap {
+  position: relative;
+}
+
+.input-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.input-with-icon {
+  padding-left: 40px !important;
+}
+
+.input-with-icon-right {
+  padding-right: 40px !important;
+}
+
+.input-icon-btn-right {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.input-icon-btn-right:hover { color: var(--text-secondary); }
+
+/* Submit button — full-width, fixed height */
+.auth-submit-btn {
+  width: 100%;
+  justify-content: center;
+  height: 44px;
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  gap: 6px;
+}
+
+/* Footer link row */
+.auth-footer {
+  margin-top: 1.25rem;
+  font-size: 0.83rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.auth-link {
+  color: var(--color-primary);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.auth-link:hover { opacity: 0.85; }
+
+/* Page footer */
+.auth-page-footer {
+  padding: 14px 16px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* ── Social login icon row ────────────────────────────────── */
+.social-icons-section {
+  margin: 1.25rem 0 1rem;
+}
+
+.social-icons-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.social-icons-line {
+  flex: 1;
+  height: 1px;
+  background: var(--glass-border);
+}
+
+.social-icons-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+}
+
+.social-icons-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 14px;
+}
+
+/* Individual circular icon button */
+.social-icon-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.social-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1.5px solid var(--glass-border);
+  background: var(--glass-bg);
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  color: var(--text-secondary);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.social-icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--glass-border-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.social-icon-btn:active:not(:disabled) { transform: translateY(0); }
+
+.social-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.social-icon-btn--google {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.social-icon-btn--google:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.social-icon-btn--facebook {
+  color: #4a9ff5;
+  border-color: rgba(24, 119, 242, 0.3);
+  background: rgba(24, 119, 242, 0.06);
+}
+
+.social-icon-btn--facebook:hover:not(:disabled) {
+  background: rgba(24, 119, 242, 0.15);
+  border-color: rgba(24, 119, 242, 0.55);
+  color: #74b9ff;
+}
+
+/* Light mode adjustments */
+[data-theme="light"] .social-icon-btn--google {
+  background: #fff;
+  border-color: #dadce0;
+}
+[data-theme="light"] .social-icon-btn--google:hover:not(:disabled) {
+  background: #f8f9fa;
+  border-color: #bdc1c6;
+}
+[data-theme="light"] .social-icon-btn--facebook {
+  background: rgba(24, 119, 242, 0.06);
+  border-color: rgba(24, 119, 242, 0.25);
+  color: #1877f2;
+}
+[data-theme="light"] .social-icon-btn--facebook:hover:not(:disabled) {
+  background: rgba(24, 119, 242, 0.12);
+  border-color: #1877f2;
+}
+
+/* Small warning badge on unconfigured Facebook icon */
+.social-icon-badge-warn {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  color: var(--color-warning);
+  background: var(--glass-bg);
+  border-radius: 50%;
+}
+
+.social-icon-error {
+  font-size: 0.72rem;
+  color: var(--color-critical);
+  max-width: 200px;
+  text-align: center;
+  line-height: 1.35;
+}
+
+/* ── Register-specific ────────────────────────────────────── */
+.register-subtitle {
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Two-column layout for specialty + department fields */
+.reg-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+
+/* Doctor fields block — tighter spacing */
+.reg-doctor-fields .form-group {
+  margin-bottom: 0.9rem;
+}
+
+/* Consent checkbox row */
+.consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 1rem 0 1.25rem;
+}
+
+.consent-checkbox {
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.consent-label {
+  font-size: 0.80rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  cursor: pointer;
+  user-select: none;
+  text-align: left;
+}
+
+/* helper card — more compact */
+.auth-helper-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 1rem;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: rgba(0, 242, 254, 0.05);
+  border: 1px solid rgba(0, 242, 254, 0.12);
+  color: var(--text-secondary);
+  font-size: 0.80rem;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.auth-helper-card svg {
+  color: var(--color-spo2);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* form-group tighter in auth context */
+.auth-panel .form-group,
+.register-panel .form-group {
+  margin-bottom: 1rem;
+}
+
+/* password rules — smaller */
+.password-rule-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 8px;
+  margin-top: 8px;
+}
+
+.password-rule {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 0.70rem;
+}
+
+.password-rule.valid { color: var(--color-bp); }
+.password-rule.valid svg { color: var(--color-bp); }
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .auth-panel {
+    padding: 1.5rem 1.25rem 1.25rem;
+  }
+
+  .auth-shell-body {
+    padding: 20px 12px 16px;
+    align-items: flex-start;
+  }
+
+  .register-panel {
+    max-width: 100%;
+  }
+
+  .reg-2col {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .social-icons-row {
+    gap: 18px;
+  }
+
+  .social-icon-btn {
+    width: 50px;
+    height: 50px;
+  }
+}
