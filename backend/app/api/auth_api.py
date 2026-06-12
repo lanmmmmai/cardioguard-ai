@@ -907,22 +907,23 @@ async def google_login(data: GoogleLoginRequest, request: Request):
                     values={
                         "full_name": display_name,
                         "email": email,
-                    "password_hash": hash_password(random_pw),
-                    "role": role,
-                    "status": status_value,
-                    "profile_completed": profile_completed,
-                    "avatar_url": avatar_url,
-                    "google_id": google_sub
-                }
-            )
+                        "password_hash": hash_password(random_pw),
+                        "role": role,
+                        "status": status_value,
+                        "profile_completed": profile_completed,
+                        "avatar_url": avatar_url,
+                        "google_id": google_sub,
+                    }
+                )
 
                 # Fetch thông tin user vừa tạo
                 user = await database.fetch_one(query=query, values={"email": email})
+                # Raise RuntimeError (không phải HTTPException) để transaction rollback đúng cách
                 if not user:
-                    raise HTTPException(status_code=500, detail="Không thể tạo tài khoản mới qua Google")
-                
+                    raise RuntimeError("Không thể tạo tài khoản mới qua Google")
+
                 user_id = user["id"]
-                
+
                 # Đồng bộ bảng patients / doctor_profiles tùy role
                 if role == "patient":
                     patient_columns = await database.fetch_all(
@@ -939,7 +940,7 @@ async def google_login(data: GoogleLoginRequest, request: Request):
                     }
                     if "user_id" in patient_cols:
                         patient_values["user_id"] = user_id
-                    
+
                     insert_columns = ", ".join(patient_values.keys())
                     bind_columns = ", ".join(f":{key}" for key in patient_values.keys())
                     await database.execute(
@@ -971,8 +972,14 @@ async def google_login(data: GoogleLoginRequest, request: Request):
                         f"INSERT INTO doctor_profiles ({insert_columns}) VALUES ({bind_columns}) ON CONFLICT DO NOTHING",
                         doctor_values,
                     )
-                    
-            # Ghi nhận log đăng ký qua Google thành công
+
+        except Exception:
+            logger.exception("Google automatic registration failed unexpectedly for email=%s", mask_email(email))
+            raise HTTPException(status_code=500, detail="Không thể đăng ký tự động bằng Google. Vui lòng thử lại sau.")
+
+        # Ghi nhận log đăng ký qua Google thành công — ngoài transaction và ngoài try/except
+        # để lỗi log không che giấu việc tạo user thành công
+        try:
             await log_activity(
                 user_id=user_id,
                 action="USER_REGISTER_SUCCESS",
@@ -981,11 +988,8 @@ async def google_login(data: GoogleLoginRequest, request: Request):
                 ip_address=ip_addr,
                 details={"method": "google"}
             )
-        except HTTPException:
-            raise
         except Exception:
-            logger.exception("Google automatic registration failed unexpectedly for email=%s", mask_email(email))
-            raise HTTPException(status_code=500, detail="Không thể đăng ký tự động bằng Google. Vui lòng thử lại sau.")
+            logger.warning("Failed to log Google registration activity for user_id=%s", user_id)
 
         db_role = role
 
