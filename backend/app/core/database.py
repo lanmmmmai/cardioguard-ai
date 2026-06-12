@@ -11,10 +11,13 @@ TỐI ƯU CHO SUPABASE POOLER (PgBouncer):
       prepared_statement_cache_size được thiết lập bằng 0.
     - Sử dụng NullPool vì PgBouncer đã tự quản lý connection pool ở phía DB,
       giúp giải phóng kết nối ngay lập tức và tránh lỗi cạn kiệt pool của Supabase Free Tier (giới hạn 15-30).
+    - connect_args timeout=60: tránh EAUTHTIMEOUT khi Supabase pooler chậm cold-start.
 """
 
+import asyncio
 import contextvars
 import logging
+import re
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import NullPool
@@ -121,17 +124,23 @@ class Database:
         elif async_url.startswith("postgres://"):
             async_url = async_url.replace("postgres://", "postgresql+asyncpg://", 1)
 
-        # Sử dụng NullPool tối ưu cho Supabase PgBouncer (Transaction mode)
+        # Che password trong log
+        safe_url = re.sub(r"://([^:@]+):([^@]+)@", r"://\1:***@", async_url)
+        logger.info("Đang khởi tạo database engine: %s", safe_url)
+
+        # Sử dụng NullPool tối ưu cho Supabase PgBouncer (Transaction mode).
+        # timeout=60: tránh EAUTHTIMEOUT khi Supabase pooler chậm cold-start.
         self._engine = create_async_engine(
             async_url,
             poolclass=NullPool,
             connect_args={
                 "statement_cache_size": 0,
                 "prepared_statement_cache_size": 0,
+                "timeout": 60,
+                "command_timeout": 60,
             },
-            pool_pre_ping=True,
         )
-        logger.info("Đã tạo SQLAlchemy engine thành công (NullPool, Cache size = 0)")
+        logger.info("Đã tạo SQLAlchemy engine thành công (NullPool, timeout=60s)")
 
     async def disconnect(self):
         """Giải phóng các tài nguyên của Engine."""
@@ -220,3 +229,42 @@ async def connect_db():
 
 async def disconnect_db():
     await database.disconnect()
+
+
+_MAX_DB_RETRIES = 10
+_DB_RETRY_DELAY = 5  # seconds
+
+
+async def wait_for_database(db: "Database | None" = None, retries: int = _MAX_DB_RETRIES, delay: int = _DB_RETRY_DELAY) -> None:
+    """Thử kết nối database với retry loop.
+
+    Gọi hàm này trước khi chạy migrations hoặc khởi động server để đảm bảo
+    database đã sẵn sàng nhận kết nối (quan trọng với Supabase remote khi cold-start).
+
+    Raises:
+        Exception: Lỗi kết nối cuối cùng sau khi đã hết số lần retry.
+    """
+    target = db or database
+    last_error: Exception | None = None
+
+    for attempt in range(1, retries + 1):
+        try:
+            logger.info("Kiểm tra kết nối database, lần %d/%d...", attempt, retries)
+            await target.connect()
+            await target.fetch_one("SELECT 1 AS ok")
+            logger.info("Kết nối database OK.")
+            return
+        except Exception as exc:
+            last_error = exc
+            logger.warning("Database chưa sẵn sàng (lần %d/%d): %s", attempt, retries, exc)
+            # Dọn dẹp engine bị lỗi để lần retry tạo engine mới
+            try:
+                await target.disconnect()
+            except Exception:
+                pass
+            if attempt < retries:
+                logger.info("Thử lại sau %d giây...", delay)
+                await asyncio.sleep(delay)
+
+    logger.error("Không thể kết nối database sau %d lần thử.", retries)
+    raise last_error  # type: ignore[misc]

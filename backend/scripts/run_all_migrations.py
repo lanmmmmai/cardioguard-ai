@@ -16,7 +16,7 @@ backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-from app.core.database import database, connect_db
+from app.core.database import database, connect_db, wait_for_database
 
 MIGRATION_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -232,9 +232,12 @@ async def main():
 
     print(f"Tìm thấy {len(files)} file migration trong thư mục {migrations_dir}")
     print("Đang kết nối cơ sở dữ liệu...")
-    await connect_db()
-    
+
+    # Retry loop — chờ database sẵn sàng (quan trọng với Supabase remote cold-start)
+    await wait_for_database()
+
     force = "--force" in sys.argv or "-f" in sys.argv
+    migration_success = False
     try:
         await ensure_migration_table()
         
@@ -260,12 +263,24 @@ async def main():
             
         print("\n====================================")
         print(f"Tổng kết: Đã áp dụng mới: {success_count}, Bỏ qua (đã chạy): {skipped_count}, Tổng số file: {len(files)}")
-        print("Mọi migrations đã được xử lý thành công!")
+        print("Migrations completed successfully.")
         print("====================================")
-        
+        migration_success = True
+
+    except Exception as exc:
+        print(f"\n💥 Migration thất bại: {exc}")
+        skip_on_error = os.getenv("SKIP_MIGRATIONS_ON_ERROR", "false").lower() == "true"
+        if skip_on_error:
+            print("⚠️  SKIP_MIGRATIONS_ON_ERROR=true — bỏ qua lỗi migration, tiếp tục startup.")
+            migration_success = True
+        else:
+            raise
     finally:
         await database.disconnect()
         print("Đã ngắt kết nối cơ sở dữ liệu.")
+
+    if not migration_success:
+        sys.exit(1)
 
 if __name__ == "__main__":
     asyncio.run(main())
