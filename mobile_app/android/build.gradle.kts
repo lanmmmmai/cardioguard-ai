@@ -23,10 +23,6 @@ subprojects {
 // ─────────────────────────────────────────────────────────────────────────────
 // Force Java 17 + Kotlin JVM 17 for ALL subprojects, including Flutter plugins
 // such as flutter_facebook_auth, shared_preferences_android, etc.
-//
-// Root cause: each plugin ships its own build.gradle that sets Java to 11.
-// KGP 2.x defaults Kotlin JVM target to a higher version → mismatch error.
-// This block overrides both sides so they agree on 17.
 // ─────────────────────────────────────────────────────────────────────────────
 subprojects {
     afterEvaluate {
@@ -37,14 +33,13 @@ subprojects {
             }
         }
 
-        // ── 2. Java source/target compatibility 17 for Android modules ────
-        // Uses the common BaseExtension parent to cover both Library and App.
-        extensions.findByName("android")?.let { ext ->
-            (ext as? com.android.build.gradle.BaseExtension)?.compileOptions {
+        // ── 2. Java source/target 17 for Android library/application modules ─
+        @Suppress("DEPRECATION")
+        (extensions.findByName("android") as? com.android.build.gradle.BaseExtension)
+            ?.compileOptions {
                 sourceCompatibility = JavaVersion.VERSION_17
                 targetCompatibility = JavaVersion.VERSION_17
             }
-        }
     }
 }
 

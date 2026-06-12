@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
@@ -37,13 +38,6 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
-    // Belt-and-suspenders: set Kotlin JVM target inside the android block as well.
-    // The tasks.withType block below also handles this, but some plugin hooks
-    // read kotlinOptions before task-level overrides take effect.
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     defaultConfig {
         applicationId = "com.cardioguard.heartmonitor"
         minSdk = flutter.minSdkVersion
@@ -72,19 +66,17 @@ android {
     }
 }
 
+// Kotlin JVM target via the new compilerOptions DSL (replaces deprecated kotlinOptions).
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
 flutter {
     source = "../.."
 }
 
-// Task-level override — catches any KotlinCompile task registered after
-// the android {} block is evaluated (e.g. by the Flutter Gradle Plugin).
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-    }
-}
-
 dependencies {
-    // Required when isCoreLibraryDesugaringEnabled = true
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
