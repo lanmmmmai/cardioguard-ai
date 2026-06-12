@@ -3058,6 +3058,12 @@ body {
   color: #0a5dc2;
 }
 
+/* Facebook button — chưa cấu hình (App ID trống) */
+.facebook-login-btn--unconfigured {
+  opacity: 0.7;
+  cursor: pointer;
+}
+
 /* Social login divider */
 .social-login-divider {
   display: flex;

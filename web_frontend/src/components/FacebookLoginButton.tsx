@@ -2,11 +2,12 @@
  * CardioGuard AI — Nút đăng nhập bằng Facebook
  *
  * Sử dụng Facebook JS SDK để lấy access_token, sau đó gọi callback onAccessToken.
- * Không xử lý lưu session — component cha chịu trách nhiệm đó.
+ * Khi FACEBOOK_APP_ID chưa được cấu hình, nút vẫn hiển thị nhưng click sẽ hiện
+ * thông báo cấu hình thay vì ẩn hoàn toàn.
  */
 
 import React, { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { loginWithFacebook } from '../lib/facebookAuth';
 
 interface FacebookLoginButtonProps {
@@ -33,11 +34,20 @@ export const FacebookLoginButton: React.FC<FacebookLoginButtonProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!appId) return null;
+  const isConfigured = Boolean(appId && appId.trim().length > 0);
 
   const handleClick = async () => {
     if (loading || disabled) return;
     setError(null);
+
+    // Chưa cấu hình App ID — hiện thông báo thay vì crash
+    if (!isConfigured) {
+      setError(
+        'Facebook Login chưa được cấu hình. Vui lòng thêm VITE_FACEBOOK_APP_ID vào file .env và cấu hình Facebook App trong Supabase Dashboard → Authentication → Providers → Facebook.'
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       const accessToken = await loginWithFacebook(appId);
@@ -53,11 +63,12 @@ export const FacebookLoginButton: React.FC<FacebookLoginButtonProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
       <button
         type="button"
-        className="facebook-login-btn"
+        className={`facebook-login-btn${!isConfigured ? ' facebook-login-btn--unconfigured' : ''}`}
         onClick={handleClick}
         disabled={disabled || loading}
         aria-label={caption}
         aria-busy={loading}
+        title={!isConfigured ? 'Facebook Login chưa được cấu hình' : undefined}
       >
         {loading ? (
           <Loader2 size={18} className="spin-icon" />
@@ -65,6 +76,9 @@ export const FacebookLoginButton: React.FC<FacebookLoginButtonProps> = ({
           <FacebookIcon size={18} />
         )}
         <span>{loading ? 'Đang kết nối Facebook...' : caption}</span>
+        {!isConfigured && !loading && (
+          <AlertCircle size={14} style={{ marginLeft: 'auto', opacity: 0.6 }} />
+        )}
       </button>
 
       {error && (
@@ -74,6 +88,7 @@ export const FacebookLoginButton: React.FC<FacebookLoginButtonProps> = ({
             color: 'var(--color-critical)',
             fontSize: '0.78rem',
             lineHeight: 1.4,
+            padding: '0 4px',
           }}
         >
           {error}

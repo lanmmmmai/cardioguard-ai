@@ -322,7 +322,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
                             child: Text(
@@ -380,7 +380,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       const SizedBox(height: 8),
                       // Meta
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             _getCategoryLabel(notif.category),

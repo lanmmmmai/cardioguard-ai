@@ -48,7 +48,8 @@ export const Login: React.FC<LoginProps> = ({ role, onLoginSuccess, onNavigateTo
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const showGoogleLogin = role !== 'admin' && Boolean(GOOGLE_CLIENT_ID);
-  const showFacebookLogin = Boolean(FACEBOOK_APP_ID);
+  // Nút Facebook luôn hiện cho patient/doctor; admin không tự đăng ký qua mạng xã hội
+  const showFacebookLogin = role !== 'admin';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -279,7 +280,7 @@ export const Login: React.FC<LoginProps> = ({ role, onLoginSuccess, onNavigateTo
                   appId={FACEBOOK_APP_ID}
                   role={role}
                   disabled={isLoading}
-                  caption={role === 'admin' ? 'Đăng nhập với Facebook (Admin)' : 'Tiếp tục với Facebook'}
+                  caption="Tiếp tục với Facebook"
                   onAccessToken={handleFacebookToken}
                 />
               )}

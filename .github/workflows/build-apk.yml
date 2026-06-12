@@ -43,6 +43,25 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Inject Facebook credentials into strings.xml
+        env:
+          FACEBOOK_APP_ID: "${{ secrets.FACEBOOK_APP_ID }}"
+          FACEBOOK_CLIENT_TOKEN: "${{ secrets.FACEBOOK_CLIENT_TOKEN }}"
+        run: |
+          # Thay thế placeholder trong strings.xml bằng giá trị từ secrets.
+          # Nếu secrets chưa được cấu hình, giữ nguyên placeholder (build vẫn compile được,
+          # nhưng Facebook Login sẽ không hoạt động trên runtime cho đến khi cấu hình đúng).
+          if [ -n "$FACEBOOK_APP_ID" ]; then
+            sed -i "s/YOUR_FACEBOOK_APP_ID/${FACEBOOK_APP_ID}/g" android/app/src/main/res/values/strings.xml
+            echo "Facebook App ID injected."
+          else
+            echo "FACEBOOK_APP_ID secret not set — build will compile but Facebook Login will not work at runtime."
+          fi
+          if [ -n "$FACEBOOK_CLIENT_TOKEN" ]; then
+            sed -i "s/YOUR_FACEBOOK_CLIENT_TOKEN/${FACEBOOK_CLIENT_TOKEN}/g" android/app/src/main/res/values/strings.xml
+            echo "Facebook Client Token injected."
+          fi
+
       - name: Prepare Android release keystore (optional)
         env:
           ANDROID_KEYSTORE_BASE64: "${{ secrets.ANDROID_KEYSTORE_BASE64 }}"

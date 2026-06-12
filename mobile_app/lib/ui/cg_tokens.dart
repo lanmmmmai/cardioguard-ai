@@ -19,6 +19,13 @@ class CgColors {
   static const bp = Color(0xFF7A5AF8);
   static const primary = Color(0xFF0369A1);
   static const accent = Color(0xFFFF3366);
+
+  // Layout / surface tokens
+  static const background = Color(0xFF0D1117);
+  static const backgroundLight = Color(0xFFF6FAFD);
+  static const surface = Color(0xFF1A2235);
+  static const surfaceLight = Color(0xFFFFFFFF);
+  static const border = Color(0xFFE5E7EB);
 }
 
 class CgSpacing {

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CardioGuard AI — Android string resources
+
+  IMPORTANT: Thay "YOUR_FACEBOOK_APP_ID" và "YOUR_FACEBOOK_CLIENT_TOKEN"
+  bằng giá trị thực từ Facebook Developer Console trước khi release.
+
+  Các giá trị này cần được đặt trong file này vì flutter_facebook_auth
+  yêu cầu chúng trong AndroidManifest.xml.
+  Không commit App Secret lên Git.
+-->
+<resources>
+    <string name="app_name">CardioGuard AI</string>
+    <!-- Facebook App ID: lấy từ https://developers.facebook.com/apps/ -->
+    <string name="facebook_app_id">YOUR_FACEBOOK_APP_ID</string>
+    <!-- Facebook Client Token: App Settings > Advanced > Client Token -->
+    <string name="facebook_client_token">YOUR_FACEBOOK_CLIENT_TOKEN</string>
+</resources>

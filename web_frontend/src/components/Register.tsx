@@ -51,7 +51,8 @@ export const Register: React.FC<RegisterProps> = ({ role, onRegisterSuccess, onN
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const timerRef = useRef<any>(null);
   const showGoogleRegister = role !== 'admin' && Boolean(GOOGLE_CLIENT_ID);
-  const showFacebookRegister = role !== 'admin' && Boolean(FACEBOOK_APP_ID);
+  // Nút Facebook luôn hiện cho patient/doctor; admin không đăng ký qua mạng xã hội
+  const showFacebookRegister = role !== 'admin';
 
   useEffect(() => {
     return () => {
