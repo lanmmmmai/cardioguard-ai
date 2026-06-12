@@ -188,7 +188,8 @@ CMS_MODULES = {
     "articles": {
         "table": "articles",
         "hidden": set(),
-        "readonly": {"id", "created_at", "updated_at"},
+        # author_id is auto-set from the current admin user — not editable via form
+        "readonly": {"id", "created_at", "updated_at", "author_id"},
         "required": {"title", "slug", "content"},
         "aliases": {},
         "csv_columns": ["title", "slug", "content", "summary", "category", "is_active"],
@@ -929,6 +930,9 @@ async def create_cms_record(module: str, payload: dict[str, Any], request: Reque
                 raise HTTPException(status_code=422, detail="Path này đã tồn tại cho một domain link đang hoạt động")
     if "id" in column_names and "id" not in values:
         values["id"] = str(uuid.uuid4())
+    # Auto-set author_id for articles from the current admin user
+    if table == "articles" and "author_id" in column_names and "author_id" not in values:
+        values["author_id"] = user["id"]
     if not values:
         raise HTTPException(status_code=422, detail="No valid data to insert")
     keys = list(values.keys())
